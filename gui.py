@@ -33,12 +33,26 @@ class RobotSimulatorGUI:
         self.canvas.bind("<B1-Motion>", self.on_mouse_drag)
         self.canvas.bind("<ButtonRelease-1>", self.on_mouse_release)  # Bind mouse release event
         self.canvas.bind("<Motion>", self.on_mouse_move)
+        self.canvas.bind("<MouseWheel>", self.on_mouse_wheel)  # Bind mouse wheel event
 
         # Center the window on the screen
         center_window(self)
 
         # Schedule draw_field() to be called after the window is fully created
         self.root.after(100, self.draw_field)
+
+    def on_mouse_wheel(self, event):
+        """
+        Handle mouse wheel events to change the zoom level of the grid.
+
+        :param event: The event object containing mouse wheel information
+        """
+        if event.delta > 0:
+            self.backend.cell_size += 5  # Increase cell size to zoom in
+        else:
+            self.backend.cell_size = max(5, self.backend.cell_size - 5)  # Decrease cell size to zoom out, with a minimum size
+
+        self.draw_field()
 
     def setup_gui(self):
         """
