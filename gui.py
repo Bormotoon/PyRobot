@@ -38,6 +38,7 @@ class RobotSimulatorGUI:
         self.canvas.bind("<ButtonRelease-1>", self.on_mouse_release)  # Bind mouse release event
         self.canvas.bind("<Motion>", self.on_mouse_move)
         self.canvas.bind("<MouseWheel>", self.on_mouse_wheel)  # Bind mouse wheel event
+        self.canvas.bind("<Button-3>", self.on_right_click)  # Bind right-click event
 
         # Bind the resize event to adjust the canvas size
         self.root.bind("<Configure>", self.on_resize)
@@ -47,6 +48,16 @@ class RobotSimulatorGUI:
 
         # Schedule draw_field() to be called after the window is fully created
         self.root.after(100, self.draw_field)
+
+    def on_right_click(self, event):
+        """
+        Handle right-click events on the canvas to place a marker.
+
+        :param event: The event object containing click information
+        """
+        if self.backend.edit_mode:
+            self.backend.handle_right_click(event)
+            self.draw_field()
 
     def on_mouse_wheel(self, event):
         """
@@ -209,13 +220,13 @@ class RobotSimulatorGUI:
 
         # Draw markers
         for (x, y) in self.backend.markers.keys():
-            marker_x = (x + 0.5) * self.backend.cell_size + offset_x
-            marker_y = (y + 0.5) * self.backend.cell_size + offset_y
-            marker_size = self.backend.cell_size * 0.3  # Increased size by half
+            marker_x = (x + 0.75) * self.backend.cell_size + offset_x  # Position closer to bottom right
+            marker_y = (y + 0.75) * self.backend.cell_size + offset_y  # Position closer to bottom right
+            marker_size = self.backend.cell_size * 0.15  # Reduced size by half
             self.canvas.create_oval(
                 marker_x - marker_size, marker_y - marker_size,
                 marker_x + marker_size, marker_y + marker_size,
-                fill='gray', outline='black'
+                fill='white', outline='black'  # White fill with black outline
             )
 
         # Draw robot as diamond on top of markers

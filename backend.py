@@ -241,3 +241,29 @@ class RobotSimulatorBackend:
         self.markers.clear()
         self.colored_cells.clear()
         self.setup_permanent_walls()
+
+    def handle_right_click(self, event):
+        """
+        Handle right-click events on the canvas to place a marker.
+
+        :param event: The event object containing click information
+        """
+        # Calculate offsets to center the grid on the canvas
+        offset_x = (event.widget.winfo_width() - self.width * self.cell_size) / 2
+        offset_y = (event.widget.winfo_height() - self.height * self.cell_size) / 2
+
+        # Adjust event coordinates based on offsets
+        adjusted_x = event.x - offset_x
+        adjusted_y = event.y - offset_y
+
+        # Calculate grid coordinates
+        grid_x = int(adjusted_x / self.cell_size)
+        grid_y = int(adjusted_y / self.cell_size)
+
+        # Check if the click is inside a cell
+        if 0 <= grid_x < self.width and 0 <= grid_y < self.height:
+            pos = (grid_x, grid_y)
+            if pos not in self.markers:
+                self.markers[pos] = 1
+            else:
+                del self.markers[pos]
