@@ -26,6 +26,10 @@ class RobotSimulatorGUI:
         self.status_var = tk.StringVar()
         self.status_var.set("Click between cells to add/remove walls")
 
+        # Variables to store current grid dimensions
+        self.width_var = tk.StringVar(value=f"Width: {self.backend.width}")
+        self.height_var = tk.StringVar(value=f"Height: {self.backend.height}")
+
         self.setup_gui()
 
         # Bind mouse events to canvas
@@ -101,8 +105,10 @@ class RobotSimulatorGUI:
         size_frame.grid(row=3, column=0, pady=5)
         ttk.Button(size_frame, text="Increase Width", command=self.increase_width).grid(row=0, column=0, padx=5)
         ttk.Button(size_frame, text="Decrease Width", command=self.decrease_width).grid(row=0, column=1, padx=5)
+        ttk.Label(size_frame, textvariable=self.width_var).grid(row=0, column=2, padx=5)  # Display current width
         ttk.Button(size_frame, text="Increase Height", command=self.increase_height).grid(row=1, column=0, padx=5)
         ttk.Button(size_frame, text="Decrease Height", command=self.decrease_height).grid(row=1, column=1, padx=5)
+        ttk.Label(size_frame, textvariable=self.height_var).grid(row=1, column=2, padx=5)  # Display current height
 
         ttk.Label(self.main_frame, textvariable=self.status_var).grid(row=4, column=0)
 
@@ -291,6 +297,7 @@ class RobotSimulatorGUI:
         Increase the width of the grid.
         """
         self.backend.increase_width()
+        self.width_var.set(f"Width: {self.backend.width}")  # Update width display
         self.draw_field()
 
     def decrease_width(self):
@@ -298,6 +305,7 @@ class RobotSimulatorGUI:
         Decrease the width of the grid.
         """
         self.backend.decrease_width()
+        self.width_var.set(f"Width: {self.backend.width}")  # Update width display
         self.draw_field()
 
     def increase_height(self):
@@ -305,6 +313,7 @@ class RobotSimulatorGUI:
         Increase the height of the grid.
         """
         self.backend.increase_height()
+        self.height_var.set(f"Height: {self.backend.height}")  # Update height display
         self.draw_field()
 
     def decrease_height(self):
@@ -312,4 +321,5 @@ class RobotSimulatorGUI:
         Decrease the height of the grid.
         """
         self.backend.decrease_height()
+        self.height_var.set(f"Height: {self.backend.height}")  # Update height display
         self.draw_field()
