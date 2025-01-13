@@ -1,16 +1,19 @@
 def center_window(gui):
     """
-    Center the GUI window on the screen.
+    Center the GUI window on the screen and set its size to half of the screen size.
 
     :param gui: The GUI object containing the root window
     """
     gui.root.update_idletasks()  # Update "idle" tasks to get correct window dimensions
-    width = gui.root.winfo_width()  # Get the current width of the window
-    height = gui.root.winfo_height()  # Get the current height of the window
+    screen_width = gui.root.winfo_screenwidth()  # Get the screen width
+    screen_height = gui.root.winfo_screenheight()  # Get the screen height
+    # Calculate the width and height to be half of the screen size
+    width = screen_width // 2
+    height = screen_height // 2
     # Calculate the x and y coordinates to center the window
-    x = (gui.root.winfo_screenwidth() // 2) - (width // 2)
-    y = (gui.root.winfo_screenheight() // 2) - (height // 2)
-    # Set the geometry of the window to center it
+    x = (screen_width // 2) - (width // 2)
+    y = (screen_height // 2) - (height // 2)
+    # Set the geometry of the window to center it and set its size
     gui.root.geometry('{}x{}+{}+{}'.format(width, height, x, y))
 
 def setup_permanent_walls(gui):

@@ -39,6 +39,9 @@ class RobotSimulatorGUI:
         self.canvas.bind("<Motion>", self.on_mouse_move)
         self.canvas.bind("<MouseWheel>", self.on_mouse_wheel)  # Bind mouse wheel event
 
+        # Bind the resize event to adjust the canvas size
+        self.root.bind("<Configure>", self.on_resize)
+
         # Center the window on the screen
         center_window(self)
 
@@ -66,22 +69,10 @@ class RobotSimulatorGUI:
         self.main_frame.grid(row=0, column=0, sticky=(tk.N, tk.S, tk.E, tk.W))
 
         self.main_frame.rowconfigure(0, weight=1)
-        self.main_frame.columnconfigure(0, weight=1)
-
-        canvas_frame = ttk.Frame(self.main_frame)
-        canvas_frame.grid(row=0, column=0, sticky=(tk.N, tk.S, tk.E, tk.W))
-        canvas_frame.rowconfigure(0, weight=1)
-        canvas_frame.columnconfigure(0, weight=1)
-
-        # Calculate canvas size based on grid dimensions
-        canvas_width = (self.backend.width + 1) * self.backend.cell_size
-        canvas_height = (self.backend.height + 1) * self.backend.cell_size
-        self.canvas = tk.Canvas(canvas_frame, width=canvas_width, height=canvas_height,
-                                background=self.backend.field_color)
-        self.canvas.grid(row=0, column=0, padx=5, pady=5)
+        self.main_frame.columnconfigure(1, weight=1)
 
         control_frame = ttk.Frame(self.main_frame)
-        control_frame.grid(row=1, column=0, pady=5)
+        control_frame.grid(row=0, column=0, pady=5, sticky=(tk.N, tk.S))
 
         # Add control buttons for robot movement
         ttk.Button(control_frame, text="↑", command=self.move_up).grid(row=0, column=1)
@@ -89,8 +80,8 @@ class RobotSimulatorGUI:
         ttk.Button(control_frame, text="←", command=self.move_left).grid(row=1, column=0)
         ttk.Button(control_frame, text="→", command=self.move_right).grid(row=1, column=2)
 
-        marker_frame = ttk.Frame(self.main_frame)
-        marker_frame.grid(row=2, column=0, pady=5)
+        marker_frame = ttk.Frame(control_frame)
+        marker_frame.grid(row=3, column=0, columnspan=3, pady=5)
         ttk.Button(marker_frame, text="Put Marker", command=self.put_marker).grid(row=0, column=0, padx=5)
         ttk.Button(marker_frame, text="Pick Marker", command=self.pick_marker).grid(row=0, column=1, padx=5)
         ttk.Button(marker_frame, text="Paint Cell", command=self.paint_cell).grid(row=1, column=0, padx=5)
@@ -101,8 +92,8 @@ class RobotSimulatorGUI:
                                                                                               columnspan=2, pady=5)
 
         # Add buttons to increase/decrease grid size
-        size_frame = ttk.Frame(self.main_frame)
-        size_frame.grid(row=3, column=0, pady=5)
+        size_frame = ttk.Frame(control_frame)
+        size_frame.grid(row=4, column=0, columnspan=3, pady=5)
         ttk.Button(size_frame, text="Increase Width", command=self.increase_width).grid(row=0, column=0, padx=5)
         ttk.Button(size_frame, text="Decrease Width", command=self.decrease_width).grid(row=0, column=1, padx=5)
         ttk.Label(size_frame, textvariable=self.width_var).grid(row=0, column=2, padx=5)  # Display current width
@@ -110,7 +101,31 @@ class RobotSimulatorGUI:
         ttk.Button(size_frame, text="Decrease Height", command=self.decrease_height).grid(row=1, column=1, padx=5)
         ttk.Label(size_frame, textvariable=self.height_var).grid(row=1, column=2, padx=5)  # Display current height
 
-        ttk.Label(self.main_frame, textvariable=self.status_var).grid(row=4, column=0)
+        canvas_frame = ttk.Frame(self.main_frame)
+        canvas_frame.grid(row=0, column=1, sticky=(tk.N, tk.S, tk.E, tk.W))
+        canvas_frame.rowconfigure(0, weight=1)
+        canvas_frame.columnconfigure(0, weight=1)
+
+        # Calculate canvas size based on grid dimensions
+        canvas_width = (self.backend.width + 1) * self.backend.cell_size
+        canvas_height = (self.backend.height + 1) * self.backend.cell_size
+        self.canvas = tk.Canvas(canvas_frame, width=canvas_width, height=canvas_height,
+                                background=self.backend.field_color)
+        self.canvas.grid(row=0, column=0, padx=5, pady=5, sticky=(tk.N, tk.S, tk.E, tk.W))
+
+        ttk.Label(self.main_frame, textvariable=self.status_var).grid(row=1, column=1)
+
+    def on_resize(self, event):
+        """
+        Handle window resize events to adjust the canvas size.
+
+        :param event: The event object containing resize information
+        """
+        # Calculate new canvas size to occupy the right half of the window
+        new_width = self.root.winfo_width() // 2
+        new_height = self.root.winfo_height()
+        self.canvas.config(width=new_width, height=new_height)
+        self.draw_field()
 
     def toggle_edit_mode(self):
         """
