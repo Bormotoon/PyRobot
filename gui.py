@@ -82,7 +82,15 @@ class RobotSimulatorGUI:
         ttk.Button(marker_frame, text="Toggle Edit Mode", command=self.toggle_edit_mode).grid(row=2, column=0,
                                                                                               columnspan=2, pady=5)
 
-        ttk.Label(self.main_frame, textvariable=self.status_var).grid(row=3, column=0)
+        # Add buttons to increase/decrease grid size
+        size_frame = ttk.Frame(self.main_frame)
+        size_frame.grid(row=3, column=0, pady=5)
+        ttk.Button(size_frame, text="Increase Width", command=self.increase_width).grid(row=0, column=0, padx=5)
+        ttk.Button(size_frame, text="Decrease Width", command=self.decrease_width).grid(row=0, column=1, padx=5)
+        ttk.Button(size_frame, text="Increase Height", command=self.increase_height).grid(row=1, column=0, padx=5)
+        ttk.Button(size_frame, text="Decrease Height", command=self.decrease_height).grid(row=1, column=1, padx=5)
+
+        ttk.Label(self.main_frame, textvariable=self.status_var).grid(row=4, column=0)
 
     def toggle_edit_mode(self):
         """
@@ -263,3 +271,31 @@ class RobotSimulatorGUI:
             self.status_var.set("Click to add/remove wall")
         else:
             self.status_var.set("Move mouse between cells to add/remove walls")
+
+    def increase_width(self):
+        """
+        Increase the width of the grid.
+        """
+        self.backend.increase_width()
+        self.draw_field()
+
+    def decrease_width(self):
+        """
+        Decrease the width of the grid.
+        """
+        self.backend.decrease_width()
+        self.draw_field()
+
+    def increase_height(self):
+        """
+        Increase the height of the grid.
+        """
+        self.backend.increase_height()
+        self.draw_field()
+
+    def decrease_height(self):
+        """
+        Decrease the height of the grid.
+        """
+        self.backend.decrease_height()
+        self.draw_field()

@@ -32,6 +32,7 @@ class RobotSimulatorBackend:
         """
         Set up the permanent walls around the grid.
         """
+        self.permanent_walls.clear()
         for x in range(self.width):
             self.permanent_walls.add(((x, 0), (x + 1, 0)))  # Top boundary
             self.permanent_walls.add(((x, self.height), (x + 1, self.height)))  # Bottom boundary
@@ -199,3 +200,44 @@ class RobotSimulatorBackend:
         Toggle the edit mode on or off.
         """
         self.edit_mode = not self.edit_mode
+
+    def increase_width(self):
+        """
+        Increase the width of the grid.
+        """
+        if self.edit_mode:
+            self.width += 1
+            self.reset_field()
+
+    def decrease_width(self):
+        """
+        Decrease the width of the grid.
+        """
+        if self.edit_mode and self.width > 1:
+            self.width -= 1
+            self.reset_field()
+
+    def increase_height(self):
+        """
+        Increase the height of the grid.
+        """
+        if self.edit_mode:
+            self.height += 1
+            self.reset_field()
+
+    def decrease_height(self):
+        """
+        Decrease the height of the grid.
+        """
+        if self.edit_mode and self.height > 1:
+            self.height -= 1
+            self.reset_field()
+
+    def reset_field(self):
+        """
+        Reset the field with new dimensions, including permanent walls and empty cells.
+        """
+        self.walls.clear()
+        self.markers.clear()
+        self.colored_cells.clear()
+        self.setup_permanent_walls()
