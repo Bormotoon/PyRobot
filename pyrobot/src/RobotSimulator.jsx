@@ -189,22 +189,22 @@ const RobotSimulator = () => {
             let newPos = {...prevPos};
             switch (direction) {
                 case 'up':
-                    if (newPos.y > 0 && !walls.has(`${newPos.x},${newPos.y},${newPos.x},${newPos.y - 1}`)) {
+                    if (newPos.y > 0 && !walls.has(`${newPos.x},${newPos.y},${newPos.x + 1},${newPos.y}`) && !permanentWalls.has(`${newPos.x},${newPos.y},${newPos.x + 1},${newPos.y}`)) {
                         newPos.y -= 1;
                     }
                     break;
                 case 'down':
-                    if (newPos.y < height - 1 && !walls.has(`${newPos.x},${newPos.y + 1},${newPos.x},${newPos.y}`)) {
+                    if (newPos.y < height - 1 && !walls.has(`${newPos.x},${newPos.y + 1},${newPos.x + 1},${newPos.y + 1}`) && !permanentWalls.has(`${newPos.x},${newPos.y + 1},${newPos.x + 1},${newPos.y + 1}`)) {
                         newPos.y += 1;
                     }
                     break;
                 case 'left':
-                    if (newPos.x > 0 && !walls.has(`${newPos.x},${newPos.y},${newPos.x - 1},${newPos.y}`)) {
+                    if (newPos.x > 0 && !walls.has(`${newPos.x},${newPos.y},${newPos.x},${newPos.y + 1}`) && !permanentWalls.has(`${newPos.x},${newPos.y},${newPos.x},${newPos.y + 1}`)) {
                         newPos.x -= 1;
                     }
                     break;
                 case 'right':
-                    if (newPos.x < width - 1 && !walls.has(`${newPos.x + 1},${newPos.y},${newPos.x},${newPos.y}`)) {
+                    if (newPos.x < width - 1 && !walls.has(`${newPos.x + 1},${newPos.y},${newPos.x + 1},${newPos.y + 1}`) && !permanentWalls.has(`${newPos.x + 1},${newPos.y},${newPos.x + 1},${newPos.y + 1}`)) {
                         newPos.x += 1;
                     }
                     break;
@@ -299,161 +299,161 @@ const RobotSimulator = () => {
     };
 
     return (<div className="container">
-            {/* Controls */}
-            <Card className="card">
-                <CardHeader
-                    title={<Typography variant="h6" style={{textAlign: 'center'}}>Controls</Typography>}
-                />
-                <CardContent>
-                    <Grid container spacing={2} alignItems="center" justifyContent="center">
-                        {/* Directional Buttons */}
-                        <Grid item xs={4}></Grid>
-                        <Grid item xs={4}>
-                            <Button
-                                variant="contained"
-                                className="button"
-                                onClick={() => moveRobot('up')}
-                            >
-                                <ChevronUp/>
-                            </Button>
-                        </Grid>
-                        <Grid item xs={4}></Grid>
-
-                        <Grid item xs={4}>
-                            <Button
-                                variant="contained"
-                                className="button"
-                                onClick={() => moveRobot('left')}
-                            >
-                                <ChevronLeft/>
-                            </Button>
-                        </Grid>
-                        <Grid item xs={4}></Grid>
-                        <Grid item xs={4}>
-                            <Button
-                                variant="contained"
-                                className="button"
-                                onClick={() => moveRobot('right')}
-                            >
-                                <ChevronRight/>
-                            </Button>
-                        </Grid>
-
-                        <Grid item xs={4}></Grid>
-                        <Grid item xs={4}>
-                            <Button
-                                variant="contained"
-                                className="button"
-                                onClick={() => moveRobot('down')}
-                            >
-                                <ChevronDown/>
-                            </Button>
-                        </Grid>
-                        <Grid item xs={4}></Grid>
-
-                        {/* Other Buttons */}
-                        <Grid item xs={6}>
-                            <Button
-                                variant="contained"
-                                className="button full-width"
-                                onClick={putMarker}
-                            >
-                                Put Marker
-                            </Button>
-                        </Grid>
-                        <Grid item xs={6}>
-                            <Button
-                                variant="contained"
-                                className="button full-width"
-                                onClick={pickMarker}
-                            >
-                                Pick Marker
-                            </Button>
-                        </Grid>
-
-                        <Grid item xs={6}>
-                            <Button
-                                variant="contained"
-                                className="button full-width"
-                                onClick={paintCell}
-                            >
-                                Paint Cell
-                            </Button>
-                        </Grid>
-                        <Grid item xs={6}>
-                            <Button
-                                variant="contained"
-                                className="button full-width"
-                                onClick={clearCell}
-                            >
-                                Clear Cell
-                            </Button>
-                        </Grid>
-
-                        <Grid item xs={12}>
-                            <Button
-                                variant="outlined"
-                                className="button full-width-outlined"
-                                onClick={() => setEditMode(!editMode)}
-                            >
-                                {editMode ? 'Exit Edit Mode' : 'Enter Edit Mode'}
-                            </Button>
-                        </Grid>
-
-                        <Grid item xs={6}>
-                            <Button
-                                variant="contained"
-                                className="button full-width"
-                                onClick={increaseWidth}
-                            >
-                                Width +
-                            </Button>
-                        </Grid>
-                        <Grid item xs={6}>
-                            <Button
-                                variant="contained"
-                                className="button full-width"
-                                onClick={decreaseWidth}
-                            >
-                                Width -
-                            </Button>
-                        </Grid>
-                        <Grid item xs={6}>
-                            <Button
-                                variant="contained"
-                                className="button full-width"
-                                onClick={increaseHeight}
-                            >
-                                Height +
-                            </Button>
-                        </Grid>
-                        <Grid item xs={6}>
-                            <Button
-                                variant="contained"
-                                className="button full-width"
-                                onClick={decreaseHeight}
-                            >
-                                Height -
-                            </Button>
-                        </Grid>
+        {/* Controls */}
+        <Card className="card">
+            <CardHeader
+                title={<Typography variant="h6" style={{textAlign: 'center'}}>Controls</Typography>}
+            />
+            <CardContent>
+                <Grid container spacing={2} alignItems="center" justifyContent="center">
+                    {/* Directional Buttons */}
+                    <Grid item xs={4}></Grid>
+                    <Grid item xs={4}>
+                        <Button
+                            variant="contained"
+                            className="button"
+                            onClick={() => moveRobot('up')}
+                        >
+                            <ChevronUp/>
+                        </Button>
                     </Grid>
-                </CardContent>
-            </Card>
+                    <Grid item xs={4}></Grid>
 
-            {/* Canvas */}
-            <Card className="card-controls">
-                <canvas
-                    ref={canvasRef}
-                    width={(width + 2) * cellSize} // Increase canvas width
-                    height={(height + 2) * cellSize} // Increase canvas height
-                    className={editMode ? 'edit-mode' : ''}
-                    onClick={handleCanvasClick}
-                    onContextMenu={handleCanvasRightClick} // Add right-click event listener
-                    onWheel={handleCanvasWheel} // Add wheel event listener
-                />
-                <Typography variant="body2">{statusMessage}</Typography>
-            </Card>
-        </div>);
+                    <Grid item xs={4}>
+                        <Button
+                            variant="contained"
+                            className="button"
+                            onClick={() => moveRobot('left')}
+                        >
+                            <ChevronLeft/>
+                        </Button>
+                    </Grid>
+                    <Grid item xs={4}></Grid>
+                    <Grid item xs={4}>
+                        <Button
+                            variant="contained"
+                            className="button"
+                            onClick={() => moveRobot('right')}
+                        >
+                            <ChevronRight/>
+                        </Button>
+                    </Grid>
+
+                    <Grid item xs={4}></Grid>
+                    <Grid item xs={4}>
+                        <Button
+                            variant="contained"
+                            className="button"
+                            onClick={() => moveRobot('down')}
+                        >
+                            <ChevronDown/>
+                        </Button>
+                    </Grid>
+                    <Grid item xs={4}></Grid>
+
+                    {/* Other Buttons */}
+                    <Grid item xs={6}>
+                        <Button
+                            variant="contained"
+                            className="button full-width"
+                            onClick={putMarker}
+                        >
+                            Put Marker
+                        </Button>
+                    </Grid>
+                    <Grid item xs={6}>
+                        <Button
+                            variant="contained"
+                            className="button full-width"
+                            onClick={pickMarker}
+                        >
+                            Pick Marker
+                        </Button>
+                    </Grid>
+
+                    <Grid item xs={6}>
+                        <Button
+                            variant="contained"
+                            className="button full-width"
+                            onClick={paintCell}
+                        >
+                            Paint Cell
+                        </Button>
+                    </Grid>
+                    <Grid item xs={6}>
+                        <Button
+                            variant="contained"
+                            className="button full-width"
+                            onClick={clearCell}
+                        >
+                            Clear Cell
+                        </Button>
+                    </Grid>
+
+                    <Grid item xs={12}>
+                        <Button
+                            variant="outlined"
+                            className="button full-width-outlined"
+                            onClick={() => setEditMode(!editMode)}
+                        >
+                            {editMode ? 'Exit Edit Mode' : 'Enter Edit Mode'}
+                        </Button>
+                    </Grid>
+
+                    <Grid item xs={6}>
+                        <Button
+                            variant="contained"
+                            className="button full-width"
+                            onClick={increaseWidth}
+                        >
+                            Width +
+                        </Button>
+                    </Grid>
+                    <Grid item xs={6}>
+                        <Button
+                            variant="contained"
+                            className="button full-width"
+                            onClick={decreaseWidth}
+                        >
+                            Width -
+                        </Button>
+                    </Grid>
+                    <Grid item xs={6}>
+                        <Button
+                            variant="contained"
+                            className="button full-width"
+                            onClick={increaseHeight}
+                        >
+                            Height +
+                        </Button>
+                    </Grid>
+                    <Grid item xs={6}>
+                        <Button
+                            variant="contained"
+                            className="button full-width"
+                            onClick={decreaseHeight}
+                        >
+                            Height -
+                        </Button>
+                    </Grid>
+                </Grid>
+            </CardContent>
+        </Card>
+
+        {/* Canvas */}
+        <Card className="card-controls">
+            <canvas
+                ref={canvasRef}
+                width={(width + 2) * cellSize} // Increase canvas width
+                height={(height + 2) * cellSize} // Increase canvas height
+                className={editMode ? 'edit-mode' : ''}
+                onClick={handleCanvasClick}
+                onContextMenu={handleCanvasRightClick} // Add right-click event listener
+                onWheel={handleCanvasWheel} // Add wheel event listener
+            />
+            <Typography variant="body2">{statusMessage}</Typography>
+        </Card>
+    </div>);
 };
 
 export default RobotSimulator;
