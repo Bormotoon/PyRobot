@@ -1,6 +1,7 @@
 import React from 'react';
 import RobotSimulator from './RobotSimulator';
 import './App.css';
+import './styles.css'; // Подключаем новый файл стилей
 import { createTheme, ThemeProvider } from '@mui/material/styles';
 
 const theme = createTheme({
