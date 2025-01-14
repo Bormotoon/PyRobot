@@ -13,11 +13,12 @@ const RobotSimulator = () => {
     const [coloredCells, setColoredCells] = useState(new Set());
     const [statusMessage, setStatusMessage] = useState("Click between cells to add/remove walls");
     const canvasRef = useRef(null);
+    const [cellSize, setCellSize] = useState(50); // Add state for cell size
 
     useEffect(() => {
         setupPermanentWalls();
         drawField();
-    }, [robotPos, width, height, walls, coloredCells, markers]);
+    }, [robotPos, width, height, walls, coloredCells, markers, cellSize]); // Add cellSize to dependencies
 
     const setupPermanentWalls = () => {
         const newPermanentWalls = new Set();
@@ -37,7 +38,6 @@ const RobotSimulator = () => {
         if (!canvas) return;
 
         const ctx = canvas.getContext('2d');
-        const cellSize = 50;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         // Draw colored cells
@@ -94,17 +94,6 @@ const RobotSimulator = () => {
         }
     };
 
-    const moveRobot = (direction) => {
-        setRobotPos((prev) => {
-            let { x, y } = prev;
-            if (direction === 'up' && y > 0 && !walls.has(`${x},${y},${x},${y - 1}`)) y -= 1;
-            if (direction === 'down' && y < height - 1 && !walls.has(`${x},${y + 1},${x},${y + 1}`)) y += 1;
-            if (direction === 'left' && x > 0 && !walls.has(`${x},${y},${x - 1},${y}`)) x -= 1;
-            if (direction === 'right' && x < width - 1 && !walls.has(`${x + 1},${y},${x + 1},${y}`)) x += 1;
-            return { x, y };
-        });
-    };
-
     const handleCanvasClick = (event) => {
         if (!editMode) return;
 
@@ -112,7 +101,6 @@ const RobotSimulator = () => {
         const rect = canvas.getBoundingClientRect();
         const x = event.clientX - rect.left;
         const y = event.clientY - rect.top;
-        const cellSize = 50;
         const gridX = Math.floor(x / cellSize);
         const gridY = Math.floor(y / cellSize);
         const margin = 5;
@@ -163,7 +151,6 @@ const RobotSimulator = () => {
         const rect = canvas.getBoundingClientRect();
         const x = event.clientX - rect.left;
         const y = event.clientY - rect.top;
-        const cellSize = 50;
         const gridX = Math.floor(x / cellSize);
         const gridY = Math.floor(y / cellSize);
 
@@ -178,6 +165,48 @@ const RobotSimulator = () => {
             return newMarkers;
         });
     };
+
+    const moveRobot = (direction) => {
+        setRobotPos((prevPos) => {
+            let newPos = { ...prevPos };
+            switch (direction) {
+                case 'up':
+                    if (prevPos.y > 0) newPos.y -= 1;
+                    break;
+                case 'down':
+                    if (prevPos.y < height - 1) newPos.y += 1;
+                    break;
+                case 'left':
+                    if (prevPos.x > 0) newPos.x -= 1;
+                    break;
+                case 'right':
+                    if (prevPos.x < width - 1) newPos.x += 1;
+                    break;
+                default:
+                    break;
+            }
+            return newPos;
+        });
+    };
+
+    const handleCanvasWheel = (event) => {
+        event.preventDefault();
+        event.stopPropagation(); // Stop the event from propagating to parent elements
+        setCellSize((prev) => Math.max(10, prev + (event.deltaY > 0 ? -5 : 5))); // Adjust cell size with a minimum value
+    };
+
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (canvas) {
+            const preventScroll = (event) => {
+                event.preventDefault();
+            };
+            canvas.addEventListener('wheel', preventScroll, { passive: false });
+            return () => {
+                canvas.removeEventListener('wheel', preventScroll);
+            };
+        }
+    }, []);
 
     const putMarker = () => {
         const pos = `${robotPos.x},${robotPos.y}`;
@@ -244,7 +273,7 @@ const RobotSimulator = () => {
     };
 
     return (
-        <div style={{ display: 'flex', gap: '16px', padding: '16px' }}>
+        <div className="container">
             {/* Controls */}
             <Card className="card">
                 <CardHeader
@@ -390,11 +419,12 @@ const RobotSimulator = () => {
             <Card className="card-controls">
                 <canvas
                     ref={canvasRef}
-                    width={width * 50}
-                    height={height * 50}
+                    width={width * cellSize}
+                    height={height * cellSize}
                     className={editMode ? 'edit-mode' : ''}
                     onClick={handleCanvasClick}
                     onContextMenu={handleCanvasRightClick} // Add right-click event listener
+                    onWheel={handleCanvasWheel} // Add wheel event listener
                 />
                 <Typography variant="body2">{statusMessage}</Typography>
             </Card>
