@@ -185,35 +185,35 @@ const RobotSimulator = () => {
     };
 
     const moveRobot = (direction) => {
-    setRobotPos((prevPos) => {
-        let newPos = { ...prevPos };
-        switch (direction) {
-            case 'up':
-                if (newPos.y > 0 && !walls.has(`${newPos.x},${newPos.y},${newPos.x},${newPos.y - 1}`)) {
-                    newPos.y -= 1;
-                }
-                break;
-            case 'down':
-                if (newPos.y < height - 1 && !walls.has(`${newPos.x},${newPos.y + 1},${newPos.x},${newPos.y}`)) {
-                    newPos.y += 1;
-                }
-                break;
-            case 'left':
-                if (newPos.x > 0 && !walls.has(`${newPos.x},${newPos.y},${newPos.x - 1},${newPos.y}`)) {
-                    newPos.x -= 1;
-                }
-                break;
-            case 'right':
-                if (newPos.x < width - 1 && !walls.has(`${newPos.x + 1},${newPos.y},${newPos.x},${newPos.y}`)) {
-                    newPos.x += 1;
-                }
-                break;
-            default:
-                break;
-        }
-        return newPos;
-    });
-};
+        setRobotPos((prevPos) => {
+            let newPos = {...prevPos};
+            switch (direction) {
+                case 'up':
+                    if (newPos.y > 0 && !walls.has(`${newPos.x},${newPos.y},${newPos.x},${newPos.y - 1}`)) {
+                        newPos.y -= 1;
+                    }
+                    break;
+                case 'down':
+                    if (newPos.y < height - 1 && !walls.has(`${newPos.x},${newPos.y + 1},${newPos.x},${newPos.y}`)) {
+                        newPos.y += 1;
+                    }
+                    break;
+                case 'left':
+                    if (newPos.x > 0 && !walls.has(`${newPos.x},${newPos.y},${newPos.x - 1},${newPos.y}`)) {
+                        newPos.x -= 1;
+                    }
+                    break;
+                case 'right':
+                    if (newPos.x < width - 1 && !walls.has(`${newPos.x + 1},${newPos.y},${newPos.x},${newPos.y}`)) {
+                        newPos.x += 1;
+                    }
+                    break;
+                default:
+                    break;
+            }
+            return newPos;
+        });
+    };
 
     const handleCanvasWheel = (event) => {
         event.preventDefault();
@@ -298,8 +298,7 @@ const RobotSimulator = () => {
         }
     };
 
-    return (
-        <div className="container">
+    return (<div className="container">
             {/* Controls */}
             <Card className="card">
                 <CardHeader
@@ -454,8 +453,7 @@ const RobotSimulator = () => {
                 />
                 <Typography variant="body2">{statusMessage}</Typography>
             </Card>
-        </div>
-    );
+        </div>);
 };
 
 export default RobotSimulator;
