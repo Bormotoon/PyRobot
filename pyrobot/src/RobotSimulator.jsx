@@ -17,8 +17,11 @@ const RobotSimulator = () => {
 
     useEffect(() => {
         setupPermanentWalls();
+    }, [width, height]); // Add width and height to dependencies
+
+    useEffect(() => {
         drawField();
-    }, [robotPos, width, height, walls, coloredCells, markers, cellSize]); // Add cellSize to dependencies
+    }, [robotPos, width, height, walls, coloredCells, markers, cellSize, permanentWalls]); // Add permanentWalls to dependencies
 
     const setupPermanentWalls = () => {
         const newPermanentWalls = new Set();
@@ -44,12 +47,12 @@ const RobotSimulator = () => {
         ctx.fillStyle = 'gray';
         coloredCells.forEach(cell => {
             const [x, y] = cell.split(',').map(Number);
-            ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+            ctx.fillRect((x + 1) * cellSize, (y + 1) * cellSize, cellSize, cellSize);
         });
 
         // Draw robot
-        const robotX = robotPos.x * cellSize + cellSize / 2;
-        const robotY = robotPos.y * cellSize + cellSize / 2;
+        const robotX = (robotPos.x + 1) * cellSize + cellSize / 2;
+        const robotY = (robotPos.y + 1) * cellSize + cellSize / 2;
         const diamondSize = cellSize * 0.4 * 1.5; // Increase size by 1.5 times
         ctx.fillStyle = '#FF4500';
         ctx.beginPath();
@@ -66,7 +69,7 @@ const RobotSimulator = () => {
             const [x, y] = key.split(',').map(Number);
             ctx.fillStyle = 'white';
             ctx.beginPath();
-            ctx.arc((x + 0.75) * cellSize, (y + 0.75) * cellSize, cellSize * 0.15, 0, 2 * Math.PI);
+            ctx.arc((x + 1.75) * cellSize, (y + 1.75) * cellSize, cellSize * 0.15, 0, 2 * Math.PI);
             ctx.fill();
             ctx.strokeStyle = 'black'; // Change outline color to black
             ctx.lineWidth = 1; // Halve the thickness of the outline
@@ -79,16 +82,25 @@ const RobotSimulator = () => {
         walls.forEach(wall => {
             const [x1, y1, x2, y2] = wall.split(',').map(Number);
             ctx.beginPath();
-            ctx.moveTo(x1 * cellSize, y1 * cellSize);
-            ctx.lineTo(x2 * cellSize, y2 * cellSize);
+            ctx.moveTo((x1 + 1) * cellSize, (y1 + 1) * cellSize);
+            ctx.lineTo((x2 + 1) * cellSize, (y2 + 1) * cellSize);
+            ctx.stroke();
+        });
+
+        // Draw permanent walls
+        permanentWalls.forEach(wall => {
+            const [x1, y1, x2, y2] = wall.split(',').map(Number);
+            ctx.beginPath();
+            ctx.moveTo((x1 + 1) * cellSize, (y1 + 1) * cellSize);
+            ctx.lineTo((x2 + 1) * cellSize, (y2 + 1) * cellSize);
             ctx.stroke();
         });
 
         // Draw grid
         ctx.strokeStyle = '#C8C80F';
         ctx.lineWidth = 2;
-        for (let x = 0; x <= width; x++) {
-            for (let y = 0; y <= height; y++) {
+        for (let x = 0; x <= width + 2; x++) {
+            for (let y = 0; y <= height + 2; y++) {
                 ctx.strokeRect(x * cellSize, y * cellSize, cellSize, cellSize);
             }
         }
@@ -101,9 +113,13 @@ const RobotSimulator = () => {
         const rect = canvas.getBoundingClientRect();
         const x = event.clientX - rect.left;
         const y = event.clientY - rect.top;
-        const gridX = Math.floor(x / cellSize);
-        const gridY = Math.floor(y / cellSize);
+        const gridX = Math.floor(x / cellSize) - 1;
+        const gridY = Math.floor(y / cellSize) - 1;
         const margin = 5;
+
+        if (gridX < 0 || gridX >= width || gridY < 0 || gridY >= height) {
+            return; // Prevent actions outside the main field
+        }
 
         const xRemainder = x % cellSize;
         const yRemainder = y % cellSize;
@@ -130,13 +146,13 @@ const RobotSimulator = () => {
                 return newWalls;
             });
         } else {
-            const cell = `${gridX},${gridY}`;
+            const pos = `${gridX},${gridY}`;
             setColoredCells((prev) => {
                 const newCells = new Set(prev);
-                if (newCells.has(cell)) {
-                    newCells.delete(cell);
+                if (newCells.has(pos)) {
+                    newCells.delete(pos);
                 } else {
-                    newCells.add(cell);
+                    newCells.add(pos);
                 }
                 return newCells;
             });
@@ -151,8 +167,10 @@ const RobotSimulator = () => {
         const rect = canvas.getBoundingClientRect();
         const x = event.clientX - rect.left;
         const y = event.clientY - rect.top;
-        const gridX = Math.floor(x / cellSize);
-        const gridY = Math.floor(y / cellSize);
+        const gridX = Math.floor(x / cellSize) - 1;
+        const gridY = Math.floor(y / cellSize) - 1;
+
+        if (gridX < 0 || gridX >= width || gridY < 0 || gridY >= height) return; // Prevent placing markers outside the main field
 
         const pos = `${gridX},${gridY}`;
         setMarkers((prev) => {
@@ -171,16 +189,16 @@ const RobotSimulator = () => {
             let newPos = { ...prevPos };
             switch (direction) {
                 case 'up':
-                    if (prevPos.y > 0) newPos.y -= 1;
+                    if (newPos.y > 0) newPos.y -= 1;
                     break;
                 case 'down':
-                    if (prevPos.y < height - 1) newPos.y += 1;
+                    if (newPos.y < height - 1) newPos.y += 1;
                     break;
                 case 'left':
-                    if (prevPos.x > 0) newPos.x -= 1;
+                    if (newPos.x > 0) newPos.x -= 1;
                     break;
                 case 'right':
-                    if (prevPos.x < width - 1) newPos.x += 1;
+                    if (newPos.x < width - 1) newPos.x += 1;
                     break;
                 default:
                     break;
@@ -419,8 +437,8 @@ const RobotSimulator = () => {
             <Card className="card-controls">
                 <canvas
                     ref={canvasRef}
-                    width={width * cellSize}
-                    height={height * cellSize}
+                    width={(width + 2) * cellSize} // Increase canvas width
+                    height={(height + 2) * cellSize} // Increase canvas height
                     className={editMode ? 'edit-mode' : ''}
                     onClick={handleCanvasClick}
                     onContextMenu={handleCanvasRightClick} // Add right-click event listener
