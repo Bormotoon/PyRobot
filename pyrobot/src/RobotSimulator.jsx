@@ -1,12 +1,12 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Button, Card, CardContent, CardHeader, Typography, Grid } from '@mui/material';
-import { ChevronUp, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import React, {useEffect, useRef, useState} from 'react';
+import {Button, Card, CardContent, CardHeader, Typography, Grid} from '@mui/material';
+import {ChevronUp, ChevronDown, ChevronLeft, ChevronRight} from 'lucide-react';
 
 const RobotSimulator = () => {
     const [width, setWidth] = useState(7);
     const [height, setHeight] = useState(7);
     const [editMode, setEditMode] = useState(false);
-    const [robotPos, setRobotPos] = useState({ x: 0, y: 0 });
+    const [robotPos, setRobotPos] = useState({x: 0, y: 0});
     const [walls, setWalls] = useState(new Set());
     const [permanentWalls, setPermanentWalls] = useState(new Set());
     const [markers, setMarkers] = useState({});
@@ -174,7 +174,7 @@ const RobotSimulator = () => {
 
         const pos = `${gridX},${gridY}`;
         setMarkers((prev) => {
-            const newMarkers = { ...prev };
+            const newMarkers = {...prev};
             if (!newMarkers[pos]) {
                 newMarkers[pos] = 1;
             } else {
@@ -185,27 +185,35 @@ const RobotSimulator = () => {
     };
 
     const moveRobot = (direction) => {
-        setRobotPos((prevPos) => {
-            let newPos = { ...prevPos };
-            switch (direction) {
-                case 'up':
-                    if (newPos.y > 0) newPos.y -= 1;
-                    break;
-                case 'down':
-                    if (newPos.y < height - 1) newPos.y += 1;
-                    break;
-                case 'left':
-                    if (newPos.x > 0) newPos.x -= 1;
-                    break;
-                case 'right':
-                    if (newPos.x < width - 1) newPos.x += 1;
-                    break;
-                default:
-                    break;
-            }
-            return newPos;
-        });
-    };
+    setRobotPos((prevPos) => {
+        let newPos = { ...prevPos };
+        switch (direction) {
+            case 'up':
+                if (newPos.y > 0 && !walls.has(`${newPos.x},${newPos.y},${newPos.x},${newPos.y - 1}`)) {
+                    newPos.y -= 1;
+                }
+                break;
+            case 'down':
+                if (newPos.y < height - 1 && !walls.has(`${newPos.x},${newPos.y + 1},${newPos.x},${newPos.y}`)) {
+                    newPos.y += 1;
+                }
+                break;
+            case 'left':
+                if (newPos.x > 0 && !walls.has(`${newPos.x},${newPos.y},${newPos.x - 1},${newPos.y}`)) {
+                    newPos.x -= 1;
+                }
+                break;
+            case 'right':
+                if (newPos.x < width - 1 && !walls.has(`${newPos.x + 1},${newPos.y},${newPos.x},${newPos.y}`)) {
+                    newPos.x += 1;
+                }
+                break;
+            default:
+                break;
+        }
+        return newPos;
+    });
+};
 
     const handleCanvasWheel = (event) => {
         event.preventDefault();
@@ -219,7 +227,7 @@ const RobotSimulator = () => {
             const preventScroll = (event) => {
                 event.preventDefault();
             };
-            canvas.addEventListener('wheel', preventScroll, { passive: false });
+            canvas.addEventListener('wheel', preventScroll, {passive: false});
             return () => {
                 canvas.removeEventListener('wheel', preventScroll);
             };
@@ -229,7 +237,7 @@ const RobotSimulator = () => {
     const putMarker = () => {
         const pos = `${robotPos.x},${robotPos.y}`;
         setMarkers((prev) => {
-            const newMarkers = { ...prev };
+            const newMarkers = {...prev};
             if (!newMarkers[pos]) {
                 newMarkers[pos] = 1;
             }
@@ -240,7 +248,7 @@ const RobotSimulator = () => {
     const pickMarker = () => {
         const pos = `${robotPos.x},${robotPos.y}`;
         setMarkers((prev) => {
-            const newMarkers = { ...prev };
+            const newMarkers = {...prev};
             if (newMarkers[pos]) {
                 delete newMarkers[pos];
             }
@@ -295,7 +303,7 @@ const RobotSimulator = () => {
             {/* Controls */}
             <Card className="card">
                 <CardHeader
-                    title={<Typography variant="h6" style={{ textAlign: 'center' }}>Controls</Typography>}
+                    title={<Typography variant="h6" style={{textAlign: 'center'}}>Controls</Typography>}
                 />
                 <CardContent>
                     <Grid container spacing={2} alignItems="center" justifyContent="center">
@@ -307,7 +315,7 @@ const RobotSimulator = () => {
                                 className="button"
                                 onClick={() => moveRobot('up')}
                             >
-                                <ChevronUp />
+                                <ChevronUp/>
                             </Button>
                         </Grid>
                         <Grid item xs={4}></Grid>
@@ -318,7 +326,7 @@ const RobotSimulator = () => {
                                 className="button"
                                 onClick={() => moveRobot('left')}
                             >
-                                <ChevronLeft />
+                                <ChevronLeft/>
                             </Button>
                         </Grid>
                         <Grid item xs={4}></Grid>
@@ -328,7 +336,7 @@ const RobotSimulator = () => {
                                 className="button"
                                 onClick={() => moveRobot('right')}
                             >
-                                <ChevronRight />
+                                <ChevronRight/>
                             </Button>
                         </Grid>
 
@@ -339,7 +347,7 @@ const RobotSimulator = () => {
                                 className="button"
                                 onClick={() => moveRobot('down')}
                             >
-                                <ChevronDown />
+                                <ChevronDown/>
                             </Button>
                         </Grid>
                         <Grid item xs={4}></Grid>
