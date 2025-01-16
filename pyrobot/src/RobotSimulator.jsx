@@ -15,6 +15,7 @@ import {ChevronUp, ChevronDown, ChevronLeft, ChevronRight} from 'lucide-react';
 
 import './styles.css';
 import {drawField} from './canvasDrawing';
+import {getHint} from './hints'; // <-- ИМПОРТ вашей функции для динамичных подсказок
 
 /**
  * Компонент RobotSimulator, ориентированный на учащихся 8 классов.
@@ -33,8 +34,9 @@ const RobotSimulator = () => {
     const [markers, setMarkers] = useState({});
     const [coloredCells, setColoredCells] = useState(new Set());
 
-    // Более дружелюбное сообщение для статуса
+    // Динамичное сообщение статуса/подсказок
     const [statusMessage, setStatusMessage] = useState(
+        // При желании можно сразу: getHint("initial", false)
         "Используйте кнопки слева, чтобы двигать Робота и рисовать на поле!"
     );
 
@@ -143,7 +145,10 @@ const RobotSimulator = () => {
         // Если попали по роботу => перетаскиваем
         if (gridX === robotPos.x && gridY === robotPos.y) {
             setIsDraggingRobot(true);
-            setStatusMessage("Перетащите робота и отпустите, чтобы переместить его!");
+            // Подсказка для «зажали робота»
+            setStatusMessage(getHint("moveRobotUp", editMode)); // Или любой подходящий ключ
+            // или, если хотите специальный hint вроде "robotDragStart":
+            // setStatusMessage(getHint("robotDragStart", editMode));
         } else {
             // Иначе - логика для стен или покраски
             handleCanvasClick(event);
@@ -160,7 +165,7 @@ const RobotSimulator = () => {
 
         const {gridX, gridY} = toGridCoords(x, y);
         if (gridX === null || gridY === null) {
-            // Если курсор вышел за границы, можно проигнорировать
+            // Если курсор вышел за границы
             setStatusMessage("Курсор за пределами поля — робот не выйдет за край.");
             return;
         }
@@ -175,6 +180,7 @@ const RobotSimulator = () => {
         if (!isDraggingRobot) return;
         // Прекращаем перетаскивание
         setIsDraggingRobot(false);
+        // Тут можно дать подсказку, типа «Робот отпущен»
         setStatusMessage("Робот отпущен! Он остался в последней выбранной клетке.");
     };
 
@@ -183,7 +189,8 @@ const RobotSimulator = () => {
     // -----------------------------------------
     const handleCanvasClick = (event) => {
         if (!editMode) {
-            setStatusMessage("Вы кликнули по полю, но 'Режим рисования' не включён!");
+            // Подсказка: режим редактирования выключен
+            setStatusMessage(getHint("canvasLeftClickNoEdit", editMode));
             return;
         }
 
@@ -228,10 +235,10 @@ const RobotSimulator = () => {
                 const newWalls = new Set(prev);
                 if (newWalls.has(wall)) {
                     newWalls.delete(wall);
-                    setStatusMessage("Стена удалена.");
+                    setStatusMessage(getHint("canvasLeftClickEditMode", editMode) + " Стена удалена.");
                 } else {
                     newWalls.add(wall);
-                    setStatusMessage("Вы поставили стену!");
+                    setStatusMessage(getHint("canvasLeftClickEditMode", editMode) + " Вы поставили стену!");
                 }
                 return newWalls;
             });
@@ -242,10 +249,10 @@ const RobotSimulator = () => {
                 const newCells = new Set(prev);
                 if (newCells.has(pos)) {
                     newCells.delete(pos);
-                    setStatusMessage("Клетка очищена от краски!");
+                    setStatusMessage(getHint("canvasLeftClickEditMode", editMode) + " Клетка очищена от краски!");
                 } else {
                     newCells.add(pos);
-                    setStatusMessage("Клетка раскрашена!");
+                    setStatusMessage(getHint("canvasLeftClickEditMode", editMode) + " Клетка раскрашена!");
                 }
                 return newCells;
             });
@@ -258,7 +265,7 @@ const RobotSimulator = () => {
     const handleCanvasRightClick = (event) => {
         event.preventDefault();
         if (!editMode) {
-            setStatusMessage("Правый клик не сработал: 'Режим рисования' не включён!");
+            setStatusMessage(getHint("canvasRightClickNoEdit", editMode));
             return;
         }
 
@@ -278,10 +285,10 @@ const RobotSimulator = () => {
             const newMarkers = {...prev};
             if (!newMarkers[pos]) {
                 newMarkers[pos] = 1;
-                setStatusMessage("Маркер добавлен!");
+                setStatusMessage(getHint("canvasRightClickEditMode", editMode) + " Маркер добавлен!");
             } else {
                 delete newMarkers[pos];
-                setStatusMessage("Маркер убран.");
+                setStatusMessage(getHint("canvasRightClickEditMode", editMode) + " Маркер убран.");
             }
             return newMarkers;
         });
@@ -292,6 +299,25 @@ const RobotSimulator = () => {
     // ДВИЖЕНИЕ РОБОТА КНОПКАМИ
     // -----------------------------------------
     const moveRobot = (direction) => {
+        // Решаем, какой ключ действия использовать
+        let actionKey = '';
+        switch (direction) {
+            case 'up':
+                actionKey = 'moveRobotUp';
+                break;
+            case 'down':
+                actionKey = 'moveRobotDown';
+                break;
+            case 'left':
+                actionKey = 'moveRobotLeft';
+                break;
+            case 'right':
+                actionKey = 'moveRobotRight';
+                break;
+            default:
+                break;
+        }
+
         setRobotPos(prevPos => {
             let newPos = {...prevPos};
             switch (direction) {
@@ -302,9 +328,10 @@ const RobotSimulator = () => {
                         !permanentWalls.has(`${newPos.x},${newPos.y},${newPos.x + 1},${newPos.y}`)
                     ) {
                         newPos.y -= 1;
-                        setStatusMessage("Робот сдвинулся вверх!");
                     } else {
+                        // При неудачном движении можно что-то другое сказать
                         setStatusMessage("Робот не может пойти вверх (стена или край).");
+                        return prevPos;
                     }
                     break;
                 case 'down':
@@ -314,9 +341,9 @@ const RobotSimulator = () => {
                         !permanentWalls.has(`${newPos.x},${newPos.y + 1},${newPos.x + 1},${newPos.y + 1}`)
                     ) {
                         newPos.y += 1;
-                        setStatusMessage("Робот сдвинулся вниз!");
                     } else {
                         setStatusMessage("Робот не может пойти вниз (стена или край).");
+                        return prevPos;
                     }
                     break;
                 case 'left':
@@ -326,9 +353,9 @@ const RobotSimulator = () => {
                         !permanentWalls.has(`${newPos.x},${newPos.y},${newPos.x},${newPos.y + 1}`)
                     ) {
                         newPos.x -= 1;
-                        setStatusMessage("Робот пошёл влево!");
                     } else {
                         setStatusMessage("Робот не может пойти влево (стена или край).");
+                        return prevPos;
                     }
                     break;
                 case 'right':
@@ -338,19 +365,24 @@ const RobotSimulator = () => {
                         !permanentWalls.has(`${newPos.x + 1},${newPos.y},${newPos.x + 1},${newPos.y + 1}`)
                     ) {
                         newPos.x += 1;
-                        setStatusMessage("Робот пошёл вправо!");
                     } else {
                         setStatusMessage("Робот не может пойти вправо (стена или край).");
+                        return prevPos;
                     }
                     break;
                 default:
-                    break;
+                    return prevPos;
             }
-            // Клэмпим на случай ошибки
+            // Клэмпим
             newPos.x = Math.min(Math.max(newPos.x, 0), width - 1);
             newPos.y = Math.min(Math.max(newPos.y, 0), height - 1);
             return newPos;
         });
+
+        if (actionKey) {
+            // Достаём случайную подсказку (не повторяем дважды подряд)
+            setStatusMessage(getHint(actionKey, editMode));
+        }
     };
 
     // -----------------------------------------
@@ -362,9 +394,9 @@ const RobotSimulator = () => {
         setCellSize(prev => {
             const newSize = Math.max(10, prev + (event.deltaY > 0 ? -5 : 5));
             if (newSize > prev) {
-                setStatusMessage("Поле стало крупнее!");
+                setStatusMessage(getHint("wheelZoomIn", editMode));
             } else if (newSize < prev) {
-                setStatusMessage("Поле стало мельче!");
+                setStatusMessage(getHint("wheelZoomOut", editMode));
             }
             return newSize;
         });
@@ -391,12 +423,14 @@ const RobotSimulator = () => {
             const newMarkers = {...prev};
             if (!newMarkers[pos]) {
                 newMarkers[pos] = 1;
-                setStatusMessage("Маркер поставлен прямо под роботом!");
             } else {
+                // Если хотите запретить второй раз ставить, можно убрать
                 setStatusMessage("Тут уже лежит маркер.");
+                return prev;
             }
             return newMarkers;
         });
+        setStatusMessage(getHint("putMarker", editMode));
     };
 
     const pickMarker = () => {
@@ -405,12 +439,13 @@ const RobotSimulator = () => {
             const newMarkers = {...prev};
             if (newMarkers[pos]) {
                 delete newMarkers[pos];
-                setStatusMessage("Маркер поднят!");
             } else {
                 setStatusMessage("Здесь нет маркера, чтобы поднять.");
+                return prev;
             }
             return newMarkers;
         });
+        setStatusMessage(getHint("pickMarker", editMode));
     };
 
     const paintCell = () => {
@@ -419,12 +454,13 @@ const RobotSimulator = () => {
             const newCells = new Set(prev);
             if (!newCells.has(pos)) {
                 newCells.add(pos);
-                setStatusMessage("Клетка под роботом раскрашена!");
             } else {
                 setStatusMessage("Клетка уже раскрашена, используйте 'Очистить клетку' чтобы убрать краску.");
+                return prev;
             }
             return newCells;
         });
+        setStatusMessage(getHint("paintCell", editMode));
     };
 
     const clearCell = () => {
@@ -433,12 +469,13 @@ const RobotSimulator = () => {
             const newCells = new Set(prev);
             if (newCells.has(pos)) {
                 newCells.delete(pos);
-                setStatusMessage("Клетка очищена!");
             } else {
                 setStatusMessage("Эта клетка и так не раскрашена.");
+                return prev;
             }
             return newCells;
         });
+        setStatusMessage(getHint("clearCell", editMode));
     };
 
     // -----------------------------------------
@@ -447,9 +484,9 @@ const RobotSimulator = () => {
     const increaseWidth = () => {
         if (editMode) {
             setWidth(prev => {
-                setStatusMessage("Поле стало шире!");
                 return prev + 1;
             });
+            setStatusMessage(getHint("increaseWidth", editMode));
         } else {
             setStatusMessage("Изменять ширину можно только в режиме рисования!");
         }
@@ -458,9 +495,9 @@ const RobotSimulator = () => {
     const decreaseWidth = () => {
         if (editMode && width > 1) {
             setWidth(prev => {
-                setStatusMessage("Поле стало уже.");
                 return prev - 1;
             });
+            setStatusMessage(getHint("decreaseWidth", editMode));
         } else {
             setStatusMessage("Изменять ширину можно только в режиме рисования!");
         }
@@ -469,9 +506,9 @@ const RobotSimulator = () => {
     const increaseHeight = () => {
         if (editMode) {
             setHeight(prev => {
-                setStatusMessage("Поле стало выше!");
                 return prev + 1;
             });
+            setStatusMessage(getHint("increaseHeight", editMode));
         } else {
             setStatusMessage("Изменять высоту можно только в режиме рисования!");
         }
@@ -480,9 +517,9 @@ const RobotSimulator = () => {
     const decreaseHeight = () => {
         if (editMode && height > 1) {
             setHeight(prev => {
-                setStatusMessage("Поле стало ниже.");
                 return prev - 1;
             });
+            setStatusMessage(getHint("decreaseHeight", editMode));
         } else {
             setStatusMessage("Изменять высоту можно только в режиме рисования!");
         }
@@ -495,13 +532,9 @@ const RobotSimulator = () => {
         setEditMode(prev => {
             const newMode = !prev;
             if (newMode) {
-                setStatusMessage(
-                    "Режим рисования ВКЛЮЧЁН: можно ставить стены, красить клетки, ставить маркеры и перетаскивать робота!"
-                );
+                setStatusMessage(getHint("enterEditMode", newMode));
             } else {
-                setStatusMessage(
-                    "Режим рисования ВЫКЛЮЧЕН: теперь холст только для просмотра и движения робота (кнопками)."
-                );
+                setStatusMessage(getHint("exitEditMode", newMode));
             }
             return newMode;
         });
@@ -681,6 +714,7 @@ const RobotSimulator = () => {
                         height={(height + 2) * cellSize}
                         className={editMode ? 'edit-mode' : ''}
 
+                        // Перехватываем mouseDown, mouseMove, mouseUp
                         onMouseDown={(e) => {
                             if (e.button !== 0) return; // только левая кнопка!
                             handleMouseDown(e);
@@ -691,7 +725,6 @@ const RobotSimulator = () => {
                         onContextMenu={handleCanvasRightClick}
                         onWheel={handleCanvasWheel}
                     />
-
                 </Card>
                 <Card className="status-card">
                     <Typography variant="body2">{statusMessage}</Typography>
