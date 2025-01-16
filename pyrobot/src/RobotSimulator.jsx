@@ -1,30 +1,40 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {Button, Card, CardContent, CardHeader, Typography, Grid} from '@mui/material';
 import {ChevronUp, ChevronDown, ChevronLeft, ChevronRight} from 'lucide-react';
+
 import './styles.css';
+import { getHint } from './hints';  // Импортируем функцию, которая возвращает СЛУЧАЙНЫЙ вариант подсказки
 
 /**
  * Основной компонент симулятора робота.
- * Содержит поле (Canvas) с сеткой, стены, робот, а также панель управления.
+ * Позволяет управлять роботом, ставить стены, маркеры и т.д.
+ * Включает динамические подсказки, ориентированные на начинающего пользователя (школьника).
  */
 const RobotSimulator = () => {
     // -------------------------------
     // Состояния (hooks useState)
     // -------------------------------
-    const [width, setWidth] = useState(7);          // Ширина в клетках
-    const [height, setHeight] = useState(7);        // Высота в клетках
-    const [editMode, setEditMode] = useState(false); // Режим редактирования (возможность ставить стены, красить клетки)
-    const [robotPos, setRobotPos] = useState({x: 0, y: 0}); // Позиция робота
-    const [walls, setWalls] = useState(new Set());          // Множество "стен", заданных пользователем
-    const [permanentWalls, setPermanentWalls] = useState(new Set()); // Статичные стены (границы поля)
-    const [markers, setMarkers] = useState({});     // Маркеры (ключ: "x,y")
-    const [coloredCells, setColoredCells] = useState(new Set()); // Набор раскрашенных ячеек
-    const [statusMessage, setStatusMessage] = useState("Click between cells to add/remove walls");
-    const canvasRef = useRef(null);                 // Ссылка на Canvas
-    const [cellSize, setCellSize] = useState(50);   // Размер (в пикселях) одной клетки
+    const [width, setWidth] = useState(7);
+    const [height, setHeight] = useState(7);
+    const [editMode, setEditMode] = useState(false);
+    const [robotPos, setRobotPos] = useState({x: 0, y: 0});
+    const [walls, setWalls] = useState(new Set());
+    const [permanentWalls, setPermanentWalls] = useState(new Set());
+    const [markers, setMarkers] = useState({});
+    const [coloredCells, setColoredCells] = useState(new Set());
+    const [statusMessage, setStatusMessage] = useState("");
+    const canvasRef = useRef(null);
+    const [cellSize, setCellSize] = useState(50);
 
     /**
-     * useEffect: При изменении ширины/высоты переопределяем постоянные стены.
+     * useEffect: При первой загрузке покажем "initial" подсказку (случайный вариант).
+     */
+    useEffect(() => {
+        setStatusMessage(getHint("initial", editMode));
+    }, []);
+
+    /**
+     * useEffect: При изменении width/height пересоздаём постоянные стены (границы).
      */
     useEffect(() => {
         setupPermanentWalls();
@@ -39,18 +49,13 @@ const RobotSimulator = () => {
 
     /**
      * Создаёт набор постоянных стен (границ поля), исходя из текущих width/height.
-     * Записывает их в state (setPermanentWalls).
      */
     const setupPermanentWalls = () => {
         const newPermanentWalls = new Set();
-
-        // Верхняя и нижняя горизонтальные границы
         for (let x = 0; x < width; x++) {
             newPermanentWalls.add(`${x},0,${x + 1},0`);
             newPermanentWalls.add(`${x},${height},${x + 1},${height}`);
         }
-
-        // Левая и правая вертикальные границы
         for (let y = 0; y < height; y++) {
             newPermanentWalls.add(`0,${y},0,${y + 1}`);
             newPermanentWalls.add(`${width},${y},${width},${y + 1}`);
@@ -59,34 +64,26 @@ const RobotSimulator = () => {
     };
 
     /**
-     * Функция для рисования всего игрового поля на Canvas:
-     * - Очищает Canvas
-     * - Отрисовывает раскрашенные ячейки
-     * - Отрисовывает робота
-     * - Отрисовывает маркеры
-     * - Отрисовывает стены (и обычные, и постоянные)
-     * - Отрисовывает сетку
+     * Функция для рисования всего поля (Canvas).
      */
     const drawField = () => {
         const canvas = canvasRef.current;
         if (!canvas) return;
 
         const ctx = canvas.getContext('2d');
-        // Очистка холста (полностью)
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // 1. Рисуем раскрашенные клетки (серым цветом)
+        // 1. Раскрашенные клетки
         ctx.fillStyle = 'gray';
         coloredCells.forEach(cell => {
             const [x, y] = cell.split(',').map(Number);
-            // Сдвиг "на 1 клетку" вправо/вниз, чтобы получить рамку вокруг
             ctx.fillRect((x + 1) * cellSize, (y + 1) * cellSize, cellSize, cellSize);
         });
 
-        // 2. Рисуем робота (оранжевый ромб)
+        // 2. Робот (оранжевый ромб)
         const robotX = (robotPos.x + 1) * cellSize + cellSize / 2;
         const robotY = (robotPos.y + 1) * cellSize + cellSize / 2;
-        const diamondSize = cellSize * 0.4 * 1.5; // 1.5x масштаб
+        const diamondSize = cellSize * 0.4 * 1.5;
         ctx.fillStyle = '#FF4500';
         ctx.beginPath();
         ctx.moveTo(robotX, robotY - diamondSize / 2);
@@ -97,25 +94,25 @@ const RobotSimulator = () => {
         ctx.fill();
         ctx.stroke();
 
-        // 3. Рисуем маркеры (маленькие белые круги)
+        // 3. Маркеры (белые круги)
         Object.keys(markers).forEach(key => {
             const [x, y] = key.split(',').map(Number);
             ctx.fillStyle = 'white';
             ctx.beginPath();
             ctx.arc(
-                (x + 1.75) * cellSize, // смещение на 1.75 клетки: чуть правее/ниже центра
+                (x + 1.75) * cellSize,
                 (y + 1.75) * cellSize,
-                cellSize * 0.15,      // радиус примерно 15% от cellSize
+                cellSize * 0.15,
                 0,
                 2 * Math.PI
             );
             ctx.fill();
-            ctx.strokeStyle = 'black'; // Чёрная тонкая обводка
+            ctx.strokeStyle = 'black';
             ctx.lineWidth = 1;
             ctx.stroke();
         });
 
-        // 4. Рисуем обычные (добавленные пользователем) стены (толстая жёлтая линия)
+        // 4. Обычные стены
         ctx.strokeStyle = '#C8C80F';
         ctx.lineWidth = 8;
         walls.forEach(wall => {
@@ -126,7 +123,7 @@ const RobotSimulator = () => {
             ctx.stroke();
         });
 
-        // 5. Рисуем постоянные стены (границы)
+        // 5. Постоянные стены (границы)
         permanentWalls.forEach(wall => {
             const [x1, y1, x2, y2] = wall.split(',').map(Number);
             ctx.beginPath();
@@ -135,7 +132,7 @@ const RobotSimulator = () => {
             ctx.stroke();
         });
 
-        // 6. Рисуем сетку (тонкая жёлтая линия, 2px)
+        // 6. Сетка
         ctx.strokeStyle = '#C8C80F';
         ctx.lineWidth = 2;
         for (let x = 0; x <= width + 2; x++) {
@@ -146,59 +143,48 @@ const RobotSimulator = () => {
     };
 
     /**
-     * Обработчик левого клика мышью по Canvas.
-     * Если режим редактирования включён (editMode = true):
-     *  - Если клик ближе к границе клетки (определяется через margin),
-     *    добавляем/удаляем стену (если она не является постоянной).
-     *  - Иначе переключаем раскраску ячейки (окрасить/снять окраску).
+     * Обработчик клика левой кнопкой по Canvas.
+     * В режиме редактирования — рисует стены или красит клетки,
+     * вне режима — подсказка, что ничего не происходит.
      */
     const handleCanvasClick = (event) => {
-        if (!editMode) return;
-
+        if (!editMode) {
+            // Подсказка: клик вне Edit Mode
+            setStatusMessage(getHint("canvasLeftClickNoEdit", editMode));
+            return;
+        }
+        // Иначе в режиме редактирования
         const canvas = canvasRef.current;
         const rect = canvas.getBoundingClientRect();
-        // Координаты клика внутри canvas
         const x = event.clientX - rect.left;
         const y = event.clientY - rect.top;
-
-        // Определяем, над какой клеткой (gridX, gridY) произошёл клик
-        // "−1", чтобы учесть отступ в 1 клетку, который добавлен при рисовании
         const gridX = Math.floor(x / cellSize) - 1;
         const gridY = Math.floor(y / cellSize) - 1;
-
-        // Небольшая "зона" у границы, где будем решать, что это клик по стене
         const margin = 5;
 
-        // Проверяем, что мы не вышли за пределы основного поля
         if (gridX < 0 || gridX >= width || gridY < 0 || gridY >= height) {
+            // Клик за пределами основной области
+            setStatusMessage(
+              getHint("canvasLeftClickEditMode", editMode)
+              + " Но вы кликнули за пределами поля (действие не сработало)."
+            );
             return;
         }
 
-        // Остатки внутри клетки, чтобы понять, близко ли мы к краю
         const xRemainder = x % cellSize;
         const yRemainder = y % cellSize;
-
         let wall = null;
-        // Если очень близко к левой границе клетки
+
         if (xRemainder < margin) {
             wall = `${gridX},${gridY},${gridX},${gridY + 1}`;
-        }
-        // Если очень близко к правой границе клетки
-        else if (xRemainder > cellSize - margin) {
+        } else if (xRemainder > cellSize - margin) {
             wall = `${gridX + 1},${gridY},${gridX + 1},${gridY + 1}`;
-        }
-        // Если очень близко к верхней границе клетки
-        else if (yRemainder < margin) {
+        } else if (yRemainder < margin) {
             wall = `${gridX},${gridY},${gridX + 1},${gridY}`;
-        }
-        // Если очень близко к нижней границе клетки
-        else if (yRemainder > cellSize - margin) {
+        } else if (yRemainder > cellSize - margin) {
             wall = `${gridX},${gridY + 1},${gridX + 1},${gridY + 1}`;
         }
 
-        // Если мы определили, что это клик по границе (wall != null)
-        // и при этом эта граница не является постоянной (границы поля),
-        // тогда добавить/убрать её из walls.
         if (wall && !permanentWalls.has(wall)) {
             setWalls((prev) => {
                 const newWalls = new Set(prev);
@@ -209,9 +195,12 @@ const RobotSimulator = () => {
                 }
                 return newWalls;
             });
-        }
-        else {
-            // Иначе (не ближе к краю) раскрашиваем/снимаем раскраску ячейки
+            setStatusMessage(
+              getHint("canvasLeftClickEditMode", editMode)
+              + " Добавили/убрали стену."
+            );
+        } else {
+            // Красим/снимаем краску
             const pos = `${gridX},${gridY}`;
             setColoredCells((prev) => {
                 const newCells = new Set(prev);
@@ -222,19 +211,22 @@ const RobotSimulator = () => {
                 }
                 return newCells;
             });
+            setStatusMessage(
+              getHint("canvasLeftClickEditMode", editMode)
+              + " Покрасили/сняли краску."
+            );
         }
     };
 
     /**
-     * Обработчик правого клика мышью по Canvas.
-     * Если режим редактирования включён, то в ячейке ставим/убираем маркер (toggle).
-     *
-     * @param {MouseEvent} event - Содержит координаты и др. данные о клике.
+     * Обработчик клика правой кнопкой по Canvas.
      */
     const handleCanvasRightClick = (event) => {
-        // Отменяем стандартное контекстное меню
         event.preventDefault();
-        if (!editMode) return;
+        if (!editMode) {
+            setStatusMessage(getHint("canvasRightClickNoEdit", editMode));
+            return;
+        }
 
         const canvas = canvasRef.current;
         const rect = canvas.getBoundingClientRect();
@@ -243,36 +235,48 @@ const RobotSimulator = () => {
         const gridX = Math.floor(x / cellSize) - 1;
         const gridY = Math.floor(y / cellSize) - 1;
 
-        // Не даём ставить маркеры за границей поля
-        if (gridX < 0 || gridX >= width || gridY < 0 || gridY >= height) return;
+        if (gridX < 0 || gridX >= width || gridY < 0 || gridY >= height) {
+            setStatusMessage(
+              getHint("canvasRightClickEditMode", editMode)
+              + " Но вы кликнули за пределами поля."
+            );
+            return;
+        }
 
         const pos = `${gridX},${gridY}`;
         setMarkers((prev) => {
             const newMarkers = {...prev};
-            // Если маркера нет — ставим
             if (!newMarkers[pos]) {
                 newMarkers[pos] = 1;
-            }
-            // Если есть — убираем
-            else {
+            } else {
                 delete newMarkers[pos];
             }
             return newMarkers;
         });
+        setStatusMessage(
+          getHint("canvasRightClickEditMode", editMode)
+          + " Поставили/убрали маркер."
+        );
     };
 
     /**
-     * Двигает робота в заданном направлении (up/down/left/right).
-     * При проверке учитываются стены (walls и permanentWalls).
-     *
-     * @param {'up'|'down'|'left'|'right'} direction - Направление движения.
+     * Двигает робота на одну клетку, если нет стены.
+     * Возвращает случайную подсказку о движении.
      */
     const moveRobot = (direction) => {
+        let actionKey = "";
+        switch(direction){
+            case 'up':    actionKey = "moveRobotUp"; break;
+            case 'down':  actionKey = "moveRobotDown"; break;
+            case 'left':  actionKey = "moveRobotLeft"; break;
+            case 'right': actionKey = "moveRobotRight"; break;
+            default:      actionKey = "";
+        }
+
         setRobotPos((prevPos) => {
             let newPos = {...prevPos};
             switch (direction) {
                 case 'up':
-                    // Проверяем верхнюю границу и отсутствие стены
                     if (
                         newPos.y > 0 &&
                         !walls.has(`${newPos.x},${newPos.y},${newPos.x + 1},${newPos.y}`) &&
@@ -282,7 +286,6 @@ const RobotSimulator = () => {
                     }
                     break;
                 case 'down':
-                    // Проверяем нижнюю границу и отсутствие стены
                     if (
                         newPos.y < height - 1 &&
                         !walls.has(`${newPos.x},${newPos.y + 1},${newPos.x + 1},${newPos.y + 1}`) &&
@@ -292,7 +295,6 @@ const RobotSimulator = () => {
                     }
                     break;
                 case 'left':
-                    // Проверяем левую границу и отсутствие стены
                     if (
                         newPos.x > 0 &&
                         !walls.has(`${newPos.x},${newPos.y},${newPos.x},${newPos.y + 1}`) &&
@@ -302,7 +304,6 @@ const RobotSimulator = () => {
                     }
                     break;
                 case 'right':
-                    // Проверяем правую границу и отсутствие стены
                     if (
                         newPos.x < width - 1 &&
                         !walls.has(`${newPos.x + 1},${newPos.y},${newPos.x + 1},${newPos.y + 1}`) &&
@@ -312,26 +313,38 @@ const RobotSimulator = () => {
                     }
                     break;
                 default:
-                    // Неизвестное направление — ничего не делаем
                     break;
             }
             return newPos;
         });
+
+        // Устанавливаем случайную подсказку (moveRobotUp/down/left/right).
+        if (actionKey) {
+            setStatusMessage(getHint(actionKey, editMode));
+        }
     };
 
     /**
-     * Обработчик события колёсика мыши (прокрутки) над Canvas.
-     * Уменьшает/увеличивает размер клетки (cellSize) с ограничением минимум 10px.
+     * Прокрутка колесика над Canvas (zoom in / zoom out).
      */
     const handleCanvasWheel = (event) => {
         event.preventDefault();
         event.stopPropagation();
-        // При прокрутке вниз (deltaY > 0) уменьшаем cellSize, вверх — увеличиваем
-        setCellSize((prev) => Math.max(10, prev + (event.deltaY > 0 ? -5 : 5)));
+        const newSize = cellSize + (event.deltaY > 0 ? -5 : 5);
+        if (newSize >= 10) {
+            setCellSize(newSize);
+
+            // Если увеличиваем, показываем wheelZoomIn, если уменьшаем — wheelZoomOut
+            if (event.deltaY > 0) {
+                setStatusMessage(getHint("wheelZoomOut", editMode));
+            } else {
+                setStatusMessage(getHint("wheelZoomIn", editMode));
+            }
+        }
     };
 
     /**
-     * useEffect для блокировки прокрутки всей страницы при прокрутке в области Canvas.
+     * useEffect: блокируем прокрутку всей страницы в зоне Canvas.
      */
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -339,9 +352,7 @@ const RobotSimulator = () => {
             const preventScroll = (event) => {
                 event.preventDefault();
             };
-            // Добавляем слушатель (passive: false, чтобы можно было отменить)
             canvas.addEventListener('wheel', preventScroll, {passive: false});
-            // При размонтировании убираем слушатель
             return () => {
                 canvas.removeEventListener('wheel', preventScroll);
             };
@@ -349,38 +360,37 @@ const RobotSimulator = () => {
     }, []);
 
     /**
-     * Кладёт маркер в ячейку, где сейчас находится робот.
-     * (Если маркера не было — появляется, если был, то не убирается, это не toggle).
+     * Положить маркер под роботом.
      */
     const putMarker = () => {
         const pos = `${robotPos.x},${robotPos.y}`;
         setMarkers((prev) => {
             const newMarkers = {...prev};
-            // Если там нет маркера, ставим
             if (!newMarkers[pos]) {
                 newMarkers[pos] = 1;
             }
             return newMarkers;
         });
+        setStatusMessage(getHint("putMarker", editMode));
     };
 
     /**
-     * Забирает маркер в ячейке, где сейчас находится робот (если там есть).
+     * Забрать маркер из ячейки, где стоит робот.
      */
     const pickMarker = () => {
         const pos = `${robotPos.x},${robotPos.y}`;
         setMarkers((prev) => {
             const newMarkers = {...prev};
             if (newMarkers[pos]) {
-                // Удаляем из объекта
                 delete newMarkers[pos];
             }
             return newMarkers;
         });
+        setStatusMessage(getHint("pickMarker", editMode));
     };
 
     /**
-     * Раскрасить клетку, в которой находится робот.
+     * Покрасить клетку под роботом.
      */
     const paintCell = () => {
         const pos = `${robotPos.x},${robotPos.y}`;
@@ -389,10 +399,11 @@ const RobotSimulator = () => {
             newCells.add(pos);
             return newCells;
         });
+        setStatusMessage(getHint("paintCell", editMode));
     };
 
     /**
-     * Снять раскраску с клетки, в которой находится робот.
+     * Снять краску с клетки под роботом.
      */
     const clearCell = () => {
         const pos = `${robotPos.x},${robotPos.y}`;
@@ -401,42 +412,62 @@ const RobotSimulator = () => {
             newCells.delete(pos);
             return newCells;
         });
+        setStatusMessage(getHint("clearCell", editMode));
     };
 
     /**
-     * Увеличить ширину поля на 1 (только если в режиме редактирования).
+     * Увеличить ширину поля (если editMode=true).
      */
     const increaseWidth = () => {
         if (editMode) {
             setWidth((prev) => prev + 1);
+            setStatusMessage(getHint("increaseWidth", editMode));
         }
     };
 
     /**
-     * Уменьшить ширину поля на 1 (минимум 1).
+     * Уменьшить ширину поля (если editMode=true).
      */
     const decreaseWidth = () => {
         if (editMode && width > 1) {
             setWidth((prev) => prev - 1);
+            setStatusMessage(getHint("decreaseWidth", editMode));
         }
     };
 
     /**
-     * Увеличить высоту поля на 1 (только если в режиме редактирования).
+     * Увеличить высоту поля (если editMode=true).
      */
     const increaseHeight = () => {
         if (editMode) {
             setHeight((prev) => prev + 1);
+            setStatusMessage(getHint("increaseHeight", editMode));
         }
     };
 
     /**
-     * Уменьшить высоту поля на 1 (минимум 1).
+     * Уменьшить высоту поля (если editMode=true).
      */
     const decreaseHeight = () => {
         if (editMode && height > 1) {
             setHeight((prev) => prev - 1);
+            setStatusMessage(getHint("decreaseHeight", editMode));
         }
+    };
+
+    /**
+     * Переключить режим редактирования (editMode).
+     */
+    const toggleEditMode = () => {
+        setEditMode((prev) => {
+            const newMode = !prev;
+            setStatusMessage(
+                newMode
+                ? getHint("enterEditMode", newMode)
+                : getHint("exitEditMode", newMode)
+            );
+            return newMode;
+        });
     };
 
     // -------------------------------------------------------------------------
@@ -444,14 +475,14 @@ const RobotSimulator = () => {
     // -------------------------------------------------------------------------
     return (
         <div className="container">
-            {/* Левая панель управления (Card) */}
+            {/* Левая панель управления */}
             <Card className="card">
                 <CardHeader
                     title={<Typography variant="h6" style={{textAlign: 'center'}}>Controls</Typography>}
                 />
                 <CardContent>
                     <Grid container spacing={2} alignItems="center" justifyContent="center">
-                        {/* Кнопки движения (стрелки) */}
+                        {/* Кнопки движения робота */}
                         <Grid item xs={4}></Grid>
                         <Grid item xs={4}>
                             <Button
@@ -459,7 +490,7 @@ const RobotSimulator = () => {
                                 className="button"
                                 onClick={() => moveRobot('up')}
                             >
-                                <ChevronUp />
+                                <ChevronUp/>
                             </Button>
                         </Grid>
                         <Grid item xs={4}></Grid>
@@ -470,7 +501,7 @@ const RobotSimulator = () => {
                                 className="button"
                                 onClick={() => moveRobot('left')}
                             >
-                                <ChevronLeft />
+                                <ChevronLeft/>
                             </Button>
                         </Grid>
                         <Grid item xs={4}></Grid>
@@ -480,7 +511,7 @@ const RobotSimulator = () => {
                                 className="button"
                                 onClick={() => moveRobot('right')}
                             >
-                                <ChevronRight />
+                                <ChevronRight/>
                             </Button>
                         </Grid>
 
@@ -491,12 +522,12 @@ const RobotSimulator = () => {
                                 className="button"
                                 onClick={() => moveRobot('down')}
                             >
-                                <ChevronDown />
+                                <ChevronDown/>
                             </Button>
                         </Grid>
                         <Grid item xs={4}></Grid>
 
-                        {/* Кнопки для маркеров и покраски */}
+                        {/* Кнопки маркеров и покраски */}
                         <Grid item xs={6}>
                             <Button
                                 variant="contained"
@@ -534,18 +565,18 @@ const RobotSimulator = () => {
                             </Button>
                         </Grid>
 
-                        {/* Переключатель режима редактирования */}
+                        {/* Режим редактирования */}
                         <Grid item xs={12}>
                             <Button
                                 variant="outlined"
                                 className="button full-width-outlined"
-                                onClick={() => setEditMode(!editMode)}
+                                onClick={toggleEditMode}
                             >
                                 {editMode ? 'Exit Edit Mode' : 'Enter Edit Mode'}
                             </Button>
                         </Grid>
 
-                        {/* Кнопки изменения размеров (Width и Height) */}
+                        {/* Изменение размеров поля */}
                         <Grid item xs={6}>
                             <Button
                                 variant="contained"
@@ -586,9 +617,8 @@ const RobotSimulator = () => {
                 </CardContent>
             </Card>
 
-            {/* Справа: область поля + отдельный блок статуса */}
+            {/* Справа: Canvas + отдельный блок для статусных подсказок */}
             <div className="field-area">
-                {/* Карточка с Canvas */}
                 <Card className="card-controls">
                     <canvas
                         ref={canvasRef}
@@ -600,8 +630,6 @@ const RobotSimulator = () => {
                         onWheel={handleCanvasWheel}
                     />
                 </Card>
-
-                {/* Отдельный блок для статуса (под Canvas) */}
                 <Card className="status-card">
                     <Typography variant="body2">{statusMessage}</Typography>
                 </Card>
