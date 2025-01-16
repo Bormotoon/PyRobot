@@ -20,15 +20,15 @@
 
 /* Правая часть: область с канвасом + отдельная карточка для статуса */
 .field-area {
-    flex: 1;                 /* Заполнить всё оставшееся пространство */
+    flex: 1; /* Заполнить всё оставшееся пространство */
     display: flex;
-    flex-direction: column;  /* Разместить Canvas и статус по вертикали */
+    flex-direction: column; /* Разместить Canvas и статус по вертикали */
     margin: 16px;
 }
 
 /* Карточка, в которой находится Canvas */
 .card-controls {
-    flex: 1;                 /* Может растягиваться по высоте */
+    flex: 1; /* Может растягиваться по высоте */
     padding: 16px;
     border-radius: 8px;
     border: 1px solid #ccc;
@@ -48,14 +48,41 @@
     text-align: center;
 }
 
-/* Общие стили для кнопок */
+/* Пример: кнопка растягивается на всю ширину и адаптирует размер шрифта */
 button {
     background-color: #1a202c;
     color: #fff;
-    width: 100%;
-    height: 5vh;
-    font-size: 2vh;
-    box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.3);
+    width: 100%; /* Растягиваем на 100% контейнера */
+    min-height: 5vh; /* Минимальная высота - 5% высоты экрана */
+    display: flex; /* Чтобы центрировать текст по вертикали и горизонтали */
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    border: none;
+    box-sizing: border-box;
+    padding: 0.5em 1em; /* Немного внутренних отступов */
+
+    /*
+      clamp(минимум, предпочитаемый, максимум)
+      Например: clamp(0.8rem, 2vw, 1.2rem)
+      - на маленьких экранах (или если текст длинный) шрифт уменьшится до 0.8rem
+      - в обычном масштабе будет примерно 2vw
+      - не вырастет больше 1.2rem при увеличении окна
+    */
+    font-size: clamp(0.8rem, 2vw, 1.2rem);
+    line-height: 1.2;
+
+    /* Если хотите, чтобы текст не переносился на вторую строку: */
+    white-space: nowrap;
+    overflow: hidden;
+    /*
+      Если хотите троеточие в конце, когда текста слишком много:
+      text-overflow: ellipsis;
+      Но тогда часть текста может быть "обрезана".
+    */
+    /* text-overflow: ellipsis; */
+    /* white-space: nowrap; */
+    box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.3); /* Тень для всех кнопок */
 }
 
 /* Кнопка "во всю ширину" */
@@ -66,13 +93,14 @@ button.full-width {
     font-size: 2vh;
 }
 
-/* Кнопка с контуром (outlined) */
+/* Кнопка с контуром (outlined) - добавим box-shadow */
 button.full-width-outlined {
     width: 100%;
-    height: 5vh;
+    min-height: 5vh;
     margin-top: 10px;
     border: 1px solid #ccc;
-    font-size: 2vh;
+    box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.3); /* Добавили тень */
+    /* ... остальные свойства ... */
 }
 
 /* Стиль для Canvas (рамка + фон) */
