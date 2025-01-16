@@ -66,40 +66,6 @@ const RobotSimulator = () => {
     // Состояние для модального окна «Помощь»
     const [helpOpen, setHelpOpen] = useState(false);
 
-    /**
-     * useEffect: При изменении ширины/высоты пересоздаём постоянные стены
-     * и клэмпим (ограничиваем) координаты робота, чтобы он не вышел за границы.
-     */
-    useEffect(() => {
-        setupPermanentWalls();
-
-        // Если робот оказался за новой границей (напр. уменьшили width),
-        // сдвигаем его внутрь
-        setRobotPos(prev => {
-            const clampedX = Math.min(Math.max(prev.x, 0), width - 1);
-            const clampedY = Math.min(Math.max(prev.y, 0), height - 1);
-            return {x: clampedX, y: clampedY};
-        });
-    }, [width, height]);
-
-    /**
-     * useEffect: При любом изменении ключевых переменных (поз. робота, стены, маркеры и т. д.)
-     * перерисовываем Canvas с помощью drawField.
-     */
-    useEffect(() => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-        drawField(canvas, {
-            coloredCells,
-            robotPos,
-            markers,
-            walls,
-            permanentWalls,
-            width,
-            height,
-            cellSize,
-        });
-    }, [robotPos, width, height, walls, coloredCells, markers, cellSize, permanentWalls]);
 
     /**
      * Создаём постоянные стены (границы поля):
@@ -120,6 +86,42 @@ const RobotSimulator = () => {
         }
         setPermanentWalls(newPermanentWalls);
     };
+
+    /**
+     * useEffect: При изменении ширины/высоты пересоздаём постоянные стены
+     * и клэмпим (ограничиваем) координаты робота, чтобы он не вышел за границы.
+     */
+    useEffect(() => {
+        setupPermanentWalls();
+
+        // Если робот оказался за новой границей (напр. уменьшили width),
+        // сдвигаем его внутрь
+        setRobotPos(prev => {
+            const clampedX = Math.min(Math.max(prev.x, 0), width - 1);
+            const clampedY = Math.min(Math.max(prev.y, 0), height - 1);
+            return {x: clampedX, y: clampedY};
+        });
+    }, [width, height, setupPermanentWalls]);
+
+    /**
+     * useEffect: При любом изменении ключевых переменных (поз. робота, стены, маркеры и т. д.)
+     * перерисовываем Canvas с помощью drawField.
+     */
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        drawField(canvas, {
+            coloredCells,
+            robotPos,
+            markers,
+            walls,
+            permanentWalls,
+            width,
+            height,
+            cellSize,
+        });
+    }, [robotPos, width, height, walls, coloredCells, markers, cellSize, permanentWalls]);
+
 
     /**
      * Функция возвращает координаты мыши (x, y) внутри Canvas,
