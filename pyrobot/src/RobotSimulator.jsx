@@ -75,8 +75,7 @@ const RobotSimulator = () => {
      * - Лево/право (вертикальные)
      */
     const setupPermanentWalls = useCallback(() => {
-        // ... код, который раньше был в setupPermanentWalls ...
-        // например:
+        // При изменении ширины/высоты пересоздаём постоянные стены
         const newPermanentWalls = new Set();
         for (let x = 0; x < width; x++) {
             newPermanentWalls.add(`${x},0,${x + 1},0`);
