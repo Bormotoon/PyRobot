@@ -1,80 +1,51 @@
-/* styles.css */
-.App {
-    text-align: center;
-}
-
-.App-header {
-    background-color: #282c34;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-size: calc(10px + 2vmin);
-    color: white;
-}
-
-button {
-    background-color: #1a202c;
-    color: #fff;
-    width: 60px;
-    height: 40px;
-    box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.3);
-}
-
-button.full-width {
-    width: 100%;
-    height: 40px;
-    margin-top: 10px;
-}
-
-button.full-width-outlined {
-    width: 100%;
-    height: 40px;
-    margin-top: 10px;
-    border: 1px solid #ccc;
-}
-
-canvas {
-    border: 2px solid #ccc;
-    margin: 16px auto;
-    display: block;
-    background-color: #289628;
-}
-
-canvas.edit-mode {
-    background-color: #6496FF;
-}
-
+/* Общий контейнер: делим на левую и правую часть */
 .container {
     display: flex;
     height: 100vh;
 }
 
+/* Левая карточка с кнопками */
 .card {
     width: 25%;
     padding: 16px;
     border-radius: 8px;
     border: 1px solid #ccc;
     box-sizing: border-box;
-    margin: 16px; /* Add margin for spacing around the button block */
-    height: auto; /* Adjust height based on content */
+    margin: 16px;
+    height: auto;
 }
 
+/* Правая часть: область с канвасом + блок статуса */
+.field-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    margin: 16px;
+}
+
+/* Карточка для поля (Canvas) */
 .card-controls {
     flex: 1;
     padding: 16px;
     border-radius: 8px;
     border: 1px solid #ccc;
     text-align: center;
-    margin: 16px; /* Add margin for spacing around the game field block */
     display: flex;
-    flex-direction: column; /* Arrange items vertically */
-    justify-content: center; /* Center horizontally */
-    align-items: center; /* Center vertically */
-    height: auto; /* Adjust height based on content */
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
 }
 
+/* Карточка для статуса/сообщения */
+.status-card {
+    padding: 8px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    margin-top: 16px;
+    text-align: center;
+}
+
+/* Стили кнопок (общие) */
 button {
     background-color: #1a202c;
     color: #fff;
@@ -84,6 +55,7 @@ button {
     box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.3);
 }
 
+/* Кнопки во всю ширину */
 button.full-width {
     width: 100%;
     height: 5vh;
@@ -91,6 +63,7 @@ button.full-width {
     font-size: 2vh;
 }
 
+/* Кнопка с рамкой */
 button.full-width-outlined {
     width: 100%;
     height: 5vh;
@@ -99,6 +72,7 @@ button.full-width-outlined {
     font-size: 2vh;
 }
 
+/* Холст */
 canvas {
     border: 2px solid #ccc;
     margin: 16px auto;
@@ -106,6 +80,7 @@ canvas {
     background-color: #289628;
 }
 
+/* Цвет заливки холста в режиме редактирования */
 canvas.edit-mode {
     background-color: #6496FF;
 }

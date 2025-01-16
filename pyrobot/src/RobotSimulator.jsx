@@ -1,6 +1,7 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {Button, Card, CardContent, CardHeader, Typography, Grid} from '@mui/material';
 import {ChevronUp, ChevronDown, ChevronLeft, ChevronRight} from 'lucide-react';
+import './styles.css';
 
 const RobotSimulator = () => {
     const [width, setWidth] = useState(7);
@@ -13,22 +14,26 @@ const RobotSimulator = () => {
     const [coloredCells, setColoredCells] = useState(new Set());
     const [statusMessage, setStatusMessage] = useState("Click between cells to add/remove walls");
     const canvasRef = useRef(null);
-    const [cellSize, setCellSize] = useState(50); // Add state for cell size
+    const [cellSize, setCellSize] = useState(50); // State для размера ячейки
 
+    // При изменении размеров поля пересоздаем постоянные стены (границы)
     useEffect(() => {
         setupPermanentWalls();
-    }, [width, height]); // Add width and height to dependencies
+    }, [width, height]);
 
+    // Перерисовка при любом изменении важных параметров
     useEffect(() => {
         drawField();
-    }, [robotPos, width, height, walls, coloredCells, markers, cellSize, permanentWalls]); // Add permanentWalls to dependencies
+    }, [robotPos, width, height, walls, coloredCells, markers, cellSize, permanentWalls]);
 
     const setupPermanentWalls = () => {
         const newPermanentWalls = new Set();
+        // Верхняя и нижняя границы
         for (let x = 0; x < width; x++) {
             newPermanentWalls.add(`${x},0,${x + 1},0`);
             newPermanentWalls.add(`${x},${height},${x + 1},${height}`);
         }
+        // Левая и правая границы
         for (let y = 0; y < height; y++) {
             newPermanentWalls.add(`0,${y},0,${y + 1}`);
             newPermanentWalls.add(`${width},${y},${width},${y + 1}`);
@@ -39,21 +44,20 @@ const RobotSimulator = () => {
     const drawField = () => {
         const canvas = canvasRef.current;
         if (!canvas) return;
-
         const ctx = canvas.getContext('2d');
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // Draw colored cells
+        // Заливка раскрашенных ячеек
         ctx.fillStyle = 'gray';
         coloredCells.forEach(cell => {
             const [x, y] = cell.split(',').map(Number);
             ctx.fillRect((x + 1) * cellSize, (y + 1) * cellSize, cellSize, cellSize);
         });
 
-        // Draw robot
+        // Рисуем робота (ромб)
         const robotX = (robotPos.x + 1) * cellSize + cellSize / 2;
         const robotY = (robotPos.y + 1) * cellSize + cellSize / 2;
-        const diamondSize = cellSize * 0.4 * 1.5; // Increase size by 1.5 times
+        const diamondSize = cellSize * 0.4 * 1.5; // 1.5x масштаб
         ctx.fillStyle = '#FF4500';
         ctx.beginPath();
         ctx.moveTo(robotX, robotY - diamondSize / 2);
@@ -64,19 +68,25 @@ const RobotSimulator = () => {
         ctx.fill();
         ctx.stroke();
 
-        // Draw markers
+        // Рисуем маркеры (кружочки)
         Object.keys(markers).forEach(key => {
             const [x, y] = key.split(',').map(Number);
             ctx.fillStyle = 'white';
             ctx.beginPath();
-            ctx.arc((x + 1.75) * cellSize, (y + 1.75) * cellSize, cellSize * 0.15, 0, 2 * Math.PI);
+            ctx.arc(
+                (x + 1.75) * cellSize,
+                (y + 1.75) * cellSize,
+                cellSize * 0.15,
+                0,
+                2 * Math.PI
+            );
             ctx.fill();
-            ctx.strokeStyle = 'black'; // Change outline color to black
-            ctx.lineWidth = 1; // Halve the thickness of the outline
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = 1;
             ctx.stroke();
         });
 
-        // Draw walls
+        // Рисуем стены (оранжевым цветом)
         ctx.strokeStyle = '#C8C80F';
         ctx.lineWidth = 8;
         walls.forEach(wall => {
@@ -87,7 +97,7 @@ const RobotSimulator = () => {
             ctx.stroke();
         });
 
-        // Draw permanent walls
+        // Рисуем постоянные стены
         permanentWalls.forEach(wall => {
             const [x1, y1, x2, y2] = wall.split(',').map(Number);
             ctx.beginPath();
@@ -96,7 +106,7 @@ const RobotSimulator = () => {
             ctx.stroke();
         });
 
-        // Draw grid
+        // Рисуем сетку
         ctx.strokeStyle = '#C8C80F';
         ctx.lineWidth = 2;
         for (let x = 0; x <= width + 2; x++) {
@@ -118,7 +128,7 @@ const RobotSimulator = () => {
         const margin = 5;
 
         if (gridX < 0 || gridX >= width || gridY < 0 || gridY >= height) {
-            return; // Prevent actions outside the main field
+            return; // Не действуем за пределами поля
         }
 
         const xRemainder = x % cellSize;
@@ -146,6 +156,7 @@ const RobotSimulator = () => {
                 return newWalls;
             });
         } else {
+            // Если не попали в стену, красим/снимаем краску
             const pos = `${gridX},${gridY}`;
             setColoredCells((prev) => {
                 const newCells = new Set(prev);
@@ -160,7 +171,7 @@ const RobotSimulator = () => {
     };
 
     const handleCanvasRightClick = (event) => {
-        event.preventDefault(); // Prevent the default context menu from appearing
+        event.preventDefault(); // Не показывать контекстное меню
         if (!editMode) return;
 
         const canvas = canvasRef.current;
@@ -170,7 +181,7 @@ const RobotSimulator = () => {
         const gridX = Math.floor(x / cellSize) - 1;
         const gridY = Math.floor(y / cellSize) - 1;
 
-        if (gridX < 0 || gridX >= width || gridY < 0 || gridY >= height) return; // Prevent placing markers outside the main field
+        if (gridX < 0 || gridX >= width || gridY < 0 || gridY >= height) return;
 
         const pos = `${gridX},${gridY}`;
         setMarkers((prev) => {
@@ -189,22 +200,38 @@ const RobotSimulator = () => {
             let newPos = {...prevPos};
             switch (direction) {
                 case 'up':
-                    if (newPos.y > 0 && !walls.has(`${newPos.x},${newPos.y},${newPos.x + 1},${newPos.y}`) && !permanentWalls.has(`${newPos.x},${newPos.y},${newPos.x + 1},${newPos.y}`)) {
+                    if (
+                        newPos.y > 0 &&
+                        !walls.has(`${newPos.x},${newPos.y},${newPos.x + 1},${newPos.y}`) &&
+                        !permanentWalls.has(`${newPos.x},${newPos.y},${newPos.x + 1},${newPos.y}`)
+                    ) {
                         newPos.y -= 1;
                     }
                     break;
                 case 'down':
-                    if (newPos.y < height - 1 && !walls.has(`${newPos.x},${newPos.y + 1},${newPos.x + 1},${newPos.y + 1}`) && !permanentWalls.has(`${newPos.x},${newPos.y + 1},${newPos.x + 1},${newPos.y + 1}`)) {
+                    if (
+                        newPos.y < height - 1 &&
+                        !walls.has(`${newPos.x},${newPos.y + 1},${newPos.x + 1},${newPos.y + 1}`) &&
+                        !permanentWalls.has(`${newPos.x},${newPos.y + 1},${newPos.x + 1},${newPos.y + 1}`)
+                    ) {
                         newPos.y += 1;
                     }
                     break;
                 case 'left':
-                    if (newPos.x > 0 && !walls.has(`${newPos.x},${newPos.y},${newPos.x},${newPos.y + 1}`) && !permanentWalls.has(`${newPos.x},${newPos.y},${newPos.x},${newPos.y + 1}`)) {
+                    if (
+                        newPos.x > 0 &&
+                        !walls.has(`${newPos.x},${newPos.y},${newPos.x},${newPos.y + 1}`) &&
+                        !permanentWalls.has(`${newPos.x},${newPos.y},${newPos.x},${newPos.y + 1}`)
+                    ) {
                         newPos.x -= 1;
                     }
                     break;
                 case 'right':
-                    if (newPos.x < width - 1 && !walls.has(`${newPos.x + 1},${newPos.y},${newPos.x + 1},${newPos.y + 1}`) && !permanentWalls.has(`${newPos.x + 1},${newPos.y},${newPos.x + 1},${newPos.y + 1}`)) {
+                    if (
+                        newPos.x < width - 1 &&
+                        !walls.has(`${newPos.x + 1},${newPos.y},${newPos.x + 1},${newPos.y + 1}`) &&
+                        !permanentWalls.has(`${newPos.x + 1},${newPos.y},${newPos.x + 1},${newPos.y + 1}`)
+                    ) {
                         newPos.x += 1;
                     }
                     break;
@@ -217,10 +244,11 @@ const RobotSimulator = () => {
 
     const handleCanvasWheel = (event) => {
         event.preventDefault();
-        event.stopPropagation(); // Stop the event from propagating to parent elements
-        setCellSize((prev) => Math.max(10, prev + (event.deltaY > 0 ? -5 : 5))); // Adjust cell size with a minimum value
+        event.stopPropagation();
+        setCellSize((prev) => Math.max(10, prev + (event.deltaY > 0 ? -5 : 5)));
     };
 
+    // Запрещаем прокрутку страницы при прокрутке колесом над канвасом
     useEffect(() => {
         const canvas = canvasRef.current;
         if (canvas) {
@@ -234,6 +262,7 @@ const RobotSimulator = () => {
         }
     }, []);
 
+    // Добавить маркер в позицию робота
     const putMarker = () => {
         const pos = `${robotPos.x},${robotPos.y}`;
         setMarkers((prev) => {
@@ -245,6 +274,7 @@ const RobotSimulator = () => {
         });
     };
 
+    // Забрать маркер в позиции робота
     const pickMarker = () => {
         const pos = `${robotPos.x},${robotPos.y}`;
         setMarkers((prev) => {
@@ -256,11 +286,17 @@ const RobotSimulator = () => {
         });
     };
 
+    // Покрасить текущую ячейку робота
     const paintCell = () => {
         const pos = `${robotPos.x},${robotPos.y}`;
-        setColoredCells((prev) => new Set(prev).add(pos));
+        setColoredCells((prev) => {
+            const newCells = new Set(prev);
+            newCells.add(pos);
+            return newCells;
+        });
     };
 
+    // Снять покраску текущей ячейки робота
     const clearCell = () => {
         const pos = `${robotPos.x},${robotPos.y}`;
         setColoredCells((prev) => {
@@ -270,190 +306,191 @@ const RobotSimulator = () => {
         });
     };
 
+    // Изменение ширины/высоты поля
     const increaseWidth = () => {
         if (editMode) {
             setWidth((prev) => prev + 1);
-            setupPermanentWalls();
         }
     };
-
     const decreaseWidth = () => {
         if (editMode && width > 1) {
             setWidth((prev) => prev - 1);
-            setupPermanentWalls();
         }
     };
-
     const increaseHeight = () => {
         if (editMode) {
             setHeight((prev) => prev + 1);
-            setupPermanentWalls();
         }
     };
-
     const decreaseHeight = () => {
         if (editMode && height > 1) {
             setHeight((prev) => prev - 1);
-            setupPermanentWalls();
         }
     };
 
-    return (<div className="container">
-        {/* Controls */}
-        <Card className="card">
-            <CardHeader
-                title={<Typography variant="h6" style={{textAlign: 'center'}}>Controls</Typography>}
-            />
-            <CardContent>
-                <Grid container spacing={2} alignItems="center" justifyContent="center">
-                    {/* Directional Buttons */}
-                    <Grid item xs={4}></Grid>
-                    <Grid item xs={4}>
-                        <Button
-                            variant="contained"
-                            className="button"
-                            onClick={() => moveRobot('up')}
-                        >
-                            <ChevronUp/>
-                        </Button>
-                    </Grid>
-                    <Grid item xs={4}></Grid>
+    return (
+        <div className="container">
+            {/* Левая панель управления */}
+            <Card className="card">
+                <CardHeader
+                    title={<Typography variant="h6" style={{textAlign: 'center'}}>Controls</Typography>}
+                />
+                <CardContent>
+                    <Grid container spacing={2} alignItems="center" justifyContent="center">
+                        {/* Кнопки движения */}
+                        <Grid item xs={4}></Grid>
+                        <Grid item xs={4}>
+                            <Button
+                                variant="contained"
+                                className="button"
+                                onClick={() => moveRobot('up')}
+                            >
+                                <ChevronUp/>
+                            </Button>
+                        </Grid>
+                        <Grid item xs={4}></Grid>
 
-                    <Grid item xs={4}>
-                        <Button
-                            variant="contained"
-                            className="button"
-                            onClick={() => moveRobot('left')}
-                        >
-                            <ChevronLeft/>
-                        </Button>
-                    </Grid>
-                    <Grid item xs={4}></Grid>
-                    <Grid item xs={4}>
-                        <Button
-                            variant="contained"
-                            className="button"
-                            onClick={() => moveRobot('right')}
-                        >
-                            <ChevronRight/>
-                        </Button>
-                    </Grid>
+                        <Grid item xs={4}>
+                            <Button
+                                variant="contained"
+                                className="button"
+                                onClick={() => moveRobot('left')}
+                            >
+                                <ChevronLeft/>
+                            </Button>
+                        </Grid>
+                        <Grid item xs={4}></Grid>
+                        <Grid item xs={4}>
+                            <Button
+                                variant="contained"
+                                className="button"
+                                onClick={() => moveRobot('right')}
+                            >
+                                <ChevronRight/>
+                            </Button>
+                        </Grid>
 
-                    <Grid item xs={4}></Grid>
-                    <Grid item xs={4}>
-                        <Button
-                            variant="contained"
-                            className="button"
-                            onClick={() => moveRobot('down')}
-                        >
-                            <ChevronDown/>
-                        </Button>
-                    </Grid>
-                    <Grid item xs={4}></Grid>
+                        <Grid item xs={4}></Grid>
+                        <Grid item xs={4}>
+                            <Button
+                                variant="contained"
+                                className="button"
+                                onClick={() => moveRobot('down')}
+                            >
+                                <ChevronDown/>
+                            </Button>
+                        </Grid>
+                        <Grid item xs={4}></Grid>
 
-                    {/* Other Buttons */}
-                    <Grid item xs={6}>
-                        <Button
-                            variant="contained"
-                            className="button full-width"
-                            onClick={putMarker}
-                        >
-                            Put Marker
-                        </Button>
-                    </Grid>
-                    <Grid item xs={6}>
-                        <Button
-                            variant="contained"
-                            className="button full-width"
-                            onClick={pickMarker}
-                        >
-                            Pick Marker
-                        </Button>
-                    </Grid>
+                        {/* Кнопки маркеров и покраски */}
+                        <Grid item xs={6}>
+                            <Button
+                                variant="contained"
+                                className="button full-width"
+                                onClick={putMarker}
+                            >
+                                Put Marker
+                            </Button>
+                        </Grid>
+                        <Grid item xs={6}>
+                            <Button
+                                variant="contained"
+                                className="button full-width"
+                                onClick={pickMarker}
+                            >
+                                Pick Marker
+                            </Button>
+                        </Grid>
+                        <Grid item xs={6}>
+                            <Button
+                                variant="contained"
+                                className="button full-width"
+                                onClick={paintCell}
+                            >
+                                Paint Cell
+                            </Button>
+                        </Grid>
+                        <Grid item xs={6}>
+                            <Button
+                                variant="contained"
+                                className="button full-width"
+                                onClick={clearCell}
+                            >
+                                Clear Cell
+                            </Button>
+                        </Grid>
 
-                    <Grid item xs={6}>
-                        <Button
-                            variant="contained"
-                            className="button full-width"
-                            onClick={paintCell}
-                        >
-                            Paint Cell
-                        </Button>
-                    </Grid>
-                    <Grid item xs={6}>
-                        <Button
-                            variant="contained"
-                            className="button full-width"
-                            onClick={clearCell}
-                        >
-                            Clear Cell
-                        </Button>
-                    </Grid>
+                        {/* Режим редактирования */}
+                        <Grid item xs={12}>
+                            <Button
+                                variant="outlined"
+                                className="button full-width-outlined"
+                                onClick={() => setEditMode(!editMode)}
+                            >
+                                {editMode ? 'Exit Edit Mode' : 'Enter Edit Mode'}
+                            </Button>
+                        </Grid>
 
-                    <Grid item xs={12}>
-                        <Button
-                            variant="outlined"
-                            className="button full-width-outlined"
-                            onClick={() => setEditMode(!editMode)}
-                        >
-                            {editMode ? 'Exit Edit Mode' : 'Enter Edit Mode'}
-                        </Button>
+                        {/* Изменение размеров */}
+                        <Grid item xs={6}>
+                            <Button
+                                variant="contained"
+                                className="button full-width"
+                                onClick={increaseWidth}
+                            >
+                                Width +
+                            </Button>
+                        </Grid>
+                        <Grid item xs={6}>
+                            <Button
+                                variant="contained"
+                                className="button full-width"
+                                onClick={decreaseWidth}
+                            >
+                                Width -
+                            </Button>
+                        </Grid>
+                        <Grid item xs={6}>
+                            <Button
+                                variant="contained"
+                                className="button full-width"
+                                onClick={increaseHeight}
+                            >
+                                Height +
+                            </Button>
+                        </Grid>
+                        <Grid item xs={6}>
+                            <Button
+                                variant="contained"
+                                className="button full-width"
+                                onClick={decreaseHeight}
+                            >
+                                Height -
+                            </Button>
+                        </Grid>
                     </Grid>
+                </CardContent>
+            </Card>
 
-                    <Grid item xs={6}>
-                        <Button
-                            variant="contained"
-                            className="button full-width"
-                            onClick={increaseWidth}
-                        >
-                            Width +
-                        </Button>
-                    </Grid>
-                    <Grid item xs={6}>
-                        <Button
-                            variant="contained"
-                            className="button full-width"
-                            onClick={decreaseWidth}
-                        >
-                            Width -
-                        </Button>
-                    </Grid>
-                    <Grid item xs={6}>
-                        <Button
-                            variant="contained"
-                            className="button full-width"
-                            onClick={increaseHeight}
-                        >
-                            Height +
-                        </Button>
-                    </Grid>
-                    <Grid item xs={6}>
-                        <Button
-                            variant="contained"
-                            className="button full-width"
-                            onClick={decreaseHeight}
-                        >
-                            Height -
-                        </Button>
-                    </Grid>
-                </Grid>
-            </CardContent>
-        </Card>
-
-        {/* Canvas */}
-        <Card className="card-controls">
-            <canvas
-                ref={canvasRef}
-                width={(width + 2) * cellSize} // Increase canvas width
-                height={(height + 2) * cellSize} // Increase canvas height
-                className={editMode ? 'edit-mode' : ''}
-                onClick={handleCanvasClick}
-                onContextMenu={handleCanvasRightClick} // Add right-click event listener
-                onWheel={handleCanvasWheel} // Add wheel event listener
-            />
-            <Typography variant="body2">{statusMessage}</Typography>
-        </Card>
-    </div>);
+            {/* Правая часть экрана: Canvas + отдельный блок статуса */}
+            <div className="field-area">
+                <Card className="card-controls">
+                    <canvas
+                        ref={canvasRef}
+                        width={(width + 2) * cellSize}
+                        height={(height + 2) * cellSize}
+                        className={editMode ? 'edit-mode' : ''}
+                        onClick={handleCanvasClick}
+                        onContextMenu={handleCanvasRightClick}
+                        onWheel={handleCanvasWheel}
+                    />
+                </Card>
+                <Card className="status-card">
+                    <Typography variant="body2">{statusMessage}</Typography>
+                </Card>
+            </div>
+        </div>
+    );
 };
 
 export default RobotSimulator;
