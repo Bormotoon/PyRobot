@@ -24,11 +24,18 @@ const RobotSimulator = () => {
     const [cellSize, setCellSize] = useState(50); // Размер одной клетки
     const canvasRef = useRef(null);
 
-    /**
-     * useEffect: Создаём постоянные стены при изменении ширины/высоты
-     */
+    // ----------------------------------
+    // 1. Создаём постоянные стены
+    // ----------------------------------
     useEffect(() => {
         setupPermanentWalls();
+        // NEW CHECK: Если при изменении width/height робот вышел за границу,
+        // клэмпим его координаты обратно внутрь [0..width-1], [0..height-1].
+        setRobotPos(prev => {
+            const clampedX = Math.min(Math.max(prev.x, 0), width - 1);
+            const clampedY = Math.min(Math.max(prev.y, 0), height - 1);
+            return {x: clampedX, y: clampedY};
+        });
     }, [width, height]);
 
     /**
@@ -82,7 +89,7 @@ const RobotSimulator = () => {
         const gridY = Math.floor(y / cellSize) - 1;
         const margin = 5;
 
-        // Не даём действовать за пределами основного поля
+        // NEW CHECK: Если попали вообще за любую границу - не делаем ничего.
         if (gridX < 0 || gridX >= width || gridY < 0 || gridY >= height) {
             return;
         }
@@ -92,13 +99,23 @@ const RobotSimulator = () => {
 
         let wall = null;
         if (xRemainder < margin) {
-            wall = `${gridX},${gridY},${gridX},${gridY + 1}`;
+            // NEW CHECK: убедимся, что gridX >= 0, gridX < width, gridY + 1 <= height ...
+            // Хотя выше уже проверили gridX,gridY, но на всякий случай можно
+            if (gridX >= 0 && gridY >= 0 && (gridY + 1) <= height) {
+                wall = `${gridX},${gridY},${gridX},${gridY + 1}`;
+            }
         } else if (xRemainder > cellSize - margin) {
-            wall = `${gridX + 1},${gridY},${gridX + 1},${gridY + 1}`;
+            if ((gridX + 1) <= width && gridY >= 0 && (gridY + 1) <= height) {
+                wall = `${gridX + 1},${gridY},${gridX + 1},${gridY + 1}`;
+            }
         } else if (yRemainder < margin) {
-            wall = `${gridX},${gridY},${gridX + 1},${gridY}`;
+            if (gridX >= 0 && (gridX + 1) <= width && gridY >= 0) {
+                wall = `${gridX},${gridY},${gridX + 1},${gridY}`;
+            }
         } else if (yRemainder > cellSize - margin) {
-            wall = `${gridX},${gridY + 1},${gridX + 1},${gridY + 1}`;
+            if (gridX >= 0 && (gridX + 1) <= width && (gridY + 1) <= height) {
+                wall = `${gridX},${gridY + 1},${gridX + 1},${gridY + 1}`;
+            }
         }
 
         // Если это "попадание" на границу клетки (wall != null), проверяем, не постоянная ли стена
@@ -141,7 +158,11 @@ const RobotSimulator = () => {
         const gridX = Math.floor(x / cellSize) - 1;
         const gridY = Math.floor(y / cellSize) - 1;
 
-        if (gridX < 0 || gridX >= width || gridY < 0 || gridY >= height) return;
+
+        // NEW CHECK: Не даём ставить маркеры за границами
+        if (gridX < 0 || gridX >= width || gridY < 0 || gridY >= height) {
+            return;
+        }
 
         const pos = `${gridX},${gridY}`;
         setMarkers((prev) => {
@@ -155,12 +176,12 @@ const RobotSimulator = () => {
         });
     };
 
-    /**
-     * Двигаем робота в указанном направлении (up/down/left/right),
-     * проверяем стены (обычные и постоянные).
-     */
+// ----------------------------------
+    // 5. moveRobot: дополнительно клэмпим
+    //    (на случай, если что-то не учли)
+    // ----------------------------------
     const moveRobot = (direction) => {
-        setRobotPos((prevPos) => {
+        setRobotPos(prevPos => {
             let newPos = {...prevPos};
             switch (direction) {
                 case 'up':
@@ -202,9 +223,14 @@ const RobotSimulator = () => {
                 default:
                     break;
             }
+            // NEW CHECK: клэмпим (x,y) на случай непредвиденных ситуаций
+            newPos.x = Math.min(Math.max(newPos.x, 0), width - 1);
+            newPos.y = Math.min(Math.max(newPos.y, 0), height - 1);
+
             return newPos;
         });
     };
+
 
     /**
      * Масштабирование колёсиком: меняем cellSize (минимум 10).
@@ -281,17 +307,20 @@ const RobotSimulator = () => {
         });
     };
 
-    /**
-     * Увеличение/уменьшение ширины (только в режиме редактирования)
-     */
+    // ----------------------------------
+    // 6. Меняем width/height (в режиме редактирования)
+    // ----------------------------------
     const increaseWidth = () => {
         if (editMode) {
-            setWidth((prev) => prev + 1);
+            setWidth(prev => prev + 1);
         }
     };
     const decreaseWidth = () => {
         if (editMode && width > 1) {
-            setWidth((prev) => prev - 1);
+            // NEW CHECK: если robot.x == width-1 и мы его уменьшаем,
+            // робот окажется за правым краем. Но мы уже клэмпим в useEffect,
+            // так что этого хватит.
+            setWidth(prev => prev - 1);
         }
     };
 
