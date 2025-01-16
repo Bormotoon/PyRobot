@@ -1,10 +1,13 @@
-/* Общий контейнер: делим на левую и правую часть */
+/*
+  Общий контейнер, в котором две колонки:
+  слева - панель управления (card), справа - поле (field-area).
+*/
 .container {
     display: flex;
-    height: 100vh;
+    height: 100vh; /* На всю высоту экрана */
 }
 
-/* Левая карточка с кнопками */
+/* Левая панель (Card) с кнопками */
 .card {
     width: 25%;
     padding: 16px;
@@ -12,20 +15,20 @@
     border: 1px solid #ccc;
     box-sizing: border-box;
     margin: 16px;
-    height: auto;
+    height: auto; /* Высота зависит от содержимого */
 }
 
-/* Правая часть: область с канвасом + блок статуса */
+/* Правая часть: область с канвасом + отдельная карточка для статуса */
 .field-area {
-    flex: 1;
+    flex: 1;                 /* Заполнить всё оставшееся пространство */
     display: flex;
-    flex-direction: column;
+    flex-direction: column;  /* Разместить Canvas и статус по вертикали */
     margin: 16px;
 }
 
-/* Карточка для поля (Canvas) */
+/* Карточка, в которой находится Canvas */
 .card-controls {
-    flex: 1;
+    flex: 1;                 /* Может растягиваться по высоте */
     padding: 16px;
     border-radius: 8px;
     border: 1px solid #ccc;
@@ -36,7 +39,7 @@
     align-items: center;
 }
 
-/* Карточка для статуса/сообщения */
+/* Отдельный блок для статуса под Canvas */
 .status-card {
     padding: 8px;
     border-radius: 8px;
@@ -45,7 +48,7 @@
     text-align: center;
 }
 
-/* Стили кнопок (общие) */
+/* Общие стили для кнопок */
 button {
     background-color: #1a202c;
     color: #fff;
@@ -55,7 +58,7 @@ button {
     box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.3);
 }
 
-/* Кнопки во всю ширину */
+/* Кнопка "во всю ширину" */
 button.full-width {
     width: 100%;
     height: 5vh;
@@ -63,7 +66,7 @@ button.full-width {
     font-size: 2vh;
 }
 
-/* Кнопка с рамкой */
+/* Кнопка с контуром (outlined) */
 button.full-width-outlined {
     width: 100%;
     height: 5vh;
@@ -72,15 +75,15 @@ button.full-width-outlined {
     font-size: 2vh;
 }
 
-/* Холст */
+/* Стиль для Canvas (рамка + фон) */
 canvas {
     border: 2px solid #ccc;
     margin: 16px auto;
     display: block;
-    background-color: #289628;
+    background-color: #289628; /* зелёный фон по умолчанию */
 }
 
-/* Цвет заливки холста в режиме редактирования */
+/* Фон Canvas в режиме редактирования (editMode) */
 canvas.edit-mode {
-    background-color: #6496FF;
+    background-color: #6496FF; /* синий фон в режиме редактирования */
 }
