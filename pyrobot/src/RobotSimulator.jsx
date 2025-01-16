@@ -1,4 +1,5 @@
-import React, {useEffect, useRef, useState} from 'react';
+import React, {useEffect, useRef, useState, useCallback} from 'react';
+
 import {
     Button,
     Card,
@@ -16,6 +17,7 @@ import {ChevronUp, ChevronDown, ChevronLeft, ChevronRight} from 'lucide-react';
 import './styles.css';
 import {drawField} from './canvasDrawing';
 import {getHint} from './hints'; // <-- Импорт функции для случайных подсказок
+
 
 /**
  * Компонент RobotSimulator — симулятор поля с «Роботом», стенами, маркерами и возможностью раскрашивать клетки.
@@ -66,6 +68,35 @@ const RobotSimulator = () => {
     // Состояние для модального окна «Помощь»
     const [helpOpen, setHelpOpen] = useState(false);
 
+
+    /**
+     * Создаём постоянные стены (границы поля):
+     * - Верх/низ (горизонтальные)
+     * - Лево/право (вертикальные)
+     */
+    const setupPermanentWalls = useCallback(() => {
+        // ... код, который раньше был в setupPermanentWalls ...
+        // например:
+        const newPermanentWalls = new Set();
+        for (let x = 0; x < width; x++) {
+            newPermanentWalls.add(`${x},0,${x + 1},0`);
+            newPermanentWalls.add(`${x},${height},${x + 1},${height}`);
+        }
+        for (let y = 0; y < height; y++) {
+            newPermanentWalls.add(`0,${y},0,${y + 1}`);
+            newPermanentWalls.add(`${width},${y},${width},${y + 1}`);
+        }
+        setPermanentWalls(newPermanentWalls);
+    }, [width, height]);
+// ^^^ Обратите внимание: [width, height], т.к. внутри функция
+//    использует width, height
+
+// useEffect:
+    useEffect(() => {
+        setupPermanentWalls();
+        // какие-то ещё действия...
+    }, [width, height, setupPermanentWalls]);
+
     /**
      * useEffect: При изменении ширины/высоты пересоздаём постоянные стены
      * и клэмпим (ограничиваем) координаты робота, чтобы он не вышел за границы.
@@ -80,7 +111,7 @@ const RobotSimulator = () => {
             const clampedY = Math.min(Math.max(prev.y, 0), height - 1);
             return {x: clampedX, y: clampedY};
         });
-    }, [width, height]);
+    }, [width, height, setupPermanentWalls]);
 
     /**
      * useEffect: При любом изменении ключевых переменных (поз. робота, стены, маркеры и т. д.)
@@ -101,25 +132,6 @@ const RobotSimulator = () => {
         });
     }, [robotPos, width, height, walls, coloredCells, markers, cellSize, permanentWalls]);
 
-    /**
-     * Создаём постоянные стены (границы поля):
-     * - Верх/низ (горизонтальные)
-     * - Лево/право (вертикальные)
-     */
-    const setupPermanentWalls = () => {
-        const newPermanentWalls = new Set();
-        // Верхняя и нижняя горизонтальные границы
-        for (let x = 0; x < width; x++) {
-            newPermanentWalls.add(`${x},0,${x + 1},0`);
-            newPermanentWalls.add(`${x},${height},${x + 1},${height}`);
-        }
-        // Левая и правая вертикальные границы
-        for (let y = 0; y < height; y++) {
-            newPermanentWalls.add(`0,${y},0,${y + 1}`);
-            newPermanentWalls.add(`${width},${y},${width},${y + 1}`);
-        }
-        setPermanentWalls(newPermanentWalls);
-    };
 
     /**
      * Функция возвращает координаты мыши (x, y) внутри Canvas,
