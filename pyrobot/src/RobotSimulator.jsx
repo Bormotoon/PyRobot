@@ -56,9 +56,7 @@ const RobotSimulator = () => {
     const [permanentWalls, setPermanentWalls] = useState(new Set());
     const [markers, setMarkers] = useState({});
     const [coloredCells, setColoredCells] = useState(new Set());
-    const [statusMessage, setStatusMessage] = useState(
-        "Используйте кнопки слева, чтобы двигать Робота и рисовать на поле!"
-    );
+    const [statusMessage, setStatusMessage] = useState("Используйте кнопки слева, чтобы двигать Робота и рисовать на поле!");
     const [cellSize, setCellSize] = useState(50);
     const [isDraggingRobot, setIsDraggingRobot] = useState(false);
 
@@ -67,6 +65,30 @@ const RobotSimulator = () => {
 
     // Состояние для модального окна «Помощь»
     const [helpOpen, setHelpOpen] = useState(false);
+
+    // Добавлены состояния
+    const [code, setCode] = useState('');
+    const [isRunning, setIsRunning] = useState(false);
+
+    // Обработчики действий
+    const handleClearCode = useCallback(() => {
+        setCode('');
+        setStatusMessage('Код программы очищен');
+    }, []);
+
+    const handleStart = useCallback(() => {
+        if (!code.trim()) {
+            setStatusMessage('Ошибка: программа пустая');
+            return;
+        }
+        setIsRunning(true);
+        setStatusMessage('Программа выполняется...');
+    }, [code]);
+
+    const handleStop = useCallback(() => {
+        setIsRunning(false);
+        setStatusMessage('Выполнение прервано');
+    }, []);
 
 
     /**
@@ -120,14 +142,7 @@ const RobotSimulator = () => {
         const canvas = canvasRef.current;
         if (!canvas) return;
         drawField(canvas, {
-            coloredCells,
-            robotPos,
-            markers,
-            walls,
-            permanentWalls,
-            width,
-            height,
-            cellSize,
+            coloredCells, robotPos, markers, walls, permanentWalls, width, height, cellSize,
         });
     }, [robotPos, width, height, walls, coloredCells, markers, cellSize, permanentWalls]);
 
@@ -389,11 +404,7 @@ const RobotSimulator = () => {
             let newPos = {...prevPos};
             switch (direction) {
                 case 'up':
-                    if (
-                        newPos.y > 0 &&
-                        !walls.has(`${newPos.x},${newPos.y},${newPos.x + 1},${newPos.y}`) &&
-                        !permanentWalls.has(`${newPos.x},${newPos.y},${newPos.x + 1},${newPos.y}`)
-                    ) {
+                    if (newPos.y > 0 && !walls.has(`${newPos.x},${newPos.y},${newPos.x + 1},${newPos.y}`) && !permanentWalls.has(`${newPos.x},${newPos.y},${newPos.x + 1},${newPos.y}`)) {
                         newPos.y -= 1;
                     } else {
                         setStatusMessage("Робот не может пойти вверх (стена или край).");
@@ -401,11 +412,7 @@ const RobotSimulator = () => {
                     }
                     break;
                 case 'down':
-                    if (
-                        newPos.y < height - 1 &&
-                        !walls.has(`${newPos.x},${newPos.y + 1},${newPos.x + 1},${newPos.y + 1}`) &&
-                        !permanentWalls.has(`${newPos.x},${newPos.y + 1},${newPos.x + 1},${newPos.y + 1}`)
-                    ) {
+                    if (newPos.y < height - 1 && !walls.has(`${newPos.x},${newPos.y + 1},${newPos.x + 1},${newPos.y + 1}`) && !permanentWalls.has(`${newPos.x},${newPos.y + 1},${newPos.x + 1},${newPos.y + 1}`)) {
                         newPos.y += 1;
                     } else {
                         setStatusMessage("Робот не может пойти вниз (стена или край).");
@@ -413,11 +420,7 @@ const RobotSimulator = () => {
                     }
                     break;
                 case 'left':
-                    if (
-                        newPos.x > 0 &&
-                        !walls.has(`${newPos.x},${newPos.y},${newPos.x},${newPos.y + 1}`) &&
-                        !permanentWalls.has(`${newPos.x},${newPos.y},${newPos.x},${newPos.y + 1}`)
-                    ) {
+                    if (newPos.x > 0 && !walls.has(`${newPos.x},${newPos.y},${newPos.x},${newPos.y + 1}`) && !permanentWalls.has(`${newPos.x},${newPos.y},${newPos.x},${newPos.y + 1}`)) {
                         newPos.x -= 1;
                     } else {
                         setStatusMessage("Робот не может пойти влево (стена или край).");
@@ -425,11 +428,7 @@ const RobotSimulator = () => {
                     }
                     break;
                 case 'right':
-                    if (
-                        newPos.x < width - 1 &&
-                        !walls.has(`${newPos.x + 1},${newPos.y},${newPos.x + 1},${newPos.y + 1}`) &&
-                        !permanentWalls.has(`${newPos.x + 1},${newPos.y},${newPos.x + 1},${newPos.y + 1}`)
-                    ) {
+                    if (newPos.x < width - 1 && !walls.has(`${newPos.x + 1},${newPos.y},${newPos.x + 1},${newPos.y + 1}`) && !permanentWalls.has(`${newPos.x + 1},${newPos.y},${newPos.x + 1},${newPos.y + 1}`)) {
                         newPos.x += 1;
                     } else {
                         setStatusMessage("Робот не может пойти вправо (стена или край).");
@@ -648,8 +647,49 @@ const RobotSimulator = () => {
     // ---------------------------------------------------------
     // JSX (верстка) — то, что отрисовывается на странице
     // ---------------------------------------------------------
-    return (
-        <div className="container">
+    return (<div className="container">
+
+
+            {/* Блок редактора кода (слева) */}
+            <Card className="card code-editor">
+    <textarea
+        className="code-input"
+        placeholder="// Программа управления роботом..."
+        value={code}
+        onChange={(e) => setCode(e.target.value)}
+    />
+
+                {/* Контейнер для кнопок */}
+                <div className="editor-controls">
+                    <Button
+                        variant="contained"
+                        color="secondary"
+                        onClick={handleClearCode}
+                        fullWidth
+                    >
+                        Очистить
+                    </Button>
+                    <Button
+                        variant="contained"
+                        color="error"
+                        onClick={handleStop}
+                        disabled={!isRunning}
+                        fullWidth
+                    >
+                        Стоп
+                    </Button>
+                    <Button
+                        variant="contained"
+                        color="success"
+                        onClick={handleStart}
+                        disabled={isRunning}
+                        fullWidth
+                    >
+                        Пуск
+                    </Button>
+                </div>
+            </Card>
+
             {/* Левая панель управления */}
             <Card className="card">
                 <CardHeader
@@ -867,8 +907,7 @@ const RobotSimulator = () => {
                     </Button>
                 </DialogActions>
             </Dialog>
-        </div>
-    );
+        </div>);
 };
 
 export default RobotSimulator;

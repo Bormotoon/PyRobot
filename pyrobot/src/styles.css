@@ -5,6 +5,59 @@
 .container {
     display: flex;
     height: 100vh; /* На всю высоту экрана */
+    gap: 16px; /* Пространство между блоками */
+}
+
+/* Стили для редактора кода */
+.code-editor {
+    width: 25%;
+    min-width: 300px;
+    margin: 16px 0 16px 0 !important;
+    padding-left: 3%;
+    padding-top: 16px;
+    padding-right: 3% !important; /* Дополнительный отступ справа */
+    background: #1e1e1e;
+    color: #d4d4d4;
+    border-radius: 8px;
+    overflow-y: auto;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.code-input {
+    width: 100%;
+    padding: 16px; /* Внутренний отступ текстового поля */
+    border: 1px solid #ccc !important; /* Граница как у кнопок */
+    border-radius: 4px; /* Скругление углов */
+    min-height: calc(100vh - 200px); /* Фиксированная высота */
+    height: calc(100vh - 220px) !important; /* Учёт места под кнопки */
+    margin: 0 0 16px;
+    transition: height 0.3s ease;
+}
+
+.code-input:focus {
+    outline: none;
+    box-shadow: inset 0 0 0 1px #1976d2;
+}
+
+/* Адаптивность */
+@media (max-width: 1200px) {
+    .container {
+        flex-wrap: wrap;
+    }
+
+    .code-editor {
+        width: 100%;
+        height: 300px;
+    }
+
+    .card {
+        width: 100% !important;
+        min-width: unset;
+    }
+
+    .field-area {
+        order: -1;
+    }
 }
 
 /* Левая панель (Card) с кнопками */
@@ -14,10 +67,20 @@
     border-radius: 8px;
     border: 1px solid #ccc;
     box-sizing: border-box;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     margin: 16px;
     height: auto; /* Высота зависит от содержимого */
     order: 2; /* Поменяли местами с field-area */
 }
+
+/* Делаем отступы идентичными блоку управления */
+.card .MuiCardContent-root {
+    padding: 16px !important;
+}
+
+/* TODO
+    Выровнять сраные кнопки под кодом по центру, ёпт!
+ */
 
 /* Правая часть: область с канвасом + отдельная карточка для статуса */
 .field-area {
@@ -60,6 +123,45 @@
     margin-top: 16px;
     text-align: center;
 }
+
+
+/* Стили для контейнера кнопок */
+.editor-controls {
+    display: flex;
+    justify-content: center; /* Центр по горизонтали */
+    align-items: center;     /* Центр по вертикали */
+    gap: 8px;
+    width: 100%;
+    margin-top: 16px;
+    padding: 0 10px; /* Защитные отступы */
+    box-sizing: border-box; /* Учёт padding в ширине */
+}
+
+
+.editor-controls button {
+    flex: 1; /* Занимают всё доступное пространство */
+    max-width: 100px; /* Ограничение максимальной ширины */
+}
+
+.editor-controls .MuiButton-root {
+    margin: 0 !important;
+    flex: 0 0 auto; /* Фиксированный размер без растягивания */
+    min-height: 40px; /* Фиксированная высота */
+    white-space: nowrap; /* Текст в одну строку */
+}
+
+/* Для мобильных устройств */
+@media (max-width: 768px) {
+    .editor-controls {
+        flex-direction: column;
+    }
+
+    .editor-controls .MuiButton-root {
+        width: 100% !important; /* На всю ширину */
+        max-width: 250px; /* Максимум для удобства */
+    }
+}
+
 
 /* Пример: кнопка растягивается на всю ширину и адаптирует размер шрифта */
 button {
