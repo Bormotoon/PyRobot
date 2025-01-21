@@ -1,18 +1,18 @@
-import React, {useEffect, useRef, useState, useCallback} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 
 import {
     Button,
     Card,
     CardContent,
     CardHeader,
-    Typography,
-    Grid,
     Dialog,
-    DialogTitle,
+    DialogActions,
     DialogContent,
-    DialogActions
+    DialogTitle,
+    Grid,
+    Typography
 } from '@mui/material';
-import {ChevronUp, ChevronDown, ChevronLeft, ChevronRight} from 'lucide-react';
+import {ChevronDown, ChevronLeft, ChevronRight, ChevronUp} from 'lucide-react';
 
 import './styles.css';
 import {drawField} from './canvasDrawing';

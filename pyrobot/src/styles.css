@@ -16,14 +16,27 @@
     box-sizing: border-box;
     margin: 16px;
     height: auto; /* Высота зависит от содержимого */
+    order: 2; /* Поменяли местами с field-area */
 }
 
 /* Правая часть: область с канвасом + отдельная карточка для статуса */
 .field-area {
     flex: 1; /* Заполнить всё оставшееся пространство */
+    order: 1; /* Поменяли местами с card */
     display: flex;
     flex-direction: column; /* Разместить Canvas и статус по вертикали */
     margin: 16px;
+}
+
+/* Для мобильной версии */
+@media (max-width: 768px) {
+    .container {
+        flex-direction: column;
+    }
+
+    .card, .field-area {
+        order: 0; /* Сброс порядка для мобилок */
+    }
 }
 
 /* Карточка, в которой находится Canvas */
