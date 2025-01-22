@@ -54,14 +54,91 @@ const RobotSimulator = () => {
     const [robotPos, setRobotPos] = useState({x: 0, y: 0});
     const [walls, setWalls] = useState(new Set());
     const [permanentWalls, setPermanentWalls] = useState(new Set());
-    const [markers, setMarkers] = useState({});
+    const [markers, setMarkers] = useState({}); // { "x,y": 1 }
     const [coloredCells, setColoredCells] = useState(new Set());
     const [statusMessage, setStatusMessage] = useState("Используйте кнопки слева, чтобы двигать Робота и рисовать на поле!");
     const [cellSize, setCellSize] = useState(50);
     const [isDraggingRobot, setIsDraggingRobot] = useState(false);
 
+
     // Ссылка на Canvas
     const canvasRef = useRef(null);
+
+    // Новые ref и состояния для импорта
+    const fileInputRef = useRef(null);
+
+    // Новые обработчики импорта
+    const handleImportField = () => {
+        fileInputRef.current.click();
+    };
+
+    const handleFileChange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        try {
+            const content = await file.text();
+            parseAndApplyFieldFile(content);
+            setStatusMessage("Обстановка успешно импортирована!");
+        } catch (error) {
+            setStatusMessage("Ошибка импорта: " + error.message);
+        }
+    };
+
+    // Парсер файла .fil
+    const parseAndApplyFieldFile = (content) => {
+        const lines = content.split('\n').filter(line => !line.startsWith(';') && line.trim() !== '');
+
+        // Размеры поля
+        const [width, height] = lines[0].split(/\s+/).map(Number);
+        setWidth(width);
+        setHeight(height);
+
+        // Позиция робота
+        const [robotX, robotY] = lines[1].split(/\s+/).map(Number);
+        setRobotPos({x: robotX, y: robotY});
+
+        // Сброс данных
+        const newWalls = new Set();
+        const newColored = new Set();
+        const newMarkers = {};
+
+        // Обработка клеток
+        for (let i = 2; i < lines.length; i++) {
+            const parts = lines[i].split(/\s+/);
+            const x = parseInt(parts[0]);
+            const y = parseInt(parts[1]);
+            const wall = parts[2];
+            const color = parts[3];
+            const point = parts[8]; // 9-й элемент массива
+
+            // Закрашенные клетки
+            if (color === '1') newColored.add(`${x},${y}`);
+
+            // Маркеры (только точки)
+            if (point === '1') {
+                newMarkers[`${x},${y}`] = 1;
+            }
+
+            // Стены (битовая маска)
+            const walls = parseWallCode(Number(wall), x, y);
+            walls.forEach(w => newWalls.add(w));
+        }
+
+        setWalls(newWalls);
+        setColoredCells(newColored);
+        setMarkers(newMarkers);
+    };
+
+
+    const parseWallCode = (code, x, y) => {
+        const walls = [];
+        if (code & 8) walls.push(`${x},${y},${x + 1},${y}`);    // Верх
+        if (code & 4) walls.push(`${x + 1},${y},${x + 1},${y + 1}`); // Право
+        if (code & 2) walls.push(`${x},${y + 1},${x + 1},${y + 1}`); // Низ
+        if (code & 1) walls.push(`${x},${y},${x},${y + 1}`);    // Лево
+        return walls;
+    };
 
     // Состояние для модального окна «Помощь»
     const [helpOpen, setHelpOpen] = useState(false);
@@ -175,7 +252,7 @@ const RobotSimulator = () => {
      * @return {{gridX: number|null, gridY: number|null}}
      */
     const toGridCoords = (x, y) => {
-        const gx = Math.floor(x / cellSize) - 1;
+        const gx = Math.floor(x / cellSize) - 1; // -1 из-за отступа поля
         const gy = Math.floor(y / cellSize) - 1;
         if (gx < 0 || gx >= width || gy < 0 || gy >= height) {
             return {gridX: null, gridY: null};
@@ -362,10 +439,10 @@ const RobotSimulator = () => {
             const newMarkers = {...prev};
             if (!newMarkers[pos]) {
                 newMarkers[pos] = 1;
-                setStatusMessage(getHint("canvasRightClickEditMode", editMode) + " Маркер добавлен!");
+                setStatusMessage("Маркер добавлен!");
             } else {
                 delete newMarkers[pos];
-                setStatusMessage(getHint("canvasRightClickEditMode", editMode) + " Маркер убран.");
+                setStatusMessage("Маркер убран.");
             }
             return newMarkers;
         });
@@ -839,6 +916,24 @@ const RobotSimulator = () => {
                         >
                             Помощь
                         </Button>
+                    </Grid>
+
+                    <Grid item xs={12}>
+                        <Button
+                            variant="contained"
+                            color="secondary"
+                            className="button full-width"
+                            onClick={handleImportField}
+                        >
+                            Импортировать обстановку
+                        </Button>
+                        <input
+                            type="file"
+                            ref={fileInputRef}
+                            style={{display: 'none'}}
+                            accept=".fil"
+                            onChange={handleFileChange}
+                        />
                     </Grid>
                 </Grid>
             </CardContent>

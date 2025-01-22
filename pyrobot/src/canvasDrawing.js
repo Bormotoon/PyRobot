@@ -54,6 +54,7 @@ export function drawRobot(ctx, robotPos, cellSize) {
  * @param {Object} markers - Объект вида { "x,y": 1, ... }
  * @param {number} cellSize
  */
+
 export function drawMarkers(ctx, markers, cellSize) {
     Object.keys(markers).forEach(key => {
         const [x, y] = key.split(',').map(Number);
@@ -118,14 +119,7 @@ export function drawGrid(ctx, width, height, cellSize) {
  */
 export function drawField(canvas, params) {
     const {
-        coloredCells,
-        robotPos,
-        markers,
-        walls,
-        permanentWalls,
-        width,
-        height,
-        cellSize
+        coloredCells, robotPos, markers, walls, permanentWalls, width, height, cellSize
     } = params;
 
     if (!canvas) return;
