@@ -72,6 +72,16 @@ const RobotSimulator = () => {
         fileInputRef.current.click();
     };
 
+    // Добавляем функцию сброса состояний
+    const resetFieldState = useCallback(() => {
+        setRobotPos({x: 0, y: 0});
+        setWalls(new Set());
+        setColoredCells(new Set());
+        setMarkers({});
+        setWidth(7);
+        setHeight(7);
+    }, []);
+
     const handleFileChange = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -87,47 +97,52 @@ const RobotSimulator = () => {
 
     // Парсер файла .fil
     const parseAndApplyFieldFile = (content) => {
-        const lines = content.split('\n').filter(line => !line.startsWith(';') && line.trim() !== '');
+        try {
+            // Полный сброс перед загрузкой новых данных
+            resetFieldState();
 
-        // Размеры поля
-        const [width, height] = lines[0].split(/\s+/).map(Number);
-        setWidth(width);
-        setHeight(height);
+            const lines = content.split('\n').filter(line => !line.startsWith(';') && line.trim() !== '');
 
-        // Позиция робота
-        const [robotX, robotY] = lines[1].split(/\s+/).map(Number);
-        setRobotPos({x: robotX, y: robotY});
+            // Размеры поля
+            const [width, height] = lines[0].split(/\s+/).map(Number);
+            setWidth(width);
+            setHeight(height);
 
-        // Сброс данных
-        const newWalls = new Set();
-        const newColored = new Set();
-        const newMarkers = {};
+            // Позиция робота
+            const [robotX, robotY] = lines[1].split(/\s+/).map(Number);
+            setRobotPos({x: robotX, y: robotY});
 
-        // Обработка клеток
-        for (let i = 2; i < lines.length; i++) {
-            const parts = lines[i].split(/\s+/);
-            const x = parseInt(parts[0]);
-            const y = parseInt(parts[1]);
-            const wall = parts[2];
-            const color = parts[3];
-            const point = parts[8]; // 9-й элемент массива
+            // Временные хранилища новых данных
+            const newWalls = new Set();
+            const newColored = new Set();
+            const newMarkers = {};
 
-            // Закрашенные клетки
-            if (color === '1') newColored.add(`${x},${y}`);
+            // Обработка клеток
+            for (let i = 2; i < lines.length; i++) {
+                const parts = lines[i].split(/\s+/);
+                const x = parseInt(parts[0]);
+                const y = parseInt(parts[1]);
+                const wall = parts[2];
+                const color = parts[3];
+                const point = parts[8];
 
-            // Маркеры (только точки)
-            if (point === '1') {
-                newMarkers[`${x},${y}`] = 1;
+                if (color === '1') newColored.add(`${x},${y}`);
+                if (point === '1') newMarkers[`${x},${y}`] = 1;
+
+                const walls = parseWallCode(Number(wall), x, y);
+                walls.forEach(w => newWalls.add(w));
             }
 
-            // Стены (битовая маска)
-            const walls = parseWallCode(Number(wall), x, y);
-            walls.forEach(w => newWalls.add(w));
-        }
+            // Применение новых данных
+            setWalls(newWalls);
+            setColoredCells(newColored);
+            setMarkers(newMarkers);
 
-        setWalls(newWalls);
-        setColoredCells(newColored);
-        setMarkers(newMarkers);
+        } catch (error) {
+            setStatusMessage("Ошибка парсинга файла: " + error.message);
+            // В случае ошибки - полный сброс
+            resetFieldState();
+        }
     };
 
 
@@ -193,7 +208,7 @@ const RobotSimulator = () => {
     useEffect(() => {
         setupPermanentWalls();
         // какие-то ещё действия...
-    }, [width, height, setupPermanentWalls]);
+    }, [width, height, setupPermanentWalls, resetFieldState]);
 
     /**
      * useEffect: При изменении ширины/высоты пересоздаём постоянные стены
