@@ -650,8 +650,8 @@ const RobotSimulator = () => {
     return (<div className="container">
 
 
-            {/* Блок редактора кода (слева) */}
-            <Card className="card code-editor">
+        {/* Блок редактора кода (слева) */}
+        <Card className="card code-editor">
     <textarea
         className="code-input"
         placeholder="// Программа управления роботом..."
@@ -659,255 +659,259 @@ const RobotSimulator = () => {
         onChange={(e) => setCode(e.target.value)}
     />
 
-                {/* Контейнер для кнопок */}
-                <div className="editor-controls">
-                    <Button
-                        variant="contained"
-                        color="secondary"
-                        onClick={handleClearCode}
-                        fullWidth
-                    >
-                        Очистить
-                    </Button>
-                    <Button
-                        variant="contained"
-                        color="error"
-                        onClick={handleStop}
-                        disabled={!isRunning}
-                        fullWidth
-                    >
-                        Стоп
-                    </Button>
-                    <Button
-                        variant="contained"
-                        color="success"
-                        onClick={handleStart}
-                        disabled={isRunning}
-                        fullWidth
-                    >
-                        Пуск
-                    </Button>
+            {/* Контейнер для кнопок */}
+            <div className="editor-controls">
+                <Button
+                    variant="contained"
+                    color="secondary"
+                    onClick={handleClearCode}
+                    fullWidth
+                >
+                    Очистить
+                </Button>
+                <Button
+                    variant="contained"
+                    color="error"
+                    onClick={handleStop}
+                    disabled={!isRunning}
+                    fullWidth
+                >
+                    Стоп
+                </Button>
+                <Button
+                    variant="contained"
+                    color="success"
+                    onClick={handleStart}
+                    disabled={isRunning}
+                    fullWidth
+                >
+                    Пуск
+                </Button>
+            </div>
+        </Card>
+
+        {/* Левая панель управления */}
+        <Card className="card">
+            <CardHeader
+                title={<Typography variant="h6" style={{textAlign: 'center'}}>Управление</Typography>}
+            />
+            <CardContent>
+                <Grid container spacing={2} alignItems="center" justifyContent="center">
+                    {/* Кнопки движения робота (стрелки) */}
+                    <Grid item xs={4}></Grid>
+                    <Grid item xs={4}>
+                        <Button
+                            variant="contained"
+                            className="button"
+                            onClick={() => moveRobot('up')}
+                        >
+                            <ChevronUp/>
+                        </Button>
+                    </Grid>
+                    <Grid item xs={4}></Grid>
+
+                    <Grid item xs={4}>
+                        <Button
+                            variant="contained"
+                            className="button"
+                            onClick={() => moveRobot('left')}
+                        >
+                            <ChevronLeft/>
+                        </Button>
+                    </Grid>
+                    <Grid item xs={4}></Grid>
+                    <Grid item xs={4}>
+                        <Button
+                            variant="contained"
+                            className="button"
+                            onClick={() => moveRobot('right')}
+                        >
+                            <ChevronRight/>
+                        </Button>
+                    </Grid>
+
+                    <Grid item xs={4}></Grid>
+                    <Grid item xs={4}>
+                        <Button
+                            variant="contained"
+                            className="button"
+                            onClick={() => moveRobot('down')}
+                        >
+                            <ChevronDown/>
+                        </Button>
+                    </Grid>
+                    <Grid item xs={4}></Grid>
+
+                    {/* Кнопки для маркеров и покраски (под роботом) */}
+                    <Grid item xs={6}>
+                        <Button
+                            variant="contained"
+                            className="button full-width"
+                            onClick={putMarker}
+                        >
+                            Положить маркер
+                        </Button>
+                    </Grid>
+                    <Grid item xs={6}>
+                        <Button
+                            variant="contained"
+                            className="button full-width"
+                            onClick={pickMarker}
+                        >
+                            Поднять маркер
+                        </Button>
+                    </Grid>
+                    <Grid item xs={6}>
+                        <Button
+                            variant="contained"
+                            className="button full-width"
+                            onClick={paintCell}
+                        >
+                            Покрасить клетку
+                        </Button>
+                    </Grid>
+                    <Grid item xs={6}>
+                        <Button
+                            variant="contained"
+                            className="button full-width"
+                            onClick={clearCell}
+                        >
+                            Очистить клетку
+                        </Button>
+                    </Grid>
+
+                    {/* Переключатель режима рисования */}
+                    <Grid item xs={12}>
+                        <Button
+                            variant="outlined"
+                            className="button full-width-outlined"
+                            onClick={toggleEditMode}
+                        >
+                            {editMode ? 'Выключить Режим рисования' : 'Включить Режим рисования'}
+                        </Button>
+                    </Grid>
+
+                    {/* Кнопки изменения размеров поля */}
+                    <Grid item xs={6}>
+                        <Button
+                            variant="contained"
+                            className="button full-width"
+                            onClick={increaseWidth}
+                        >
+                            Поле шире
+                        </Button>
+                    </Grid>
+                    <Grid item xs={6}>
+                        <Button
+                            variant="contained"
+                            className="button full-width"
+                            onClick={decreaseWidth}
+                        >
+                            Поле уже
+                        </Button>
+                    </Grid>
+                    <Grid item xs={6}>
+                        <Button
+                            variant="contained"
+                            className="button full-width"
+                            onClick={increaseHeight}
+                        >
+                            Поле выше
+                        </Button>
+                    </Grid>
+                    <Grid item xs={6}>
+                        <Button
+                            variant="contained"
+                            className="button full-width"
+                            onClick={decreaseHeight}
+                        >
+                            Поле ниже
+                        </Button>
+                    </Grid>
+
+                    {/* Кнопка "Помощь" */}
+                    <Grid item xs={12}>
+                        <Button
+                            variant="contained"
+                            color="secondary"
+                            className="button full-width"
+                            onClick={openHelp}
+                        >
+                            Помощь
+                        </Button>
+                    </Grid>
+                </Grid>
+            </CardContent>
+        </Card>
+
+        {/* Правая часть экрана: Canvas + Статус/Подсказки */}
+        <div className="field-area">
+            <Card className="card-controls">
+                <div className="field-container">
+                    <div className="canvas-wrapper">
+                        <canvas
+                            ref={canvasRef}
+                            width={(width + 2) * cellSize}
+                            height={(height + 2) * cellSize}
+                            className={editMode ? 'edit-mode' : ''}
+
+                            // Важно: onMouseDown вместо onClick, чтобы обрабатывать левую кнопку
+                            onMouseDown={(e) => {
+                                if (e.button !== 0) return; // только левая кнопка!
+                                handleMouseDown(e);
+                            }}
+                            onMouseMove={handleMouseMove}
+                            onMouseUp={handleMouseUp}
+
+                            onContextMenu={handleCanvasRightClick}
+                            onWheel={handleCanvasWheel}
+                        />
+                    </div>
                 </div>
             </Card>
-
-            {/* Левая панель управления */}
-            <Card className="card">
-                <CardHeader
-                    title={<Typography variant="h6" style={{textAlign: 'center'}}>Управление</Typography>}
-                />
-                <CardContent>
-                    <Grid container spacing={2} alignItems="center" justifyContent="center">
-                        {/* Кнопки движения робота (стрелки) */}
-                        <Grid item xs={4}></Grid>
-                        <Grid item xs={4}>
-                            <Button
-                                variant="contained"
-                                className="button"
-                                onClick={() => moveRobot('up')}
-                            >
-                                <ChevronUp/>
-                            </Button>
-                        </Grid>
-                        <Grid item xs={4}></Grid>
-
-                        <Grid item xs={4}>
-                            <Button
-                                variant="contained"
-                                className="button"
-                                onClick={() => moveRobot('left')}
-                            >
-                                <ChevronLeft/>
-                            </Button>
-                        </Grid>
-                        <Grid item xs={4}></Grid>
-                        <Grid item xs={4}>
-                            <Button
-                                variant="contained"
-                                className="button"
-                                onClick={() => moveRobot('right')}
-                            >
-                                <ChevronRight/>
-                            </Button>
-                        </Grid>
-
-                        <Grid item xs={4}></Grid>
-                        <Grid item xs={4}>
-                            <Button
-                                variant="contained"
-                                className="button"
-                                onClick={() => moveRobot('down')}
-                            >
-                                <ChevronDown/>
-                            </Button>
-                        </Grid>
-                        <Grid item xs={4}></Grid>
-
-                        {/* Кнопки для маркеров и покраски (под роботом) */}
-                        <Grid item xs={6}>
-                            <Button
-                                variant="contained"
-                                className="button full-width"
-                                onClick={putMarker}
-                            >
-                                Положить маркер
-                            </Button>
-                        </Grid>
-                        <Grid item xs={6}>
-                            <Button
-                                variant="contained"
-                                className="button full-width"
-                                onClick={pickMarker}
-                            >
-                                Поднять маркер
-                            </Button>
-                        </Grid>
-                        <Grid item xs={6}>
-                            <Button
-                                variant="contained"
-                                className="button full-width"
-                                onClick={paintCell}
-                            >
-                                Покрасить клетку
-                            </Button>
-                        </Grid>
-                        <Grid item xs={6}>
-                            <Button
-                                variant="contained"
-                                className="button full-width"
-                                onClick={clearCell}
-                            >
-                                Очистить клетку
-                            </Button>
-                        </Grid>
-
-                        {/* Переключатель режима рисования */}
-                        <Grid item xs={12}>
-                            <Button
-                                variant="outlined"
-                                className="button full-width-outlined"
-                                onClick={toggleEditMode}
-                            >
-                                {editMode ? 'Выключить Режим рисования' : 'Включить Режим рисования'}
-                            </Button>
-                        </Grid>
-
-                        {/* Кнопки изменения размеров поля */}
-                        <Grid item xs={6}>
-                            <Button
-                                variant="contained"
-                                className="button full-width"
-                                onClick={increaseWidth}
-                            >
-                                Поле шире
-                            </Button>
-                        </Grid>
-                        <Grid item xs={6}>
-                            <Button
-                                variant="contained"
-                                className="button full-width"
-                                onClick={decreaseWidth}
-                            >
-                                Поле уже
-                            </Button>
-                        </Grid>
-                        <Grid item xs={6}>
-                            <Button
-                                variant="contained"
-                                className="button full-width"
-                                onClick={increaseHeight}
-                            >
-                                Поле выше
-                            </Button>
-                        </Grid>
-                        <Grid item xs={6}>
-                            <Button
-                                variant="contained"
-                                className="button full-width"
-                                onClick={decreaseHeight}
-                            >
-                                Поле ниже
-                            </Button>
-                        </Grid>
-
-                        {/* Кнопка "Помощь" */}
-                        <Grid item xs={12}>
-                            <Button
-                                variant="contained"
-                                color="secondary"
-                                className="button full-width"
-                                onClick={openHelp}
-                            >
-                                Помощь
-                            </Button>
-                        </Grid>
-                    </Grid>
-                </CardContent>
+            <Card className="status-card">
+                {/* Здесь отображаем последнее сообщение (подсказку) */}
+                <Typography variant="body2">{statusMessage}</Typography>
+                <Typography variant="body2" style={{marginTop: 8}}>
+                    Маркеров на поле: {Object.keys(markers).length} <br/>
+                    Раскрашенных клеток: {coloredCells.size}
+                </Typography>
             </Card>
+        </div>
 
-            {/* Правая часть экрана: Canvas + Статус/Подсказки */}
-            <div className="field-area">
-                <Card className="card-controls">
-                    <canvas
-                        ref={canvasRef}
-                        width={(width + 2) * cellSize}
-                        height={(height + 2) * cellSize}
-                        className={editMode ? 'edit-mode' : ''}
-
-                        // Важно: onMouseDown вместо onClick, чтобы обрабатывать левую кнопку
-                        onMouseDown={(e) => {
-                            if (e.button !== 0) return; // только левая кнопка!
-                            handleMouseDown(e);
-                        }}
-                        onMouseMove={handleMouseMove}
-                        onMouseUp={handleMouseUp}
-
-                        onContextMenu={handleCanvasRightClick}
-                        onWheel={handleCanvasWheel}
-                    />
-                </Card>
-                <Card className="status-card">
-                    {/* Здесь отображаем последнее сообщение (подсказку) */}
-                    <Typography variant="body2">{statusMessage}</Typography>
-                    <Typography variant="body2" style={{marginTop: 8}}>
-                        Маркеров на поле: {Object.keys(markers).length} <br/>
-                        Раскрашенных клеток: {coloredCells.size}
-                    </Typography>
-                </Card>
-            </div>
-
-            {/* Модальное окно "Помощь" с инструкциями */}
-            <Dialog open={helpOpen} onClose={closeHelp}>
-                <DialogTitle>Как пользоваться симулятором?</DialogTitle>
-                <DialogContent>
-                    <Typography variant="body1" paragraph>
-                        1. Кнопки со стрелками двигают Робота по полю, если перед ним нет стены.
-                    </Typography>
-                    <Typography variant="body1" paragraph>
-                        2. «Включить Режим рисования» даёт возможность рисовать стены и раскрашивать клетки:
-                        <br/>• Левый клик по границе клетки — поставить/убрать стену;
-                        <br/>• Левый клик внутри клетки — раскрасить/очистить клетку;
-                        <br/>• Правый клик в клетке — поставить/убрать маркер;
-                        <br/>• А также перетаскивать Робота (зажать мышь на роботе и двигать).
-                    </Typography>
-                    <Typography variant="body1" paragraph>
-                        3. Кнопки «Поле шире/уже/выше/ниже» меняют размер игрового поля
-                        (работают только в Режиме рисования).
-                    </Typography>
-                    <Typography variant="body1" paragraph>
-                        4. Колёсико мыши изменяет масштаб поля (увеличивает или уменьшает размер клеток).
-                    </Typography>
-                    <Typography variant="body1" paragraph>
-                        5. Пробуйте экспериментировать: можете красить клетки, ставить маркеры и создавать лабиринты из
-                        стен!
-                    </Typography>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={closeHelp} variant="contained" color="primary">
-                        Понятно!
-                    </Button>
-                </DialogActions>
-            </Dialog>
-        </div>);
+        {/* Модальное окно "Помощь" с инструкциями */}
+        <Dialog open={helpOpen} onClose={closeHelp}>
+            <DialogTitle>Как пользоваться симулятором?</DialogTitle>
+            <DialogContent>
+                <Typography variant="body1" paragraph>
+                    1. Кнопки со стрелками двигают Робота по полю, если перед ним нет стены.
+                </Typography>
+                <Typography variant="body1" paragraph>
+                    2. «Включить Режим рисования» даёт возможность рисовать стены и раскрашивать клетки:
+                    <br/>• Левый клик по границе клетки — поставить/убрать стену;
+                    <br/>• Левый клик внутри клетки — раскрасить/очистить клетку;
+                    <br/>• Правый клик в клетке — поставить/убрать маркер;
+                    <br/>• А также перетаскивать Робота (зажать мышь на роботе и двигать).
+                </Typography>
+                <Typography variant="body1" paragraph>
+                    3. Кнопки «Поле шире/уже/выше/ниже» меняют размер игрового поля
+                    (работают только в Режиме рисования).
+                </Typography>
+                <Typography variant="body1" paragraph>
+                    4. Колёсико мыши изменяет масштаб поля (увеличивает или уменьшает размер клеток).
+                </Typography>
+                <Typography variant="body1" paragraph>
+                    5. Пробуйте экспериментировать: можете красить клетки, ставить маркеры и создавать лабиринты из
+                    стен!
+                </Typography>
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={closeHelp} variant="contained" color="primary">
+                    Понятно!
+                </Button>
+            </DialogActions>
+        </Dialog>
+    </div>);
 };
 
 export default RobotSimulator;
