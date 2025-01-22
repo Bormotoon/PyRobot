@@ -168,20 +168,38 @@ const RobotSimulator = () => {
         setStatusMessage('Код программы очищен');
     }, []);
 
-    const handleStart = useCallback(() => {
+    const handleStart = useCallback(async () => {
         if (!code.trim()) {
             setStatusMessage('Ошибка: программа пустая');
             return;
         }
-        setIsRunning(true);
-        setStatusMessage('Программа выполняется...');
+        try {
+            const response = await fetch('http://localhost:5000/execute', {
+                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({code}),
+            });
+            const result = await response.json();
+
+            if (result.success) {
+                setRobotPos(result.robotPos);
+                setStatusMessage(result.message);
+                setIsRunning(true);
+            } else {
+                setStatusMessage(`Ошибка: ${result.message}`);
+            }
+        } catch (error) {
+            setStatusMessage('Ошибка соединения с сервером');
+        }
     }, [code]);
 
-    const handleStop = useCallback(() => {
-        setIsRunning(false);
-        setStatusMessage('Выполнение прервано');
+    const handleReset = useCallback(async () => {
+        try {
+            await fetch('http://localhost:5000/reset', {method: 'POST'});
+            setRobotPos({x: 0, y: 0});
+            setStatusMessage('Симулятор сброшен');
+        } catch (error) {
+            setStatusMessage('Ошибка сброса');
+        }
     }, []);
-
 
     /**
      * Создаём постоянные стены (границы поля):
@@ -564,6 +582,12 @@ const RobotSimulator = () => {
             return newSize;
         });
     };
+
+    // В разделе с обработчиками действий добавьте:
+    const handleStop = useCallback(() => {
+        setIsRunning(false);
+        setStatusMessage('Выполнение прервано');
+    }, []); // Пустой массив зависимостей, если не используется внешний стейт
 
     /**
      * useEffect: Блокируем прокрутку всей страницы при прокрутке на канвасе.
@@ -949,6 +973,30 @@ const RobotSimulator = () => {
                             accept=".fil"
                             onChange={handleFileChange}
                         />
+                    </Grid>
+
+                    {/* Добавляем кнопку сброса здесь */}
+                    <Grid item xs={12}>
+                        <Button
+                            variant="contained"
+                            color="secondary"
+                            onClick={handleReset}
+                            fullWidth
+                        >
+                            Сбросить симулятор
+                        </Button>
+                    </Grid>
+
+                    {/* Кнопка "Помощь" */}
+                    <Grid item xs={12}>
+                        <Button
+                            variant="contained"
+                            color="secondary"
+                            className="button full-width"
+                            onClick={openHelp}
+                        >
+                            Помощь
+                        </Button>
                     </Grid>
                 </Grid>
             </CardContent>
