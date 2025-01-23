@@ -3,17 +3,17 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "@chakra-ui/react": "^3.3.1",
+    "@chakra-ui/react": "^3.4.0",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
-    "@mui/material": "^6.3.1",
+    "@mui/material": "^6.4.1",
     "axios": "^1.7.9",
     "cra-template": "1.2.0",
-    "framer-motion": "^11.17.0",
-    "lucide-react": "^0.471.1",
+    "framer-motion": "^12.0.1",
+    "lucide-react": "^0.473.0",
     "prop-types": "^15.8.1",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
     "react-scripts": "^5.0.1",
     "web-vitals": "^4.2.4"
   },
@@ -21,7 +21,8 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "preinstall": "npx npm-force-resolutions"
   },
   "eslintConfig": {
     "extends": [
@@ -44,6 +45,14 @@
   "devDependencies": {
     "@babel/plugin-proposal-nullish-coalescing-operator": "^7.18.6",
     "@babel/plugin-proposal-optional-chaining": "^7.21.0",
-    "@babel/preset-env": "^7.26.0"
+    "@babel/preset-env": "^7.26.0",
+    "npm-force-resolutions": "^0.0.10",
+    "postcss": ">=8.4.31"
+  },
+  "overrides": {
+    "nth-check": "^2.0.1"
+  },
+  "resolutions": {
+    "postcss": "^8.4.31"
   }
 }
