@@ -11,6 +11,7 @@ import {
     DialogContent,
     DialogTitle,
     Grid,
+    Slider,
     Typography
 } from '@mui/material';
 import {ChevronDown, ChevronLeft, ChevronRight, ChevronUp} from 'lucide-react';
@@ -49,6 +50,15 @@ const RobotSimulator = () => {
 
     // Ссылка и функции для импорта файлов .fil
     const fileInputRef = useRef(null);
+
+    // --- Для анимации ---
+    const [history, setHistory] = useState([]);           // массив шагов
+    const [currentStepIndex, setCurrentStepIndex] = useState(0);
+    const [animationSpeed, setAnimationSpeed] = useState(500); // задержка в мс
+
+    // Флаг, идёт ли сейчас «прокручивание» шагов
+    const [isPlayingHistory, setIsPlayingHistory] = useState(false);
+
 
     const handleImportField = () => {
         fileInputRef.current.click();
@@ -159,6 +169,7 @@ const RobotSimulator = () => {
     }, []);
 
     // Запуск (пуск)
+    // --- Запуск кода (ПУСК) ---
     const handleStart = useCallback(async () => {
         if (!code.trim()) {
             setStatusMessage('Ошибка: программа пустая');
@@ -169,38 +180,62 @@ const RobotSimulator = () => {
             const response = await fetch('http://localhost:5000/execute', {
                 method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({code}),
             });
-
-            // Если сервер вернул ошибку (4xx/5xx)
             if (!response.ok) {
-                setStatusMessage(`HTTP-ошибка: ${response.status}`);
+                setStatusMessage(`Ошибка HTTP: ${response.status}`);
                 return;
             }
 
-            // Пытаемся распарсить JSON
             const data = await response.json();
-
-            // Смотрим поле success из ответа сервера
             if (data.success) {
-                // У нас есть robotPos, walls, markers, coloredCells
+                setStatusMessage(data.message || 'Код выполнен успешно!');
+
+                // Применяем итоговое состояние (если хотим сразу в конце показать результат)
                 setRobotPos(data.robotPos);
                 setWalls(new Set(data.walls));
-                setColoredCells(new Set(data.coloredCells));
                 setMarkers(data.markers);
+                setColoredCells(new Set(data.coloredCells));
 
-                setStatusMessage(data.message || 'Код выполнен успешно!');
-                // Если вы используете isRunning — сбросите его, чтобы можно было жать ПУСК ещё раз
-                setIsRunning(false);
+                // Сохраняем всю "историю" и начинаем показывать её шаг за шагом
+                // (каждый элемент history — это { robotPos, walls, markers, coloredCells })
+                setHistory(data.history || []);
+                setCurrentStepIndex(0);
+                setIsPlayingHistory(true);  // запустим анимацию
+
             } else {
-                // Если success=false
-                setStatusMessage(`Ошибка: ${data.message}`);
+                setStatusMessage(`Ошибка интерпретатора: ${data.message}`);
             }
-        } catch (error) {
-            // Сюда попадёт, если реально нет связи с сервером, таймаут и т.п.
+        } catch (err) {
             setStatusMessage('Ошибка соединения с сервером');
-            console.error('Ошибка при отправке запроса:', error);
+            console.error(err);
         }
     }, [code]);
 
+    useEffect(() => {
+        if (!isPlayingHistory) return;
+
+        // Если массив history пустой или индекс вышел за пределы — останавливаемся
+        if (!history.length || currentStepIndex >= history.length) {
+            setIsPlayingHistory(false);
+            return;
+        }
+
+        // Берём "шаг" из history по currentStepIndex
+        const step = history[currentStepIndex];
+        // Применяем состояние этого шага
+        setRobotPos(step.robotPos);
+        setWalls(new Set(step.walls));
+        setMarkers(step.markers);
+        setColoredCells(new Set(step.coloredCells));
+
+        // Запланируем переход к следующему шагу через animationSpeed мс
+        const timer = setTimeout(() => {
+            setCurrentStepIndex((prev) => prev + 1);
+        }, animationSpeed);
+
+        // Очищаем таймер при размонтаже
+        return () => clearTimeout(timer);
+
+    }, [isPlayingHistory, history, currentStepIndex, animationSpeed]);
 
     // Сброс симулятора
     const handleReset = useCallback(async () => {
@@ -689,58 +724,100 @@ const RobotSimulator = () => {
     return (<div className="container">
 
         {/* Блок редактора кода (слева) */}
-        <Card className="card code-editor">
-            <CardContent style={{flex: '1 1 auto', display: 'flex', flexDirection: 'column'}}>
+        <Card
+            className="card code-editor"
+            style={{
+                width: '100%', maxWidth: 900,    // ограничим ширину карточки, чтобы всё смотрелось аккуратнее
+                margin: '0 auto' // центрируем карточку по горизонтали
+            }}
+        >
+            <CardContent
+                style={{
+                    display: 'flex', flexDirection: 'column'
+                }}
+            >
                 <Typography variant="h5" gutterBottom style={{color: '#fff'}}>
                     Редактор Кода
                 </Typography>
-                <Editor
-                    value={code}
-                    onValueChange={code => setCode(code)}
-                    highlight={highlightCode}
-                    padding={10}
-                    className="react-simple-code-editor"
-                    style={{
-                        fontFamily: '"Fira Code", monospace', fontSize: 14, flex: '1 1 auto', overflow: 'auto',
-                    }}
-                />
-                <div className="editor-controls">
-                    <Button
-                        variant="contained"
-                        color="secondary"
-                        onClick={handleClearCode}
-                        fullWidth
-                    >
-                        Очистить
-                    </Button>
-                    <Button
-                        variant="contained"
-                        color="error"
-                        onClick={handleStop}
-                        disabled={!isRunning}
-                        fullWidth
-                    >
-                        Стоп
-                    </Button>
-                    <Button
-                        variant="contained"
-                        color="success"
-                        onClick={handleStart}
-                        disabled={isRunning}
-                        fullWidth
-                    >
-                        Пуск
-                    </Button>
-                    <Button
-                        variant="outlined"
-                        color="primary"
-                        onClick={handleReset}
-                        fullWidth
-                    >
-                        Сбросить симулятор
-                    </Button>
+
+                {/* Ограничиваем высоту редактора 200px, прокрутка если кода много */}
+                <div style={{height: 200, overflow: 'auto', marginBottom: 16}}>
+                    <Editor
+                        value={code}
+                        onValueChange={newCode => setCode(newCode)}
+                        highlight={highlightCode}
+                        padding={10}
+                        className="react-simple-code-editor"
+                        style={{
+                            fontFamily: '"Fira Code", monospace', fontSize: 14, // Убираем flex: 1 1 auto, чтобы не растягивался
+                            // height: '100%', и т.д.
+                        }}
+                    />
                 </div>
-                {statusMessage && (<Typography variant="body1" color="primary" style={{marginTop: '16px'}}>
+
+                {/* Кнопки + Слайдер в две строки через Grid */}
+                <Grid container spacing={2}>
+                    {/* Первая строка: 4 кнопки */}
+                    <Grid item xs={3}>
+                        <Button
+                            variant="contained"
+                            color="secondary"
+                            onClick={handleClearCode}
+                            fullWidth
+                        >
+                            Очистить
+                        </Button>
+                    </Grid>
+                    <Grid item xs={3}>
+                        <Button
+                            variant="contained"
+                            color="error"
+                            onClick={handleStop}
+                            disabled={!isRunning}
+                            fullWidth
+                        >
+                            Стоп
+                        </Button>
+                    </Grid>
+                    <Grid item xs={3}>
+                        <Button
+                            variant="contained"
+                            color="success"
+                            onClick={handleStart}
+                            disabled={isRunning}
+                            fullWidth
+                        >
+                            Пуск
+                        </Button>
+                    </Grid>
+                    <Grid item xs={3}>
+                        <Button
+                            variant="outlined"
+                            color="primary"
+                            onClick={handleReset}
+                            fullWidth
+                        >
+                            Сброс
+                        </Button>
+                    </Grid>
+
+                    {/* Вторая строка: слайдер (xs={12} — на всю ширину) */}
+                    <Grid item xs={12}>
+                        <Typography variant="body1" gutterBottom>
+                            Скорость анимации (мс): {animationSpeed}
+                        </Typography>
+                        <Slider
+                            value={animationSpeed}
+                            min={100}
+                            max={2000}
+                            step={100}
+                            onChange={(event, newVal) => setAnimationSpeed(newVal)}
+                        />
+                    </Grid>
+                </Grid>
+
+                {/* Сообщение о статусе */}
+                {statusMessage && (<Typography variant="body1" color="primary" style={{marginTop: 16}}>
                     {statusMessage}
                 </Typography>)}
             </CardContent>
