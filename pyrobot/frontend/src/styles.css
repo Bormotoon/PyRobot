@@ -21,20 +21,54 @@
     border-radius: 8px;
     overflow-y: auto;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
 }
 
-.code-input {
+/* Стили для редактора кода с react-simple-code-editor */
+.code-editor .react-simple-code-editor {
+    flex: 1;
     width: 100%;
-    padding: 16px; /* Внутренний отступ текстового поля */
+    padding: 16px;
     border: 1px solid #ccc !important; /* Граница как у кнопок */
     border-radius: 4px; /* Скругление углов */
     min-height: calc(100vh - 200px); /* Фиксированная высота */
     height: calc(100vh - 220px) !important; /* Учёт места под кнопки */
     margin: 0 0 16px;
     transition: height 0.3s ease;
+    background: #1e1e1e; /* Совпадает с фоном .code-editor */
+    color: #d4d4d4; /* Цвет текста */
+    font-family: 'Fira Code', monospace; /* Рекомендуется для редакторов кода */
+    font-size: 14px;
+    overflow: auto;
 }
 
-.code-input:focus {
+/* Подсветка синтаксиса для языка КУМИР с помощью Prism.js */
+.token.keyword {
+    color: #569cd6;
+    font-weight: bold;
+}
+
+.token.comment {
+    color: #6a9955;
+    font-style: italic;
+}
+
+.token.string {
+    color: #ce9178;
+}
+
+.token.number {
+    color: #b5cea8;
+}
+
+.token.operator {
+    color: #d4d4d4;
+}
+
+/* Стили фона и границ при фокусе */
+.code-editor .react-simple-code-editor:focus {
     outline: none;
     box-shadow: inset 0 0 0 1px #1976d2;
 }
@@ -253,4 +287,94 @@ canvas.edit-mode {
     background-color: #6496FF;
 }
 
+/* Подсветка синтаксиса для языка КУМИР */
+.token.keyword {
+    color: #569cd6;
+    font-weight: bold;
+}
 
+.token.comment {
+    color: #6a9955;
+    font-style: italic;
+}
+
+.token.string {
+    color: #ce9178;
+}
+
+.token.number {
+    color: #b5cea8;
+}
+
+.token.operator {
+    color: #d4d4d4;
+}
+
+/* Дополнительные стили для редактора кода */
+.code-editor .react-simple-code-editor {
+    /* Стили уже заданы выше */
+}
+
+/* Стили для подсветки линий */
+.code-editor .prism-code {
+    padding: 10px;
+    font-family: 'Fira Code', monospace;
+    font-size: 14px;
+}
+
+/* Scrollbar стили для редактора кода */
+.code-editor .react-simple-code-editor::-webkit-scrollbar {
+    width: 8px;
+}
+
+.code-editor .react-simple-code-editor::-webkit-scrollbar-track {
+    background: #2d2d2d;
+}
+
+.code-editor .react-simple-code-editor::-webkit-scrollbar-thumb {
+    background-color: #555;
+    border-radius: 4px;
+}
+
+/* Стиль для модального окна "Помощь" */
+.MuiDialog-paper {
+    background-color: #f5f5f5;
+}
+
+.MuiDialogTitle-root, .MuiDialogContent-root, .MuiDialogActions-root {
+    color: #333;
+}
+
+/* Стиль для кнопок внутри модального окна */
+.MuiButton-containedPrimary {
+    background-color: #1976d2;
+}
+
+.MuiButton-containedSecondary {
+    background-color: #dc004e;
+}
+
+/* Обновлённые стили для адаптивности редактора кода */
+@media (max-width: 1200px) {
+    .code-editor .react-simple-code-editor {
+        height: 300px !important;
+    }
+}
+
+/* Обновление стилей для кнопок в редакторе */
+.editor-controls {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+@media (max-width: 768px) {
+    .editor-controls {
+        flex-direction: column;
+    }
+
+    .editor-controls button {
+        width: 100%;
+    }
+}

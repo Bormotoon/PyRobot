@@ -1,75 +1,73 @@
+# backend/server.py
+
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import subprocess
-import tempfile
 import os
 import json
+import sys
+import logging
+from kumir_interpreter import KumirInterpreter, KumirInterpreterError
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={
+    r"/execute": {"origins": "http://localhost:3000"},  # Замените на ваш фронтенд-домен
+    r"/reset": {"origins": "http://localhost:3000"}
+})
 
+# Настройка логирования
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger('FlaskServer')
 
-class RobotSimulator:
-    def __init__(self):
-        self.robot_pos = {"x": 0, "y": 0}
-        self.walls = set()
-        self.markers = {}
-        self.colored_cells = set()
-
-    def reset(self):
-        self.robot_pos = {"x": 0, "y": 0}
-        self.walls.clear()
-        self.markers.clear()
-        self.colored_cells.clear()
-
-
-simulator = RobotSimulator()
+# Инициализация интерпретатора
+interpreter = KumirInterpreter()
 
 
 @app.route('/execute', methods=['POST'])
 def execute_code():
     data = request.json
     code = data.get('code', '')
+    logger.info("Получен код для выполнения.")
+    logger.debug(f"Код:\n{code}")
+
+    if not code.strip():
+        logger.warning("Получен пустой код.")
+        return jsonify({'success': False, 'message': 'Код не предоставлен.'}), 400
 
     try:
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.py') as f:
-            f.write(code)
-            temp_name = f.name
+        # Интерпретация кода на языке КУМИР
+        result = interpreter.interpret(code)
 
-        result = subprocess.run(
-            ['python', temp_name],
-            capture_output=True,
-            text=True,
-            timeout=5
-        )
-
-        os.unlink(temp_name)
-
-        if result.stderr:
+        if result['success']:
+            logger.info("Код выполнен успешно.")
+            logger.debug(f"Результат: {result['result']}")
+            return jsonify({
+                'success': True,
+                'message': 'Код выполнен успешно.',
+                'robotPos': interpreter.robot_pos,
+                'walls': list(interpreter.walls),
+                'markers': interpreter.markers,
+                'coloredCells': list(interpreter.colored_cells)
+            }), 200
+        else:
+            logger.error(f"Ошибка интерпретации: {result['message']}")
             return jsonify({
                 'success': False,
-                'message': f'Ошибка выполнения: {result.stderr}'
-            })
+                'message': result['message']
+            }), 400
 
-        output = json.loads(result.stdout)
-        simulator.robot_pos = output.get('robotPos', simulator.robot_pos)
-
-        return jsonify({
-            'success': True,
-            'message': 'Код выполнен',
-            'robotPos': simulator.robot_pos
-        })
-
-    except json.JSONDecodeError:
-        return jsonify({'success': False, 'message': 'Неверный формат вывода'})
+    except KumirInterpreterError as e:
+        logger.error(f"Ошибка интерпретатора: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e)})
+        logger.exception("Неизвестная ошибка при выполнении кода.")
+        return jsonify({'success': False, 'message': f'Неизвестная ошибка: {str(e)}'}), 500
 
 
 @app.route('/reset', methods=['POST'])
 def reset_simulator():
-    simulator.reset()
-    return jsonify({'success': True, 'message': 'Симулятор сброшен'})
+    interpreter.reset()
+    logger.info("Состояние симулятора сброшено.")
+    return jsonify({'success': True, 'message': 'Симулятор сброшен.'}), 200
 
 
 if __name__ == '__main__':
