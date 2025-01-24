@@ -167,34 +167,40 @@ const RobotSimulator = () => {
 
         try {
             const response = await fetch('http://localhost:5000/execute', {
-                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({code}), // Отправляем код на сервер
+                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({code}),
             });
+
+            // Если сервер вернул ошибку (4xx/5xx)
+            if (!response.ok) {
+                setStatusMessage(`HTTP-ошибка: ${response.status}`);
+                return;
+            }
+
+            // Пытаемся распарсить JSON
             const data = await response.json();
 
-            if (response.ok && data.success) {
-                // Сервер вернул состояние после выполнения кода
-                const {robotPos, walls, markers, coloredCells} = data.result;
+            // Смотрим поле success из ответа сервера
+            if (data.success) {
+                // У нас есть robotPos, walls, markers, coloredCells
+                setRobotPos(data.robotPos);
+                setWalls(new Set(data.walls));
+                setColoredCells(new Set(data.coloredCells));
+                setMarkers(data.markers);
 
-                // !!! ВАЖНО: обновляем все состояния, чтобы Canvas перерисовался
-                setRobotPos(robotPos);
-                setWalls(new Set(walls));
-                setMarkers(markers);
-                setColoredCells(new Set(coloredCells));
-
-                // Пишем пользователю, что код отработал
-                setStatusMessage("Код выполнен успешно!");
-
-                // Если вы используете isRunning как "флаг выполнения", можно сбросить:
+                setStatusMessage(data.message || 'Код выполнен успешно!');
+                // Если вы используете isRunning — сбросите его, чтобы можно было жать ПУСК ещё раз
                 setIsRunning(false);
             } else {
-                // Сервер вернул ошибку интерпретатора
-                setStatusMessage("Ошибка: " + (data.message || "неизвестная"));
+                // Если success=false
+                setStatusMessage(`Ошибка: ${data.message}`);
             }
         } catch (error) {
+            // Сюда попадёт, если реально нет связи с сервером, таймаут и т.п.
             setStatusMessage('Ошибка соединения с сервером');
             console.error('Ошибка при отправке запроса:', error);
         }
     }, [code]);
+
 
     // Сброс симулятора
     const handleReset = useCallback(async () => {
