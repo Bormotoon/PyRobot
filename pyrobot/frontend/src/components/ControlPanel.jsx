@@ -4,18 +4,19 @@ import React, { useRef } from 'react';
 import { Button, Card, CardHeader, CardContent, Grid, Typography } from '@mui/material';
 import { ChevronUp, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 
+// Импорт функции для подсказок
+import { getHint } from '../hints';
+
 /**
- * Компонент панели управления (кнопки перемещения робота, маркеры, покраска,
+ * Компонент панели управления (кнопки движения, маркеры, покраска,
  * изменение размеров поля, режим рисования, импорт .fil).
- * @param {Object} props - Пропсы.
- * @returns {JSX.Element} Разметка панели управления.
  */
 function ControlPanel({
   robotPos,
   setRobotPos,
   walls,
   setWalls,
-  permanentWalls, // <--- добавили сюда permanentWalls
+  permanentWalls,
   markers,
   setMarkers,
   coloredCells,
@@ -33,16 +34,18 @@ function ControlPanel({
   const fileInputRef = useRef(null);
 
   /**
-   * moveRobot(direction)
-   * Перемещение робота кнопками (вверх/вниз/влево/вправо).
-   * Запрещаем ходить сквозь обычные и постоянные стены.
+   * Двигаем робота кнопками: учитываем стены (обычные + постоянные) и край поля.
+   * Если движение успешно — выводим подсказку через getHint('moveRobotUp'...) и т.д.
    */
   const moveRobot = (direction) => {
     setRobotPos(prevPos => {
       let newPos = { ...prevPos };
 
+      // Определяем ключ подсказки
+      let hintKey = '';
+
       if (direction === 'up') {
-        // Проверяем, нет ли стены сверху
+        hintKey = 'moveRobotUp';
         if (
           newPos.y > 0 &&
           !walls.has(`${newPos.x},${newPos.y},${newPos.x + 1},${newPos.y}`) &&
@@ -54,6 +57,7 @@ function ControlPanel({
           return prevPos;
         }
       } else if (direction === 'down') {
+        hintKey = 'moveRobotDown';
         if (
           newPos.y < height - 1 &&
           !walls.has(`${newPos.x},${newPos.y + 1},${newPos.x + 1},${newPos.y + 1}`) &&
@@ -65,6 +69,7 @@ function ControlPanel({
           return prevPos;
         }
       } else if (direction === 'left') {
+        hintKey = 'moveRobotLeft';
         if (
           newPos.x > 0 &&
           !walls.has(`${newPos.x},${newPos.y},${newPos.x},${newPos.y + 1}`) &&
@@ -76,6 +81,7 @@ function ControlPanel({
           return prevPos;
         }
       } else if (direction === 'right') {
+        hintKey = 'moveRobotRight';
         if (
           newPos.x < width - 1 &&
           !walls.has(`${newPos.x + 1},${newPos.y},${newPos.x + 1},${newPos.y + 1}`) &&
@@ -88,81 +94,101 @@ function ControlPanel({
         }
       }
 
-      setStatusMessage(`Робот переместился: ${direction}`);
+      setStatusMessage(getHint(hintKey, editMode));
       return newPos;
     });
   };
 
-  // Остальная логика (putMarker, pickMarker, paintCell, clearCell, toggleEditMode и т.д.) не меняется
-  // ... ниже без изменений ...
-
+  /**
+   * Положить маркер
+   */
   const putMarker = () => {
     const posKey = `${robotPos.x},${robotPos.y}`;
     if (!markers[posKey]) {
       const newMarkers = { ...markers };
       newMarkers[posKey] = 1;
       setMarkers(newMarkers);
-      setStatusMessage('Маркер положен.');
+      setStatusMessage(getHint('putMarker', editMode));
     } else {
-      setStatusMessage('Тут уже есть маркер.');
+      setStatusMessage('Здесь уже лежит маркер.');
     }
   };
 
+  /**
+   * Поднять маркер
+   */
   const pickMarker = () => {
     const posKey = `${robotPos.x},${robotPos.y}`;
     if (markers[posKey]) {
       const newMarkers = { ...markers };
       delete newMarkers[posKey];
       setMarkers(newMarkers);
-      setStatusMessage('Маркер поднят.');
+      setStatusMessage(getHint('pickMarker', editMode));
     } else {
       setStatusMessage('Здесь нет маркера.');
     }
   };
 
+  /**
+   * Покрасить клетку
+   */
   const paintCell = () => {
     const posKey = `${robotPos.x},${robotPos.y}`;
     if (!coloredCells.has(posKey)) {
       const newSet = new Set(coloredCells);
       newSet.add(posKey);
       setColoredCells(newSet);
-      setStatusMessage('Клетка покрашена!');
+      setStatusMessage(getHint('paintCell', editMode));
     } else {
       setStatusMessage('Клетка уже покрашена.');
     }
   };
 
+  /**
+   * Очистить клетку
+   */
   const clearCell = () => {
     const posKey = `${robotPos.x},${robotPos.y}`;
     if (coloredCells.has(posKey)) {
       const newSet = new Set(coloredCells);
       newSet.delete(posKey);
       setColoredCells(newSet);
-      setStatusMessage('Клетка очищена.');
+      setStatusMessage(getHint('clearCell', editMode));
     } else {
       setStatusMessage('Эта клетка и так не была покрашена.');
     }
   };
 
+  /**
+   * Включить/выключить режим рисования
+   */
   const toggleEditMode = () => {
     const newMode = !editMode;
     setEditMode(newMode);
     if (newMode) {
-      setStatusMessage('Режим рисования включён.');
+      // Включили — getHint('enterEditMode')
+      setStatusMessage(getHint('enterEditMode', newMode));
     } else {
-      setStatusMessage('Режим рисования выключен.');
+      // Выключили — getHint('exitEditMode')
+      setStatusMessage(getHint('exitEditMode', newMode));
     }
   };
 
+  /**
+   * Увеличить ширину поля
+   */
   const increaseWidth = () => {
     if (!editMode) {
       setStatusMessage('Включите режим рисования для изменения поля.');
       return;
     }
     setWidth(width + 1);
-    setStatusMessage('Поле расширено.');
+    setStatusMessage(getHint('increaseWidth', editMode));
   };
 
+  /**
+   * Уменьшить ширину поля
+   */
   const decreaseWidth = () => {
     if (!editMode) {
       setStatusMessage('Включите режим рисования для изменения поля.');
@@ -170,21 +196,27 @@ function ControlPanel({
     }
     if (width > 1) {
       setWidth(width - 1);
-      setStatusMessage('Поле сужено.');
+      setStatusMessage(getHint('decreaseWidth', editMode));
     } else {
       setStatusMessage('Ширина не может быть < 1.');
     }
   };
 
+  /**
+   * Увеличить высоту поля
+   */
   const increaseHeight = () => {
     if (!editMode) {
       setStatusMessage('Включите режим рисования для изменения поля.');
       return;
     }
     setHeight(height + 1);
-    setStatusMessage('Поле увеличено по высоте.');
+    setStatusMessage(getHint('increaseHeight', editMode));
   };
 
+  /**
+   * Уменьшить высоту поля
+   */
   const decreaseHeight = () => {
     if (!editMode) {
       setStatusMessage('Включите режим рисования для изменения поля.');
@@ -192,13 +224,15 @@ function ControlPanel({
     }
     if (height > 1) {
       setHeight(height - 1);
-      setStatusMessage('Поле уменьшено по высоте.');
+      setStatusMessage(getHint('decreaseHeight', editMode));
     } else {
       setStatusMessage('Высота не может быть < 1.');
     }
   };
 
-  // Импорт .fil
+  /**
+   * Импорт .fil
+   */
   const handleImportField = () => {
     fileInputRef.current.click();
   };
@@ -215,6 +249,9 @@ function ControlPanel({
     }
   };
 
+  /**
+   * parseAndApplyFieldFile(content): логика чтения .fil
+   */
   const parseAndApplyFieldFile = (content) => {
     try {
       setRobotPos({ x: 0, y: 0 });
@@ -281,6 +318,8 @@ function ControlPanel({
       />
       <CardContent>
         <Grid container spacing={2} alignItems="center" justifyContent="center">
+
+          {/* Кнопки движения (стрелки) */}
           <Grid item xs={4}></Grid>
           <Grid item xs={4}>
             <Button variant="contained" onClick={() => moveRobot('up')}>
@@ -309,6 +348,7 @@ function ControlPanel({
           </Grid>
           <Grid item xs={4}></Grid>
 
+          {/* Маркеры */}
           <Grid item xs={6}>
             <Button
               variant="contained"
@@ -327,6 +367,8 @@ function ControlPanel({
               Поднять маркер
             </Button>
           </Grid>
+
+          {/* Покраска */}
           <Grid item xs={6}>
             <Button
               variant="contained"
@@ -346,6 +388,7 @@ function ControlPanel({
             </Button>
           </Grid>
 
+          {/* Режим рисования */}
           <Grid item xs={12}>
             <Button
               variant="outlined"
@@ -356,6 +399,7 @@ function ControlPanel({
             </Button>
           </Grid>
 
+          {/* Изменение размеров поля */}
           <Grid item xs={6}>
             <Button
               variant="contained"
@@ -393,12 +437,14 @@ function ControlPanel({
             </Button>
           </Grid>
 
+          {/* Помощь (заглушка) */}
           <Grid item xs={12}>
             <Button variant="contained" color="secondary" fullWidth>
               Помощь
             </Button>
           </Grid>
 
+          {/* Импорт .fil */}
           <Grid item xs={12}>
             <Button
               variant="contained"

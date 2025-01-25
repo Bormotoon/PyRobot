@@ -5,6 +5,9 @@ import { Button, Typography } from '@mui/material';
 import Editor from 'react-simple-code-editor';
 import Prism from 'prismjs';
 
+/**
+ * Описание языка КУМИР в Prism
+ */
 Prism.languages.kumir = {
   'keyword': /\b(использовать|Робот|алг|нач|кон|влево|вправо|вверх|вниз|закрасить|если|иначе|для|пока|температура|радиация)\b/g,
   'comment': /#.*/g,
@@ -13,17 +16,25 @@ Prism.languages.kumir = {
   'operator': /\b(==|!=|<=|>=|<|>|\+|\-|\*|\/)\b/g,
 };
 
+/**
+ * Компонент CodeEditor
+ * - Показывает textarea для редактирования кода
+ * - Кнопки Очистить, Стоп, Пуск, Сбросить симулятор
+ * - Не выводит никаких сообщений (statusMessage) в UI,
+ *   вся логика подсказок находится теперь в Field.
+ */
 function CodeEditor({
   code,
   setCode,
-  statusMessage,
-  setStatusMessage,
   isRunning,
   onClearCode,
   onStop,
   onStart,
   onReset
 }) {
+  /**
+   * Подсветка кода при вводе
+   */
   const highlightCode = (inputCode) => {
     return Prism.highlight(inputCode, Prism.languages.kumir, 'kumir');
   };
@@ -87,16 +98,6 @@ function CodeEditor({
           Сбросить симулятор
         </Button>
       </div>
-
-      {statusMessage && (
-        <Typography
-          variant="body1"
-          color="primary"
-          style={{ marginTop: '16px' }}
-        >
-          {statusMessage}
-        </Typography>
-      )}
     </div>
   );
 }

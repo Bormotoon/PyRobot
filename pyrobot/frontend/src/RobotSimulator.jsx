@@ -1,17 +1,17 @@
-// RobotSimulator.jsx
+// /frontend/src/RobotSimulator.jsx
 
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import CodeEditor from './components/CodeEditor';
 import ControlPanel from './components/ControlPanel';
 import Field from './components/Field';
 
 /**
  * Главный компонент приложения.
- * Хранит глобальное состояние робота, стены, поле, а также
- * осуществляет связь с сервером (execute/reset).
+ * Хранит глобальное состояние (включая statusMessage),
+ * передаёт нужные пропсы в CodeEditor, ControlPanel, Field.
  */
 function RobotSimulator() {
-  // Код в редакторе
+  // Код редактора
   const [code, setCode] = useState(`использовать Робот
 
 алг
@@ -23,160 +23,75 @@ function RobotSimulator() {
   закрасить
 кон`);
 
-  // Сообщения о состоянии/ошибках
-  const [statusMessage, setStatusMessage] = useState('Готов к работе!');
-
-  // Флаг выполнения кода
+  // Выполняется ли код
   const [isRunning, setIsRunning] = useState(false);
 
-  // Размеры поля (в клетках)
+  // Главное поле для подсказок
+  const [statusMessage, setStatusMessage] = useState('');
+
+  // Параметры поля
   const [width, setWidth] = useState(7);
   const [height, setHeight] = useState(7);
-
-  // Размер клетки (пиксели)
   const [cellSize, setCellSize] = useState(50);
 
-  // Позиция робота (x,y)
+  // Позиция робота
   const [robotPos, setRobotPos] = useState({ x: 0, y: 0 });
 
-  // Множество обычных стен (string: "x1,y1,x2,y2")
+  // Стены
   const [walls, setWalls] = useState(new Set());
-
-  // Множество постоянных (граничных) стен
+  // Постоянные стены (границы)
   const [permanentWalls, setPermanentWalls] = useState(new Set());
 
-  // Маркеры (object: { "x,y": 1 })
+  // Маркеры и раскрашенные клетки
   const [markers, setMarkers] = useState({});
-
-  // Множество раскрашенных клеток
   const [coloredCells, setColoredCells] = useState(new Set());
 
-  // Режим рисования (true/false)
+  // Режим рисования
   const [editMode, setEditMode] = useState(false);
 
-  // Ссылка на canvas
+  // Ссылка на canvas (используется в Field)
   const canvasRef = useRef(null);
 
-  /**
-   * setupPermanentWalls(): Создаём границы поля (верх, низ, лево, право).
-   */
-  const setupPermanentWalls = useCallback(() => {
-    const newSet = new Set();
-    // Горизонтальные
-    for (let x = 0; x < width; x++) {
-      newSet.add(`${x},0,${x + 1},0`);         // верх
-      newSet.add(`${x},${height},${x + 1},${height}`); // низ
-    }
-    // Вертикальные
-    for (let y = 0; y < height; y++) {
-      newSet.add(`0,${y},0,${y + 1}`);         // лево
-      newSet.add(`${width},${y},${width},${y + 1}`);   // право
-    }
-    setPermanentWalls(newSet);
-  }, [width, height]);
-
-  /**
-   * clampRobotPos(): Клэмпим позицию робота, если он «вышел» за поле.
-   */
-  const clampRobotPos = useCallback(() => {
-    setRobotPos(prev => {
-      const clampedX = Math.min(Math.max(prev.x, 0), width - 1);
-      const clampedY = Math.min(Math.max(prev.y, 0), height - 1);
-      return { x: clampedX, y: clampedY };
-    });
-  }, [width, height]);
-
-  // Вызываем setupPermanentWalls() и clampRobotPos при изменении width/height
-  useEffect(() => {
-    setupPermanentWalls();
-    clampRobotPos();
-  }, [width, height, setupPermanentWalls, clampRobotPos]);
-
-  /**
-   * Очистка кода
-   */
+  // Примеры функций управления кодом (onClear, onStart, onStop, onReset)
   const handleClearCode = useCallback(() => {
     setCode('');
-    setStatusMessage('Код очищен.');
+    setStatusMessage('Код программы очищен.');
   }, []);
 
-  /**
-   * Остановка выполнения
-   */
   const handleStop = useCallback(() => {
     setIsRunning(false);
-    setStatusMessage('Выполнение прервано.');
+    setStatusMessage('Выполнение остановлено.');
   }, []);
 
-  /**
-   * Запуск кода (POST /execute)
-   */
-  const handleStart = useCallback(async () => {
+  const handleStart = useCallback(() => {
     if (!code.trim()) {
-      setStatusMessage('Ошибка: программа пустая');
+      setStatusMessage('Ошибка: программа пустая.');
       return;
     }
     setIsRunning(true);
-    try {
-      const resp = await fetch('http://localhost:5000/execute', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code })
-      });
-      if (!resp.ok) {
-        setStatusMessage(`HTTP-ошибка: ${resp.status}`);
-        setIsRunning(false);
-        return;
-      }
-      const data = await resp.json();
-      if (data.success) {
-        setRobotPos(data.robotPos);
-        setWalls(new Set(data.walls));
-        setColoredCells(new Set(data.coloredCells));
-        setMarkers(data.markers);
-        setStatusMessage(data.message || 'Код выполнен успешно!');
-      } else {
-        setStatusMessage(`Ошибка: ${data.message}`);
-      }
-    } catch (error) {
-      setStatusMessage('Ошибка соединения с сервером.');
-    } finally {
+    // Пример без реального сервера
+    setTimeout(() => {
       setIsRunning(false);
-    }
+      setStatusMessage('Код (демо) выполнен успешно!');
+    }, 800);
   }, [code]);
 
-  /**
-   * Сброс симулятора (POST /reset)
-   */
-  const handleReset = useCallback(async () => {
-    try {
-      const resp = await fetch('http://localhost:5000/reset', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      });
-      const result = await resp.json();
-      if (resp.ok && result.success) {
-        // Сбрасываем локально
-        setRobotPos({ x: 0, y: 0 });
-        setWalls(new Set());
-        setColoredCells(new Set());
-        setMarkers({});
-        setWidth(7);
-        setHeight(7);
-        setCode(`использовать Робот
+  const handleReset = useCallback(() => {
+    // Сброс состояния
+    setRobotPos({ x: 0, y: 0 });
+    setWalls(new Set());
+    setColoredCells(new Set());
+    setMarkers({});
+    setWidth(7);
+    setHeight(7);
+    setCode(`использовать Робот
 
 алг
 нач
   # Ваши команды здесь
 кон`);
-        setIsRunning(false);
-        setStatusMessage(result.message);
-      } else {
-        setStatusMessage(`Ошибка: ${result.message}`);
-      }
-    } catch (error) {
-      setStatusMessage('Ошибка соединения с сервером.');
-    }
+    setIsRunning(false);
+    setStatusMessage('Симулятор сброшен (демо).');
   }, []);
 
   return (
@@ -184,8 +99,6 @@ function RobotSimulator() {
       <CodeEditor
         code={code}
         setCode={setCode}
-        statusMessage={statusMessage}
-        setStatusMessage={setStatusMessage}
         isRunning={isRunning}
         onClearCode={handleClearCode}
         onStop={handleStop}
@@ -229,8 +142,8 @@ function RobotSimulator() {
         setWalls={setWalls}
         setMarkers={setMarkers}
         setColoredCells={setColoredCells}
+        statusMessage={statusMessage}
         setStatusMessage={setStatusMessage}
-        setCellSize={setCellSize}
       />
     </div>
   );
