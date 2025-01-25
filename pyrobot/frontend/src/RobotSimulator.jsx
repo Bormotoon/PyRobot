@@ -7,11 +7,11 @@ import Field from './components/Field';
 
 /**
  * Главный компонент приложения.
- * Хранит глобальное состояние робота, стены, поле,
- * а также осуществляет связь с сервером.
+ * Хранит глобальное состояние робота, стены, поле, а также
+ * осуществляет связь с сервером (execute/reset).
  */
 function RobotSimulator() {
-  // Код для редактора
+  // Код в редакторе
   const [code, setCode] = useState(`использовать Робот
 
 алг
@@ -26,57 +26,57 @@ function RobotSimulator() {
   // Сообщения о состоянии/ошибках
   const [statusMessage, setStatusMessage] = useState('Готов к работе!');
 
-  // Флаг выполнения кода (для дизейбла кнопок)
+  // Флаг выполнения кода
   const [isRunning, setIsRunning] = useState(false);
 
-  // Размеры поля в клетках
+  // Размеры поля (в клетках)
   const [width, setWidth] = useState(7);
   const [height, setHeight] = useState(7);
 
-  // Размер клетки (пикселей)
+  // Размер клетки (пиксели)
   const [cellSize, setCellSize] = useState(50);
 
-  // Позиция робота
+  // Позиция робота (x,y)
   const [robotPos, setRobotPos] = useState({ x: 0, y: 0 });
 
-  // Множество обычных стен
+  // Множество обычных стен (string: "x1,y1,x2,y2")
   const [walls, setWalls] = useState(new Set());
 
-  // Множество постоянных стен (границы)
+  // Множество постоянных (граничных) стен
   const [permanentWalls, setPermanentWalls] = useState(new Set());
 
-  // Объект маркеров {"x,y": 1}
+  // Маркеры (object: { "x,y": 1 })
   const [markers, setMarkers] = useState({});
 
-  // Множество раскрашенных клеток (строки "x,y")
+  // Множество раскрашенных клеток
   const [coloredCells, setColoredCells] = useState(new Set());
 
-  // Режим рисования
+  // Режим рисования (true/false)
   const [editMode, setEditMode] = useState(false);
 
   // Ссылка на canvas
   const canvasRef = useRef(null);
 
   /**
-   * Генерация постоянных стен по текущим width/height.
+   * setupPermanentWalls(): Создаём границы поля (верх, низ, лево, право).
    */
   const setupPermanentWalls = useCallback(() => {
-    const newPermWalls = new Set();
-    // Горизонтальные границы
+    const newSet = new Set();
+    // Горизонтальные
     for (let x = 0; x < width; x++) {
-      newPermWalls.add(`${x},0,${x + 1},0`);        // верхняя
-      newPermWalls.add(`${x},${height},${x + 1},${height}`); // нижняя
+      newSet.add(`${x},0,${x + 1},0`);         // верх
+      newSet.add(`${x},${height},${x + 1},${height}`); // низ
     }
-    // Вертикальные границы
+    // Вертикальные
     for (let y = 0; y < height; y++) {
-      newPermWalls.add(`0,${y},0,${y + 1}`);        // левая
-      newPermWalls.add(`${width},${y},${width},${y + 1}`);   // правая
+      newSet.add(`0,${y},0,${y + 1}`);         // лево
+      newSet.add(`${width},${y},${width},${y + 1}`);   // право
     }
-    setPermanentWalls(newPermWalls);
+    setPermanentWalls(newSet);
   }, [width, height]);
 
   /**
-   * Клэмпим позицию робота в пределах поля.
+   * clampRobotPos(): Клэмпим позицию робота, если он «вышел» за поле.
    */
   const clampRobotPos = useCallback(() => {
     setRobotPos(prev => {
@@ -86,9 +86,7 @@ function RobotSimulator() {
     });
   }, [width, height]);
 
-  /**
-   * При изменении width/height пересоздаём постоянные стены и клэмпим робота.
-   */
+  // Вызываем setupPermanentWalls() и clampRobotPos при изменении width/height
   useEffect(() => {
     setupPermanentWalls();
     clampRobotPos();
@@ -120,17 +118,17 @@ function RobotSimulator() {
     }
     setIsRunning(true);
     try {
-      const response = await fetch('http://localhost:5000/execute', {
+      const resp = await fetch('http://localhost:5000/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code })
       });
-      if (!response.ok) {
-        setStatusMessage(`HTTP-ошибка: ${response.status}`);
+      if (!resp.ok) {
+        setStatusMessage(`HTTP-ошибка: ${resp.status}`);
         setIsRunning(false);
         return;
       }
-      const data = await response.json();
+      const data = await resp.json();
       if (data.success) {
         setRobotPos(data.robotPos);
         setWalls(new Set(data.walls));
@@ -152,13 +150,13 @@ function RobotSimulator() {
    */
   const handleReset = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:5000/reset', {
+      const resp = await fetch('http://localhost:5000/reset', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       });
-      const result = await response.json();
-      if (response.ok && result.success) {
-        // Сбрасываем локальное состояние
+      const result = await resp.json();
+      if (resp.ok && result.success) {
+        // Сбрасываем локально
         setRobotPos({ x: 0, y: 0 });
         setWalls(new Set());
         setColoredCells(new Set());
@@ -181,12 +179,6 @@ function RobotSimulator() {
     }
   }, []);
 
-  /**
-   * Рендерим главную раскладку:
-   * - CodeEditor
-   * - ControlPanel
-   * - Field
-   */
   return (
     <div className="container">
       <CodeEditor
@@ -206,6 +198,7 @@ function RobotSimulator() {
         setRobotPos={setRobotPos}
         walls={walls}
         setWalls={setWalls}
+        permanentWalls={permanentWalls}
         markers={markers}
         setMarkers={setMarkers}
         coloredCells={coloredCells}
