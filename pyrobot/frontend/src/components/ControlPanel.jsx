@@ -1,15 +1,49 @@
-// /frontend/src/components/ControlPanel.jsx
+/**
+ * ControlPanel.jsx
+ *
+ * В этом файле находится компонент панели управления (ControlPanel),
+ * который получает часть состояния и колбэки через пропсы (передаваемые из RobotSimulator).
+ * Теперь, когда мы используем useReducer в RobotSimulator, здесь ничего не меняется в логике —
+ * мы по-прежнему вызываем setWalls, setStatusMessage, setRobotPos и т. д.
+ * (на самом деле под капотом это будут dispatch(...) в родительском компоненте).
+ *
+ * Все операции (движение робота, рисование стен, маркеры, покраска клеток, изменение поля)
+ * выполняются путём вызова пропов setStatusMessage и соответствующих setter-функций.
+ * Это даёт нам единый источник правды в RobotSimulator (где лежит useReducer).
+ */
 
 import React, { useRef } from 'react';
 import { Button, Card, CardHeader, CardContent, Grid, Typography } from '@mui/material';
 import { ChevronUp, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
-
-// Импорт функции для подсказок
 import { getHint } from '../hints';
 
 /**
- * Компонент панели управления (кнопки движения, маркеры, покраска,
- * изменение размеров поля, режим рисования, импорт .fil).
+ * Компонент ControlPanel:
+ * - При нажатии кнопок движет робота, ставит/убирает маркеры, рисует/очищает клетку,
+ * - Меняет размер поля, переключает режим рисования, импортирует .fil.
+ * - Все изменения состояния (стены, позиция робота) осуществляются через пропсы,
+ *   которые из RobotSimulator вызывают dispatch(...) в useReducer.
+ * - Также при каждом действии, если нужно, вызывается setStatusMessage(...) с подсказкой.
+ * @param {Object} props - объект пропсов
+ * @param {{x:number, y:number}} props.robotPos - текущее положение робота
+ * @param {function} props.setRobotPos - колбэк, меняющий позицию робота
+ * @param {Set<string>} props.walls - множество обычных стен
+ * @param {function} props.setWalls - колбэк, меняющий набор walls
+ * @param {Set<string>} props.permanentWalls - множество постоянных (граничных) стен
+ * @param {Object} props.markers - объект маркеров { \"x,y\": 1 }
+ * @param {function} props.setMarkers - колбэк, меняющий markers
+ * @param {Set<string>} props.coloredCells - множество закрашенных клеток \"x,y\"
+ * @param {function} props.setColoredCells - колбэк, меняющий coloredCells
+ * @param {number} props.width - ширина поля (кол-во клеток)
+ * @param {function} props.setWidth - колбэк, меняющий width
+ * @param {number} props.height - высота поля (кол-во клеток)
+ * @param {function} props.setHeight - колбэк, меняющий height
+ * @param {number} props.cellSize - размер клетки (пиксели)
+ * @param {function} props.setCellSize - колбэк, меняющий cellSize
+ * @param {boolean} props.editMode - режим рисования
+ * @param {function} props.setEditMode - колбэк, меняющий editMode
+ * @param {function} props.setStatusMessage - колбэк, выводящий подсказку
+ * @returns {JSX.Element} Разметка панели управления
  */
 function ControlPanel({
   robotPos,
@@ -31,17 +65,21 @@ function ControlPanel({
   setEditMode,
   setStatusMessage
 }) {
+  /**
+   * fileInputRef - ссылка на скрытый input для импорта .fil
+   */
   const fileInputRef = useRef(null);
 
   /**
-   * Двигаем робота кнопками: учитываем стены (обычные + постоянные) и край поля.
-   * Если движение успешно — выводим подсказку через getHint('moveRobotUp'...) и т.д.
+   * moveRobot(direction)
+   * Двигает робота на 1 клетку (вверх/вниз/влево/вправо),
+   * проверяя наличие стены/края,
+   * затем вызывает setStatusMessage(...) с подсказкой или сообщением об ошибке.
+   * @param {string} direction - 'up' | 'down' | 'left' | 'right'
    */
   const moveRobot = (direction) => {
     setRobotPos(prevPos => {
       let newPos = { ...prevPos };
-
-      // Определяем ключ подсказки
       let hintKey = '';
 
       if (direction === 'up') {
@@ -100,7 +138,9 @@ function ControlPanel({
   };
 
   /**
-   * Положить маркер
+   * putMarker()
+   * Ставит маркер на текущей клетке (robotPos),
+   * если там ещё нет маркера.
    */
   const putMarker = () => {
     const posKey = `${robotPos.x},${robotPos.y}`;
@@ -115,7 +155,8 @@ function ControlPanel({
   };
 
   /**
-   * Поднять маркер
+   * pickMarker()
+   * Убирает маркер с текущей клетки, если он там есть.
    */
   const pickMarker = () => {
     const posKey = `${robotPos.x},${robotPos.y}`;
@@ -130,7 +171,9 @@ function ControlPanel({
   };
 
   /**
-   * Покрасить клетку
+   * paintCell()
+   * Закрашивает текущую клетку (robotPos),
+   * если она ещё не закрашена.
    */
   const paintCell = () => {
     const posKey = `${robotPos.x},${robotPos.y}`;
@@ -145,7 +188,8 @@ function ControlPanel({
   };
 
   /**
-   * Очистить клетку
+   * clearCell()
+   * Очищает текущую клетку (robotPos) от краски, если она была покрашена.
    */
   const clearCell = () => {
     const posKey = `${robotPos.x},${robotPos.y}`;
@@ -160,22 +204,22 @@ function ControlPanel({
   };
 
   /**
-   * Включить/выключить режим рисования
+   * toggleEditMode()
+   * Переключает режим рисования (editMode).
    */
   const toggleEditMode = () => {
     const newMode = !editMode;
     setEditMode(newMode);
     if (newMode) {
-      // Включили — getHint('enterEditMode')
       setStatusMessage(getHint('enterEditMode', newMode));
     } else {
-      // Выключили — getHint('exitEditMode')
       setStatusMessage(getHint('exitEditMode', newMode));
     }
   };
 
   /**
-   * Увеличить ширину поля
+   * increaseWidth(), decreaseWidth(), increaseHeight(), decreaseHeight()
+   * Меняют размеры поля (width/height), если editMode включён.
    */
   const increaseWidth = () => {
     if (!editMode) {
@@ -185,10 +229,6 @@ function ControlPanel({
     setWidth(width + 1);
     setStatusMessage(getHint('increaseWidth', editMode));
   };
-
-  /**
-   * Уменьшить ширину поля
-   */
   const decreaseWidth = () => {
     if (!editMode) {
       setStatusMessage('Включите режим рисования для изменения поля.');
@@ -201,10 +241,6 @@ function ControlPanel({
       setStatusMessage('Ширина не может быть < 1.');
     }
   };
-
-  /**
-   * Увеличить высоту поля
-   */
   const increaseHeight = () => {
     if (!editMode) {
       setStatusMessage('Включите режим рисования для изменения поля.');
@@ -213,10 +249,6 @@ function ControlPanel({
     setHeight(height + 1);
     setStatusMessage(getHint('increaseHeight', editMode));
   };
-
-  /**
-   * Уменьшить высоту поля
-   */
   const decreaseHeight = () => {
     if (!editMode) {
       setStatusMessage('Включите режим рисования для изменения поля.');
@@ -231,12 +263,18 @@ function ControlPanel({
   };
 
   /**
-   * Импорт .fil
+   * handleImportField()
+   * Открывает диалог выбора файла .fil
    */
   const handleImportField = () => {
     fileInputRef.current.click();
   };
 
+  /**
+   * handleFileChange(e)
+   * Вызывается при выборе файла, читает содержимое .fil,
+   * вызывает parseAndApplyFieldFile(content).
+   */
   const handleFileChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -250,7 +288,9 @@ function ControlPanel({
   };
 
   /**
-   * parseAndApplyFieldFile(content): логика чтения .fil
+   * parseAndApplyFieldFile(content)
+   * Разбирает файл .fil, обновляет размеры поля, позицию робота,
+   * стены, раскрашенные клетки, маркеры.
    */
   const parseAndApplyFieldFile = (content) => {
     try {
@@ -297,6 +337,10 @@ function ControlPanel({
     }
   };
 
+  /**
+   * parseWallCode(code, x, y)
+   * По коду стен (8,4,2,1) возвращает массив строк \"x1,y1,x2,y2\".
+   */
   const parseWallCode = (code, x, y) => {
     const arr = [];
     // 8 => верх, 4 => право, 2 => низ, 1 => лево
@@ -319,7 +363,6 @@ function ControlPanel({
       <CardContent>
         <Grid container spacing={2} alignItems="center" justifyContent="center">
 
-          {/* Кнопки движения (стрелки) */}
           <Grid item xs={4}></Grid>
           <Grid item xs={4}>
             <Button variant="contained" onClick={() => moveRobot('up')}>
@@ -348,103 +391,61 @@ function ControlPanel({
           </Grid>
           <Grid item xs={4}></Grid>
 
-          {/* Маркеры */}
           <Grid item xs={6}>
-            <Button
-              variant="contained"
-              onClick={putMarker}
-              fullWidth
-            >
+            <Button variant="contained" onClick={putMarker} fullWidth>
               Положить маркер
             </Button>
           </Grid>
           <Grid item xs={6}>
-            <Button
-              variant="contained"
-              onClick={pickMarker}
-              fullWidth
-            >
+            <Button variant="contained" onClick={pickMarker} fullWidth>
               Поднять маркер
             </Button>
           </Grid>
 
-          {/* Покраска */}
           <Grid item xs={6}>
-            <Button
-              variant="contained"
-              onClick={paintCell}
-              fullWidth
-            >
+            <Button variant="contained" onClick={paintCell} fullWidth>
               Покрасить
             </Button>
           </Grid>
           <Grid item xs={6}>
-            <Button
-              variant="contained"
-              onClick={clearCell}
-              fullWidth
-            >
+            <Button variant="contained" onClick={clearCell} fullWidth>
               Очистить
             </Button>
           </Grid>
 
-          {/* Режим рисования */}
           <Grid item xs={12}>
-            <Button
-              variant="outlined"
-              onClick={toggleEditMode}
-              fullWidth
-            >
+            <Button variant="outlined" onClick={toggleEditMode} fullWidth>
               {editMode ? 'Выключить Режим рисования' : 'Включить Режим рисования'}
             </Button>
           </Grid>
 
-          {/* Изменение размеров поля */}
           <Grid item xs={6}>
-            <Button
-              variant="contained"
-              onClick={increaseWidth}
-              fullWidth
-            >
+            <Button variant="contained" onClick={increaseWidth} fullWidth>
               Поле шире
             </Button>
           </Grid>
           <Grid item xs={6}>
-            <Button
-              variant="contained"
-              onClick={decreaseWidth}
-              fullWidth
-            >
+            <Button variant="contained" onClick={decreaseWidth} fullWidth>
               Поле уже
             </Button>
           </Grid>
           <Grid item xs={6}>
-            <Button
-              variant="contained"
-              onClick={increaseHeight}
-              fullWidth
-            >
+            <Button variant="contained" onClick={increaseHeight} fullWidth>
               Поле выше
             </Button>
           </Grid>
           <Grid item xs={6}>
-            <Button
-              variant="contained"
-              onClick={decreaseHeight}
-              fullWidth
-            >
+            <Button variant="contained" onClick={decreaseHeight} fullWidth>
               Поле ниже
             </Button>
           </Grid>
 
-          {/* Помощь (заглушка) */}
           <Grid item xs={12}>
             <Button variant="contained" color="secondary" fullWidth>
               Помощь
             </Button>
           </Grid>
 
-          {/* Импорт .fil */}
           <Grid item xs={12}>
             <Button
               variant="contained"
@@ -458,7 +459,7 @@ function ControlPanel({
               type="file"
               ref={fileInputRef}
               style={{ display: 'none' }}
-              accept=".fil\"
+              accept=".fil"
               onChange={handleFileChange}
             />
           </Grid>

@@ -1,10 +1,39 @@
-// /frontend/src/components/Field.jsx
+/**
+ * Field.jsx
+ *
+ * Данный файл содержит компонент Field, который:
+ * - Отображает Canvas (поле) и обрабатывает взаимодействие мыши (рисование стен, раскраска, маркеры, перетаскивание робота в режиме рисования).
+ * - Выводит статус (позицию робота, количество маркеров/закрашенных) и строку подсказок (statusMessage) в отдельном блоке.
+ * - Использует пропсы, переданные из RobotSimulator, где состояние хранится в useReducer.
+ * - При необходимости вызывает setRobotPos, setWalls, setColoredCells и т. д., которые под капотом диспатчат действия в Reducer.
+ */
 
 import React, { useEffect, useCallback, useState } from 'react';
 import { Card, Typography } from '@mui/material';
 import { drawField } from '../canvasDrawing';
 import { getHint } from '../hints';
 
+/**
+ * Компонент Field.
+ * @param {Object} props - объект пропсов.
+ * @param {React.MutableRefObject} props.canvasRef - ссылка на canvas DOM-элемент.
+ * @param {{x:number,y:number}} props.robotPos - позиция робота.
+ * @param {Set<string>} props.walls - множество обычных стен.
+ * @param {Set<string>} props.permanentWalls - множество постоянных (внешних) стен.
+ * @param {Set<string>} props.coloredCells - множество закрашенных клеток \"x,y\".
+ * @param {Object} props.markers - объект маркеров { \"x,y\": 1 }.
+ * @param {number} props.width - ширина поля (количество клеток).
+ * @param {number} props.height - высота поля (количество клеток).
+ * @param {number} props.cellSize - размер клетки (в пикселях).
+ * @param {boolean} props.editMode - режим рисования.
+ * @param {function} props.setRobotPos - функция-колбэк для изменения позиции робота.
+ * @param {function} props.setWalls - функция-колбэк для изменения множества walls.
+ * @param {function} props.setMarkers - функция-колбэк для изменения объекта markers.
+ * @param {function} props.setColoredCells - функция-колбэк для изменения множества закрашенных клеток.
+ * @param {string} props.statusMessage - текущая строка подсказок/сообщений.
+ * @param {function} props.setStatusMessage - функция-колбэк для изменения statusMessage.
+ * @returns {JSX.Element} Разметка, содержащая Canvas и блок статуса/подсказки.
+ */
 function Field({
   canvasRef,
   robotPos,
@@ -20,12 +49,18 @@ function Field({
   setWalls,
   setMarkers,
   setColoredCells,
-  statusMessage,     // <-- текущее сообщение
-  setStatusMessage   // <-- функция обновления
+  statusMessage,
+  setStatusMessage
 }) {
+  /**
+   * Локальное состояние: isDraggingRobot указывает, перетаскиваем ли мы робота в режиме рисования.
+   */
   const [isDraggingRobot, setIsDraggingRobot] = useState(false);
 
-  // Отрисовка Canvas
+  /**
+   * useEffect, который при каждом рендере (или изменении зависимостей)
+   * отрисовывает текущее состояние поля, робота, стен, маркеров на Canvas.
+   */
   useEffect(() => {
     if (!canvasRef.current) return;
     drawField(canvasRef.current, {
@@ -50,7 +85,11 @@ function Field({
     cellSize
   ]);
 
-  // Вспомогательные функции (getCanvasCoords, toGridCoords) — не меняем
+  /**
+   * getCanvasCoords(event)
+   * Возвращает координаты (x,y) внутри canvas, либо {x:null,y:null} если canvasRef пуст.
+   * @param {MouseEvent} event - событие мыши
+   */
   const getCanvasCoords = useCallback((event) => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: null, y: null };
@@ -61,6 +100,14 @@ function Field({
     };
   }, [canvasRef]);
 
+  /**
+   * toGridCoords(px, py)
+   * Перевод пиксельных координат (px, py) в координаты сетки (gridX, gridY).
+   * Учитываем, что поле отсчитывается с отступом cellSize (т. е. \"+1\" в draw).
+   * @param {number} px - координата X в пикселях внутри canvas
+   * @param {number} py - координата Y в пикселях внутри canvas
+   * @returns {{gridX:number|null, gridY:number|null}}
+   */
   const toGridCoords = useCallback((px, py) => {
     const gx = Math.floor(px / cellSize) - 1;
     const gy = Math.floor(py / cellSize) - 1;
@@ -70,15 +117,18 @@ function Field({
     return { gridX: gx, gridY: gy };
   }, [cellSize, width, height]);
 
-  /********************************************
-   * handleCanvasLeftClickEditMode(px, py):
-   *   Рисуем стены / красим клетки
-   ********************************************/
+  /**
+   * handleCanvasLeftClickEditMode(px, py)
+   * Рисует/убирает стену, если клик на границе клетки, или красит/очищает клетку,
+   * если клик внутри клетки (в режиме рисования).
+   * Выводит подсказку getHint('canvasLeftClickEditMode', true).
+   */
   const handleCanvasLeftClickEditMode = useCallback((px, py) => {
     const margin = 5;
     const gridX = Math.floor(px / cellSize) - 1;
     const gridY = Math.floor(py / cellSize) - 1;
-    if (gridX == null || gridY == null || gridX < 0 || gridY < 0 || gridX >= width || gridY >= height) {
+    if (gridX == null || gridY == null ||
+      gridX < 0 || gridX >= width || gridY < 0 || gridY >= height) {
       setStatusMessage('Клик за пределами поля рисования.');
       return;
     }
@@ -87,6 +137,7 @@ function Field({
     const yRem = py % cellSize;
     let wall = null;
 
+    // Проверка на границу (лево/право/верх/низ) с помощью margin
     if (xRem < margin) {
       wall = `${gridX},${gridY},${gridX},${gridY + 1}`;
     } else if (xRem > cellSize - margin) {
@@ -98,6 +149,7 @@ function Field({
     }
 
     if (wall) {
+      // Если клик на границу => стена
       if (!permanentWalls.has(wall)) {
         setWalls(prev => {
           const copy = new Set(prev);
@@ -114,7 +166,7 @@ function Field({
         setStatusMessage('Это постоянная стена. ' + getHint('canvasLeftClickEditMode', true));
       }
     } else {
-      // Красим клетку
+      // Иначе считаем, что клик внутри клетки => красим/очищаем клетку
       const posKey = `${gridX},${gridY}`;
       setColoredCells(prev => {
         const c = new Set(prev);
@@ -129,20 +181,26 @@ function Field({
       });
     }
   }, [
-    cellSize, width, height,
-    permanentWalls, setWalls, setColoredCells,
+    cellSize,
+    width,
+    height,
+    permanentWalls,
+    setWalls,
+    setColoredCells,
     setStatusMessage
   ]);
 
-  /********************************************
-   * handleMouseDown(e):
-   *   - если !editMode => canvasLeftClickNoEdit
-   *   - если editMode => drag robot или рисуем/красим
-   ********************************************/
+  /**
+   * handleMouseDown(e)
+   * Срабатывает при нажатии левой кнопки мыши на canvas.
+   * Если не editMode => canvasLeftClickNoEdit,
+   * иначе => либо начинаем перетаскивание робота, либо рисуем (handleCanvasLeftClickEditMode).
+   */
   const handleMouseDown = useCallback((e) => {
-    if (e.button !== 0) return; // только левая
+    if (e.button !== 0) return; // только левая кнопка
     const { x, y } = getCanvasCoords(e);
     if (x === null || y === null) return;
+
     const { gridX, gridY } = toGridCoords(x, y);
     if (gridX === null || gridY === null) {
       setStatusMessage('Клик за пределами поля.');
@@ -154,12 +212,12 @@ function Field({
       return;
     }
 
-    // Если клик по роботу => drag
+    // Если editMode = true и клик по роботу => перетаскивание (без учёта стен)
     if (gridX === robotPos.x && gridY === robotPos.y) {
       setIsDraggingRobot(true);
       setStatusMessage('Перетаскивание робота (стены игнорируются).');
     } else {
-      // Иначе ставим/убираем стены или красим клетку
+      // Иначе рисуем стену/раскрашиваем клетку
       handleCanvasLeftClickEditMode(x, y);
     }
   }, [
@@ -171,10 +229,11 @@ function Field({
     setStatusMessage
   ]);
 
-  /********************************************
-   * handleMouseMove(e):
-   *   - если drag robot => свободно двигаем
-   ********************************************/
+  /**
+   * handleMouseMove(e)
+   * Если isDraggingRobot=true => двигаем робота, не обращая внимания на стены,
+   * просто клэмпим в пределах поля (0..width-1, 0..height-1).
+   */
   const handleMouseMove = useCallback((e) => {
     if (!isDraggingRobot) return;
     const { x, y } = getCanvasCoords(e);
@@ -192,15 +251,16 @@ function Field({
     isDraggingRobot,
     getCanvasCoords,
     toGridCoords,
-    setRobotPos,
     setStatusMessage,
+    setRobotPos,
     width,
     height
   ]);
 
-  /********************************************
-   * handleMouseUp: завершаем drag
-   ********************************************/
+  /**
+   * handleMouseUp()
+   * Завершает перетаскивание робота, если оно было начато.
+   */
   const handleMouseUp = useCallback(() => {
     if (isDraggingRobot) {
       setIsDraggingRobot(false);
@@ -208,11 +268,11 @@ function Field({
     }
   }, [isDraggingRobot, setStatusMessage]);
 
-  /********************************************
-   * handleCanvasRightClick(e):
-   *   - если !editMode => canvasRightClickNoEdit
-   *   - если editMode => ставим/убираем маркер
-   ********************************************/
+  /**
+   * handleCanvasRightClick(e)
+   * При правом клике, если editMode=false => canvasRightClickNoEdit,
+   * иначе ставим/убираем маркер (x,y).
+   */
   const handleCanvasRightClick = useCallback((e) => {
     e.preventDefault();
     if (!editMode) {
@@ -247,15 +307,18 @@ function Field({
     setStatusMessage
   ]);
 
-  /********************************************
-   * Итоговый рендер: Canvas + StatusCard
-   ********************************************/
-  // Формируем итоговую строку, которая выводится в <Typography>
+  /**
+   * Формируем итоговую строку для статуса:
+   * Позиция робота, количество маркеров, количество закрашенных клеток.
+   */
   const displayString = `Позиция робота: (${robotPos.x}, ${robotPos.y})
 Маркеров: ${Object.keys(markers).length}
 Раскрашенных клеток: ${coloredCells.size}`;
 
-  // Если есть statusMessage, добавляем двойной перевод строки и саму подсказку
+  /**
+   * Если есть statusMessage, добавляем двойной перевод строки перед ним,
+   * чтобы подсказка отображалась отдельно ниже статуса.
+   */
   const finalString = statusMessage
     ? `${displayString}\n\n${statusMessage}`
     : displayString;
@@ -279,7 +342,6 @@ function Field({
         </div>
       </Card>
 
-      {/* Карточка, где всё: и статусы, и подсказки */}
       <Card className="status-card">
         <Typography variant="body2" style={{ whiteSpace: 'pre-line' }}>
           {finalString}
