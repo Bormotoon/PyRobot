@@ -1,6 +1,6 @@
 // /frontend/src/RobotSimulator.jsx
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import CodeEditor from './components/CodeEditor';
 import ControlPanel from './components/ControlPanel';
 import Field from './components/Field';
@@ -37,9 +37,9 @@ function RobotSimulator() {
   // Позиция робота
   const [robotPos, setRobotPos] = useState({ x: 0, y: 0 });
 
-  // Стены
+  // Стены (обычные)
   const [walls, setWalls] = useState(new Set());
-  // Постоянные стены (границы)
+  // Постоянные стены (границы) — здесь будут внешние стены
   const [permanentWalls, setPermanentWalls] = useState(new Set());
 
   // Маркеры и раскрашенные клетки
@@ -52,7 +52,9 @@ function RobotSimulator() {
   // Ссылка на canvas (используется в Field)
   const canvasRef = useRef(null);
 
-  // Примеры функций управления кодом (onClear, onStart, onStop, onReset)
+  /**
+   * Функции управления кодом (onClear, onStart, onStop, onReset)
+   */
   const handleClearCode = useCallback(() => {
     setCode('');
     setStatusMessage('Код программы очищен.');
@@ -93,6 +95,48 @@ function RobotSimulator() {
     setIsRunning(false);
     setStatusMessage('Симулятор сброшен (демо).');
   }, []);
+
+  /**
+   * setupPermanentWalls:
+   * При каждом изменении width/height создаём заново внешние стены (границы).
+   */
+  const setupPermanentWalls = useCallback(() => {
+    const newWalls = new Set();
+    // Горизонтальные границы
+    for (let x = 0; x < width; x++) {
+      newWalls.add(`${x},0,${x + 1},0`);           // Верх
+      newWalls.add(`${x},${height},${x + 1},${height}`); // Низ
+    }
+    // Вертикальные границы
+    for (let y = 0; y < height; y++) {
+      newWalls.add(`0,${y},0,${y + 1}`);             // Лево
+      newWalls.add(`${width},${y},${width},${y + 1}`);   // Право
+    }
+    setPermanentWalls(newWalls);
+  }, [width, height]);
+
+  /**
+   * clampRobotPos:
+   * Удерживает робота внутри поля (0..width-1, 0..height-1)
+   * при изменении размеров поля.
+   */
+  const clampRobotPos = useCallback(() => {
+    setRobotPos(prev => {
+      const clampedX = Math.min(Math.max(prev.x, 0), width - 1);
+      const clampedY = Math.min(Math.max(prev.y, 0), height - 1);
+      return { x: clampedX, y: clampedY };
+    });
+  }, [width, height]);
+
+  /**
+   * useEffect: при любом изменении width/height ->
+   *  - пересоздать внешние стены (setupPermanentWalls)
+   *  - clampRobotPos, чтобы робот не остался за границей.
+   */
+  useEffect(() => {
+    setupPermanentWalls();
+    clampRobotPos();
+  }, [width, height, setupPermanentWalls, clampRobotPos]);
 
   return (
     <div className="container">
