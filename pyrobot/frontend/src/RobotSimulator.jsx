@@ -62,8 +62,7 @@ const initialState = {
  * возвращает новое состояние на основе типа действия (action.type)
  * и дополнительных данных (action.payload).
  */
-function
-reducer(state, action) {
+function reducer(state, action) {
     switch (action.type) {
         case 'SET_CODE':
             return {...state, code: action.payload};
@@ -84,7 +83,12 @@ reducer(state, action) {
             return {...state, cellSize: action.payload};
 
         case 'SET_ROBOT_POS':
-            return {...state, robotPos: action.payload};
+            return {
+                ...state,
+                robotPos: typeof action.payload === 'function'
+                    ? action.payload(state.robotPos)
+                    : action.payload
+            };
 
         case 'SET_WALLS':
             return {
@@ -220,8 +224,7 @@ function RobotSimulator() {
         dispatch({type: 'SET_WIDTH', payload: 7});
         dispatch({type: 'SET_HEIGHT', payload: 7});
         dispatch({
-            type: 'SET_CODE',
-            payload: `использовать Робот
+            type: 'SET_CODE', payload: `использовать Робот
 
 алг
 нач
@@ -247,88 +250,86 @@ function RobotSimulator() {
         dispatch({type: 'SET_ROBOT_POS', payload: newPos});
     }, [state.width, state.height]);
 
-    return (
-        <div className="container">
-            {/**
-             * Компонент CodeEditor:
-             * передаём текущее state.code и isRunning,
-             * а также колбэки handleClearCode, handleStop, handleStart, handleReset
-             */}
-            <CodeEditor
-                code={state.code}
-                setCode={(newCode) => dispatch({type: 'SET_CODE', payload: newCode})}
-                isRunning={state.isRunning}
-                onClearCode={handleClearCode}
-                onStop={handleStop}
-                onStart={handleStart}
-                onReset={handleReset}
-            />
+    return (<div className="container">
+        {/**
+         * Компонент CodeEditor:
+         * передаём текущее state.code и isRunning,
+         * а также колбэки handleClearCode, handleStop, handleStart, handleReset
+         */}
+        <CodeEditor
+            code={state.code}
+            setCode={(newCode) => dispatch({type: 'SET_CODE', payload: newCode})}
+            isRunning={state.isRunning}
+            onClearCode={handleClearCode}
+            onStop={handleStop}
+            onStart={handleStart}
+            onReset={handleReset}
+        />
 
-            {/**
-             * Компонент ControlPanel:
-             * передаём нужные части state (robotPos, walls, markers и т.д.)
-             * и dispatch или соответствующие setter-колбэки,
-             * а также setStatusMessage для подсказок.
-             */}
-            <ControlPanel
-                robotPos={state.robotPos}
-                setRobotPos={(pos) => dispatch({type: 'SET_ROBOT_POS', payload: pos})}
+        {/**
+         * Компонент ControlPanel:
+         * передаём нужные части state (robotPos, walls, markers и т.д.)
+         * и dispatch или соответствующие setter-колбэки,
+         * а также setStatusMessage для подсказок.
+         */}
+        <ControlPanel
+            robotPos={state.robotPos}
+            setRobotPos={(pos) => dispatch({type: 'SET_ROBOT_POS', payload: pos})}
 
-                walls={state.walls}
-                setWalls={(newWalls) => dispatch({type: 'SET_WALLS', payload: newWalls})}
+            walls={state.walls}
+            setWalls={(newWalls) => dispatch({type: 'SET_WALLS', payload: newWalls})}
 
-                permanentWalls={state.permanentWalls}
+            permanentWalls={state.permanentWalls}
 
-                markers={state.markers}
-                setMarkers={(m) => dispatch({type: 'SET_MARKERS', payload: m})}
+            markers={state.markers}
+            setMarkers={(m) => dispatch({type: 'SET_MARKERS', payload: m})}
 
-                coloredCells={state.coloredCells}
-                setColoredCells={(c) => dispatch({type: 'SET_COLORED_CELLS', payload: c})}
+            coloredCells={state.coloredCells}
+            setColoredCells={(c) => dispatch({type: 'SET_COLORED_CELLS', payload: c})}
 
-                width={state.width}
-                setWidth={(val) => dispatch({type: 'SET_WIDTH', payload: val})}
+            width={state.width}
+            setWidth={(val) => dispatch({type: 'SET_WIDTH', payload: val})}
 
-                height={state.height}
-                setHeight={(val) => dispatch({type: 'SET_HEIGHT', payload: val})}
+            height={state.height}
+            setHeight={(val) => dispatch({type: 'SET_HEIGHT', payload: val})}
 
-                cellSize={state.cellSize}
-                setCellSize={(val) => dispatch({type: 'SET_CELL_SIZE', payload: val})}
+            cellSize={state.cellSize}
+            setCellSize={(val) => dispatch({type: 'SET_CELL_SIZE', payload: val})}
 
-                editMode={state.editMode}
-                setEditMode={(val) => dispatch({type: 'SET_EDIT_MODE', payload: val})}
+            editMode={state.editMode}
+            setEditMode={(val) => dispatch({type: 'SET_EDIT_MODE', payload: val})}
 
-                setStatusMessage={(msg) => dispatch({type: 'SET_STATUS_MESSAGE', payload: msg})}
-            />
+            setStatusMessage={(msg) => dispatch({type: 'SET_STATUS_MESSAGE', payload: msg})}
+        />
 
-            {/**
-             * Компонент Field:
-             * передаём Canvas ref, а также все части state и setter для них,
-             * в т.ч. statusMessage и setStatusMessage,
-             * чтобы Field мог рисовать Canvas и обновлять сообщения.
-             */}
-            <Field
-                canvasRef={canvasRef}
+        {/**
+         * Компонент Field:
+         * передаём Canvas ref, а также все части state и setter для них,
+         * в т.ч. statusMessage и setStatusMessage,
+         * чтобы Field мог рисовать Canvas и обновлять сообщения.
+         */}
+        <Field
+            canvasRef={canvasRef}
 
-                robotPos={state.robotPos}
-                walls={state.walls}
-                permanentWalls={state.permanentWalls}
-                coloredCells={state.coloredCells}
-                markers={state.markers}
+            robotPos={state.robotPos}
+            walls={state.walls}
+            permanentWalls={state.permanentWalls}
+            coloredCells={state.coloredCells}
+            markers={state.markers}
 
-                width={state.width}
-                height={state.height}
-                cellSize={state.cellSize}
-                editMode={state.editMode}
+            width={state.width}
+            height={state.height}
+            cellSize={state.cellSize}
+            editMode={state.editMode}
 
-                setRobotPos={(pos) => dispatch({type: 'SET_ROBOT_POS', payload: pos})}
-                setWalls={(newWalls) => dispatch({type: 'SET_WALLS', payload: newWalls})}
-                setMarkers={(m) => dispatch({type: 'SET_MARKERS', payload: m})}
-                setColoredCells={(c) => dispatch({type: 'SET_COLORED_CELLS', payload: c})}
-                statusMessage={state.statusMessage}
-                setStatusMessage={(msg) => dispatch({type: 'SET_STATUS_MESSAGE', payload: msg})}
-            />
-        </div>
-    );
+            setRobotPos={(pos) => dispatch({type: 'SET_ROBOT_POS', payload: pos})}
+            setWalls={(newWalls) => dispatch({type: 'SET_WALLS', payload: newWalls})}
+            setMarkers={(m) => dispatch({type: 'SET_MARKERS', payload: m})}
+            setColoredCells={(c) => dispatch({type: 'SET_COLORED_CELLS', payload: c})}
+            statusMessage={state.statusMessage}
+            setStatusMessage={(msg) => dispatch({type: 'SET_STATUS_MESSAGE', payload: msg})}
+        />
+    </div>);
 }
 
 export default RobotSimulator;
