@@ -1,7 +1,4 @@
-/*
-  Общий контейнер, в котором две колонки:
-  слева - панель управления (card), справа - поле (field-area).
-*/
+/* Общий контейнер */
 .container {
     display: flex;
     height: 100vh; /* На всю высоту экрана */
@@ -12,10 +9,8 @@
 .code-editor {
     width: 25%;
     min-width: 300px;
-    margin: 16px 0 16px 0 !important;
-    padding-left: 3%;
-    padding-top: 16px;
-    padding-right: 3% !important; /* Дополнительный отступ справа */
+    margin: 16px 0;
+    padding: 16px 3%; /* Упрощённый padding */
     background: #1e1e1e;
     color: #d4d4d4;
     border-radius: 8px;
@@ -26,265 +21,21 @@
     justify-content: space-between;
 }
 
-/* Стили для редактора кода с react-simple-code-editor */
+/* Редактор кода внутри code-editor */
 .code-editor .react-simple-code-editor {
     flex: 1;
     width: 100%;
     padding: 16px;
-    border: 1px solid #ccc !important; /* Граница как у кнопок */
-    border-radius: 4px; /* Скругление углов */
+    border: 1px solid #ccc;
+    border-radius: 4px;
     min-height: calc(100vh - 200px); /* Фиксированная высота */
-    height: calc(100vh - 220px) !important; /* Учёт места под кнопки */
-    margin: 0 0 16px;
+    margin-bottom: 16px;
     transition: height 0.3s ease;
-    background: #1e1e1e; /* Совпадает с фоном .code-editor */
-    color: #d4d4d4; /* Цвет текста */
-    font-family: 'Fira Code', monospace; /* Рекомендуется для редакторов кода */
+    background: inherit; /* Наследует фон от родителя */
+    color: inherit; /* Наследует цвет текста */
+    font-family: 'Fira Code', monospace;
     font-size: 14px;
     overflow: auto;
-}
-
-/* Подсветка синтаксиса для языка КУМИР с помощью Prism.js */
-.token.keyword {
-    color: #569cd6;
-    font-weight: bold;
-}
-
-.token.comment {
-    color: #6a9955;
-    font-style: italic;
-}
-
-.token.string {
-    color: #ce9178;
-}
-
-.token.number {
-    color: #b5cea8;
-}
-
-.token.operator {
-    color: #d4d4d4;
-}
-
-/* Стили фона и границ при фокусе */
-.code-editor .react-simple-code-editor:focus {
-    outline: none;
-    box-shadow: inset 0 0 0 1px #1976d2;
-}
-
-/* Адаптивность */
-@media (max-width: 1200px) {
-    .container {
-        flex-wrap: wrap;
-    }
-
-    .code-editor {
-        width: 100%;
-        height: 300px;
-    }
-
-    .card {
-        width: 100% !important;
-        min-width: unset;
-    }
-
-    .field-area {
-        order: -1;
-    }
-}
-
-/* Левая панель (Card) с кнопками */
-.card {
-    width: 25%;
-    padding: 16px;
-    border-radius: 8px;
-    border: 1px solid #ccc;
-    box-sizing: border-box;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    margin: 16px;
-    height: auto; /* Высота зависит от содержимого */
-    order: 2; /* Поменяли местами с field-area */
-}
-
-/* Делаем отступы идентичными блоку управления */
-.card .MuiCardContent-root {
-    padding: 16px !important;
-}
-
-/* TODO
-    Выровнять сраные кнопки под кодом по центру, ёпт!
- */
-
-/* Обновленный контейнер поля */
-.field-area {
-    flex: 1;
-    min-width: 300px;
-    max-width: 70vh;
-    margin: 16px;
-    order: 1;
-}
-
-/* Для мобильной версии */
-@media (max-width: 768px) {
-    .container {
-        flex-direction: column;
-    }
-
-    .card, .field-area {
-        order: 0; /* Сброс порядка для мобилок */
-    }
-}
-
-/* Карточка, в которой находится Canvas */
-.card-controls {
-    flex: 1; /* Может растягиваться по высоте */
-    padding: 16px;
-    border-radius: 8px;
-    border: 1px solid #ccc;
-    text-align: center;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-}
-
-/* Отдельный блок для статуса под Canvas */
-.status-card {
-    padding: 8px;
-    border-radius: 8px;
-    border: 1px solid #ccc;
-    margin-top: 16px;
-    text-align: center;
-}
-
-
-/* Стили для контейнера кнопок */
-.editor-controls {
-    display: flex;
-    justify-content: center; /* Центр по горизонтали */
-    align-items: center; /* Центр по вертикали */
-    gap: 8px;
-    width: 100%;
-    margin-top: 16px;
-    padding: 0 10px; /* Защитные отступы */
-    box-sizing: border-box; /* Учёт padding в ширине */
-}
-
-
-.editor-controls button {
-    flex: 1; /* Занимают всё доступное пространство */
-    max-width: 100px; /* Ограничение максимальной ширины */
-}
-
-.editor-controls .MuiButton-root {
-    margin: 0 !important;
-    flex: 0 0 auto; /* Фиксированный размер без растягивания */
-    min-height: 40px; /* Фиксированная высота */
-    white-space: nowrap; /* Текст в одну строку */
-}
-
-/* Для мобильных устройств */
-@media (max-width: 768px) {
-    .editor-controls {
-        flex-direction: column;
-    }
-
-    .editor-controls .MuiButton-root {
-        width: 100% !important; /* На всю ширину */
-        max-width: 250px; /* Максимум для удобства */
-    }
-}
-
-
-/* Пример: кнопка растягивается на всю ширину и адаптирует размер шрифта */
-button {
-    background-color: #1a202c;
-    color: #fff;
-    width: 100%; /* Растягиваем на 100% контейнера */
-    min-height: 5vh; /* Минимальная высота - 5% высоты экрана */
-    display: flex; /* Чтобы центрировать текст по вертикали и горизонтали */
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    border: none;
-    box-sizing: border-box;
-    padding: 0.5em 1em; /* Немного внутренних отступов */
-
-    /*
-      clamp(минимум, предпочитаемый, максимум)
-      Например: clamp(0.8rem, 2vw, 1.2rem)
-      - на маленьких экранах (или если текст длинный) шрифт уменьшится до 0.8rem
-      - в обычном масштабе будет примерно 2vw
-      - не вырастет больше 1.2rem при увеличении окна
-    */
-    font-size: clamp(0.8rem, 2vw, 1.2rem);
-    line-height: 1.2;
-
-    /* Если хотите, чтобы текст не переносился на вторую строку: */
-    white-space: nowrap;
-    overflow: hidden;
-    /*
-      Если хотите троеточие в конце, когда текста слишком много:
-      text-overflow: ellipsis;
-      Но тогда часть текста может быть "обрезана".
-    */
-    /* text-overflow: ellipsis; */
-    /* white-space: nowrap; */
-    box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.3); /* Тень для всех кнопок */
-}
-
-/* Кнопка "во всю ширину" */
-button.full-width {
-    width: 100%;
-    height: 5vh;
-    margin-top: 10px;
-    font-size: 2vh;
-}
-
-/* Кнопка с контуром (outlined) - добавим box-shadow */
-button.full-width-outlined {
-    width: 100%;
-    min-height: 5vh;
-    margin-top: 10px;
-    border: 1px solid #ccc;
-    box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.3); /* Добавили тень */
-    /* ... остальные свойства ... */
-}
-
-/* Контейнер поля с фиксированным соотношением сторон */
-.field-container {
-    position: relative;
-    width: 100%;
-    padding-top: 100%; /* Соотношение 1:1 */
-    background: #FFFFFF;
-    border-radius: 8px;
-    overflow: hidden;
-}
-
-/* Внутренняя обертка для канваса */
-.canvas-wrapper {
-    position: absolute;
-    top: 0;
-    left: 0;
-    bottom: 0;
-    right: 0;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
-
-/* Новые стили для канваса */
-canvas {
-    max-width: 100%;
-    max-height: 100%;
-    object-fit: contain;
-    background-color: #289628;
-    transition: transform 0.2s;
-}
-
-canvas.edit-mode {
-    background-color: #6496FF;
 }
 
 /* Подсветка синтаксиса для языка КУМИР */
@@ -310,19 +61,177 @@ canvas.edit-mode {
     color: #d4d4d4;
 }
 
-/* Дополнительные стили для редактора кода */
-.code-editor .react-simple-code-editor {
-    /* Стили уже заданы выше */
+/* Адаптивность */
+@media (max-width: 1200px) {
+    .container {
+        flex-wrap: wrap;
+    }
+
+    .code-editor {
+        width: 100%;
+        height: 300px;
+    }
+
+    .card {
+        width: 100%;
+        min-width: unset;
+    }
+
+    .field-area {
+        order: -1;
+    }
 }
 
-/* Стили для подсветки линий */
-.code-editor .prism-code {
-    padding: 10px;
-    font-family: 'Fira Code', monospace;
-    font-size: 14px;
+/* Левая панель (Card) с кнопками */
+.card {
+    width: 25%;
+    padding: 16px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    margin: 16px;
+    height: auto;
+    order: 2;
 }
 
-/* Scrollbar стили для редактора кода */
+/* Контейнер поля */
+.field-area {
+    flex: 1;
+    min-width: 300px;
+    max-width: 70vh;
+    margin: 16px;
+    order: 1;
+}
+
+/* Для мобильных устройств */
+@media (max-width: 768px) {
+    .container {
+        flex-direction: column;
+    }
+
+    .card,
+    .field-area {
+        order: 0;
+        width: 100%;
+    }
+}
+
+/* Карточка управления */
+.card-controls {
+    flex: 1;
+    padding: 16px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Блок статуса под Canvas */
+.status-card {
+    padding: 8px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    margin-top: 16px;
+    text-align: center;
+}
+
+/* Контейнер кнопок */
+.editor-controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    margin-top: 16px;
+    padding: 0 10px;
+    box-sizing: border-box;
+}
+
+.editor-controls button {
+    flex: 1;
+    max-width: 100px;
+}
+
+/* Адаптивные кнопки */
+@media (max-width: 768px) {
+    .editor-controls {
+        flex-direction: column;
+    }
+
+    .editor-controls button {
+        width: 100%;
+        max-width: 250px;
+    }
+}
+
+/* Общие стили для кнопок */
+button {
+    background-color: #1a202c;
+    color: #fff;
+    width: 100%;
+    min-height: 5vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    border: none;
+    padding: 0.5em 1em;
+    font-size: clamp(0.8rem, 2vw, 1.2rem);
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.3);
+}
+
+/* Полноэкранные кнопки */
+button.full-width {
+    width: 100%;
+    height: 5vh;
+    margin-top: 10px;
+    font-size: 2vh;
+}
+
+button.full-width-outlined {
+    border: 1px solid #ccc;
+}
+
+/* Контейнер поля с фиксированным соотношением сторон */
+.field-container {
+    position: relative;
+    width: 100%;
+    padding-top: 100%;
+    background: #fff;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.canvas-wrapper {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+canvas {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    background-color: #289628;
+    transition: transform 0.2s;
+}
+
+canvas.edit-mode {
+    background-color: #6496ff;
+}
+
+/* Scrollbar стили */
 .code-editor .react-simple-code-editor::-webkit-scrollbar {
     width: 8px;
 }
@@ -336,16 +245,17 @@ canvas.edit-mode {
     border-radius: 4px;
 }
 
-/* Стиль для модального окна "Помощь" */
+/* Модальное окно "Помощь" */
 .MuiDialog-paper {
     background-color: #f5f5f5;
 }
 
-.MuiDialogTitle-root, .MuiDialogContent-root, .MuiDialogActions-root {
+.MuiDialogTitle-root,
+.MuiDialogContent-root,
+.MuiDialogActions-root {
     color: #333;
 }
 
-/* Стиль для кнопок внутри модального окна */
 .MuiButton-containedPrimary {
     background-color: #1976d2;
 }
@@ -354,27 +264,22 @@ canvas.edit-mode {
     background-color: #dc004e;
 }
 
-/* Обновлённые стили для адаптивности редактора кода */
-@media (max-width: 1200px) {
-    .code-editor .react-simple-code-editor {
-        height: 300px !important;
-    }
-}
-
-/* Обновление стилей для кнопок в редакторе */
-.editor-controls {
+/* Основной контейнер приложения */
+.app-container {
     display: flex;
     flex-direction: row;
-    justify-content: space-between;
-    gap: 8px;
+    gap: 20px;
+    align-items: flex-start;
 }
 
 @media (max-width: 768px) {
-    .editor-controls {
+    .app-container {
         flex-direction: column;
     }
 
-    .editor-controls button {
+    .code-editor,
+    .control-panel,
+    .field {
         width: 100%;
     }
 }

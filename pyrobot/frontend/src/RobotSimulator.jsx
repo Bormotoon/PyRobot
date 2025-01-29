@@ -134,7 +134,7 @@ const RobotSimulator = memo(() => {
 	}, [state.width, state.height]);
 
 	return (
-		<>
+		<div className="app-container">
 			<CodeEditor
 				code={state.code}
 				setCode={(newCode) => dispatch({type: 'SET_CODE', payload: newCode})}
@@ -182,7 +182,7 @@ const RobotSimulator = memo(() => {
 				statusMessage={state.statusMessage}
 				setStatusMessage={(msg) => dispatch({type: 'SET_STATUS_MESSAGE', payload: msg})}
 			/>
-		</>
+		</div>
 	);
 });
 
