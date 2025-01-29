@@ -35,29 +35,42 @@ function reducer(state, action) {
 		case 'SET_ROBOT_POS':
 			return {
 				...state,
-				robotPos: typeof action.payload === 'function' ? action.payload(state.robotPos) : action.payload,
+				robotPos:
+					typeof action.payload === 'function'
+						? action.payload(state.robotPos)
+						: action.payload,
 			};
 		case 'SET_WALLS':
 			return {
 				...state,
-				walls: typeof action.payload === 'function' ? action.payload(state.walls) : new Set(action.payload),
+				walls:
+					typeof action.payload === 'function'
+						? action.payload(state.walls)
+						: new Set(action.payload),
 			};
 		case 'SET_PERMANENT_WALLS':
 			return {
 				...state,
 				permanentWalls:
-					typeof action.payload === 'function' ? action.payload(state.permanentWalls) : new Set(action.payload),
+					typeof action.payload === 'function'
+						? action.payload(state.permanentWalls)
+						: new Set(action.payload),
 			};
 		case 'SET_MARKERS':
 			return {
 				...state,
-				markers: typeof action.payload === 'function' ? action.payload(state.markers) : action.payload,
+				markers:
+					typeof action.payload === 'function'
+						? action.payload(state.markers)
+						: action.payload,
 			};
 		case 'SET_COLORED_CELLS':
 			return {
 				...state,
 				coloredCells:
-					typeof action.payload === 'function' ? action.payload(state.coloredCells) : new Set(action.payload),
+					typeof action.payload === 'function'
+						? action.payload(state.coloredCells)
+						: new Set(action.payload),
 			};
 		case 'SET_EDIT_MODE':
 			return {...state, editMode: action.payload};

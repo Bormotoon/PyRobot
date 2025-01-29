@@ -11,47 +11,65 @@ Prism.languages.kumir = {
 	operator: /\b(==|!=|<=|>=|<|>|\+|\-|\*|\/)\b/g,
 };
 
-const CodeEditor = memo(
-	({code, setCode, isRunning, onClearCode, onStop, onStart, onReset}) => {
-		const highlightCode = useCallback((inputCode) => {
-			return Prism.highlight(inputCode, Prism.languages.kumir, 'kumir');
-		}, []);
+const CodeEditor = memo(({code, setCode, isRunning, onClearCode, onStop, onStart, onReset}) => {
+	const highlightCode = useCallback((inputCode) => {
+		return Prism.highlight(inputCode, Prism.languages.kumir, 'kumir');
+	}, []);
 
-		return (
-			<div className="card code-editor">
-				<Typography variant="h5" gutterBottom style={{color: '#fff'}}>
-					Редактор Кода
-				</Typography>
-				<Editor
-					value={code}
-					onValueChange={setCode}
-					highlight={highlightCode}
-					padding={10}
-					className="react-simple-code-editor"
-					style={{
-						fontFamily: '"Fira Code", monospace',
-						fontSize: 14,
-						flex: '1 1 auto',
-						overflow: 'auto',
-					}}
-				/>
-				<div className="editor-controls">
-					<Button variant="contained" color="secondary" onClick={onClearCode} fullWidth>
-						Очистить
-					</Button>
-					<Button variant="contained" color="error" onClick={onStop} disabled={!isRunning} fullWidth>
-						Стоп
-					</Button>
-					<Button variant="contained" color="success" onClick={onStart} disabled={isRunning} fullWidth>
-						Пуск
-					</Button>
-					<Button variant="outlined" color="primary" onClick={onReset} fullWidth>
-						Сбросить симулятор
-					</Button>
-				</div>
+	return (
+		<div className="card code-editor">
+			<Typography variant="h5" gutterBottom className="editor-title">
+				Редактор Кода
+			</Typography>
+			<Editor
+				value={code}
+				onValueChange={setCode}
+				highlight={highlightCode}
+				padding={10}
+				className="react-simple-code-editor"
+			/>
+			<div className="editor-controls">
+				<Button
+					variant="contained"
+					color="secondary"
+					onClick={onClearCode}
+					fullWidth
+					className="control-button"
+				>
+					Очистить
+				</Button>
+				<Button
+					variant="contained"
+					color="error"
+					onClick={onStop}
+					disabled={!isRunning}
+					fullWidth
+					className="control-button"
+				>
+					Стоп
+				</Button>
+				<Button
+					variant="contained"
+					color="success"
+					onClick={onStart}
+					disabled={isRunning}
+					fullWidth
+					className="control-button"
+				>
+					Пуск
+				</Button>
+				<Button
+					variant="outlined"
+					color="primary"
+					onClick={onReset}
+					fullWidth
+					className="control-button"
+				>
+					Сброс
+				</Button>
 			</div>
-		);
-	}
-);
+		</div>
+	);
+});
 
 export default CodeEditor;

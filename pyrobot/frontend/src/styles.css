@@ -283,3 +283,271 @@ canvas.edit-mode {
         width: 100%;
     }
 }
+
+/* Общий контейнер */
+.app-container {
+    display: flex;
+    flex-direction: row;
+    gap: 20px;
+    align-items: flex-start;
+    padding: 20px;
+    background-color: #f9f9f9;
+    min-height: 100vh;
+}
+
+/* Для мобильных устройств */
+@media (max-width: 768px) {
+    .app-container {
+        flex-direction: column;
+    }
+
+    .code-editor,
+    .control-panel,
+    .field {
+        width: 100%;
+    }
+}
+
+/* Стили для редактора кода */
+.code-editor {
+    width: 30%;
+    min-width: 300px;
+    margin: 16px 0;
+    padding: 16px;
+    background: #1e1e1e;
+    color: #d4d4d4;
+    border-radius: 8px;
+    overflow-y: auto;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+/* Стили для кнопок управления */
+.control-panel {
+    width: 20%;
+    padding: 16px;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* Стили для поля */
+.field {
+    flex: 1;
+    min-width: 300px;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* Canvas */
+canvas {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    background-color: #289628;
+    transition: transform 0.2s;
+}
+
+canvas.edit-mode {
+    background-color: #6496ff;
+}
+
+/* Кнопки */
+button {
+    background-color: #1a202c;
+    color: #fff;
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.2s;
+}
+
+button:hover {
+    background-color: #333;
+}
+
+button.full-width {
+    width: 100%;
+    margin-top: 8px;
+}
+
+/* Сообщения */
+.status-message {
+    font-size: 14px;
+    color: #333;
+    margin-top: 8px;
+}
+
+/* Общий контейнер для редактора кода */
+.code-editor {
+    width: 30%;
+    min-width: 300px;
+    margin: 16px 0;
+    padding: 16px;
+    background: #1e1e1e;
+    color: #d4d4d4;
+    border-radius: 8px;
+    overflow-y: auto;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+/* Заголовок редактора кода */
+.editor-title {
+    color: #fff;
+    margin-bottom: 16px;
+    font-size: 1.2rem;
+    font-weight: bold;
+}
+
+/* Стили для редактора кода (react-simple-code-editor) */
+.react-simple-code-editor {
+    font-family: 'Fira Code', monospace;
+    font-size: 14px;
+    flex: 1 1 auto;
+    overflow: auto;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background: inherit; /* Наследует фон от родителя */
+    color: inherit; /* Наследует цвет текста */
+}
+
+/* Контейнер кнопок управления */
+.editor-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 16px;
+}
+
+/* Стили для кнопок управления */
+.control-button {
+    margin-bottom: 8px;
+    width: 100%;
+    padding: 8px 16px;
+    font-size: 14px;
+    border-radius: 4px;
+}
+
+.control-button:hover {
+    opacity: 0.9;
+}
+
+/* Адаптивность для мобильных устройств */
+@media (max-width: 768px) {
+    .code-editor {
+        width: 100%;
+        min-width: unset;
+    }
+}
+
+/* Общий контейнер для панели управления */
+.control-panel {
+    width: 25%;
+    min-width: 300px;
+    padding: 16px;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* Заголовок панели управления */
+.control-panel .MuiCardHeader-title {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #333;
+}
+
+/* Кнопки управления */
+.control-button {
+    width: 100%;
+    padding: 8px 16px;
+    font-size: 14px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.control-button:hover {
+    opacity: 0.9;
+}
+
+/* Адаптивность для мобильных устройств */
+@media (max-width: 768px) {
+    .control-panel {
+        width: 100%;
+        min-width: unset;
+    }
+}
+
+/* Общий контейнер для поля */
+.field-area {
+    flex: 1;
+    min-width: 300px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* Контейнер для Canvas */
+.canvas-wrapper {
+    position: relative;
+    width: 100%;
+    padding-top: 100%; /* Сохраняет пропорции квадрата */
+}
+
+canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    background-color: #289628;
+    transition: transform 0.2s;
+}
+
+canvas.edit-mode {
+    background-color: #6496ff;
+}
+
+/* Карточка статуса */
+.status-card {
+    padding: 16px;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Сообщение статуса */
+.status-message {
+    font-size: 14px;
+    color: #333;
+    white-space: pre-wrap;
+}
+
+/* Адаптивность для мобильных устройств */
+@media (max-width: 768px) {
+    .field-area {
+        width: 100%;
+        min-width: unset;
+    }
+}
