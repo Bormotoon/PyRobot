@@ -29,6 +29,17 @@
     --font-size-status: 14px;
 }
 
+/* Установка высоты для html и body */
+html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: Arial, sans-serif; /* Общий шрифт для тела документа */
+}
+
 /* Глобальные стили */
 *, *::before, *::after {
     box-sizing: border-box;
@@ -68,31 +79,36 @@
     display: flex;
     justify-content: center;
     align-items: flex-start;
+    height: 100%; /* Занимает всю высоту окна */
+    overflow: hidden; /* Предотвращает появление полос прокрутки */
+    min-height: 0; /* Позволяет контейнеру сжиматься */
 }
 
 .app-container {
     display: flex;
     flex-direction: row; /* Горизонтальное расположение на десктопах */
-    align-items: flex-start;
+    align-items: stretch; /* Растягивает дочерние элементы по высоте контейнера */
     background-color: var(--background-color-app);
     width: 100%;
-    height: auto;
+    height: 100%;
     gap: var(--spacing); /* Пространство между блоками */
+    overflow: hidden; /* Предотвращает появление полос прокрутки */
+    min-height: 0; /* Позволяет контейнеру сжиматься */
 }
 
 /* Редактор кода */
 .code-editor {
-    width: 25%; /* Установлено на 25% ширины контейнера */
-    min-width: 300px;
+    flex: 1 1 25%; /* Гибкий блок: базовая ширина 25%, может расти и сжиматься */
     background: var(--background-color-code-editor); /* Белый фон */
     color: var(--text-color-code-editor); /* Тёмный текст */
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    overflow-y: auto;
+    overflow: hidden; /* Скрывает избыточный контент */
     border-radius: var(--border-radius);
     box-shadow: var(--box-shadow);
-    order: 1;
+    order: 1; /* Порядок по умолчанию для больших экранов */
+    min-height: 0; /* Позволяет сжиматься */
 }
 
 /* Редактор кода (react-simple-code-editor) */
@@ -108,7 +124,8 @@
     color: inherit;
     font-family: var(--font-family-monospace);
     font-size: 14px;
-    overflow: auto;
+    overflow: auto; /* Позволяет прокручивать содержимое при переполнении */
+    min-height: 0; /* Позволяет сжиматься */
 }
 
 /* Подсветка синтаксиса для языка Кумир */
@@ -136,49 +153,64 @@
 
 /* Панель управления */
 .control-panel {
-    width: 25%; /* Установлено на 25% ширины контейнера */
-    min-width: 300px;
+    flex: 1 1 25%; /* Гибкий блок: базовая ширина 25%, может расти и сжиматься */
     display: flex;
     flex-direction: column;
     gap: var(--spacing);
-    order: 3;
+    order: 3; /* Порядок по умолчанию для больших экранов */
+    overflow-y: auto; /* Позволяет прокручивать панель при необходимости */
+    min-height: 0; /* Позволяет сжиматься */
 }
 
 /* Основная рабочая область */
 .field-area {
-    width: 50%; /* Установлено на 50% ширины контейнера */
-    min-width: 300px;
+    flex: 2 1 50%; /* Гибкий блок: базовая ширина 50%, может расти и сжиматься */
     display: flex;
     flex-direction: column;
-    justify-content: flex-start;
-    align-items: stretch; /* Позволяет дочерним элементам занимать всю доступную ширину */
-    order: 2;
+    justify-content: flex-start; /* Выравнивание элементов сверху */
+    align-items: stretch; /* Позволяет дочерним элементам растягиваться по ширине */
+    order: 2; /* Порядок по умолчанию для больших экранов */
+    overflow: hidden; /* Скрывает избыточный контент */
+    min-height: 0; /* Позволяет сжиматься */
 }
 
 /* Поле для отображения контента */
 .field {
-    width: 100%;
+    width: 100%; /* Занимает всю ширину родительского контейнера */
     display: flex;
     flex-direction: column;
+    justify-content: center; /* Центрирует содержимое вертикально */
+    align-items: center; /* Центрирует содержимое горизонтально */
+    min-height: 0; /* Позволяет сжиматься */
+    box-sizing: border-box; /* Учитывает паддинги и бордеры */
 }
 
 /* Canvas */
 canvas {
     width: 100%; /* Занимает 100% ширины контейнера */
-    aspect-ratio: 1 / 1; /* Сохраняет пропорции 1:1 */
+    aspect-ratio: 1 / 1; /* Сохраняет пропорции 1:1 (квадрат) */
     background-color: var(--background-color-canvas);
     transition: transform 0.2s;
     border-radius: var(--border-radius);
     object-fit: contain; /* Сохраняет содержимое внутри рамок */
+    flex-shrink: 0; /* Предотвращает уменьшение размера */
+    max-height: 100%; /* Ограничивает максимальную высоту */
+    box-sizing: border-box; /* Учитывает паддинги и бордеры */
 }
 
+/* Изменение фона `canvas` при активном режиме редактирования */
 canvas.edit-mode {
     background-color: var(--background-color-edit-mode);
 }
 
 /* Карточка статуса */
 .status-card {
-    text-align: center;
+    width: 100%; /* Занимает 100% ширины родителя */
+    align-self: stretch; /* Гарантирует растягивание независимо от родителя */
+    box-sizing: border-box; /* Учитывает паддинги и бордеры в общей ширине */
+    text-align: center; /* Сохраняет центрирование текста */
+    min-height: 0; /* Позволяет сжиматься */
+    /* Дополнительные стили по необходимости */
 }
 
 /* Сообщение статуса */
@@ -193,7 +225,7 @@ button {
     background-color: var(--button-bg-color); /* Голубой фон */
     color: #fff;
     width: 100%;
-    min-height: 5vh;
+    min-height: 32px; /* Уменьшение минимальной высоты кнопок */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -229,20 +261,21 @@ button.full-width-outlined {
 /* Контейнер кнопок управления */
 .editor-controls {
     display: flex;
-    justify-content: space-between; /* Пространство между кнопками */
-    align-items: center;
+    flex-direction: column; /* Вертикальное расположение кнопок */
+    justify-content: flex-start;
+    align-items: stretch;
     width: 100%;
     margin-top: var(--spacing);
     padding: var(--spacing);
     box-sizing: border-box;
-    /* Удалён gap */
+    min-height: 0; /* Позволяет сжиматься */
 }
 
 /* Кнопки внутри .editor-controls */
 .editor-controls button {
-    flex: 1;
-    max-width: 100px;
-    margin: 0 var(--half-spacing);
+    width: 100%;
+    max-width: 100%;
+    margin: var(--half-spacing) 0;
 }
 
 /* Стили для кнопок управления */
@@ -254,6 +287,7 @@ button.full-width-outlined {
     cursor: pointer;
     transition: opacity 0.2s, background-color 0.2s;
     margin-bottom: var(--spacing);
+    min-height: 32px; /* Уменьшение минимальной высоты */
 }
 
 /* Scrollbar стили для редактора кода */
@@ -303,39 +337,44 @@ button.full-width-outlined {
         flex-wrap: wrap;
     }
 
-    .code-editor {
-        width: 100%;
-        height: auto;
-        margin: 8px 0;
-    }
-
-    .card,
-    .field-card,
+    .code-editor,
+    .field-area,
     .control-panel {
-        width: 100%;
-        min-width: unset;
-        margin: 8px 0;
+        flex: 1 1 100%; /* Занимает всю ширину контейнера */
+        min-width: unset; /* Убираем минимальную ширину */
+        margin: 8px 0; /* Отступы сверху и снизу */
     }
 
     .field-area {
-        order: -1;
+        order: 1; /* Поле становится первым блоком */
         margin: 8px 0;
         padding: 8px;
+    }
+
+    .code-editor {
+        order: 2; /* Редактор Кода становится вторым блоком */
+    }
+
+    .control-panel {
+        order: 3; /* Панель Кнопок остается третьей */
     }
 }
 
 @media (max-width: 768px) {
     .container,
     .app-container {
-        flex-direction: column;
+        flex-direction: column; /* Перестройка контейнера в колонку */
+        height: 100%; /* Полная высота контейнера */
     }
 
     .code-editor,
     .control-panel,
     .field-area {
-        width: 100%;
-        margin: 8px 0;
-        padding: 8px;
+        flex: 1 1 auto; /* Гибкое распределение высоты */
+        width: 100%; /* Полная ширина */
+        margin: 8px 0; /* Отступы сверху и снизу */
+        padding: 8px; /* Внутренние отступы */
+        height: auto; /* Автоматическая высота */
     }
 
     .editor-controls {
@@ -351,13 +390,18 @@ button.full-width-outlined {
 
     .card,
     .field-area {
-        order: 0;
+        order: 1; /* Поле становится первым блоком */
         width: 100%;
         margin: 8px 0;
         padding: 8px;
     }
 
+    .code-editor {
+        order: 2; /* Редактор Кода становится вторым блоком */
+    }
+
     .control-panel {
+        order: 3; /* Панель Кнопок остается третьей */
         width: 100%;
         min-width: unset;
         margin: 8px 0;
