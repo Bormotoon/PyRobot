@@ -72,16 +72,17 @@
 
 .app-container {
     display: flex;
-    flex-direction: row;
+    flex-direction: row; /* Горизонтальное расположение на десктопах */
     align-items: flex-start;
     background-color: var(--background-color-app);
-    width: auto;
+    width: 100%;
     height: auto;
+    gap: var(--spacing); /* Пространство между блоками */
 }
 
 /* Редактор кода */
 .code-editor {
-    width: 25%;
+    width: 25%; /* Установлено на 25% ширины контейнера */
     min-width: 300px;
     background: var(--background-color-code-editor); /* Белый фон */
     color: var(--text-color-code-editor); /* Тёмный текст */
@@ -135,41 +136,40 @@
 
 /* Панель управления */
 .control-panel {
-    width: 25%;
+    width: 25%; /* Установлено на 25% ширины контейнера */
     min-width: 300px;
     display: flex;
     flex-direction: column;
+    gap: var(--spacing);
     order: 3;
 }
 
 /* Основная рабочая область */
 .field-area {
+    width: 50%; /* Установлено на 50% ширины контейнера */
     min-width: 300px;
-    width: 50%;
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
-    align-items: center;
+    align-items: stretch; /* Позволяет дочерним элементам занимать всю доступную ширину */
     order: 2;
 }
 
 /* Поле для отображения контента */
 .field {
-    min-width: 300px;
+    width: 100%;
     display: flex;
     flex-direction: column;
 }
 
 /* Canvas */
 canvas {
-    width: 100%;
-    height: auto;
-    max-width: 70vh;
-    aspect-ratio: 1 / 1;
-    object-fit: contain;
+    width: 100%; /* Занимает 100% ширины контейнера */
+    aspect-ratio: 1 / 1; /* Сохраняет пропорции 1:1 */
     background-color: var(--background-color-canvas);
     transition: transform 0.2s;
     border-radius: var(--border-radius);
+    object-fit: contain; /* Сохраняет содержимое внутри рамок */
 }
 
 canvas.edit-mode {
@@ -229,7 +229,7 @@ button.full-width-outlined {
 /* Контейнер кнопок управления */
 .editor-controls {
     display: flex;
-    justify-content: center;
+    justify-content: space-between; /* Пространство между кнопками */
     align-items: center;
     width: 100%;
     margin-top: var(--spacing);
@@ -238,6 +238,7 @@ button.full-width-outlined {
     /* Удалён gap */
 }
 
+/* Кнопки внутри .editor-controls */
 .editor-controls button {
     flex: 1;
     max-width: 100px;
@@ -309,7 +310,8 @@ button.full-width-outlined {
     }
 
     .card,
-    .field-card {
+    .field-card,
+    .control-panel {
         width: 100%;
         min-width: unset;
         margin: 8px 0;
@@ -330,7 +332,7 @@ button.full-width-outlined {
 
     .code-editor,
     .control-panel,
-    .field {
+    .field-area {
         width: 100%;
         margin: 8px 0;
         padding: 8px;
