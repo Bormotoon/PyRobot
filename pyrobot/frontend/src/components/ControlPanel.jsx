@@ -28,8 +28,11 @@ const ControlPanel = memo(({
 		setRobotPos((prevPos) => {
 			let newPos = {...prevPos};
 			let hintKey = '';
+			let actionKey = '';
+
 			if (direction === 'up') {
 				hintKey = 'moveRobotUp';
+				actionKey = 'moveRobotUpBlocked';
 				if (
 					newPos.y > 0 &&
 					!walls.has(`${newPos.x},${newPos.y},${newPos.x + 1},${newPos.y}`) &&
@@ -37,11 +40,12 @@ const ControlPanel = memo(({
 				) {
 					newPos.y -= 1;
 				} else {
-					setStatusMessage('Робот не может пойти вверх (стена или край).');
+					setStatusMessage(getHint(actionKey, editMode));
 					return prevPos;
 				}
 			} else if (direction === 'down') {
 				hintKey = 'moveRobotDown';
+				actionKey = 'moveRobotDownBlocked';
 				if (
 					newPos.y < height - 1 &&
 					!walls.has(`${newPos.x},${newPos.y + 1},${newPos.x + 1},${newPos.y + 1}`) &&
@@ -49,11 +53,12 @@ const ControlPanel = memo(({
 				) {
 					newPos.y += 1;
 				} else {
-					setStatusMessage('Робот не может пойти вниз (стена или край).');
+					setStatusMessage(getHint(actionKey, editMode));
 					return prevPos;
 				}
 			} else if (direction === 'left') {
 				hintKey = 'moveRobotLeft';
+				actionKey = 'moveRobotLeftBlocked';
 				if (
 					newPos.x > 0 &&
 					!walls.has(`${newPos.x},${newPos.y},${newPos.x},${newPos.y + 1}`) &&
@@ -61,11 +66,12 @@ const ControlPanel = memo(({
 				) {
 					newPos.x -= 1;
 				} else {
-					setStatusMessage('Робот не может пойти влево (стена или край).');
+					setStatusMessage(getHint(actionKey, editMode));
 					return prevPos;
 				}
 			} else if (direction === 'right') {
 				hintKey = 'moveRobotRight';
+				actionKey = 'moveRobotRightBlocked';
 				if (
 					newPos.x < width - 1 &&
 					!walls.has(`${newPos.x + 1},${newPos.y},${newPos.x + 1},${newPos.y + 1}`) &&
@@ -73,10 +79,11 @@ const ControlPanel = memo(({
 				) {
 					newPos.x += 1;
 				} else {
-					setStatusMessage('Робот не может пойти вправо (стена или край).');
+					setStatusMessage(getHint(actionKey, editMode));
 					return prevPos;
 				}
 			}
+
 			setStatusMessage(getHint(hintKey, editMode));
 			return newPos;
 		});
@@ -90,7 +97,7 @@ const ControlPanel = memo(({
 			setMarkers(newMarkers);
 			setStatusMessage(getHint('putMarker', editMode));
 		} else {
-			setStatusMessage('Здесь уже лежит маркер.');
+			setStatusMessage(getHint('markerAlreadyExists', editMode));
 		}
 	};
 
@@ -102,7 +109,7 @@ const ControlPanel = memo(({
 			setMarkers(newMarkers);
 			setStatusMessage(getHint('pickMarker', editMode));
 		} else {
-			setStatusMessage('Здесь нет маркера.');
+			setStatusMessage(getHint('noMarkerHere', editMode));
 		}
 	};
 
@@ -114,7 +121,7 @@ const ControlPanel = memo(({
 			setColoredCells(newSet);
 			setStatusMessage(getHint('paintCell', editMode));
 		} else {
-			setStatusMessage('Клетка уже покрашена.');
+			setStatusMessage(getHint('cellAlreadyPainted', editMode));
 		}
 	};
 
@@ -126,7 +133,7 @@ const ControlPanel = memo(({
 			setColoredCells(newSet);
 			setStatusMessage(getHint('clearCell', editMode));
 		} else {
-			setStatusMessage('Эта клетка и так не была покрашена.');
+			setStatusMessage(getHint('cellAlreadyClear', editMode));
 		}
 	};
 
@@ -142,7 +149,7 @@ const ControlPanel = memo(({
 
 	const increaseWidth = () => {
 		if (!editMode) {
-			setStatusMessage('Включите режим рисования для изменения поля.');
+			setStatusMessage(getHint('editModeRequired', editMode));
 			return;
 		}
 		setWidth(width + 1);
@@ -151,20 +158,20 @@ const ControlPanel = memo(({
 
 	const decreaseWidth = () => {
 		if (!editMode) {
-			setStatusMessage('Включите режим рисования для изменения поля.');
+			setStatusMessage(getHint('editModeRequired', editMode));
 			return;
 		}
 		if (width > 1) {
 			setWidth(width - 1);
 			setStatusMessage(getHint('decreaseWidth', editMode));
 		} else {
-			setStatusMessage('Ширина не может быть < 1.');
+			setStatusMessage(getHint('widthCannotBeLessThan1', editMode));
 		}
 	};
 
 	const increaseHeight = () => {
 		if (!editMode) {
-			setStatusMessage('Включите режим рисования для изменения поля.');
+			setStatusMessage(getHint('editModeRequired', editMode));
 			return;
 		}
 		setHeight(height + 1);
@@ -173,14 +180,14 @@ const ControlPanel = memo(({
 
 	const decreaseHeight = () => {
 		if (!editMode) {
-			setStatusMessage('Включите режим рисования для изменения поля.');
+			setStatusMessage(getHint('editModeRequired', editMode));
 			return;
 		}
 		if (height > 1) {
 			setHeight(height - 1);
 			setStatusMessage(getHint('decreaseHeight', editMode));
 		} else {
-			setStatusMessage('Высота не может быть < 1.');
+			setStatusMessage(getHint('heightCannotBeLessThan1', editMode));
 		}
 	};
 
@@ -194,9 +201,9 @@ const ControlPanel = memo(({
 		try {
 			const content = await file.text();
 			parseAndApplyFieldFile(content);
-			setStatusMessage('Обстановка импортирована!');
+			setStatusMessage(getHint('importSuccess', editMode));
 		} catch (error) {
-			setStatusMessage('Ошибка импорта: ' + error.message);
+			setStatusMessage(getHint('importError', editMode) + error.message);
 		}
 	};
 
@@ -233,7 +240,7 @@ const ControlPanel = memo(({
 			setColoredCells(newColored);
 			setMarkers(newMarkers);
 		} catch (error) {
-			setStatusMessage('Ошибка парсинга .fil: ' + error.message);
+			setStatusMessage(getHint('parseError', editMode) + error.message);
 		}
 	};
 
@@ -317,7 +324,7 @@ const ControlPanel = memo(({
 						</Button>
 					</Grid>
 					<Grid item xs={12}>
-						<Button onClick={() => setStatusMessage(getHint('help'))} className="control-button">
+						<Button onClick={() => setStatusMessage(getHint('help', editMode))} className="control-button">
 							Помощь
 						</Button>
 					</Grid>
