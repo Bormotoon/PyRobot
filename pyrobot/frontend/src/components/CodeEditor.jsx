@@ -3,6 +3,7 @@ import {Button, Typography} from '@mui/material';
 import Editor from 'react-simple-code-editor';
 import Prism from 'prismjs';
 
+// Определение языка Кумир для Prism
 Prism.languages.kumir = {
 	keyword: /\b(использовать|Робот|алг|нач|кон|влево|вправо|вверх|вниз|закрасить|если|иначе|для|пока|температура|радиация)\b/g,
 	comment: /#.*/g,
@@ -11,14 +12,23 @@ Prism.languages.kumir = {
 	operator: /\b(==|!=|<=|>=|<|>|\+|\-|\*|\/)\b/g,
 };
 
-const CodeEditor = memo(({code, setCode, isRunning, onClearCode, onStop, onStart, onReset}) => {
+const CodeEditor = memo(({
+	                         code,
+	                         setCode,
+	                         isRunning,
+	                         onClearCode,
+	                         onStop,
+	                         onStart,
+	                         onReset
+                         }) => {
+	// Функция подсветки кода
 	const highlightCode = useCallback((inputCode) => {
 		return Prism.highlight(inputCode, Prism.languages.kumir, 'kumir');
 	}, []);
 
 	return (
-		<div className="card code-editor">
-			<Typography variant="h5" gutterBottom className="editor-title">
+		<div className="code-editor">
+			<Typography variant="h5" gutterBottom>
 				Редактор Кода
 			</Typography>
 			<Editor
@@ -31,39 +41,35 @@ const CodeEditor = memo(({code, setCode, isRunning, onClearCode, onStop, onStart
 			<div className="editor-controls">
 				<Button
 					variant="contained"
-					color="secondary"
+					color="primary" // Голубой цвет
 					onClick={onClearCode}
 					fullWidth
-					className="control-button"
 				>
 					Очистить
 				</Button>
 				<Button
 					variant="contained"
-					color="error"
+					color="primary" // Голубой цвет
 					onClick={onStop}
 					disabled={!isRunning}
 					fullWidth
-					className="control-button"
 				>
 					Стоп
 				</Button>
 				<Button
 					variant="contained"
-					color="success"
+					color="primary" // Голубой цвет
 					onClick={onStart}
 					disabled={isRunning}
 					fullWidth
-					className="control-button"
 				>
 					Пуск
 				</Button>
 				<Button
 					variant="outlined"
-					color="primary"
+					color="primary" // Голубой цвет
 					onClick={onReset}
 					fullWidth
-					className="control-button"
 				>
 					Сброс
 				</Button>

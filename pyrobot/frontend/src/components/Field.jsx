@@ -249,24 +249,20 @@ const Field = memo(({
 
 	return (
 		<div className="field-area">
-			<Card className="card-controls">
-				<div className="field-container">
-					<div className="canvas-wrapper">
-						<canvas
-							ref={canvasRef}
-							width={(width + 2) * cellSize}
-							height={(height + 2) * cellSize}
-							className={editMode ? 'edit-mode' : ''}
-							onMouseDown={handleMouseDown}
-							onMouseMove={handleMouseMove}
-							onMouseUp={handleMouseUp}
-							onContextMenu={handleCanvasRightClick}
-						/>
-					</div>
-				</div>
+			<Card className="field-card">
+				<canvas
+					ref={canvasRef}
+					width={(width + 2) * cellSize}
+					height={(height + 2) * cellSize}
+					className={editMode ? 'edit-mode' : ''}
+					onMouseDown={handleMouseDown}
+					onMouseMove={handleMouseMove}
+					onMouseUp={handleMouseUp}
+					onContextMenu={handleCanvasRightClick}
+				/>
 			</Card>
 			<Card className="status-card">
-				<Typography variant="body2" className="status-message">
+				<Typography variant="body2">
 					{finalString}
 				</Typography>
 			</Card>
