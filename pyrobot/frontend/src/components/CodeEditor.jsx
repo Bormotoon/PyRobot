@@ -2,6 +2,9 @@ import React, {memo, useCallback} from 'react';
 import {Button, Typography} from '@mui/material';
 import Editor from 'react-simple-code-editor';
 import Prism from 'prismjs';
+import './CodeEditor.css';
+
+// ... (остальной код компонента)
 
 // Определение языка Кумир для Prism
 Prism.languages.kumir = {

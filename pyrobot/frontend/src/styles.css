@@ -5,15 +5,12 @@
     /* Отступы */
     --spacing: 8px;
     --half-spacing: 4px;
-
     /* Радиус границы */
     --border-radius: 8px;
     --small-border-radius: 4px;
-
     /* Тени */
     --box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     --button-box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.3);
-
     /* Цвета */
     --background-color-app: #f9f9f9;
     --background-color-code-editor: #ffffff; /* Белый фон */
@@ -26,26 +23,19 @@
     --button-bg-color: #1976d2; /* Голубой цвет кнопок */
     --button-hover-bg-color: #115293; /* Затемнённый голубой при наведении */
     --button-outlined-border: #ccc;
-
     /* Дополнительные цвета */
     --button-success-bg: #4caf50; /* Зелёный */
     --button-success-hover-bg: #388e3c;
-
     --button-error-bg: #f44336; /* Красный */
     --button-error-hover-bg: #d32f2f;
-
     --button-warning-bg: #ff9800; /* Оранжевый */
     --button-warning-hover-bg: #f57c00;
-
     --button-info-bg: #2196f3; /* Синий */
     --button-info-hover-bg: #1976d2;
-
     --button-default-bg: #9e9e9e; /* Серый */
     --button-default-hover-bg: #757575;
-
     --button-upload-bg: #3f51b5; /* Индиго */
     --button-upload-hover-bg: #303f9f;
-
     /* Шрифты */
     --font-family-monospace: 'Fira Code', monospace;
     --font-size-status: 14px;

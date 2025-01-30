@@ -2,6 +2,7 @@ import React, {memo, useCallback, useEffect, useState} from 'react';
 import {Card, Typography} from '@mui/material';
 import {drawField} from '../canvasDrawing';
 import {getHint} from '../hints';
+import './Field.css';
 
 const Field = memo(({
 	                    canvasRef,

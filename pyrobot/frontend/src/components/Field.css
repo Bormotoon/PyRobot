@@ -1,0 +1,26 @@
+/* Field.css */
+.Field {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    min-height: 0;
+    box-sizing: border-box;
+}
+
+canvas {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    background-color: var(--background-color-canvas);
+    transition: transform 0.2s;
+    border-radius: var(--border-radius);
+    object-fit: contain;
+    flex-shrink: 0;
+    max-height: 100%;
+    box-sizing: border-box;
+}
+
+canvas.edit-mode {
+    background-color: var(--background-color-edit-mode);
+}

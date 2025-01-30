@@ -1,23 +1,23 @@
 /* ControlPanel.css */
 
-/* Стили для панели управления */
 .control-panel {
     flex: 1 1 25%;
     display: flex;
     flex-direction: column;
-    gap: var(--spacing);
+    gap: var(--spacing); /* Расстояние между кнопками */
     order: 3;
     overflow-y: auto;
     min-height: 0;
+    padding: var(--spacing); /* Отступы внутри контейнера */
+    margin: var(--spacing); /* Отступы снаружи контейнера */
 }
 
-/* Общие стили для кнопок панели управления */
 .control-button {
     display: flex;
     align-items: center;
     justify-content: flex-start;
     width: 100%;
-    padding: var(--spacing);
+    padding: var(--spacing); /* Отступы внутри кнопок */
     font-size: 14px;
     color: #fff; /* Всегда белый текст для читаемости */
     border: none;
@@ -25,8 +25,8 @@
     box-shadow: var(--button-box-shadow);
     cursor: pointer;
     transition: background-color 0.2s, opacity 0.2s;
-    margin: var(--spacing) 0;
-    min-height: 40px; /* Немного увеличил высоту для удобства */
+    margin: var(--half-spacing) 0; /* Уменьшенные отступы между кнопками */
+    min-height: 40px; /* Минимальная высота кнопок */
     font-weight: bold;
 }
 
@@ -34,7 +34,6 @@
     opacity: 0.9;
 }
 
-/* 🔹 Кнопки движения (ромб) — синий */
 .move-button {
     background-color: var(--button-info-bg);
 }
@@ -43,7 +42,6 @@
     background-color: var(--button-info-hover-bg);
 }
 
-/* 🔹 Кнопки маркеров — зелёный (добавление), красный (удаление) */
 .add-marker-button {
     background-color: var(--button-success-bg);
 }
@@ -60,7 +58,6 @@
     background-color: var(--button-error-hover-bg);
 }
 
-/* 🔹 Кнопки покраски — жёлтый (покрасить), серый (очистить) */
 .paint-button {
     background-color: var(--button-warning-bg);
     color: black; /* Чёрный текст для контраста */
@@ -79,7 +76,6 @@
     background-color: var(--button-default-hover-bg);
 }
 
-/* 🔹 Режим редактирования — фиолетовый */
 .edit-mode-button {
     background-color: var(--button-upload-bg);
 }
@@ -88,7 +84,6 @@
     background-color: var(--button-upload-hover-bg);
 }
 
-/* 🔹 Изменение размеров поля — голубой */
 .resize-button {
     background-color: var(--button-info-bg);
 }
@@ -97,7 +92,6 @@
     background-color: var(--button-info-hover-bg);
 }
 
-/* 🔹 Импорт файла — тёмно-синий */
 .import-button {
     background-color: #1b3a5d;
 }
@@ -106,7 +100,6 @@
     background-color: #10233b;
 }
 
-/* 🔹 Помощь — светло-синий */
 .help-button {
     background-color: #03a9f4;
 }
@@ -115,8 +108,7 @@
     background-color: #0288d1;
 }
 
-/* Настройка иконок внутри кнопок */
 .control-button .MuiSvgIcon-root {
     font-size: 22px;
-    margin-right: 8px;
+    margin-right: var(--spacing); /* Расстояние между иконкой и текстом */
 }
