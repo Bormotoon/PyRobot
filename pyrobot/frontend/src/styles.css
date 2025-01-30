@@ -1,3 +1,6 @@
+/* styles.css */
+
+/* Корневые переменные */
 :root {
     /* Отступы */
     --spacing: 8px;
@@ -23,6 +26,25 @@
     --button-bg-color: #1976d2; /* Голубой цвет кнопок */
     --button-hover-bg-color: #115293; /* Затемнённый голубой при наведении */
     --button-outlined-border: #ccc;
+
+    /* Дополнительные цвета */
+    --button-success-bg: #4caf50; /* Зелёный */
+    --button-success-hover-bg: #388e3c;
+
+    --button-error-bg: #f44336; /* Красный */
+    --button-error-hover-bg: #d32f2f;
+
+    --button-warning-bg: #ff9800; /* Оранжевый */
+    --button-warning-hover-bg: #f57c00;
+
+    --button-info-bg: #2196f3; /* Синий */
+    --button-info-hover-bg: #1976d2;
+
+    --button-default-bg: #9e9e9e; /* Серый */
+    --button-default-hover-bg: #757575;
+
+    --button-upload-bg: #3f51b5; /* Индиго */
+    --button-upload-hover-bg: #303f9f;
 
     /* Шрифты */
     --font-family-monospace: 'Fira Code', monospace;
@@ -51,7 +73,6 @@ body {
 .container,
 .app-container,
 .code-editor,
-.control-panel,
 .field-area,
 .field,
 .status-card,
@@ -79,36 +100,36 @@ body {
     display: flex;
     justify-content: center;
     align-items: flex-start;
-    height: 100%; /* Занимает всю высоту окна */
-    overflow: hidden; /* Предотвращает появление полос прокрутки */
-    min-height: 0; /* Позволяет контейнеру сжиматься */
+    height: 100%;
+    overflow: hidden;
+    min-height: 0;
 }
 
 .app-container {
     display: flex;
-    flex-direction: row; /* Горизонтальное расположение на десктопах */
-    align-items: stretch; /* Растягивает дочерние элементы по высоте контейнера */
+    flex-direction: row;
+    align-items: stretch;
     background-color: var(--background-color-app);
     width: 100%;
     height: 100%;
-    gap: var(--spacing); /* Пространство между блоками */
-    overflow: hidden; /* Предотвращает появление полос прокрутки */
-    min-height: 0; /* Позволяет контейнеру сжиматься */
+    gap: var(--spacing);
+    overflow: hidden;
+    min-height: 0;
 }
 
 /* Редактор кода */
 .code-editor {
-    flex: 1 1 25%; /* Гибкий блок: базовая ширина 25%, может расти и сжиматься */
-    background: var(--background-color-code-editor); /* Белый фон */
-    color: var(--text-color-code-editor); /* Тёмный текст */
+    flex: 1 1 25%;
+    background: var(--background-color-code-editor);
+    color: var(--text-color-code-editor);
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    overflow: hidden; /* Скрывает избыточный контент */
+    overflow: hidden;
     border-radius: var(--border-radius);
     box-shadow: var(--box-shadow);
-    order: 1; /* Порядок по умолчанию для больших экранов */
-    min-height: 0; /* Позволяет сжиматься */
+    order: 1;
+    min-height: 0;
 }
 
 /* Редактор кода (react-simple-code-editor) */
@@ -124,211 +145,89 @@ body {
     color: inherit;
     font-family: var(--font-family-monospace);
     font-size: 14px;
-    overflow: auto; /* Позволяет прокручивать содержимое при переполнении */
-    min-height: 0; /* Позволяет сжиматься */
+    overflow: auto;
+    min-height: 0;
 }
 
-/* Подсветка синтаксиса для языка Кумир */
+/* Подсветка синтаксиса */
 .token.keyword {
-    color: #d73a49; /* Красный для ключевых слов */
+    color: #d73a49;
     font-weight: bold;
 }
 
 .token.comment {
-    color: #6a737d; /* Серый для комментариев */
+    color: #6a737d;
     font-style: italic;
 }
 
 .token.string {
-    color: #032f62; /* Синий для строк */
+    color: #032f62;
 }
 
 .token.number {
-    color: #005cc5; /* Голубой для чисел */
+    color: #005cc5;
 }
 
 .token.operator {
-    color: #24292e; /* Тёмный серый для операторов */
+    color: #24292e;
 }
 
-/* Панель управления */
-.control-panel {
-    flex: 1 1 25%; /* Гибкий блок: базовая ширина 25%, может расти и сжиматься */
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing);
-    order: 3; /* Порядок по умолчанию для больших экранов */
-    overflow-y: auto; /* Позволяет прокручивать панель при необходимости */
-    min-height: 0; /* Позволяет сжиматься */
+/* Стили кнопок внутри блока кода */
+.code-editor button {
+    background-color: var(--button-bg-color); /* Голубой */
+    color: #fff;
+    border: none;
+    padding: var(--spacing);
+    font-size: 14px;
+    border-radius: var(--small-border-radius);
+    box-shadow: var(--button-box-shadow);
+    cursor: pointer;
+    transition: background-color 0.2s, opacity 0.2s;
+    margin: var(--spacing) 0;
+}
+
+.code-editor button:hover {
+    background-color: var(--button-hover-bg-color);
 }
 
 /* Основная рабочая область */
 .field-area {
-    flex: 2 1 50%; /* Гибкий блок: базовая ширина 50%, может расти и сжиматься */
+    flex: 2 1 50%;
     display: flex;
     flex-direction: column;
-    justify-content: flex-start; /* Выравнивание элементов сверху */
-    align-items: stretch; /* Позволяет дочерним элементам растягиваться по ширине */
-    order: 2; /* Порядок по умолчанию для больших экранов */
-    overflow: hidden; /* Скрывает избыточный контент */
-    min-height: 0; /* Позволяет сжиматься */
+    justify-content: flex-start;
+    align-items: stretch;
+    order: 2;
+    overflow: hidden;
+    min-height: 0;
 }
 
-/* Поле для отображения контента */
+/* Поле */
 .field {
-    width: 100%; /* Занимает всю ширину родительского контейнера */
+    width: 100%;
     display: flex;
     flex-direction: column;
-    justify-content: center; /* Центрирует содержимое вертикально */
-    align-items: center; /* Центрирует содержимое горизонтально */
-    min-height: 0; /* Позволяет сжиматься */
-    box-sizing: border-box; /* Учитывает паддинги и бордеры */
+    justify-content: center;
+    align-items: center;
+    min-height: 0;
+    box-sizing: border-box;
 }
 
 /* Canvas */
 canvas {
-    width: 100%; /* Занимает 100% ширины контейнера */
-    aspect-ratio: 1 / 1; /* Сохраняет пропорции 1:1 (квадрат) */
+    width: 100%;
+    aspect-ratio: 1 / 1;
     background-color: var(--background-color-canvas);
     transition: transform 0.2s;
     border-radius: var(--border-radius);
-    object-fit: contain; /* Сохраняет содержимое внутри рамок */
-    flex-shrink: 0; /* Предотвращает уменьшение размера */
-    max-height: 100%; /* Ограничивает максимальную высоту */
-    box-sizing: border-box; /* Учитывает паддинги и бордеры */
+    object-fit: contain;
+    flex-shrink: 0;
+    max-height: 100%;
+    box-sizing: border-box;
 }
 
-/* Изменение фона `canvas` при активном режиме редактирования */
 canvas.edit-mode {
     background-color: var(--background-color-edit-mode);
-}
-
-/* Карточка статуса */
-.status-card {
-    width: 100%; /* Занимает 100% ширины родителя */
-    align-self: stretch; /* Гарантирует растягивание независимо от родителя */
-    box-sizing: border-box; /* Учитывает паддинги и бордеры в общей ширине */
-    text-align: center; /* Сохраняет центрирование текста */
-    min-height: 0; /* Позволяет сжиматься */
-    /* Дополнительные стили по необходимости */
-}
-
-/* Сообщение статуса */
-.status-card .MuiTypography-body2 {
-    font-size: var(--font-size-status);
-    color: var(--text-color-status);
-    white-space: pre-wrap;
-}
-
-/* Общие стили для кнопок */
-button {
-    background-color: var(--button-bg-color); /* Голубой фон */
-    color: #fff;
-    width: 100%;
-    min-height: 32px; /* Уменьшение минимальной высоты кнопок */
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    border: none;
-    padding: var(--spacing);
-    font-size: 14px;
-    line-height: 1.2;
-    white-space: nowrap;
-    overflow: hidden;
-    box-shadow: var(--button-box-shadow);
-    border-radius: 4px;
-    cursor: pointer;
-    transition: background-color 0.2s;
-    margin: var(--spacing) 0;
-}
-
-button:hover {
-    background-color: var(--button-hover-bg-color); /* Затемнённый голубой при наведении */
-}
-
-button.full-width {
-    width: 100%;
-    height: 5vh;
-    margin-top: var(--spacing);
-    font-size: 2vh;
-}
-
-button.full-width-outlined {
-    border: 1px solid var(--button-outlined-border);
-}
-
-/* Контейнер кнопок управления */
-.editor-controls {
-    display: flex;
-    flex-direction: column; /* Вертикальное расположение кнопок */
-    justify-content: flex-start;
-    align-items: stretch;
-    width: 100%;
-    margin-top: var(--spacing);
-    padding: var(--spacing);
-    box-sizing: border-box;
-    min-height: 0; /* Позволяет сжиматься */
-}
-
-/* Кнопки внутри .editor-controls */
-.editor-controls button {
-    width: 100%;
-    max-width: 100%;
-    margin: var(--half-spacing) 0;
-}
-
-/* Стили для кнопок управления */
-.control-button {
-    width: 100%;
-    padding: var(--spacing);
-    font-size: 14px;
-    border-radius: var(--small-border-radius);
-    cursor: pointer;
-    transition: opacity 0.2s, background-color 0.2s;
-    margin-bottom: var(--spacing);
-    min-height: 32px; /* Уменьшение минимальной высоты */
-}
-
-/* Scrollbar стили для редактора кода */
-.code-editor .react-simple-code-editor::-webkit-scrollbar {
-    width: 8px;
-}
-
-.code-editor .react-simple-code-editor::-webkit-scrollbar-track {
-    background: #2d2d2d;
-}
-
-.code-editor .react-simple-code-editor::-webkit-scrollbar-thumb {
-    background-color: #555;
-    border-radius: 4px;
-}
-
-/* Модальное окно "Помощь" */
-.MuiDialog-paper {
-    background-color: var(--background-color-dialog);
-    margin: var(--spacing);
-    padding: var(--spacing);
-}
-
-.MuiDialogTitle-root,
-.MuiDialogContent-root,
-.MuiDialogActions-root {
-    color: var(--text-color-status);
-    margin: var(--spacing) 0;
-}
-
-.MuiButton-containedPrimary {
-    background-color: var(--button-bg-color);
-}
-
-.MuiButton-containedSecondary {
-    background-color: #dc004e;
-}
-
-/* Удаление ненужных стилей */
-.field-container {
-    /* Удалено, так как оптимизируем структуру */
 }
 
 /* Адаптивность */
@@ -336,82 +235,21 @@ button.full-width-outlined {
     .container {
         flex-wrap: wrap;
     }
-
-    .code-editor,
-    .field-area,
-    .control-panel {
-        flex: 1 1 100%; /* Занимает всю ширину контейнера */
-        min-width: unset; /* Убираем минимальную ширину */
-        margin: 8px 0; /* Отступы сверху и снизу */
-    }
-
-    .field-area {
-        order: 1; /* Поле становится первым блоком */
-        margin: 8px 0;
-        padding: 8px;
-    }
-
-    .code-editor {
-        order: 2; /* Редактор Кода становится вторым блоком */
-    }
-
-    .control-panel {
-        order: 3; /* Панель Кнопок остается третьей */
-    }
 }
 
 @media (max-width: 768px) {
     .container,
     .app-container {
-        flex-direction: column; /* Перестройка контейнера в колонку */
-        height: 100%; /* Полная высота контейнера */
+        flex-direction: column;
+        height: 100%;
     }
 
     .code-editor,
-    .control-panel,
     .field-area {
-        flex: 1 1 auto; /* Гибкое распределение высоты */
-        width: 100%; /* Полная ширина */
-        margin: 8px 0; /* Отступы сверху и снизу */
-        padding: 8px; /* Внутренние отступы */
-        height: auto; /* Автоматическая высота */
-    }
-
-    .editor-controls {
-        flex-direction: column;
-        padding: var(--spacing);
-    }
-
-    .editor-controls button {
-        width: 100%;
-        max-width: 250px;
-        margin: var(--half-spacing) 0;
-    }
-
-    .card,
-    .field-area {
-        order: 1; /* Поле становится первым блоком */
+        flex: 1 1 auto;
         width: 100%;
         margin: 8px 0;
         padding: 8px;
-    }
-
-    .code-editor {
-        order: 2; /* Редактор Кода становится вторым блоком */
-    }
-
-    .control-panel {
-        order: 3; /* Панель Кнопок остается третьей */
-        width: 100%;
-        min-width: unset;
-        margin: 8px 0;
-        padding: 8px;
-    }
-
-    .field-area {
-        width: 100%;
-        min-width: unset;
-        margin: 8px 0;
-        padding: 8px;
+        height: auto;
     }
 }

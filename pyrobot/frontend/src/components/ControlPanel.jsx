@@ -1,6 +1,23 @@
+// ControlPanel.jsx
 import React, {memo, useCallback, useRef} from 'react';
 import {Button, Card, CardContent, CardHeader, Grid} from '@mui/material';
+import {
+	Add,
+	AddLocation,
+	ArrowBack,
+	ArrowDownward,
+	ArrowForward,
+	ArrowUpward,
+	Brush,
+	Clear,
+	DeleteOutline,
+	Edit,
+	FileUpload,
+	HelpOutline,
+	Remove,
+} from '@mui/icons-material';
 import {getHint} from '../hints';
+import './ControlPanel.css'; // Импортируем отдельный CSS-файл
 
 const ControlPanel = memo(({
 	                           robotPos,
@@ -258,78 +275,124 @@ const ControlPanel = memo(({
 			<CardHeader title="Управление"/>
 			<CardContent>
 				<Grid container spacing={2}>
-					<Grid item xs={12}>
-						<Button onClick={() => moveRobot('up')} className="control-button">
+					{/* Кнопки Направлений в форме Ромба */}
+					<Grid item xs={12} style={{textAlign: 'center'}}>
+						<Button
+							onClick={() => moveRobot('up')}
+							className="control-button primary-button"
+							aria-label="Вверх"
+						>
+							<ArrowUpward/>
 							Вверх
 						</Button>
 					</Grid>
-					<Grid item xs={6}>
-						<Button onClick={() => moveRobot('left')} className="control-button">
+
+					<Grid item xs={6} style={{textAlign: 'right'}}>
+						<Button
+							onClick={() => moveRobot('left')}
+							className="control-button primary-button"
+							aria-label="Влево"
+						>
+							<ArrowBack/>
 							Влево
 						</Button>
 					</Grid>
-					<Grid item xs={6}>
-						<Button onClick={() => moveRobot('right')} className="control-button">
+					<Grid item xs={6} style={{textAlign: 'left'}}>
+						<Button
+							onClick={() => moveRobot('right')}
+							className="control-button primary-button"
+							aria-label="Вправо"
+						>
+							<ArrowForward/>
 							Вправо
 						</Button>
 					</Grid>
-					<Grid item xs={12}>
-						<Button onClick={() => moveRobot('down')} className="control-button">
+
+					<Grid item xs={12} style={{textAlign: 'center'}}>
+						<Button
+							onClick={() => moveRobot('down')}
+							className="control-button primary-button"
+							aria-label="Вниз"
+						>
+							<ArrowDownward/>
 							Вниз
 						</Button>
 					</Grid>
-					<Grid item xs={12}>
-						<Button onClick={putMarker} className="control-button">
+
+					{/* Группировка кнопок по смыслу с иконками и цветами */}
+					<Grid item xs={6}>
+						<Button onClick={putMarker} className="control-button success-button"
+						        aria-label="Положить маркер">
+							<AddLocation style={{marginRight: '8px'}}/>
 							Положить маркер
 						</Button>
 					</Grid>
-					<Grid item xs={12}>
-						<Button onClick={pickMarker} className="control-button">
+					<Grid item xs={6}>
+						<Button onClick={pickMarker} className="control-button error-button"
+						        aria-label="Поднять маркер">
+							<DeleteOutline style={{marginRight: '8px'}}/>
 							Поднять маркер
 						</Button>
 					</Grid>
-					<Grid item xs={12}>
-						<Button onClick={paintCell} className="control-button">
+
+					<Grid item xs={6}>
+						<Button onClick={paintCell} className="control-button warning-button" aria-label="Покрасить">
+							<Brush style={{marginRight: '8px'}}/>
 							Покрасить
 						</Button>
 					</Grid>
-					<Grid item xs={12}>
-						<Button onClick={clearCell} className="control-button">
+					<Grid item xs={6}>
+						<Button onClick={clearCell} className="control-button default-button" aria-label="Очистить">
+							<Clear style={{marginRight: '8px'}}/>
 							Очистить
 						</Button>
 					</Grid>
+
 					<Grid item xs={12}>
-						<Button onClick={toggleEditMode} className="control-button">
+						<Button onClick={toggleEditMode} className="control-button secondary-button"
+						        aria-label="Тоггл Режим Рисования">
+							<Edit style={{marginRight: '8px'}}/>
 							{editMode ? 'Выключить Режим рисования' : 'Включить Режим рисования'}
 						</Button>
 					</Grid>
-					<Grid item xs={12}>
-						<Button onClick={increaseWidth} className="control-button">
+
+					<Grid item xs={6}>
+						<Button onClick={increaseWidth} className="control-button info-button" aria-label="Поле шире">
+							<Add style={{marginRight: '8px'}}/>
 							Поле шире
 						</Button>
 					</Grid>
-					<Grid item xs={12}>
-						<Button onClick={decreaseWidth} className="control-button">
+					<Grid item xs={6}>
+						<Button onClick={decreaseWidth} className="control-button info-button" aria-label="Поле уже">
+							<Remove style={{marginRight: '8px'}}/>
 							Поле уже
 						</Button>
 					</Grid>
-					<Grid item xs={12}>
-						<Button onClick={increaseHeight} className="control-button">
+
+					<Grid item xs={6}>
+						<Button onClick={increaseHeight} className="control-button info-button" aria-label="Поле выше">
+							<Add style={{marginRight: '8px'}}/>
 							Поле выше
 						</Button>
 					</Grid>
-					<Grid item xs={12}>
-						<Button onClick={decreaseHeight} className="control-button">
+					<Grid item xs={6}>
+						<Button onClick={decreaseHeight} className="control-button info-button" aria-label="Поле ниже">
+							<Remove style={{marginRight: '8px'}}/>
 							Поле ниже
 						</Button>
 					</Grid>
-					<Grid item xs={12}>
-						<Button onClick={() => setStatusMessage(getHint('help', editMode))} className="control-button">
+
+					<Grid item xs={6}>
+						<Button onClick={() => setStatusMessage(getHint('help', editMode))}
+						        className="control-button info-button" aria-label="Помощь">
+							<HelpOutline style={{marginRight: '8px'}}/>
 							Помощь
 						</Button>
 					</Grid>
-					<Grid item xs={12}>
-						<Button onClick={handleImportField} className="control-button">
+					<Grid item xs={6}>
+						<Button onClick={handleImportField} className="control-button upload-button"
+						        aria-label="Импорт .fil">
+							<FileUpload style={{marginRight: '8px'}}/>
 							Импорт .fil
 						</Button>
 						<input
@@ -341,8 +404,7 @@ const ControlPanel = memo(({
 					</Grid>
 				</Grid>
 			</CardContent>
-		</Card>
-	);
+		</Card>)
 });
 
 export default ControlPanel;
