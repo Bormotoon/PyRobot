@@ -4,9 +4,9 @@ import Editor from 'react-simple-code-editor';
 import Prism from 'prismjs';
 import './CodeEditor.css';
 
-// ... (остальной код компонента)
-
-// Определение языка Кумир для Prism
+/**
+ * Определение языка Кумир для Prism
+ */
 Prism.languages.kumir = {
 	keyword: /\b(использовать|Робот|алг|нач|кон|влево|вправо|вверх|вниз|закрасить|если|иначе|для|пока|температура|радиация)\b/g,
 	comment: /#.*/g,
@@ -34,6 +34,7 @@ const CodeEditor = memo(({
 			<Typography variant="h5" gutterBottom>
 				Редактор Кода
 			</Typography>
+
 			<Editor
 				value={code}
 				onValueChange={setCode}
@@ -41,36 +42,48 @@ const CodeEditor = memo(({
 				padding={10}
 				className="react-simple-code-editor"
 			/>
+
 			<div className="editor-controls">
+				{/* Очистка кода */}
 				<Button
 					variant="contained"
-					color="primary" // Голубой цвет
+					color="info"
+					className="control-button"
 					onClick={onClearCode}
 					fullWidth
 				>
 					Очистить
 				</Button>
+
+				{/* Стоп */}
 				<Button
 					variant="contained"
-					color="primary" // Голубой цвет
+					color="error"
+					className="control-button"
 					onClick={onStop}
 					disabled={!isRunning}
 					fullWidth
 				>
 					Стоп
 				</Button>
+
+				{/* Пуск */}
 				<Button
 					variant="contained"
-					color="primary" // Голубой цвет
+					color="success"
+					className="control-button"
 					onClick={onStart}
 					disabled={isRunning}
 					fullWidth
 				>
 					Пуск
 				</Button>
+
+				{/* Сброс */}
 				<Button
 					variant="outlined"
-					color="primary" // Голубой цвет
+					color="warning"
+					className="control-button"
 					onClick={onReset}
 					fullWidth
 				>

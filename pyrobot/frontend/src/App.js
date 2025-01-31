@@ -1,7 +1,7 @@
 import React from 'react';
-import RobotSimulator from './RobotSimulator';
+import RobotSimulator from './components/RobotSimulator';
 import './App.css';
-import './styles.css'; // Подключаем новый файл стилей
+import './styles/styles.css'; // Подключаем новый файл стилей
 
 function App() {
     return (

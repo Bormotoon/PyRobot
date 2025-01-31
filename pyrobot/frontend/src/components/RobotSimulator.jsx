@@ -1,7 +1,9 @@
 import React, {memo, useCallback, useEffect, useReducer, useRef} from 'react';
-import CodeEditor from './components/CodeEditor';
-import ControlPanel from './components/ControlPanel';
-import Field from './components/Field';
+import {ThemeProvider} from '@mui/material/styles';
+import CodeEditor from './CodeEditor/CodeEditor';
+import ControlPanel from './ControlPanel/ControlPanel';
+import Field from './Field/Field';
+import theme from '../styles/theme'; // Файл с вашей MUI-темой
 
 const initialState = {
 	code: `использовать Робот\nалг\nнач\n  вправо\n  вниз\n  влево\n  вверх\n  закрасить\nкон`,
@@ -144,58 +146,62 @@ const RobotSimulator = memo(() => {
 		dispatch({type: 'SET_PERMANENT_WALLS', payload: newWalls});
 		const newPos = clampRobotPos(state.robotPos, state.width, state.height);
 		dispatch({type: 'SET_ROBOT_POS', payload: newPos});
-	}, [state.width, state.height]);
+	}, [state.width, state.height, state.robotPos]);
 
 	return (
-		<div className="app-container">
-			<CodeEditor
-				code={state.code}
-				setCode={(newCode) => dispatch({type: 'SET_CODE', payload: newCode})}
-				isRunning={state.isRunning}
-				onClearCode={handleClearCode}
-				onStop={handleStop}
-				onStart={handleStart}
-				onReset={handleReset}
-			/>
-			<ControlPanel
-				robotPos={state.robotPos}
-				setRobotPos={(pos) => dispatch({type: 'SET_ROBOT_POS', payload: pos})}
-				walls={state.walls}
-				setWalls={(newWalls) => dispatch({type: 'SET_WALLS', payload: newWalls})}
-				permanentWalls={state.permanentWalls}
-				markers={state.markers}
-				setMarkers={(m) => dispatch({type: 'SET_MARKERS', payload: m})}
-				coloredCells={state.coloredCells}
-				setColoredCells={(c) => dispatch({type: 'SET_COLORED_CELLS', payload: c})}
-				width={state.width}
-				setWidth={(val) => dispatch({type: 'SET_WIDTH', payload: val})}
-				height={state.height}
-				setHeight={(val) => dispatch({type: 'SET_HEIGHT', payload: val})}
-				cellSize={state.cellSize}
-				setCellSize={(val) => dispatch({type: 'SET_CELL_SIZE', payload: val})}
-				editMode={state.editMode}
-				setEditMode={(val) => dispatch({type: 'SET_EDIT_MODE', payload: val})}
-				setStatusMessage={(msg) => dispatch({type: 'SET_STATUS_MESSAGE', payload: msg})}
-			/>
-			<Field
-				canvasRef={canvasRef}
-				robotPos={state.robotPos}
-				setRobotPos={(pos) => dispatch({type: 'SET_ROBOT_POS', payload: pos})}
-				walls={state.walls}
-				setWalls={(newWalls) => dispatch({type: 'SET_WALLS', payload: newWalls})}
-				permanentWalls={state.permanentWalls}
-				markers={state.markers}
-				setMarkers={(m) => dispatch({type: 'SET_MARKERS', payload: m})}
-				coloredCells={state.coloredCells}
-				setColoredCells={(c) => dispatch({type: 'SET_COLORED_CELLS', payload: c})}
-				width={state.width}
-				height={state.height}
-				cellSize={state.cellSize}
-				editMode={state.editMode}
-				statusMessage={state.statusMessage}
-				setStatusMessage={(msg) => dispatch({type: 'SET_STATUS_MESSAGE', payload: msg})}
-			/>
-		</div>
+		<ThemeProvider theme={theme}>
+			<div className="app-container">
+				<CodeEditor
+					code={state.code}
+					setCode={(newCode) => dispatch({type: 'SET_CODE', payload: newCode})}
+					isRunning={state.isRunning}
+					onClearCode={handleClearCode}
+					onStop={handleStop}
+					onStart={handleStart}
+					onReset={handleReset}
+				/>
+
+				<ControlPanel
+					robotPos={state.robotPos}
+					setRobotPos={(pos) => dispatch({type: 'SET_ROBOT_POS', payload: pos})}
+					walls={state.walls}
+					setWalls={(newWalls) => dispatch({type: 'SET_WALLS', payload: newWalls})}
+					permanentWalls={state.permanentWalls}
+					markers={state.markers}
+					setMarkers={(m) => dispatch({type: 'SET_MARKERS', payload: m})}
+					coloredCells={state.coloredCells}
+					setColoredCells={(c) => dispatch({type: 'SET_COLORED_CELLS', payload: c})}
+					width={state.width}
+					setWidth={(val) => dispatch({type: 'SET_WIDTH', payload: val})}
+					height={state.height}
+					setHeight={(val) => dispatch({type: 'SET_HEIGHT', payload: val})}
+					cellSize={state.cellSize}
+					setCellSize={(val) => dispatch({type: 'SET_CELL_SIZE', payload: val})}
+					editMode={state.editMode}
+					setEditMode={(val) => dispatch({type: 'SET_EDIT_MODE', payload: val})}
+					setStatusMessage={(msg) => dispatch({type: 'SET_STATUS_MESSAGE', payload: msg})}
+				/>
+
+				<Field
+					canvasRef={canvasRef}
+					robotPos={state.robotPos}
+					setRobotPos={(pos) => dispatch({type: 'SET_ROBOT_POS', payload: pos})}
+					walls={state.walls}
+					setWalls={(newWalls) => dispatch({type: 'SET_WALLS', payload: newWalls})}
+					permanentWalls={state.permanentWalls}
+					markers={state.markers}
+					setMarkers={(m) => dispatch({type: 'SET_MARKERS', payload: m})}
+					coloredCells={state.coloredCells}
+					setColoredCells={(c) => dispatch({type: 'SET_COLORED_CELLS', payload: c})}
+					width={state.width}
+					height={state.height}
+					cellSize={state.cellSize}
+					editMode={state.editMode}
+					statusMessage={state.statusMessage}
+					setStatusMessage={(msg) => dispatch({type: 'SET_STATUS_MESSAGE', payload: msg})}
+				/>
+			</div>
+		</ThemeProvider>
 	);
 });
 

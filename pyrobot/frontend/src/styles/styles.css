@@ -1,0 +1,108 @@
+/* styles.css */
+
+/* 1) Корневые переменные */
+:root {
+    /* Отступы */
+    --spacing: 8px;
+    --half-spacing: 4px;
+
+    /* Скругления */
+    --border-radius: 8px;
+    --small-border-radius: 4px;
+
+    /* Тени */
+    --box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    --button-box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.3);
+
+    /* Цвета (общие) */
+    --background-color-app: #f9f9f9;
+    --background-color-card: #fff;
+
+    /* Специфические цвета (редактор кода, холст, режим редактирования) */
+    --background-color-code-editor: #ffffff;
+    --text-color-code-editor: #333333;
+    --background-color-canvas: #289628;
+    --background-color-edit-mode: #6496ff;
+    --background-color-dialog: #f5f5f5;
+    --text-color-status: #333;
+
+    /* Шрифты */
+    --font-family-monospace: 'Fira Code', monospace;
+    --font-size-status: 14px;
+}
+
+/* 2) Базовые ресеты */
+html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: Arial, sans-serif;
+}
+
+/* Сброс box-sizing и обнуление отступов */
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+/* 3) Общие стили для крупных контейнеров, карточек и т.п. */
+.container,
+.app-container,
+.card,
+.field-card,
+.status-card {
+    margin: var(--spacing);
+    padding: var(--spacing);
+    background: var(--background-color-card);
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow);
+}
+
+.card,
+.field-card,
+.status-card {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.container {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    height: 100%;
+    overflow: hidden;
+    min-height: 0;
+}
+
+.app-container {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    background-color: var(--background-color-app);
+    width: 100%;
+    height: 100%;
+    gap: var(--spacing);
+    overflow: hidden;
+    min-height: 0;
+}
+
+/* 4) Адаптивность */
+@media (max-width: 1200px) {
+    .container {
+        flex-wrap: wrap;
+    }
+}
+
+@media (max-width: 768px) {
+    .container,
+    .app-container {
+        flex-direction: column;
+        height: 100%;
+    }
+}

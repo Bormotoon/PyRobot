@@ -1,5 +1,7 @@
 /* Field.css */
-.Field {
+
+/* Главная обёртка для холста и статусного блока */
+.field-area {
     width: 100%;
     display: flex;
     flex-direction: column;
@@ -9,7 +11,8 @@
     box-sizing: border-box;
 }
 
-canvas {
+/* Сам canvas */
+.field-area canvas {
     width: 100%;
     aspect-ratio: 1 / 1;
     background-color: var(--background-color-canvas);
@@ -21,6 +24,7 @@ canvas {
     box-sizing: border-box;
 }
 
-canvas.edit-mode {
+/* Когда включён режим редактирования */
+.field-area canvas.edit-mode {
     background-color: var(--background-color-edit-mode);
 }

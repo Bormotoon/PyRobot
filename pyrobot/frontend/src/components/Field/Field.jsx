@@ -1,7 +1,7 @@
 import React, {memo, useCallback, useEffect, useState} from 'react';
 import {Card, Typography} from '@mui/material';
-import {drawField} from '../canvasDrawing';
-import {getHint} from '../hints';
+import {drawField} from '../../canvasDrawing';
+import {getHint} from '../../hints';
 import './Field.css';
 
 const Field = memo(({
@@ -246,7 +246,9 @@ const Field = memo(({
 Маркеров: ${Object.keys(markers).length}
 Раскрашенных клеток: ${coloredCells.size}`;
 
-	const finalString = statusMessage ? `${displayString}\n\n${statusMessage}` : displayString;
+	const finalString = statusMessage
+		? `${displayString}\n\n${statusMessage}`
+		: displayString;
 
 	return (
 		<div className="field-area">
@@ -262,6 +264,7 @@ const Field = memo(({
 					onContextMenu={handleCanvasRightClick}
 				/>
 			</Card>
+
 			<Card className="status-card">
 				<Typography variant="body2">
 					{finalString}
