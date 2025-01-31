@@ -147,7 +147,7 @@ const RobotSimulator = memo(() => {
 		dispatch({type: 'SET_PERMANENT_WALLS', payload: newWalls});
 		const newPos = clampRobotPos(state.robotPos, state.width, state.height);
 		dispatch({type: 'SET_ROBOT_POS', payload: newPos});
-	}, [state.width, state.height, state.robotPos]);
+	}, [state.width, state.height]); // Исключили state.robotPos из зависимостей
 
 	return (
 		<ThemeProvider theme={theme}>
