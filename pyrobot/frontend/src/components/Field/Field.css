@@ -1,8 +1,12 @@
 /* Field.css */
 
-/* Главная обёртка для холста и статусного блока */
 .field-area {
-    width: 100%;
+    flex: 2 1 50%;
+    order: 2;
+
+    margin: var(--spacing);
+    padding: var(--spacing);
+
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -24,7 +28,26 @@
     box-sizing: border-box;
 }
 
-/* Когда включён режим редактирования */
 .field-area canvas.edit-mode {
     background-color: var(--background-color-edit-mode);
+}
+
+/* Блок статуса */
+.status-card {
+    align-items: flex-start; /* Чтобы текст начинался сверху слева */
+    width: 100%; /* Растягиваем карточку на всю ширину field-area */
+    margin-top: var(--spacing);
+}
+
+.status-text {
+    white-space: pre-line; /* Учитывать \n как переносы */
+    min-height: 80px; /* Чтобы при коротких подсказках место не схлопывалось */
+    max-height: 150px; /* Если подсказка очень длинная, чтобы не растягивалось бесконечно */
+    overflow-y: auto; /* Скролл, если высота > 150px */
+    width: 100%;
+    box-sizing: border-box;
+    line-height: 1.4; /* Чуть увеличим межстрочный интервал для красоты */
+    padding: var(--spacing);
+    border-radius: var(--small-border-radius);
+    background: #fefefe; /* Например, чуть выделим фон текста, при желании */
 }

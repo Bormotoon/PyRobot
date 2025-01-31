@@ -4,11 +4,12 @@ import CodeEditor from './CodeEditor/CodeEditor';
 import ControlPanel from './ControlPanel/ControlPanel';
 import Field from './Field/Field';
 import theme from '../styles/theme'; // Файл с вашей MUI-темой
+import {getHint} from './hints';
 
 const initialState = {
 	code: `использовать Робот\nалг\nнач\n  вправо\n  вниз\n  влево\n  вверх\n  закрасить\nкон`,
 	isRunning: false,
-	statusMessage: '',
+	statusMessage: getHint('initial'),
 	width: 7,
 	height: 7,
 	cellSize: 50,

@@ -16,7 +16,7 @@ import {
 	HelpOutline,
 	Remove,
 } from '@mui/icons-material';
-import {getHint} from '../../hints';
+import {getHint} from '../hints';
 import './ControlPanel.css'; // Стили с .control-panel и .control-button
 
 const ControlPanel = memo(({

@@ -1,7 +1,7 @@
 import React, {memo, useCallback, useEffect, useState} from 'react';
 import {Card, Typography} from '@mui/material';
-import {drawField} from '../../canvasDrawing';
-import {getHint} from '../../hints';
+import {drawField} from '../canvasDrawing';
+import {getHint} from '../hints';
 import './Field.css';
 
 const Field = memo(({
@@ -71,7 +71,7 @@ const Field = memo(({
 		(px, py) => {
 			const margin = 5;
 			const gridX = Math.floor(px / cellSize) - 1;
-			const gridY = Math.floor(py / cellSize) - 1;
+			const gridY = Math.floor(px / cellSize) - 1;
 
 			if (
 				gridX == null ||
@@ -242,13 +242,13 @@ const Field = memo(({
 		[editMode, getCanvasCoords, toGridCoords, setMarkers, setStatusMessage]
 	);
 
-	const displayString = `Позиция робота: (${robotPos.x}, ${robotPos.y})
-Маркеров: ${Object.keys(markers).length}
-Раскрашенных клеток: ${coloredCells.size}`;
-
-	const finalString = statusMessage
-		? `${displayString}\n\n${statusMessage}`
-		: displayString;
+	// Разделяем статус и подсказку визуально
+	const statusLines = [
+		`Позиция робота: (${robotPos.x}, ${robotPos.y})`,
+		`Маркеров: ${Object.keys(markers).length}`,
+		`Раскрашенных клеток: ${coloredCells.size}`,
+	];
+	const statusText = statusLines.join('\n'); // склеиваем в несколько строк
 
 	return (
 		<div className="field-area">
@@ -266,8 +266,13 @@ const Field = memo(({
 			</Card>
 
 			<Card className="status-card">
-				<Typography variant="body2">
-					{finalString}
+				{/* Статус: несколько строк, + пропуск строки перед подсказкой */}
+				<Typography
+					variant="body2"
+					className="status-text"
+				>
+					{statusText}
+					{statusMessage ? `\n\n${statusMessage}` : ''}
 				</Typography>
 			</Card>
 		</div>

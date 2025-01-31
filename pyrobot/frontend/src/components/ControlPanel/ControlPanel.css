@@ -1,34 +1,45 @@
 /* ControlPanel.css */
 
-/* Контейнер панели */
+/* Контейнер панели (справа) */
 .control-panel {
     flex: 1 1 25%;
+    order: 3;
+
+    margin: var(--spacing);
+    padding: var(--spacing);
+
     display: flex;
     flex-direction: column;
-    gap: var(--spacing); /* Расстояние между группами элементов */
-    order: 3;
     overflow-y: auto;
     min-height: 0;
-    padding: var(--spacing);
-    margin: var(--spacing);
 }
 
-/* Базовый класс для всех кнопок на панели
-   (форма, отступы, общая стилистика) */
+/* Базовый класс для всех кнопок */
 .control-button {
     display: flex;
     align-items: center;
     justify-content: flex-start;
     width: 100%;
-    padding: var(--spacing);
-    font-size: 14px;
-    color: #fff; /* Текст по умолчанию белый (MUI может переопределить) */
+    /* Масштабируемый шрифт: минимум 12px,
+       максимум 16px, в зависимости от ширины экрана */
+    font-size: clamp(12px, 2vw, 16px);
+
+    /* Если нужно запретить перенос текста и обрезать при нехватке места: */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+
+    color: #fff;
     border: none;
     border-radius: var(--small-border-radius);
     box-shadow: var(--button-box-shadow);
     cursor: pointer;
     transition: background-color 0.2s, opacity 0.2s;
+
+    /* Единые отступы */
+    padding: var(--spacing);
     margin: var(--half-spacing) 0;
+
     min-height: 40px;
     font-weight: bold;
 }
@@ -37,8 +48,7 @@
     opacity: 0.9;
 }
 
-/* Селектор для иконок внутри кнопок,
-   чтобы немного уменьшить отступ между иконкой и текстом */
+/* Иконки внутри кнопок */
 .control-button .MuiSvgIcon-root {
     font-size: 22px;
     margin-right: var(--spacing);

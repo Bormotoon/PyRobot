@@ -2,21 +2,26 @@
 
 /* Главный контейнер редактора */
 .code-editor {
+    /* Расположение в сетке (слева) */
     flex: 1 1 25%;
-    background: var(--background-color-code-editor); /* Белый фон */
-    color: var(--text-color-code-editor); /* Тёмный текст */
+    order: 1;
+
+    /* Единые отступы */
+    margin: var(--spacing);
+    padding: var(--spacing);
+
+    background: var(--background-color-code-editor);
+    color: var(--text-color-code-editor);
     display: flex;
     flex-direction: column;
     justify-content: space-between;
     overflow: hidden;
     border-radius: var(--border-radius);
     box-shadow: var(--box-shadow);
-    order: 1;
     min-height: 0;
-    padding: var(--spacing); /* Отступы внутри контейнера */
 }
 
-/* Сам react-simple-code-editor */
+/* React Simple Code Editor */
 .code-editor .react-simple-code-editor {
     flex: 1 1 auto;
     width: 100%;
@@ -33,7 +38,7 @@
     min-height: 0;
 }
 
-/* Блок с кнопками (MUI Button), только отступы и лейаут */
+/* Блок с кнопками */
 .editor-controls {
     display: flex;
     flex-direction: column;
@@ -41,7 +46,7 @@
     margin-top: var(--spacing);
 }
 
-/* Подсветка синтаксиса (Kumir) */
+/* Подсветка синтаксиса */
 .code-editor .token.keyword {
     color: #d73a49;
     font-weight: bold;
