@@ -41,7 +41,6 @@ body {
 }
 
 /* 3) Общие стили для контейнеров и карточек */
-/* Общие свойства для всех блоков */
 .container,
 .card,
 .field-card,
@@ -51,7 +50,6 @@ body {
     box-shadow: var(--box-shadow);
 }
 
-/* Стили карточек (центровка содержимого) */
 .card,
 .field-card,
 .status-card {
@@ -61,7 +59,7 @@ body {
     align-items: center;
 }
 
-/* Стили контейнера приложения */
+/* Контейнер приложения */
 .container {
     display: flex;
     justify-content: center;
@@ -71,8 +69,9 @@ body {
     min-height: 0;
 }
 
-/* Основной контейнер приложения */
+/* Основной контейнер приложения – делаем позиционирование относительным */
 .app-container {
+    position: relative; /* Добавлено для возможности абсолютного позиционирования подсказок */
     display: flex;
     flex-direction: row;
     align-items: stretch;

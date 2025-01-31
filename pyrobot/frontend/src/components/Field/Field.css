@@ -13,7 +13,14 @@
     align-items: center;
     min-height: 0;
     box-sizing: border-box;
+
+    background: var(--background-color-card);
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow);
+    margin: var(--spacing);
+    padding: var(--spacing);
 }
+
 
 /* Сам canvas */
 .field-area canvas {
@@ -32,15 +39,32 @@
     background-color: var(--background-color-edit-mode);
 }
 
-/* Блок статуса */
-.status-card {
-    align-items: flex-start; /* Чтобы текст начинался сверху слева */
-    width: 100%; /* Растягиваем карточку на всю ширину field-area */
-    margin-top: var(--spacing);
+/* Контейнер для canvas, который центрирует его в свободном пространстве */
+.field-card {
+    flex: 1; /* занимает все доступное пространство */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+}
+
+/* Настройка canvas: он занимает максимально возможное пространство,
+   сохраняя соотношение сторон 1:1 */
+.field-card canvas {
+    width: 100%;
+    height: auto;
+    max-height: 100%;
+    aspect-ratio: 1 / 1;
+    border-radius: var(--border-radius);
+    object-fit: contain;
 }
 
 /* Сам текст статуса/подсказок */
 .status-text {
+    display: flex;
+    justify-content: center; /* Горизонтальное центрирование */
+    align-items: center; /* Вертикальное центрирование */
+
     white-space: pre-line; /* учитывать \n как переносы */
     min-height: 80px; /* базовая высота, чтобы не прыгало при маленьком тексте */
     max-height: 120px; /* ограничение сверху, чтобы не растягивать всё поле */
@@ -49,5 +73,5 @@
     padding: var(--spacing);
     border-radius: var(--small-border-radius);
     background: #fefefe; /* светлый фон */
-    line-height: 1.3;
+    text-align: center; /* дополнительное горизонтальное центрирование текста */
 }
