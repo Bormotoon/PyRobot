@@ -7,7 +7,6 @@ function App() {
     return (
         <div className="App">
             <header className="App-header">
-                <h1>Robot Simulator</h1>
                 <RobotSimulator/>
             </header>
         </div>

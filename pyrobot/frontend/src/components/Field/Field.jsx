@@ -19,15 +19,11 @@ const Field = memo(({
 	                    height,
 	                    cellSize,
 	                    editMode,
-	                    statusMessage,
+	                    statusMessage,    // Динамические подсказки (например, "Стена поставлена", "Клик за пределами поля")
 	                    setStatusMessage,
                     }) => {
-	// Состояние для отслеживания перетаскивания робота
 	const [isDraggingRobot, setIsDraggingRobot] = useState(false);
 
-	/**
-	 * Перерисовываем поле при каждом изменении данных (координаты робота, стены и т.д.).
-	 */
 	useEffect(() => {
 		if (!canvasRef.current) return;
 		drawField(canvasRef.current, {
@@ -38,110 +34,39 @@ const Field = memo(({
 			permanentWalls,
 			width,
 			height,
-			cellSize
+			cellSize,
 		});
-	}, [
-		canvasRef,
-		coloredCells,
-		robotPos,
-		markers,
-		walls,
-		permanentWalls,
-		width,
-		height,
-		cellSize
-	]);
+	}, [canvasRef, coloredCells, robotPos, markers, walls, permanentWalls, width, height, cellSize]);
 
-	/**
-	 * Преобразует координаты клика (event.clientX, event.clientY)
-	 * в координаты canvas с учётом масштабирования.
-	 */
 	const getCanvasCoords = useCallback((event) => {
 		const canvas = canvasRef.current;
 		if (!canvas) return {x: null, y: null};
-
 		const rect = canvas.getBoundingClientRect();
 		const scaleX = canvas.width / rect.width;
 		const scaleY = canvas.height / rect.height;
-
 		const x = (event.clientX - rect.left) * scaleX;
 		const y = (event.clientY - rect.top) * scaleY;
 		return {x, y};
 	}, [canvasRef]);
 
-	/**
-	 * Проверка, не вышли ли мы за пределы холста (по пикселям).
-	 */
 	const isOutsideCanvas = useCallback((px, py) => {
 		return px < 0 || py < 0 || px >= width * cellSize || py >= height * cellSize;
 	}, [width, height, cellSize]);
 
-	/**
-	 * Преобразует пиксельные координаты (px, py) в координаты сетки (gridX, gridY),
-	 * зажимая (clamp) в диапазон [0..width-1] и [0..height-1].
-	 */
 	const toGridCoords = useCallback((px, py) => {
 		let gx = Math.floor(px / cellSize);
 		let gy = Math.floor(py / cellSize);
-
 		gx = Math.min(Math.max(gx, 0), width - 1);
 		gy = Math.min(Math.max(gy, 0), height - 1);
-
 		return {gridX: gx, gridY: gy};
 	}, [cellSize, width, height]);
 
-	/**
-	 * ЛКМ в режиме редактирования:
-	 * - если кликаем по роботу, начинаем перетаскивание;
-	 * - иначе ставим/убираем стены или закрашиваем клетку.
-	 */
-	const handleMouseDown = useCallback((e) => {
-		if (e.button !== 0) return; // Только левая кнопка
-		e.preventDefault();
-		e.stopPropagation();
-
-		const {x, y} = getCanvasCoords(e);
-		if (x === null || y === null || isOutsideCanvas(x, y)) {
-			setStatusMessage('Клик за пределами поля.');
-			return;
-		}
-
-		if (!editMode) {
-			setStatusMessage(getHint('canvasLeftClickNoEdit', false));
-			return;
-		}
-
-		// Определяем клетку, куда кликнули
-		const {gridX, gridY} = toGridCoords(x, y);
-
-		// Если это клетка, в которой сейчас робот – начинаем «drag»
-		if (gridX === robotPos.x && gridY === robotPos.y) {
-			setIsDraggingRobot(true);
-			setStatusMessage('Начали перетаскивать робота.');
-			return;
-		}
-
-		// Иначе - взаимодействуем со стенами/раскрашенными клетками
-		handleWallsAndCells(gridX, gridY, x, y);
-	}, [
-		editMode,
-		robotPos,
-		getCanvasCoords,
-		isOutsideCanvas,
-		toGridCoords,
-		setStatusMessage
-	]);
-
-	/**
-	 * Вспомогательный метод для постановки/убирания стен или закраски клетки.
-	 */
+	// Обработка взаимодействия со стенами/клетками
 	const handleWallsAndCells = useCallback((gx, gy, px, py) => {
-		const margin = 5; // отступ от края клетки для "попадания" в стену
+		const margin = 5;
 		const xRem = px % cellSize;
 		const yRem = py % cellSize;
 		let wall = null;
-
-		// Левый/правый/верхний/нижний край
 		if (xRem < margin) {
 			wall = `${gx},${gy},${gx},${gy + 1}`;
 		} else if (xRem > cellSize - margin) {
@@ -151,9 +76,7 @@ const Field = memo(({
 		} else if (yRem > cellSize - margin) {
 			wall = `${gx},${gy + 1},${gx + 1},${gy + 1}`;
 		}
-
 		if (wall) {
-			// Ставим/убираем стену (если она не «постоянная»)
 			if (!permanentWalls.has(wall)) {
 				setWalls(prev => {
 					const copy = new Set(prev);
@@ -167,12 +90,9 @@ const Field = memo(({
 					return copy;
 				});
 			} else {
-				setStatusMessage(
-					'Это постоянная стена. ' + getHint('canvasLeftClickEditMode', true)
-				);
+				setStatusMessage('Это постоянная стена. ' + getHint('canvasLeftClickEditMode', true));
 			}
 		} else {
-			// Закрашиваем/очищаем клетку
 			const posKey = `${gx},${gy}`;
 			setColoredCells(prev => {
 				const c = new Set(prev);
@@ -186,71 +106,63 @@ const Field = memo(({
 				return c;
 			});
 		}
-	}, [
-		cellSize,
-		permanentWalls,
-		setWalls,
-		setColoredCells,
-		setStatusMessage
-	]);
+	}, [cellSize, permanentWalls, setWalls, setColoredCells, setStatusMessage]);
 
-	/**
-	 * Пока ЛКМ зажата и мы «таскаем» робота — он двигается за курсором.
-	 */
+	const handleMouseDown = useCallback((e) => {
+		if (e.button !== 0) return; // только левая кнопка
+		e.preventDefault();
+		e.stopPropagation();
+		const {x, y} = getCanvasCoords(e);
+		if (x === null || y === null || isOutsideCanvas(x, y)) {
+			setStatusMessage('Клик за пределами поля.');
+			return;
+		}
+		if (!editMode) {
+			setStatusMessage(getHint('canvasLeftClickNoEdit', false));
+			return;
+		}
+		const {gridX, gridY} = toGridCoords(x, y);
+		if (gridX === robotPos.x && gridY === robotPos.y) {
+			setIsDraggingRobot(true);
+			setStatusMessage('Начали перетаскивать робота.');
+			return;
+		}
+		// Вызываем функцию обработки стен/клеток
+		handleWallsAndCells(gridX, gridY, x, y);
+	}, [editMode, robotPos, getCanvasCoords, isOutsideCanvas, toGridCoords, setStatusMessage, handleWallsAndCells]);
+
 	const handleMouseMove = useCallback((e) => {
 		if (!isDraggingRobot) return;
 		e.preventDefault();
 		e.stopPropagation();
-
 		const {x, y} = getCanvasCoords(e);
-		if (x === null || y === null || isOutsideCanvas(x, y)) {
-			return;
-		}
-
-		// Определяем клетку и «зажимаем» в пределах поля
+		if (x === null || y === null || isOutsideCanvas(x, y)) return;
 		const {gridX, gridY} = toGridCoords(x, y);
 		setRobotPos({x: gridX, y: gridY});
-	}, [
-		isDraggingRobot,
-		getCanvasCoords,
-		toGridCoords,
-		setRobotPos,
-		isOutsideCanvas
-	]);
+	}, [isDraggingRobot, getCanvasCoords, toGridCoords, setRobotPos, isOutsideCanvas]);
 
-	/**
-	 * Отпустили ЛКМ — завершаем «drag», робот фиксируется в текущей клетке.
-	 */
 	const handleMouseUp = useCallback((e) => {
 		if (!isDraggingRobot) return;
 		e.preventDefault();
 		e.stopPropagation();
-
 		setIsDraggingRobot(false);
 		setStatusMessage('Перемещение робота завершено.');
 	}, [isDraggingRobot, setStatusMessage]);
 
-	/**
-	 * Правый клик (ПКМ) в режиме редактирования: добавить/убрать маркер.
-	 */
 	const handleCanvasRightClick = useCallback((e) => {
 		e.preventDefault();
 		e.stopPropagation();
-
 		const {x, y} = getCanvasCoords(e);
 		if (x === null || y === null || isOutsideCanvas(x, y)) {
 			setStatusMessage('Правый клик за пределами поля.');
 			return;
 		}
-
 		if (!editMode) {
 			setStatusMessage(getHint('canvasRightClickNoEdit', false));
 			return;
 		}
-
 		const {gridX, gridY} = toGridCoords(x, y);
 		const posKey = `${gridX},${gridY}`;
-
 		setMarkers(prev => {
 			const copy = {...prev};
 			if (!copy[posKey]) {
@@ -262,22 +174,7 @@ const Field = memo(({
 			}
 			return copy;
 		});
-	}, [
-		editMode,
-		getCanvasCoords,
-		isOutsideCanvas,
-		toGridCoords,
-		setMarkers,
-		setStatusMessage
-	]);
-
-	// Статус для отображения текущего состояния
-	const statusLines = [
-		`Позиция робота: (${robotPos.x}, ${robotPos.y})`,
-		`Маркеров: ${Object.keys(markers).length}`,
-		`Раскрашенных клеток: ${coloredCells.size}`,
-	];
-	const statusText = statusLines.join('\n');
+	}, [editMode, getCanvasCoords, isOutsideCanvas, toGridCoords, setMarkers, setStatusMessage]);
 
 	return (
 		<div className="field-area">
@@ -290,15 +187,14 @@ const Field = memo(({
 					onMouseDown={handleMouseDown}
 					onMouseMove={handleMouseMove}
 					onMouseUp={handleMouseUp}
-					// не используем onMouseLeave, чтобы не обрывать «drag» внезапно
 					onContextMenu={handleCanvasRightClick}
 				/>
 			</Card>
 
+			{/* Под полем отображаются только динамические подсказки */}
 			<Card className="status-card">
 				<Typography variant="body2" className="status-text">
-					{statusText}
-					{statusMessage ? `\n\n${statusMessage}` : ''}
+					{statusMessage}
 				</Typography>
 			</Card>
 		</div>

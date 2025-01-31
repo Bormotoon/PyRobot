@@ -4,10 +4,8 @@
 .code-editor {
     flex: 1 1 25%;
     order: 1;
-
     margin: var(--spacing);
     padding: var(--spacing);
-
     background: var(--background-color-code-editor);
     color: var(--text-color-code-editor);
     display: flex;
@@ -36,112 +34,106 @@
     min-height: 0;
 }
 
-/* Блок с кнопками под редактором */
+/* Панель управления: кнопки в одну строку */
 .editor-controls {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
+    justify-content: space-around;
     gap: var(--spacing);
     margin-top: var(--spacing);
 }
 
-/* Масштабируемые кнопки (как в ControlPanel) */
+/* Кнопки управления (только иконки) */
 .editor-button {
     display: flex;
     align-items: center;
-    justify-content: flex-start;
-    width: 100%;
-
-    /* Масштабируемый шрифт:
-       от 12px до 16px, при этом используем 2vw для серединки */
-    font-size: clamp(12px, 2vw, 16px);
-
-    /* Не переносим текст, обрезаем при нехватке места */
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-
+    justify-content: center;
+    /* Размер кнопки можно регулировать по необходимости */
+    width: 40px;
+    height: 40px;
     color: #fff;
     border: none;
     border-radius: var(--small-border-radius);
     box-shadow: var(--button-box-shadow);
     cursor: pointer;
     transition: background-color 0.2s, opacity 0.2s;
-
-    /* Отступы внутри кнопки, отступ снизу/сверху */
-    padding: var(--spacing);
-    margin: 0; /* можем регулировать в .editor-controls, где gap */
-
-    min-height: 40px;
-    font-weight: bold;
 }
 
-/* Ховер-эффект */
+/* Ховер-эффект для кнопок */
 .editor-button:hover {
     opacity: 0.9;
 }
 
 /* Масштабируемые иконки внутри кнопок */
 .editor-button .MuiSvgIcon-root {
-    /* Например, от 16px до 22px */
     font-size: clamp(16px, 3vw, 22px);
-    margin-right: var(--spacing);
 }
 
-/* Prism-token: структурные */
+/* Блок статуса (перенесён из Field) */
+/* Можно использовать существующие стили .status-card и .status-text */
+.status-card {
+    align-self: stretch;
+    margin-top: var(--spacing);
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow);
+}
+
+.status-text {
+    white-space: pre-line;
+    min-height: 80px;
+    max-height: 120px;
+    overflow-y: auto;
+    padding: var(--spacing);
+    border-radius: var(--small-border-radius);
+    background: #fefefe;
+    line-height: 1.3;
+}
+
+/* Prism-token стили остаются без изменений */
+
 .code-editor .token.keyword-struct {
     color: #0d58ee;
     font-weight: bold;
 }
 
-/* Prism-token: типы (type) */
 .code-editor .token.keyword-type {
-    color: #0451a5; /* Синий */
+    color: #0451a5;
     font-weight: bold;
 }
 
-/* Prism-token: булевы / логика */
 .code-editor .token.keyword-bool {
-    color: #008080; /* Тёмно-бирюзовый */
+    color: #008080;
     font-weight: bold;
 }
 
-/* Prism-token: ввод/вывод */
 .code-editor .token.keyword-io {
-    color: #995c00; /* Коричневатый */
+    color: #995c00;
     font-weight: bold;
 }
 
-/* Prism-token: управление потоком (flow) */
 .code-editor .token.keyword-flow {
-    color: #9c27b0; /* Фиолетовый */
+    color: #9c27b0;
     font-weight: bold;
 }
 
-/* Комментарии */
 .code-editor .token.comment {
     color: #7d8590;
     font-style: italic;
 }
 
-/* Строки */
 .code-editor .token.string {
     color: #007c9c;
 }
 
-/* Числа */
 .code-editor .token.number {
     color: #0e76c8;
 }
 
-/* Операторы */
 .code-editor .token.operator {
     color: #24292e;
 }
 
-/* Команды Робота */
 .code-editor .token.robot-command {
-    color: #008000; /* зелёный */
+    color: #008000;
     font-weight: bold;
-
-
 }

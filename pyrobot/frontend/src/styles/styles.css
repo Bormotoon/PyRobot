@@ -23,14 +23,9 @@
 }
 
 /* 2) Базовые ресеты */
-html, body {
-    height: 100%;
-    margin: 0;
-    padding: 0;
-}
-
+html,
 body {
-    font-family: Arial, sans-serif;
+    height: 100%;
 }
 
 *,
@@ -41,9 +36,13 @@ body {
     padding: 0;
 }
 
-/* 3) Общие стили для крупных контейнеров, карточек */
+body {
+    font-family: Arial, sans-serif;
+}
+
+/* 3) Общие стили для контейнеров и карточек */
+/* Общие свойства для всех блоков */
 .container,
-.app-container,
 .card,
 .field-card,
 .status-card {
@@ -52,6 +51,7 @@ body {
     box-shadow: var(--box-shadow);
 }
 
+/* Стили карточек (центровка содержимого) */
 .card,
 .field-card,
 .status-card {
@@ -61,7 +61,7 @@ body {
     align-items: center;
 }
 
-/* Контейнер приложения */
+/* Стили контейнера приложения */
 .container {
     display: flex;
     justify-content: center;
@@ -71,14 +71,14 @@ body {
     min-height: 0;
 }
 
-/* Убираем gap и margin, чтобы каждый блок сам регулировал отступы */
+/* Основной контейнер приложения */
 .app-container {
     display: flex;
     flex-direction: row;
     align-items: stretch;
     background-color: var(--background-color-app);
     width: 100%;
-    height: 100%;
+    height: 100vh;
     overflow: hidden;
     min-height: 0;
 }

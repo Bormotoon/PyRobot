@@ -147,7 +147,14 @@ const RobotSimulator = memo(() => {
 		dispatch({type: 'SET_PERMANENT_WALLS', payload: newWalls});
 		const newPos = clampRobotPos(state.robotPos, state.width, state.height);
 		dispatch({type: 'SET_ROBOT_POS', payload: newPos});
-	}, [state.width, state.height]); // Исключили state.robotPos из зависимостей
+	}, [state.width, state.height]); // robotPos не включаем в зависимости
+
+	// Формируем статус для CodeEditor (отображается под кнопками в редакторе)
+	const statusText = [
+		`Позиция робота: (${state.robotPos.x}, ${state.robotPos.y})`,
+		`Маркеров: ${Object.keys(state.markers).length}`,
+		`Раскрашенных клеток: ${state.coloredCells.size}`,
+	].join('\n');
 
 	return (
 		<ThemeProvider theme={theme}>
@@ -160,6 +167,7 @@ const RobotSimulator = memo(() => {
 					onStop={handleStop}
 					onStart={handleStart}
 					onReset={handleReset}
+					statusText={statusText}
 				/>
 
 				<ControlPanel
