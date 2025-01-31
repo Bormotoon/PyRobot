@@ -2,11 +2,9 @@
 
 /* Главный контейнер редактора */
 .code-editor {
-    /* Расположение в сетке (слева) */
     flex: 1 1 25%;
     order: 1;
 
-    /* Единые отступы */
     margin: var(--spacing);
     padding: var(--spacing);
 
@@ -21,7 +19,7 @@
     min-height: 0;
 }
 
-/* React Simple Code Editor */
+/* Сам react-simple-code-editor */
 .code-editor .react-simple-code-editor {
     flex: 1 1 auto;
     width: 100%;
@@ -38,7 +36,7 @@
     min-height: 0;
 }
 
-/* Блок с кнопками */
+/* Блок с кнопками под редактором */
 .editor-controls {
     display: flex;
     flex-direction: column;
@@ -46,25 +44,45 @@
     margin-top: var(--spacing);
 }
 
-/* Подсветка синтаксиса */
-.code-editor .token.keyword {
-    color: #d73a49;
+/* Масштабируемые кнопки (как в ControlPanel) */
+.editor-button {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    width: 100%;
+
+    /* Масштабируемый шрифт:
+       от 12px до 16px, при этом используем 2vw для серединки */
+    font-size: clamp(12px, 2vw, 16px);
+
+    /* Не переносим текст, обрезаем при нехватке места */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+
+    color: #fff;
+    border: none;
+    border-radius: var(--small-border-radius);
+    box-shadow: var(--button-box-shadow);
+    cursor: pointer;
+    transition: background-color 0.2s, opacity 0.2s;
+
+    /* Отступы внутри кнопки, отступ снизу/сверху */
+    padding: var(--spacing);
+    margin: 0; /* можем регулировать в .editor-controls, где gap */
+
+    min-height: 40px;
     font-weight: bold;
 }
 
-.code-editor .token.comment {
-    color: #6a737d;
-    font-style: italic;
+/* Ховер-эффект */
+.editor-button:hover {
+    opacity: 0.9;
 }
 
-.code-editor .token.string {
-    color: #032f62;
-}
-
-.code-editor .token.number {
-    color: #005cc5;
-}
-
-.code-editor .token.operator {
-    color: #24292e;
+/* Масштабируемые иконки внутри кнопок */
+.editor-button .MuiSvgIcon-root {
+    /* Например, от 16px до 22px */
+    font-size: clamp(16px, 3vw, 22px);
+    margin-right: var(--spacing);
 }

@@ -2,6 +2,10 @@ import React, {memo, useCallback} from 'react';
 import {Button, Typography} from '@mui/material';
 import Editor from 'react-simple-code-editor';
 import Prism from 'prismjs';
+
+/* Иконки MUI */
+import {Delete, Stop, PlayArrow, Refresh} from '@mui/icons-material';
+
 import './CodeEditor.css';
 
 /**
@@ -24,6 +28,7 @@ const CodeEditor = memo(({
 	                         onStart,
 	                         onReset
                          }) => {
+
 	// Функция подсветки кода
 	const highlightCode = useCallback((inputCode) => {
 		return Prism.highlight(inputCode, Prism.languages.kumir, 'kumir');
@@ -44,14 +49,15 @@ const CodeEditor = memo(({
 			/>
 
 			<div className="editor-controls">
-				{/* Очистка кода */}
+				{/* Очистить */}
 				<Button
 					variant="contained"
 					color="info"
-					className="control-button"
+					className="editor-button"
 					onClick={onClearCode}
 					fullWidth
 				>
+					<Delete/>
 					Очистить
 				</Button>
 
@@ -59,11 +65,12 @@ const CodeEditor = memo(({
 				<Button
 					variant="contained"
 					color="error"
-					className="control-button"
+					className="editor-button"
 					onClick={onStop}
 					disabled={!isRunning}
 					fullWidth
 				>
+					<Stop/>
 					Стоп
 				</Button>
 
@@ -71,11 +78,12 @@ const CodeEditor = memo(({
 				<Button
 					variant="contained"
 					color="success"
-					className="control-button"
+					className="editor-button"
 					onClick={onStart}
 					disabled={isRunning}
 					fullWidth
 				>
+					<PlayArrow/>
 					Пуск
 				</Button>
 
@@ -83,10 +91,11 @@ const CodeEditor = memo(({
 				<Button
 					variant="outlined"
 					color="warning"
-					className="control-button"
+					className="editor-button"
 					onClick={onReset}
 					fullWidth
 				>
+					<Refresh/>
 					Сброс
 				</Button>
 			</div>
