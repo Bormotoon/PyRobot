@@ -39,15 +39,15 @@
     margin-top: var(--spacing);
 }
 
+/* Сам текст статуса/подсказок */
 .status-text {
-    white-space: pre-line; /* Учитывать \n как переносы */
-    min-height: 80px; /* Чтобы при коротких подсказках место не схлопывалось */
-    max-height: 150px; /* Если подсказка очень длинная, чтобы не растягивалось бесконечно */
-    overflow-y: auto; /* Скролл, если высота > 150px */
-    width: 100%;
+    white-space: pre-line; /* учитывать \n как переносы */
+    min-height: 80px; /* базовая высота, чтобы не прыгало при маленьком тексте */
+    max-height: 120px; /* ограничение сверху, чтобы не растягивать всё поле */
+    overflow-y: auto; /* скролл, если текста больше */
     box-sizing: border-box;
-    line-height: 1.4; /* Чуть увеличим межстрочный интервал для красоты */
     padding: var(--spacing);
     border-radius: var(--small-border-radius);
-    background: #fefefe; /* Например, чуть выделим фон текста, при желании */
+    background: #fefefe; /* светлый фон */
+    line-height: 1.3;
 }
