@@ -86,3 +86,62 @@
     font-size: clamp(16px, 3vw, 22px);
     margin-right: var(--spacing);
 }
+
+/* Prism-token: структурные */
+.code-editor .token.keyword-struct {
+    color: #0d58ee;
+    font-weight: bold;
+}
+
+/* Prism-token: типы (type) */
+.code-editor .token.keyword-type {
+    color: #0451a5; /* Синий */
+    font-weight: bold;
+}
+
+/* Prism-token: булевы / логика */
+.code-editor .token.keyword-bool {
+    color: #008080; /* Тёмно-бирюзовый */
+    font-weight: bold;
+}
+
+/* Prism-token: ввод/вывод */
+.code-editor .token.keyword-io {
+    color: #995c00; /* Коричневатый */
+    font-weight: bold;
+}
+
+/* Prism-token: управление потоком (flow) */
+.code-editor .token.keyword-flow {
+    color: #9c27b0; /* Фиолетовый */
+    font-weight: bold;
+}
+
+/* Комментарии */
+.code-editor .token.comment {
+    color: #7d8590;
+    font-style: italic;
+}
+
+/* Строки */
+.code-editor .token.string {
+    color: #007c9c;
+}
+
+/* Числа */
+.code-editor .token.number {
+    color: #0e76c8;
+}
+
+/* Операторы */
+.code-editor .token.operator {
+    color: #24292e;
+}
+
+/* Команды Робота */
+.code-editor .token.robot-command {
+    color: #008000; /* зелёный */
+    font-weight: bold;
+
+
+}
