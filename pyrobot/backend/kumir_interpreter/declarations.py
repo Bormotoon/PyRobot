@@ -3,6 +3,7 @@
 from constants import ALLOWED_TYPES, МАКСЦЕЛ
 from identifiers import is_valid_identifier
 from safe_eval import safe_eval, get_eval_env
+from file_functions import get_default_output, get_default_input
 
 
 def process_declaration(line, env):
@@ -154,10 +155,11 @@ def process_assignment(line, env):
 def process_output(line, env):
     """
     Обрабатывает команду вывода.
-    Формат: вывод выражение-1, ... , выражение-N
-    Если встречается ключевое слово нс, вставляется перевод строки.
+    Формат: вывод выражение1, ..., выражениеN
+    Если первое выражение – переменная типа файл, то вывод происходит в этот файл,
+    иначе – если задан стандартный вывод (через НАЗНАЧИТЬ ВЫВОД), то запись производится в него.
+    Ключевое слово нс трактуется как переход на новую строку.
     """
-    from safe_eval import safe_eval, get_eval_env
     content = line[5:].strip()
     expressions = [expr.strip() for expr in content.split(",") if expr.strip()]
     eval_env = get_eval_env(env)
@@ -171,4 +173,63 @@ def process_output(line, env):
             except Exception:
                 value = expr
             output_str += str(value)
-    print(output_str)
+    # Если стандартный вывод задан, пишем туда, иначе – печатаем на экран
+    default_out = get_default_output()
+    if default_out is not None:
+        try:
+            default_out.write(output_str)
+            default_out.flush()
+        except Exception as e:
+            print(f"Ошибка записи в файл вывода: {e}")
+    else:
+        print(output_str)
+
+
+def process_input(line, env):
+    """
+    Обрабатывает команду ввода.
+    Формат: ввод выражение1, ..., выражениеN
+    Если стандартный ввод задан (через НАЗНАЧИТЬ ВВОД), читаем из него,
+    иначе – запрашиваем ввод с клавиатуры.
+    Присваивает введённые значения соответствующим переменным.
+    """
+    content = line[4:].strip()
+    targets = [t.strip() for t in content.split(",") if t.strip()]
+    default_in = get_default_input()
+    if default_in is not None:
+        input_str = default_in.read()
+    else:
+        input_str = input("Введите значения для команды 'ввод' (разделенные пробелом): ")
+    values = input_str.split()
+    if len(values) < len(targets):
+        print("Предупреждение: введено меньше значений, чем требуется.")
+    for i, target in enumerate(targets):
+        if target.lower() == "нс":
+            continue
+        if target in env:
+            var_type = env[target]["type"]
+            try:
+                if var_type == "цел":
+                    val = int(values[i])
+                elif var_type == "вещ":
+                    val = float(values[i])
+                elif var_type == "лог":
+                    s = values[i].lower()
+                    if s == "да":
+                        val = True
+                    elif s == "нет":
+                        val = False
+                    else:
+                        val = bool(values[i])
+                elif var_type in {"сим", "лит"}:
+                    val = str(values[i])
+                    if var_type == "сим" and len(val) != 1:
+                        raise Exception("Символьная величина должна быть ровно один символ.")
+                else:
+                    raise Exception(f"Неподдерживаемый тип: {var_type}")
+            except Exception as e:
+                print(f"Ошибка преобразования значения для '{target}': {e}")
+                continue
+            env[target]["value"] = val
+        else:
+            print(f"Переменная '{target}' не объявлена.")
