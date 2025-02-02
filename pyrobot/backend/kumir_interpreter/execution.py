@@ -1,15 +1,17 @@
 # execution.py
 
-from declarations import process_declaration, process_assignment, process_output
+from declarations import process_declaration, process_assignment, process_output, process_input
 from robot_commands import process_robot_command
 from safe_eval import safe_eval, get_eval_env
 from constants import ALLOWED_TYPES
 
 
+# Функция для обработки команд контроля (утв, дано, надо)
 def process_control_command(line, env):
     """
     Обрабатывает команды контроля выполнения: утв, дано, надо.
-    Вычисляет логическое выражение, и если оно ложно, прерывает выполнение алгоритма.
+    Вычисляет логическое выражение (после ключевого слова) и, если результат не является истинным,
+    выбрасывает исключение, прекращающее выполнение текущего алгоритма.
     """
     lower_line = line.lower().strip()
     for keyword in ["утв", "дано", "надо"]:
@@ -20,147 +22,340 @@ def process_control_command(line, env):
                 result = safe_eval(expr, eval_env)
             except Exception as e:
                 raise Exception(f"Ошибка вычисления логического выражения '{expr}': {e}")
-            if isinstance(result, bool):
-                condition = result
-            elif isinstance(result, str):
-                condition = (result.lower() == "да")
-            else:
-                condition = bool(result)
+            # Интерпретируем результат как логическое значение:
+            condition = result if isinstance(result, bool) else (str(result).strip().lower() == "да")
             if not condition:
                 raise Exception(f"Отказ: условие '{expr}' не выполнено (результат: {result}).")
             return True
     return False
 
 
-def process_input(line, env):
+# Функция для обработки конструкции "если ... то ... [иначе ...] все"
+def process_if_block(lines, start_index, env, robot, interpreter):
     """
-    Обрабатывает команду ввода.
-    Формат: ввод выражение1, выражение2, ... , выражениеN
-    Для простоты реализовано интерактивное чтение.
+    Обрабатывает блок конструкции "если-то-[иначе]-все".
+    Возвращает индекс следующей строки после блока.
+    Синтаксис:
+        если условие
+          то серия1
+          [иначе серия2]
+        все
+    Если условие истинно – выполняется серия1, иначе (если есть) серия2.
     """
-    content = line[4:].strip()
-    targets = [t.strip() for t in content.split(",") if t.strip()]
-    input_str = input("Введите значения для команды 'ввод' (разделенные пробелом): ")
-    values = input_str.split()
-    if len(values) < len(targets):
-        print("Предупреждение: введено меньше значений, чем требуется.")
-    for i, target in enumerate(targets):
-        if target.lower() == "нс":
+    n = len(lines)
+    # Получаем условие: строка с "если"
+    cond_line = lines[start_index].strip()
+    if not cond_line.lower().startswith("если"):
+        raise Exception("Блок if должен начинаться со слова 'если'")
+    condition_expr = cond_line[len("если"):].strip()
+    # Ищем строку с "то"
+    i = start_index + 1
+    series1 = []
+    series2 = []
+    found_then = False
+    found_else = False
+    while i < n:
+        line = lines[i].strip()
+        lower_line = line.lower()
+        if lower_line == "все":
+            break
+        elif lower_line.startswith("то") and not found_then:
+            # Начало серии "то"
+            # Если после "то" есть команды на той же строке, добавляем их в series1
+            content = line[len("то"):].strip()
+            if content:
+                series1.append(content)
+            found_then = True
+            i += 1
             continue
-        # Если target — простая переменная
-        if target in env:
-            var_type = env[target]["type"]
-            try:
-                if var_type == "цел":
-                    val = int(values[i])
-                elif var_type == "вещ":
-                    val = float(values[i])
-                elif var_type == "лог":
-                    s = values[i].lower()
-                    if s == "да":
-                        val = True
-                    elif s == "нет":
-                        val = False
-                    else:
-                        val = bool(values[i])
-                elif var_type in {"сим", "лит"}:
-                    val = str(values[i])
-                    if var_type == "сим" and len(val) != 1:
-                        raise Exception("Символьная величина должна быть ровно один символ.")
-                else:
-                    raise Exception(f"Неподдерживаемый тип: {var_type}")
-            except Exception as e:
-                print(f"Ошибка преобразования значения для '{target}': {e}")
-                continue
-            env[target]["value"] = val
+        elif lower_line.startswith("иначе"):
+            found_else = True
+            content = line[len("иначе"):].strip()
+            if content:
+                series2.append(content)
+            i += 1
+            # Далее все команды до "все" относятся к series2
+            while i < n and lines[i].strip().lower() != "все":
+                series2.append(lines[i])
+                i += 1
+            break
         else:
-            # Поддержка ввода для элемента таблицы: a[i] или b[i,j]
-            if "[" in target and target.endswith("]"):
-                import re
-                match = re.match(
-                    r"^([A-Za-zА-Яа-яЁё@_][A-Za-zА-Яа-яЁё0-9@_]*(?:\s+[A-Za-zА-Яа-яЁё@_][A-Za-zА-Яа-яЁё0-9@_]*)*)\[(.+)\]$",
-                    target)
-                if not match:
-                    print(f"Неверный синтаксис для ввода: {target}")
-                    continue
-                var_name = match.group(1).strip()
-                indices_expr = match.group(2).strip()
-                index_tokens = [token.strip() for token in indices_expr.split(",")]
-                try:
-                    indices = tuple(safe_eval(token, get_eval_env(env)) for token in index_tokens)
-                except Exception as e:
-                    print(f"Ошибка вычисления индексов для '{target}': {e}")
-                    continue
-                if var_name not in env or not env[var_name].get("is_table"):
-                    print(f"Переменная '{var_name}' не объявлена как таблица.")
-                    continue
-                var_type = env[var_name]["type"]
-                try:
-                    if var_type == "цел":
-                        val = int(values[i])
-                    elif var_type == "вещ":
-                        val = float(values[i])
-                    elif var_type == "лог":
-                        s = values[i].lower()
-                        if s == "да":
-                            val = True
-                        elif s == "нет":
-                            val = False
-                        else:
-                            val = bool(values[i])
-                    elif var_type in {"сим", "лит"}:
-                        val = str(values[i])
-                        if var_type == "сим" and len(val) != 1:
-                            raise Exception("Символьная величина должна быть ровно один символ.")
-                    else:
-                        raise Exception(f"Неподдерживаемый тип: {var_type}")
-                except Exception as e:
-                    print(f"Ошибка преобразования значения для '{target}': {e}")
-                    continue
-                if env[var_name]["value"] is None:
-                    env[var_name]["value"] = {}
-                env[var_name]["value"][indices] = val
+            if not found_then:
+                # Если еще не встретили "то", возможно условие написано на нескольких строках
+                condition_expr += " " + line
             else:
-                print(f"Переменная '{target}' не объявлена.")
+                series1.append(line)
+        i += 1
 
-
-def process_algorithm_call(line, env, interpreter):
-    """
-    Проверяет, является ли строка вызовом алгоритма-процедуры.
-    Поддерживаются формы:
-       имя алгоритма-процедуры
-       имя алгоритма-процедуры(список параметров)
-    Для упрощения параметры не обрабатываются.
-    """
-    line = line.strip()
-    if "(" in line:
-        name_part = line.split("(", 1)[0].strip()
+    if i >= n or lines[i].strip().lower() != "все":
+        raise Exception("Отсутствует 'все' для завершения конструкции 'если'")
+    # Вычисляем условие
+    eval_env = get_eval_env(env)
+    try:
+        cond_value = safe_eval(condition_expr, eval_env)
+    except Exception as e:
+        raise Exception(f"Ошибка вычисления условия in 'если': {e}")
+    cond_bool = cond_value if isinstance(cond_value, bool) else (str(cond_value).strip().lower() == "да")
+    # Выполняем соответствующую серию
+    if cond_bool:
+        execute_lines(series1, env, robot, interpreter)
     else:
-        name_part = line
-    if name_part in interpreter.algorithms:
-        alg = interpreter.algorithms[name_part]
-        execute_lines(alg["body"], env, interpreter.robot)
-        return True
-    return False
+        if series2:
+            execute_lines(series2, env, robot, interpreter)
+    return i + 1  # индекс следующей строки после "все"
+
+
+# Функция для обработки конструкции "выбор ... при ... [иначе ...] все"
+def process_выбор_block(lines, start_index, env, robot, interpreter):
+    """
+    Обрабатывает блок конструкции "выбор-при-[иначе]-все".
+    Синтаксис:
+        выбор
+          при условие1 : серия1
+          при условие2 : серия2
+          ...
+          [иначе серияN+1]
+        все
+    Выполняется первая серия, для которой условие истинно; если ни одно условие не истинно, а блок "иначе" присутствует – выполняется она.
+    Возвращает индекс следующей строки после блока.
+    """
+    n = len(lines)
+    i = start_index + 1  # после "выбор"
+    branches = []  # список кортежей (condition_expr, series_lines)
+    else_series = []
+    while i < n:
+        line = lines[i].strip()
+        lower_line = line.lower()
+        if lower_line == "все":
+            break
+        if lower_line.startswith("при"):
+            # Разбиваем строку на условие и серию: "при условие : серия"
+            parts = line.split(":", 1)
+            if len(parts) != 2:
+                raise Exception("Неверный синтаксис ветки 'при': отсутствует двоеточие")
+            cond_part = parts[0].strip()
+            # Удаляем ключевое слово "при"
+            condition_expr = cond_part[len("при"):].strip()
+            series_line = parts[1].strip()
+            # Для простоты считаем, что серия состоит из одной строки (при необходимости можно обрабатывать многострочные блоки)
+            branches.append((condition_expr, [series_line]))
+        elif lower_line.startswith("иначе"):
+            content = line[len("иначе"):].strip()
+            else_series.append(content)
+            # Можно также включить последующие строки до "все" в else_series
+            i += 1
+            while i < n and lines[i].strip().lower() != "все":
+                else_series.append(lines[i])
+                i += 1
+            break
+        else:
+            # Если строка не начинается с "при" или "иначе", можно предположить, что она продолжает предыдущую серию.
+            if branches:
+                branches[-1][1].append(line)
+            else:
+                raise Exception("Неверный синтаксис конструкции 'выбор': ожидается 'при' или 'иначе'")
+        i += 1
+
+    if i >= n or lines[i].strip().lower() != "все":
+        raise Exception("Отсутствует 'все' для завершения конструкции 'выбор'")
+
+    # Теперь последовательно проверяем условия
+    eval_env = get_eval_env(env)
+    executed = False
+    for condition_expr, series in branches:
+        try:
+            cond_value = safe_eval(condition_expr, eval_env)
+        except Exception as e:
+            raise Exception(f"Ошибка вычисления условия в конструкции 'выбор': {e}")
+        cond_bool = cond_value if isinstance(cond_value, bool) else (str(cond_value).strip().lower() == "да")
+        if cond_bool:
+            execute_lines(series, env, robot, interpreter)
+            executed = True
+            break
+    if not executed and else_series:
+        execute_lines(else_series, env, robot, interpreter)
+    return i + 1
+
+
+def execute_lines(lines, env, robot, interpreter=None):
+    """
+    Исполняет список строк (например, тело алгоритма или блока цикла, ветвления и т.д.).
+    Поддерживает:
+      - Циклы:
+          * Цикл "для": начинается со строки, начинающейся с "нц для"
+          * Цикл "пока": начинается с "нц пока"
+          * Цикл "N раз": начинается с "нц" <число> "раз"
+          * Цикл "до тех пор": определяется как блок, завершающийся строкой "кц_при" или "кц при" с условием
+          * Цикл "нц-кц": если ни одно специальное слово не встречается, то считается бесконечным (если не используется "выход")
+      - Команды ветвления: "если" и "выбор"
+      - Прочие команды (обрабатываются функцией execute_line)
+    Если внутри цикла встречается команда "выход", то цикл прерывается.
+    """
+    i = 0
+    n = len(lines)
+    while i < n:
+        line = lines[i].strip()
+        lower_line = line.lower()
+        # Обработка конструкции "если"
+        if lower_line.startswith("если"):
+            i = process_if_block(lines, i, env, robot, interpreter)
+            continue
+        # Обработка конструкции "выбор"
+        if lower_line.startswith("выбор"):
+            i = process_выбор_block(lines, i, env, robot, interpreter)
+            continue
+        # Обработка цикла "нц для"
+        if lower_line.startswith("нц для"):
+            # Пример: нц для i от i1 до i2 [шаг d]
+            tokens = lower_line.split()
+            # Ожидается: нц для <var> от <start> до <end> [шаг <step>]
+            if len(tokens) < 6:
+                raise Exception("Неверный синтаксис цикла 'для'")
+            var = tokens[2]
+            if tokens[3] != "от":
+                raise Exception("Ожидается 'от' в цикле 'для'")
+            start_expr = tokens[4]
+            if tokens[5] != "до":
+                raise Exception("Ожидается 'до' в цикле 'для'")
+            end_expr = tokens[6]
+            step_expr = "1"
+            if len(tokens) > 7:
+                if tokens[7] == "шаг" and len(tokens) > 8:
+                    step_expr = tokens[8]
+                else:
+                    raise Exception("Неверный синтаксис шага в цикле 'для'")
+            try:
+                eval_env = get_eval_env(env)
+                start_val = int(safe_eval(start_expr, eval_env))
+                end_val = int(safe_eval(end_expr, eval_env))
+                step_val = int(safe_eval(step_expr, eval_env))
+            except Exception as e:
+                raise Exception(f"Ошибка вычисления параметров цикла 'для': {e}")
+            # Сохраняем начальное значение параметра цикла
+            env[var] = {"type": "цел", "value": start_val, "kind": "local", "is_table": False}
+            loop_body = []
+            i += 1
+            while i < n and lines[i].strip().lower() != "кц":
+                loop_body.append(lines[i])
+                i += 1
+            if i == n:
+                raise Exception("Отсутствует 'кц' для цикла 'для'")
+            # Выполнение цикла: для i от start до end с шагом step
+            # При положительном шаге, i <= end; при отрицательном, i >= end.
+            current = start_val
+
+            def condition(val):
+                return val <= end_val if step_val > 0 else val >= end_val
+
+            while condition(current):
+                env[var]["value"] = current
+                try:
+                    execute_lines(loop_body, env, robot, interpreter)
+                except Exception as e:
+                    if str(e).startswith("Выход"):
+                        break
+                    else:
+                        raise e
+                current += step_val
+            i += 1  # пропускаем "кц"
+            continue
+        # Обработка цикла "нц пока"
+        if lower_line.startswith("нц пока"):
+            # Формат: нц пока условие
+            condition_expr = line[len("нц пока"):].strip()
+            loop_body = []
+            i += 1
+            while i < n and lines[i].strip().lower() != "кц":
+                loop_body.append(lines[i])
+                i += 1
+            if i == n:
+                raise Exception("Отсутствует 'кц' для цикла 'пока'")
+            while True:
+                eval_env = get_eval_env(env)
+                try:
+                    cond_val = safe_eval(condition_expr, eval_env)
+                except Exception as e:
+                    raise Exception(f"Ошибка вычисления условия цикла 'пока': {e}")
+                cond_bool = cond_val if isinstance(cond_val, bool) else (str(cond_val).strip().lower() == "да")
+                if not cond_bool:
+                    break
+                try:
+                    execute_lines(loop_body, env, robot, interpreter)
+                except Exception as e:
+                    if str(e).startswith("Выход"):
+                        break
+                    else:
+                        raise e
+            i += 1  # пропускаем "кц"
+            continue
+        # Обработка цикла "нц раз" (N раз)
+        if lower_line.startswith("нц"):
+            tokens = lower_line.split()
+            if len(tokens) >= 3 and tokens[2] == "раз":
+                try:
+                    count = int(tokens[1])
+                except Exception as e:
+                    raise Exception(f"Ошибка определения количества повторений в цикле 'N раз': {e}")
+                loop_body = []
+                i += 1
+                while i < n and lines[i].strip().lower() != "кц":
+                    loop_body.append(lines[i])
+                    i += 1
+                if i == n:
+                    raise Exception("Отсутствует 'кц' для цикла 'N раз'")
+                for _ in range(count):
+                    try:
+                        execute_lines(loop_body, env, robot, interpreter)
+                    except Exception as e:
+                        if str(e).startswith("Выход"):
+                            break
+                        else:
+                            raise e
+                i += 1  # пропускаем "кц"
+                continue
+        # Обработка цикла "нц-кц" (бесконечный цикл)
+        if lower_line.startswith("нц") and lower_line == "нц":
+            loop_body = []
+            i += 1
+            while i < n and lines[i].strip().lower() != "кц":
+                loop_body.append(lines[i])
+                i += 1
+            if i == n:
+                raise Exception("Отсутствует 'кц' для бесконечного цикла")
+            while True:
+                try:
+                    execute_lines(loop_body, env, robot, interpreter)
+                except Exception as e:
+                    if str(e).startswith("Выход"):
+                        break
+                    else:
+                        raise e
+            i += 1  # пропускаем "кц"
+            continue
+        # Обработка команды "выход"
+        if lower_line.startswith("выход"):
+            raise Exception("Выход из цикла/алгоритма.")
+        # Если строка начинается с "если" или "выбор", они уже обработаны выше
+        # Для всех остальных команд вызываем функцию execute_line
+        execute_line(line, env, robot, interpreter)
+        i += 1
 
 
 def execute_line(line, env, robot, interpreter=None):
     """
     Исполняет одну строку кода.
-    Обрабатываются:
+    Обрабатывает:
       - Объявления (если строка начинается с одного из ALLOWED_TYPES)
-      - Присваивания (оператор ":=")
-      - Команда вывода (начинается со слова "вывод")
-      - Команда ввода (начинается со слова "ввод")
+      - Присваивания (с оператором ":=")
+      - Команды вывода (начинается со слова "вывод")
+      - Команды ввода (начинается со слова "ввод")
       - Команды контроля (утв, дано, надо)
       - Команды управления роботом
       - Команды управления выполнением: пауза, стоп
-      - Вызовы алгоритмов-процедур
-      - Команда "выход" (для выхода из цикла или алгоритма)
+      - Вызов алгоритмов-процедур (если строка не распознана)
     Если строка не распознана, выводится сообщение.
     """
     lower_line = line.lower().strip()
-
     # Объявления
     for t in ALLOWED_TYPES:
         if lower_line.startswith(t):
@@ -203,7 +398,7 @@ def execute_line(line, env, robot, interpreter=None):
             raise e
         return
 
-    # Команды управления выполнением: пауза и стоп
+    # Команды управления выполнением: пауза, стоп
     if lower_line.startswith("пауза"):
         input("Пауза. Нажмите Enter для продолжения...")
         return
@@ -214,60 +409,30 @@ def execute_line(line, env, robot, interpreter=None):
     if process_robot_command(line, robot):
         return
 
-    # Вызов алгоритма-процедуры (если интерпретатор передан)
-    if interpreter is not None and process_algorithm_call(line, env, interpreter):
-        return
-
-    # Команда "выход" – используется для прерывания цикла или алгоритма
-    if lower_line.startswith("выход"):
-        raise Exception("Выход из цикла/алгоритма.")
+    # Если интерпретатор передан, проверяем вызов алгоритма-процедуры
+    if interpreter is not None:
+        # Допустим, если строка не распознана ни одной из вышеперечисленных, считаем, что это вызов подпрограммы.
+        if process_algorithm_call(line, env, interpreter):
+            return
 
     print(f"Неизвестная команда: {line}")
 
 
-def execute_lines(lines, env, robot, interpreter=None):
+def process_algorithm_call(line, env, interpreter):
     """
-    Исполняет список строк (например, тело алгоритма или тело цикла).
-    Поддерживается конструкция цикла:
-      нц <число> раз
-         ... (тело цикла)
-      кц
-    Если внутри цикла встречается команда "выход", то цикл прерывается.
+    Если строка является вызовом алгоритма-процедуры,
+    выполняет тело соответствующего алгоритма.
+    Поддерживаются вызовы с параметрами (но параметризацию реализуем в упрощённом виде).
+    Возвращает True, если вызов обработан.
     """
-    i = 0
-    while i < len(lines):
-        line = lines[i]
-        lower_line = line.lower().strip()
-        # Обработка цикла: нц ... кц
-        if lower_line.startswith("нц"):
-            tokens = lower_line.split()
-            if len(tokens) < 3 or tokens[2] != "раз":
-                raise Exception("Неверный синтаксис цикла. Ожидается: нц <число> раз")
-            try:
-                count = int(tokens[1])
-            except:
-                raise Exception("Неверное число повторений в цикле.")
-            loop_body = []
-            i += 1
-            while i < len(lines) and lines[i].lower().strip() != "кц":
-                loop_body.append(lines[i])
-                i += 1
-            if i == len(lines):
-                raise Exception("Отсутствует команда 'кц' для завершения цикла.")
-            i += 1  # пропускаем "кц"
-            for j in range(count):
-                try:
-                    execute_lines(loop_body, env, robot, interpreter)
-                except Exception as e:
-                    # Если команда "выход" вызвала исключение, прекращаем выполнение цикла
-                    if str(e).startswith("Выход"):
-                        break
-                    else:
-                        raise e
-            continue
-        # Если команда "выход" вне цикла
-        if lower_line.startswith("выход"):
-            raise Exception("Выход из алгоритма.")
-        # Обработка прочих строк
-        execute_line(line, env, robot, interpreter)
-        i += 1
+    line = line.strip()
+    # Если есть круглые скобки, берем имя до скобок
+    if "(" in line:
+        name_part = line.split("(", 1)[0].strip()
+    else:
+        name_part = line
+    if name_part in interpreter.algorithms:
+        alg = interpreter.algorithms[name_part]
+        execute_lines(alg["body"], env, interpreter.robot, interpreter)
+        return True
+    return False
