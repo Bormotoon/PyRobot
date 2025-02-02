@@ -3,7 +3,7 @@
 import math
 import re
 
-from pyrobot.backend.kumir_interpreter.robot_interpreter import KumirInterpreter  # Исполнитель "Робот"
+from kumir_interpreter.robot_interpreter import KumirInterpreter
 
 # ---------------------------------------------------------------------
 # Константы и настройки

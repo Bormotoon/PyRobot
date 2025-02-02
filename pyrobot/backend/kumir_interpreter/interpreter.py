@@ -1,8 +1,8 @@
 # interpreter.py
 
-from preprocessing import preprocess_code, separate_sections, parse_algorithm_header
-from execution import execute_lines
-from robot_interpreter import KumirInterpreter
+from .preprocessing import preprocess_code, separate_sections, parse_algorithm_header
+from .execution import execute_lines
+from .robot_interpreter import KumirInterpreter
 
 
 class KumirLanguageInterpreter:

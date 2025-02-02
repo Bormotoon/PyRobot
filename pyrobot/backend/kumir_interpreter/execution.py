@@ -1,9 +1,9 @@
 # execution.py
 
-from declarations import process_declaration, process_assignment, process_output, process_input
-from robot_commands import process_robot_command
-from safe_eval import safe_eval, get_eval_env
-from constants import ALLOWED_TYPES
+from .declarations import process_declaration, process_assignment, process_output, process_input
+from .robot_commands import process_robot_command
+from .safe_eval import safe_eval, get_eval_env
+from .constants import ALLOWED_TYPES
 
 
 # Функция для обработки команд контроля (утв, дано, надо)

@@ -1,9 +1,9 @@
 # declarations.py
 
-from constants import ALLOWED_TYPES, МАКСЦЕЛ
-from identifiers import is_valid_identifier
-from safe_eval import safe_eval, get_eval_env
-from file_functions import get_default_output, get_default_input
+from .constants import ALLOWED_TYPES, МАКСЦЕЛ
+from .identifiers import is_valid_identifier
+from .safe_eval import safe_eval, get_eval_env
+from .file_functions import get_default_output, get_default_input
 
 
 def process_declaration(line, env):

@@ -1,7 +1,7 @@
 # identifiers.py
 
 import re
-from constants import RESERVED_KEYWORDS
+from .constants import RESERVED_KEYWORDS
 
 
 def is_valid_identifier(identifier, var_type):

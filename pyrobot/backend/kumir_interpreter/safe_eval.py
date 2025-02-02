@@ -1,24 +1,24 @@
 # safe_eval.py (обновленный фрагмент)
 
 import math
-from identifiers import convert_hex_constants
-from builtins import цел_в_лит, вещ_в_лит, лит_в_вещ, лит_в_цел, Цел, Вещ, Лог
-from math_functions import (
+from .identifiers import convert_hex_constants
+from .builtins import цел_в_лит, вещ_в_лит, лит_в_вещ, лит_в_цел, Цел, Вещ, Лог
+from .math_functions import (
     sqrt, abs_val, iabs, sign,
     sin_val, cos_val, tg, ctg, arcsin_val, arccos_val, arctg, arcctg,
     ln, lg, exp_val,
     min_val, max_val, imin, imax, div, mod, int_part,
     rnd, rand, irnd, irand, МАКСЦЕЛ, МАКСВЕЩ
 )
-from text_functions import длин, код, юникод, символ, юнисимвол
+from .text_functions import длин, код, юникод, символ, юнисимвол
 
-from string_utils import (
+from .string_utils import (
     верхний_регистр, нижний_регистр,
     позиция, поз, позиция_после, поз_после,
     вставить, заменить, удалить
 )
 
-from file_functions import (
+from .file_functions import (
     открыть_на_чтение, открыть_на_запись, открыть_на_добавление, закрыть,
     начать_чтение, конец_файла, есть_данные,
     установить_кодировку, можно_открыть_на_чтение, можно_открыть_на_запись,
@@ -26,7 +26,7 @@ from file_functions import (
     полный_путь, РАБОЧИЙ_КАТАЛОГ, КАТАЛОГ_ПРОГРАММЫ,
     НАЗНАЧИТЬ_ВВОД, НАЗНАЧИТЬ_ВЫВОД, консоль
 )
-from system_functions import ждать, время  # новый импорт
+from .system_functions import ждать, время  # новый импорт
 
 
 def safe_eval(expr, eval_env):
