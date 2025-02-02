@@ -1,5 +1,5 @@
 // ControlPanel.jsx
-import React, {memo, useCallback, useRef} from 'react';
+import React, {memo, useCallback, useRef, useState} from 'react';
 import {Button, Card, CardContent, CardHeader, Grid} from '@mui/material';
 import {
 	Add,
@@ -18,6 +18,9 @@ import {
 } from '@mui/icons-material';
 import {getHint} from '../hints';
 import './ControlPanel.css'; // Стили с .control-panel и .control-button
+
+// Импорт компонента диалога с инструкцией
+import HelpDialog from '../Help/HelpDialog';
 
 const ControlPanel = memo(({
 	                           robotPos,
@@ -40,6 +43,8 @@ const ControlPanel = memo(({
 	                           setStatusMessage,
                            }) => {
 	const fileInputRef = useRef(null);
+	// Состояние для открытия/закрытия диалога помощи
+	const [helpOpen, setHelpOpen] = useState(false);
 
 	const moveRobot = useCallback((direction) => {
 		setRobotPos((prevPos) => {
@@ -271,213 +276,218 @@ const ControlPanel = memo(({
 	};
 
 	return (
-		<Card className="control-panel">
-			<CardHeader title="Управление"/>
-			<CardContent>
-				<Grid container spacing={2}>
-					{/* Кнопки направления */}
-					<Grid item xs={12} style={{textAlign: 'center'}}>
-						<Button
-							onClick={() => moveRobot('up')}
-							color="primary"
-							variant="contained"
-							className="control-button"
-							aria-label="Вверх"
-						>
-							<ArrowUpward/>
-							Вверх
-						</Button>
-					</Grid>
+		<>
+			<Card className="control-panel">
+				<CardHeader title="Управление"/>
+				<CardContent>
+					<Grid container spacing={2}>
+						{/* Кнопки направления */}
+						<Grid item xs={12} style={{textAlign: 'center'}}>
+							<Button
+								onClick={() => moveRobot('up')}
+								color="primary"
+								variant="contained"
+								className="control-button"
+								aria-label="Вверх"
+							>
+								<ArrowUpward/>
+								Вверх
+							</Button>
+						</Grid>
 
-					<Grid item xs={6} style={{textAlign: 'right'}}>
-						<Button
-							onClick={() => moveRobot('left')}
-							color="primary"
-							variant="contained"
-							className="control-button"
-							aria-label="Влево"
-						>
-							<ArrowBack/>
-							Влево
-						</Button>
-					</Grid>
-					<Grid item xs={6} style={{textAlign: 'left'}}>
-						<Button
-							onClick={() => moveRobot('right')}
-							color="primary"
-							variant="contained"
-							className="control-button"
-							aria-label="Вправо"
-						>
-							<ArrowForward/>
-							Вправо
-						</Button>
-					</Grid>
+						<Grid item xs={6} style={{textAlign: 'right'}}>
+							<Button
+								onClick={() => moveRobot('left')}
+								color="primary"
+								variant="contained"
+								className="control-button"
+								aria-label="Влево"
+							>
+								<ArrowBack/>
+								Влево
+							</Button>
+						</Grid>
+						<Grid item xs={6} style={{textAlign: 'left'}}>
+							<Button
+								onClick={() => moveRobot('right')}
+								color="primary"
+								variant="contained"
+								className="control-button"
+								aria-label="Вправо"
+							>
+								<ArrowForward/>
+								Вправо
+							</Button>
+						</Grid>
 
-					<Grid item xs={12} style={{textAlign: 'center'}}>
-						<Button
-							onClick={() => moveRobot('down')}
-							color="primary"
-							variant="contained"
-							className="control-button"
-							aria-label="Вниз"
-						>
-							<ArrowDownward/>
-							Вниз
-						</Button>
-					</Grid>
+						<Grid item xs={12} style={{textAlign: 'center'}}>
+							<Button
+								onClick={() => moveRobot('down')}
+								color="primary"
+								variant="contained"
+								className="control-button"
+								aria-label="Вниз"
+							>
+								<ArrowDownward/>
+								Вниз
+							</Button>
+						</Grid>
 
-					{/* Маркеры */}
-					<Grid item xs={6}>
-						<Button
-							onClick={putMarker}
-							color="success"
-							variant="contained"
-							className="control-button"
-							aria-label="Положить маркер"
-						>
-							<AddLocation style={{marginRight: '8px'}}/>
-							Положить маркер
-						</Button>
-					</Grid>
-					<Grid item xs={6}>
-						<Button
-							onClick={pickMarker}
-							color="error"
-							variant="contained"
-							className="control-button"
-							aria-label="Поднять маркер"
-						>
-							<DeleteOutline style={{marginRight: '8px'}}/>
-							Поднять маркер
-						</Button>
-					</Grid>
+						{/* Маркеры */}
+						<Grid item xs={6}>
+							<Button
+								onClick={putMarker}
+								color="success"
+								variant="contained"
+								className="control-button"
+								aria-label="Положить маркер"
+							>
+								<AddLocation style={{marginRight: '8px'}}/>
+								Положить маркер
+							</Button>
+						</Grid>
+						<Grid item xs={6}>
+							<Button
+								onClick={pickMarker}
+								color="error"
+								variant="contained"
+								className="control-button"
+								aria-label="Поднять маркер"
+							>
+								<DeleteOutline style={{marginRight: '8px'}}/>
+								Поднять маркер
+							</Button>
+						</Grid>
 
-					{/* Покраска / Очистка клетки */}
-					<Grid item xs={6}>
-						<Button
-							onClick={paintCell}
-							color="warning"
-							variant="contained"
-							className="control-button"
-							aria-label="Покрасить"
-						>
-							<Brush style={{marginRight: '8px'}}/>
-							Покрасить
-						</Button>
-					</Grid>
-					<Grid item xs={6}>
-						<Button
-							onClick={clearCell}
-							color="info"
-							variant="contained"
-							className="control-button"
-							aria-label="Очистить"
-						>
-							<Clear style={{marginRight: '8px'}}/>
-							Очистить
-						</Button>
-					</Grid>
+						{/* Покраска / Очистка клетки */}
+						<Grid item xs={6}>
+							<Button
+								onClick={paintCell}
+								color="warning"
+								variant="contained"
+								className="control-button"
+								aria-label="Покрасить"
+							>
+								<Brush style={{marginRight: '8px'}}/>
+								Покрасить
+							</Button>
+						</Grid>
+						<Grid item xs={6}>
+							<Button
+								onClick={clearCell}
+								color="info"
+								variant="contained"
+								className="control-button"
+								aria-label="Очистить"
+							>
+								<Clear style={{marginRight: '8px'}}/>
+								Очистить
+							</Button>
+						</Grid>
 
-					{/* Режим рисования */}
-					<Grid item xs={12}>
-						<Button
-							onClick={toggleEditMode}
-							color="secondary"
-							variant="contained"
-							className="control-button"
-							aria-label="Тоггл Режим Рисования"
-						>
-							<Edit style={{marginRight: '8px'}}/>
-							{editMode ? 'Выключить Режим рисования' : 'Включить Режим рисования'}
-						</Button>
-					</Grid>
+						{/* Режим рисования */}
+						<Grid item xs={12}>
+							<Button
+								onClick={toggleEditMode}
+								color="secondary"
+								variant="contained"
+								className="control-button"
+								aria-label="Тоггл Режим Рисования"
+							>
+								<Edit style={{marginRight: '8px'}}/>
+								{editMode ? 'Выключить Режим рисования' : 'Включить Режим рисования'}
+							</Button>
+						</Grid>
 
-					{/* Изменение размеров поля */}
-					<Grid item xs={6}>
-						<Button
-							onClick={increaseWidth}
-							color="primary"
-							variant="contained"
-							className="control-button"
-							aria-label="Поле шире"
-						>
-							<Add style={{marginRight: '8px'}}/>
-							Поле шире
-						</Button>
-					</Grid>
-					<Grid item xs={6}>
-						<Button
-							onClick={decreaseWidth}
-							color="primary"
-							variant="contained"
-							className="control-button"
-							aria-label="Поле уже"
-						>
-							<Remove style={{marginRight: '8px'}}/>
-							Поле уже
-						</Button>
-					</Grid>
+						{/* Изменение размеров поля */}
+						<Grid item xs={6}>
+							<Button
+								onClick={increaseWidth}
+								color="primary"
+								variant="contained"
+								className="control-button"
+								aria-label="Поле шире"
+							>
+								<Add style={{marginRight: '8px'}}/>
+								Поле шире
+							</Button>
+						</Grid>
+						<Grid item xs={6}>
+							<Button
+								onClick={decreaseWidth}
+								color="primary"
+								variant="contained"
+								className="control-button"
+								aria-label="Поле уже"
+							>
+								<Remove style={{marginRight: '8px'}}/>
+								Поле уже
+							</Button>
+						</Grid>
 
-					<Grid item xs={6}>
-						<Button
-							onClick={increaseHeight}
-							color="primary"
-							variant="contained"
-							className="control-button"
-							aria-label="Поле выше"
-						>
-							<Add style={{marginRight: '8px'}}/>
-							Поле выше
-						</Button>
-					</Grid>
-					<Grid item xs={6}>
-						<Button
-							onClick={decreaseHeight}
-							color="primary"
-							variant="contained"
-							className="control-button"
-							aria-label="Поле ниже"
-						>
-							<Remove style={{marginRight: '8px'}}/>
-							Поле ниже
-						</Button>
-					</Grid>
+						<Grid item xs={6}>
+							<Button
+								onClick={increaseHeight}
+								color="primary"
+								variant="contained"
+								className="control-button"
+								aria-label="Поле выше"
+							>
+								<Add style={{marginRight: '8px'}}/>
+								Поле выше
+							</Button>
+						</Grid>
+						<Grid item xs={6}>
+							<Button
+								onClick={decreaseHeight}
+								color="primary"
+								variant="contained"
+								className="control-button"
+								aria-label="Поле ниже"
+							>
+								<Remove style={{marginRight: '8px'}}/>
+								Поле ниже
+							</Button>
+						</Grid>
 
-					{/* Помощь / Импорт */}
-					<Grid item xs={6}>
-						<Button
-							onClick={() => setStatusMessage(getHint('help', editMode))}
-							color="info"
-							variant="contained"
-							className="control-button"
-							aria-label="Помощь"
-						>
-							<HelpOutline style={{marginRight: '8px'}}/>
-							Помощь
-						</Button>
+						{/* Помощь / Импорт */}
+						<Grid item xs={6}>
+							<Button
+								// Вместо установки статусного сообщения, открываем диалог помощи
+								onClick={() => setHelpOpen(true)}
+								color="info"
+								variant="contained"
+								className="control-button"
+								aria-label="Помощь"
+							>
+								<HelpOutline style={{marginRight: '8px'}}/>
+								Помощь
+							</Button>
+						</Grid>
+						<Grid item xs={6}>
+							<Button
+								onClick={handleImportField}
+								color="secondary"
+								variant="contained"
+								className="control-button"
+								aria-label="Импорт .fil"
+							>
+								<FileUpload style={{marginRight: '8px'}}/>
+								Импорт .fil
+							</Button>
+							<input
+								type="file"
+								ref={fileInputRef}
+								style={{display: 'none'}}
+								onChange={handleFileChange}
+							/>
+						</Grid>
 					</Grid>
-					<Grid item xs={6}>
-						<Button
-							onClick={handleImportField}
-							color="secondary"
-							variant="contained"
-							className="control-button"
-							aria-label="Импорт .fil"
-						>
-							<FileUpload style={{marginRight: '8px'}}/>
-							Импорт .fil
-						</Button>
-						<input
-							type="file"
-							ref={fileInputRef}
-							style={{display: 'none'}}
-							onChange={handleFileChange}
-						/>
-					</Grid>
-				</Grid>
-			</CardContent>
-		</Card>
+				</CardContent>
+			</Card>
+			{/* Диалог помощи */}
+			<HelpDialog open={helpOpen} onClose={() => setHelpOpen(false)}/>
+		</>
 	);
 });
 
