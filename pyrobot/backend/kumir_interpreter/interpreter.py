@@ -1,7 +1,7 @@
 # interpreter.py
 
 from preprocessing import preprocess_code, separate_sections, parse_algorithm_header
-from execution import execute_line
+from execution import execute_lines
 from robot_interpreter import KumirInterpreter
 
 
@@ -39,13 +39,13 @@ class KumirLanguageInterpreter:
 
     def execute_introduction(self):
         """Исполняет вступление (команды до первого алгоритма)."""
-        for line in self.introduction:
-            execute_line(line, self.env, self.robot)
+        from execution import execute_lines
+        execute_lines(self.introduction, self.env, self.robot, self)
 
     def execute_algorithm(self, algorithm):
         """Исполняет тело алгоритма (строки между 'нач' и 'кон')."""
-        for line in algorithm["body"]:
-            execute_line(line, self.env, self.robot)
+        from execution import execute_lines
+        execute_lines(algorithm["body"], self.env, self.robot, self)
 
     def interpret(self):
         """Полная интерпретация программы: парсинг, исполнение вступления и основного алгоритма."""
@@ -53,4 +53,5 @@ class KumirLanguageInterpreter:
         self.execute_introduction()
         print("Выполнение основного алгоритма:")
         self.execute_algorithm(self.main_algorithm)
+        # Результат – обновленное окружение и текущее состояние робота.
         return {"env": self.env, "robot": self.robot.robot_pos}

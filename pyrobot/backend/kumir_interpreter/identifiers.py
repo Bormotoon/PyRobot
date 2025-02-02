@@ -20,7 +20,7 @@ def is_valid_identifier(identifier, var_type):
         return False
     for word in words:
         if word.lower() in RESERVED_KEYWORDS:
-            # Для логических величин допустимо встраивание "не" (не должно быть первым)
+            # Для логических величин допустимо встраивание "не", если оно не первое
             if var_type == "лог" and word.lower() == "не" and word != words[0]:
                 continue
             return False
@@ -32,6 +32,6 @@ def is_valid_identifier(identifier, var_type):
 def convert_hex_constants(expr):
     """
     Заменяет шестнадцатеричные константы, начинающиеся с '$', на формат, понятный Python.
-    Например, '$100' -> '0x100'
+    Например: '$100' -> '0x100'
     """
     return re.sub(r'\$(?P<hex>[A-Fa-f0-9]+)', r'0x\g<hex>', expr)
