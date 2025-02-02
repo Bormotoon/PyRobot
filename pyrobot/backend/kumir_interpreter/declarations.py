@@ -152,13 +152,14 @@ def process_assignment(line, env):
     env[left]["value"] = value
 
 
-def process_output(line, env):
+def process_output(line, env, interpreter=None):
     """
     Обрабатывает команду вывода.
     Формат: вывод выражение1, ..., выражениеN
     Если первое выражение – переменная типа файл, то вывод происходит в этот файл,
     иначе – если задан стандартный вывод (через НАЗНАЧИТЬ ВЫВОД), то запись производится в него.
-    Ключевое слово нс трактуется как переход на новую строку.
+    Ключевое слово нс трактуется как перевод на новую строку.
+    Если передан параметр interpreter, вывод добавляется в его буфер (интерpreter.output).
     """
     content = line[5:].strip()
     expressions = [expr.strip() for expr in content.split(",") if expr.strip()]
@@ -173,7 +174,6 @@ def process_output(line, env):
             except Exception:
                 value = expr
             output_str += str(value)
-    # Если стандартный вывод задан, пишем туда, иначе – печатаем на экран
     default_out = get_default_output()
     if default_out is not None:
         try:
@@ -181,6 +181,8 @@ def process_output(line, env):
             default_out.flush()
         except Exception as e:
             print(f"Ошибка записи в файл вывода: {e}")
+    elif interpreter is not None:
+        interpreter.output += output_str + "\n"
     else:
         print(output_str)
 

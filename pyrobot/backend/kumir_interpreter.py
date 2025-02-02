@@ -3,7 +3,7 @@
 import math
 import re
 
-from kumir_interpreter.robot_interpreter import KumirInterpreter
+from .kumir_interpreter.robot_interpreter import KumirInterpreter
 
 # ---------------------------------------------------------------------
 # Константы и настройки

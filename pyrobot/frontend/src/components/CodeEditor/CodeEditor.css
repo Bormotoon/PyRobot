@@ -137,3 +137,21 @@
     color: #008000;
     font-weight: bold;
 }
+
+.console-card {
+    margin-top: var(--spacing);
+    padding: var(--spacing);
+    background: #fefefe;
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow);
+    min-height: 100px; /* Устанавливаем минимальную высоту */
+    max-height: 300px; /* Максимальная высота, если требуется */
+    overflow-y: auto; /* Вертикальная прокрутка, если содержимого больше */
+}
+
+.console-text {
+    font-family: var(--font-family-monospace);
+    font-size: 14px;
+    white-space: pre-wrap;
+    word-break: break-all;
+}

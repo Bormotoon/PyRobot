@@ -3,7 +3,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import logging
-from kumir_interpreter.interpreter import KumirLanguageInterpreter  # Импорт нового интерпретатора
+from pyrobot.backend.kumir_interpreter.interpreter import KumirLanguageInterpreter  # Импорт нового интерпретатора
 
 app = Flask(__name__)
 CORS(app, resources={
@@ -28,17 +28,15 @@ def execute_code():
         return jsonify({'success': False, 'message': 'Код не предоставлен.'}), 400
 
     try:
-        # Создаем новый экземпляр интерпретатора языка Кумир для каждого запроса
+        # Создаем новый экземпляр интерпретатора для каждого запроса
         interpreter = KumirLanguageInterpreter(code)
         result = interpreter.interpret()
         logger.info("Код выполнен успешно.")
         logger.debug(f"Результат: {result}")
-        # Ожидаем, что результат содержит нужные поля, например:
-        # { 'env': ..., 'robotPos': ..., 'walls': ..., 'markers': ..., 'coloredCells': ... }
         return jsonify({
             'success': True,
             'message': 'Код выполнен успешно.',
-            **result
+            **result  # result содержит поля: env, robot, output (и, при необходимости, другие)
         }), 200
 
     except Exception as e:

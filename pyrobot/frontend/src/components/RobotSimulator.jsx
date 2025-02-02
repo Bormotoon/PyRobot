@@ -1,3 +1,5 @@
+// RobotSimulator.jsx
+
 import React, {memo, useCallback, useEffect, useReducer, useRef} from 'react';
 import {ThemeProvider} from '@mui/material/styles';
 import CodeEditor from './CodeEditor/CodeEditor';
@@ -10,6 +12,7 @@ const initialState = {
 	code: `использовать Робот\nалг\nнач\n  вправо\n  вниз\n  влево\n  вверх\n  закрасить\nкон`,
 	isRunning: false,
 	statusMessage: getHint('initial'),
+	consoleOutput: "", // новое свойство для вывода сервера
 	width: 7,
 	height: 7,
 	cellSize: 50,
@@ -29,6 +32,8 @@ function reducer(state, action) {
 			return {...state, isRunning: action.payload};
 		case 'SET_STATUS_MESSAGE':
 			return {...state, statusMessage: action.payload};
+		case 'SET_CONSOLE_OUTPUT':
+			return {...state, consoleOutput: action.payload};
 		case 'SET_WIDTH':
 			return {...state, width: action.payload};
 		case 'SET_HEIGHT':
@@ -121,10 +126,29 @@ const RobotSimulator = memo(() => {
 			return;
 		}
 		dispatch({type: 'SET_IS_RUNNING', payload: true});
-		setTimeout(() => {
-			dispatch({type: 'SET_IS_RUNNING', payload: false});
-			dispatch({type: 'SET_STATUS_MESSAGE', payload: 'Код (демо) выполнен успешно!'});
-		}, 800);
+
+		// Отправляем код на сервер для исполнения
+		fetch('http://localhost:5000/execute', {
+			method: 'POST',
+			headers: {'Content-Type': 'application/json'},
+			body: JSON.stringify({code: state.code})
+		})
+			.then(response => response.json())
+			.then(data => {
+				if (data.success) {
+					dispatch({type: 'SET_STATUS_MESSAGE', payload: 'Код выполнен успешно.'});
+					dispatch({type: 'SET_CONSOLE_OUTPUT', payload: data.output || ""});
+				} else {
+					dispatch({type: 'SET_STATUS_MESSAGE', payload: 'Ошибка: ' + data.message});
+					dispatch({type: 'SET_CONSOLE_OUTPUT', payload: ""});
+				}
+				dispatch({type: 'SET_IS_RUNNING', payload: false});
+			})
+			.catch(error => {
+				dispatch({type: 'SET_STATUS_MESSAGE', payload: 'Ошибка выполнения запроса.'});
+				dispatch({type: 'SET_CONSOLE_OUTPUT', payload: ""});
+				dispatch({type: 'SET_IS_RUNNING', payload: false});
+			});
 	}, [state.code]);
 
 	const handleReset = useCallback(() => {
@@ -140,6 +164,7 @@ const RobotSimulator = memo(() => {
 		});
 		dispatch({type: 'SET_IS_RUNNING', payload: false});
 		dispatch({type: 'SET_STATUS_MESSAGE', payload: 'Симулятор сброшен (демо).'});
+		dispatch({type: 'SET_CONSOLE_OUTPUT', payload: ""});
 	}, []);
 
 	useEffect(() => {
@@ -147,9 +172,9 @@ const RobotSimulator = memo(() => {
 		dispatch({type: 'SET_PERMANENT_WALLS', payload: newWalls});
 		const newPos = clampRobotPos(state.robotPos, state.width, state.height);
 		dispatch({type: 'SET_ROBOT_POS', payload: newPos});
-	}, [state.width, state.height]); // robotPos не включаем в зависимости
+	}, [state.width, state.height]);
 
-	// Формируем статус для CodeEditor (отображается под кнопками в редакторе)
+	// Формируем статус для CodeEditor (например, позиция робота, маркеры и т.д.)
 	const statusText = [
 		`Позиция робота: (${state.robotPos.x}, ${state.robotPos.y})`,
 		`Маркеров: ${Object.keys(state.markers).length}`,
@@ -168,6 +193,7 @@ const RobotSimulator = memo(() => {
 					onStart={handleStart}
 					onReset={handleReset}
 					statusText={statusText}
+					consoleOutput={state.consoleOutput}  // Передаем вывод сервера для отображения в консоли
 				/>
 
 				<ControlPanel

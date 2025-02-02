@@ -1,6 +1,6 @@
 # main.py
 
-from interpreter import KumirLanguageInterpreter
+from .interpreter import KumirLanguageInterpreter
 
 if __name__ == "__main__":
     sample_code = r'''

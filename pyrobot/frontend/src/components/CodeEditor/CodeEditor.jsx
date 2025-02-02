@@ -1,3 +1,5 @@
+// CodeEditor.jsx
+
 import React, {memo, useCallback} from 'react';
 import {Button, Typography, Card} from '@mui/material';
 import Editor from 'react-simple-code-editor';
@@ -70,7 +72,8 @@ const CodeEditor = memo(({
 	                         onStop,
 	                         onStart,
 	                         onReset,
-	                         statusText  // Передаётся из родителя: строка с позицией, числом маркеров и раскрашенных клеток
+	                         statusText,    // Строка с текущим статусом (например, позиция робота, маркеры и т.д.)
+	                         consoleOutput  // Строка с выводом (ответами сервера)
                          }) => {
 	const highlightCode = useCallback((inputCode) => {
 		return Prism.highlight(inputCode, Prism.languages.kumir, 'kumir');
@@ -90,7 +93,7 @@ const CodeEditor = memo(({
 				className="react-simple-code-editor"
 			/>
 
-			{/* Панель управления: кнопки в одну строку, только иконки */}
+			{/* Панель управления: кнопки */}
 			<div className="editor-controls">
 				<Button
 					variant="contained"
@@ -131,10 +134,17 @@ const CodeEditor = memo(({
 				</Button>
 			</div>
 
-			{/* Под панелью управления – реальный статус */}
+			{/* Статус */}
 			<Card className="status-card">
 				<Typography variant="body2" className="status-text">
 					{statusText}
+				</Typography>
+			</Card>
+
+			{/* Консоль для вывода ответов сервера */}
+			<Card className="console-card">
+				<Typography variant="body2" className="console-text">
+					{consoleOutput}
 				</Typography>
 			</Card>
 		</div>
