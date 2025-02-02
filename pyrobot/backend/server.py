@@ -2,11 +2,8 @@
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import os
-import json
-import sys
 import logging
-from kumir_interpreter import KumirInterpreter, KumirInterpreterError
+from kumir_interpreter.interpreter import KumirLanguageInterpreter  # Импорт нового интерпретатора
 
 app = Flask(__name__)
 CORS(app, resources={
@@ -17,9 +14,6 @@ CORS(app, resources={
 # Настройка логирования
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger('FlaskServer')
-
-# Инициализация интерпретатора
-interpreter = KumirInterpreter()
 
 
 @app.route('/execute', methods=['POST'])
@@ -34,30 +28,19 @@ def execute_code():
         return jsonify({'success': False, 'message': 'Код не предоставлен.'}), 400
 
     try:
-        # Интерпретация кода на языке КУМИР
-        result = interpreter.interpret(code)
+        # Создаем новый экземпляр интерпретатора языка Кумир для каждого запроса
+        interpreter = KumirLanguageInterpreter(code)
+        result = interpreter.interpret()
+        logger.info("Код выполнен успешно.")
+        logger.debug(f"Результат: {result}")
+        # Ожидаем, что результат содержит нужные поля, например:
+        # { 'env': ..., 'robotPos': ..., 'walls': ..., 'markers': ..., 'coloredCells': ... }
+        return jsonify({
+            'success': True,
+            'message': 'Код выполнен успешно.',
+            **result
+        }), 200
 
-        if result['success']:
-            logger.info("Код выполнен успешно.")
-            logger.debug(f"Результат: {result['result']}")
-            return jsonify({
-                'success': True,
-                'message': 'Код выполнен успешно.',
-                'robotPos': interpreter.robot_pos,
-                'walls': list(interpreter.walls),
-                'markers': interpreter.markers,
-                'coloredCells': list(interpreter.colored_cells)
-            }), 200
-        else:
-            logger.error(f"Ошибка интерпретации: {result['message']}")
-            return jsonify({
-                'success': False,
-                'message': result['message']
-            }), 400
-
-    except KumirInterpreterError as e:
-        logger.error(f"Ошибка интерпретатора: {e}")
-        return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
         logger.exception("Неизвестная ошибка при выполнении кода.")
         return jsonify({'success': False, 'message': f'Неизвестная ошибка: {str(e)}'}), 500
@@ -65,8 +48,9 @@ def execute_code():
 
 @app.route('/reset', methods=['POST'])
 def reset_simulator():
-    interpreter.reset()
-    logger.info("Состояние симулятора сброшено.")
+    # В новой парадигме состояние интерпретатора не хранится глобально,
+    # поэтому можно просто вернуть сообщение о сбросе.
+    logger.info("Запрос на сброс симулятора получен. (Глобальное состояние не сохраняется.)")
     return jsonify({'success': True, 'message': 'Симулятор сброшен.'}), 200
 
 
