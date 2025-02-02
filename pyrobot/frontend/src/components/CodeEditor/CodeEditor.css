@@ -28,10 +28,14 @@
     transition: height 0.3s ease;
     background: inherit;
     color: inherit;
-    font-family: var(--font-family-monospace);
+    font-family: 'Roboto Mono', monospace !important;
     font-size: 14px;
-    overflow: auto;
+    overflow-y: auto !important;
     min-height: 0;
+    white-space: pre-wrap !important;
+    word-break: break-all !important;
+    text-align: left !important;
+    box-sizing: border-box !important;
 }
 
 /* Панель управления: кнопки в одну строку */
@@ -76,6 +80,7 @@
     margin-top: var(--spacing);
     border-radius: var(--border-radius);
     box-shadow: var(--box-shadow);
+    min-height: calc(3*1.15em) !important;
 }
 
 .status-text {
@@ -138,20 +143,28 @@
     font-weight: bold;
 }
 
+/* Блок консоли */
+/* Переопределяем стили для блока консоли */
 .console-card {
-    margin-top: var(--spacing);
-    padding: var(--spacing);
-    background: #fefefe;
-    border-radius: var(--border-radius);
-    box-shadow: var(--box-shadow);
-    min-height: 100px; /* Устанавливаем минимальную высоту */
-    max-height: 300px; /* Максимальная высота, если требуется */
-    overflow-y: auto; /* Вертикальная прокрутка, если содержимого больше */
+    margin-top: var(--spacing) !important;
+    padding: var(--spacing) !important;
+    background: #fefefe !important;
+    border-radius: var(--border-radius) !important;
+    box-shadow: var(--box-shadow) !important;
+    max-height: calc(10 * 1.05em) !important; /* Фиксированная максимальная высота ~10 строк */
+    overflow-y: auto !important; /* Вертикальная прокрутка при переполнении */
+    display: block !important;
+    box-sizing: border-box !important;
 }
 
+/* Переопределяем стили для текста консоли */
 .console-text {
-    font-family: var(--font-family-monospace);
-    font-size: 14px;
-    white-space: pre-wrap;
-    word-break: break-all;
+    font-family: 'Roboto Mono', monospace !important; /* Моноширинный шрифт */
+    font-size: 14px !important;
+    white-space: pre-wrap !important;
+    word-break: break-all !important;
+    text-align: left !important; /* Выравнивание по левому краю */
+    padding-left: 1em;
+    padding-right: 1em;
 }
+
