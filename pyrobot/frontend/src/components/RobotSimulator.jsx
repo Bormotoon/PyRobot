@@ -9,7 +9,7 @@ import theme from '../styles/theme'; // Файл с вашей MUI-темой
 import {getHint} from './hints';
 
 const initialState = {
-	code: `использовать Робот\nалг\nнач\n  вправо\n  вниз\n  влево\n  вверх\n  закрасить\nкон`,
+	code: `использовать Робот\nалг\nнач\n  вправо\n  вниз\n  вправо\nкон`,
 	isRunning: false,
 	statusMessage: getHint('initial'),
 	consoleOutput: "", // новое свойство для вывода сервера
@@ -34,20 +34,14 @@ function reducer(state, action) {
 			return {...state, statusMessage: action.payload};
 		case 'SET_CONSOLE_OUTPUT':
 			return {...state, consoleOutput: action.payload};
+		case 'SET_ROBOT_POS':
+			return {...state, robotPos: action.payload};
 		case 'SET_WIDTH':
 			return {...state, width: action.payload};
 		case 'SET_HEIGHT':
 			return {...state, height: action.payload};
 		case 'SET_CELL_SIZE':
 			return {...state, cellSize: action.payload};
-		case 'SET_ROBOT_POS':
-			return {
-				...state,
-				robotPos:
-					typeof action.payload === 'function'
-						? action.payload(state.robotPos)
-						: action.payload,
-			};
 		case 'SET_WALLS':
 			return {
 				...state,
@@ -138,6 +132,9 @@ const RobotSimulator = memo(() => {
 				if (data.success) {
 					dispatch({type: 'SET_STATUS_MESSAGE', payload: 'Код выполнен успешно.'});
 					dispatch({type: 'SET_CONSOLE_OUTPUT', payload: data.output || ""});
+					// Обновляем положение робота и закрашенные клетки
+					dispatch({type: 'SET_ROBOT_POS', payload: data.robot});
+					dispatch({type: 'SET_COLORED_CELLS', payload: new Set(data.coloredCells)});
 				} else {
 					dispatch({type: 'SET_STATUS_MESSAGE', payload: 'Ошибка: ' + data.message});
 					dispatch({type: 'SET_CONSOLE_OUTPUT', payload: ""});
@@ -150,6 +147,7 @@ const RobotSimulator = memo(() => {
 				dispatch({type: 'SET_IS_RUNNING', payload: false});
 			});
 	}, [state.code]);
+
 
 	const handleReset = useCallback(() => {
 		dispatch({type: 'SET_ROBOT_POS', payload: {x: 0, y: 0}});
@@ -174,7 +172,6 @@ const RobotSimulator = memo(() => {
 		dispatch({type: 'SET_ROBOT_POS', payload: newPos});
 	}, [state.width, state.height]);
 
-	// Формируем статус для CodeEditor (например, позиция робота, маркеры и т.д.)
 	const statusText = [
 		`Позиция робота: (${state.robotPos.x}, ${state.robotPos.y})`,
 		`Маркеров: ${Object.keys(state.markers).length}`,
@@ -193,7 +190,7 @@ const RobotSimulator = memo(() => {
 					onStart={handleStart}
 					onReset={handleReset}
 					statusText={statusText}
-					consoleOutput={state.consoleOutput}  // Передаем вывод сервера для отображения в консоли
+					consoleOutput={state.consoleOutput} // Передаем вывод сервера для отображения в консоли
 				/>
 
 				<ControlPanel

@@ -1,7 +1,7 @@
 # interpreter.py
 
 from .preprocessing import preprocess_code, separate_sections, parse_algorithm_header
-from .execution import execute_lines
+from .execution import execute_lines, execute_line, process_algorithm_call
 from .robot_interpreter import KumirInterpreter
 
 
@@ -10,7 +10,7 @@ class KumirLanguageInterpreter:
         self.code = code
         # Окружение для переменных: { var_name: {"type": ..., "value": ..., "kind": ..., "is_table": ...} }
         self.env = {}
-        self.algorithms = {}  # Словарь вспомогательных алгоритмов по имени
+        self.algorithms = {}  # Словарь для вспомогательных алгоритмов по имени
         self.main_algorithm = None
         # Создаем экземпляр исполнителя "Робот"
         self.robot = KumirInterpreter()
@@ -19,7 +19,7 @@ class KumirLanguageInterpreter:
 
     def parse(self):
         """
-        Предварительная обработка исходного кода: удаление комментариев, разделение на вступление и алгоритмы,
+        Обрабатывает исходный код: удаление комментариев, разделение на вступление и алгоритмы,
         разбор заголовков алгоритмов.
         """
         lines = preprocess_code(self.code)
@@ -28,9 +28,11 @@ class KumirLanguageInterpreter:
         self.algo_sections = algo_sections
 
         if algo_sections:
+            # Первый алгоритм считается основным
             self.main_algorithm = algo_sections[0]
             header_info = parse_algorithm_header(self.main_algorithm["header"])
             self.main_algorithm["header_info"] = header_info
+            # Остальные алгоритмы сохраняем в таблице, если они имеют имя
             for alg in algo_sections[1:]:
                 info = parse_algorithm_header(alg["header"])
                 alg["header_info"] = info
@@ -41,13 +43,13 @@ class KumirLanguageInterpreter:
 
     def execute_introduction(self):
         """Исполняет вступление (команды до первого алгоритма)."""
-        from .execution import execute_lines
-        execute_lines(self.introduction, self.env, self.robot, self)
+        for line in self.introduction:
+            execute_line(line, self.env, self.robot)
 
     def execute_algorithm(self, algorithm):
         """Исполняет тело алгоритма (строки между 'нач' и 'кон')."""
-        from .execution import execute_lines
-        execute_lines(algorithm["body"], self.env, self.robot, self)
+        for line in algorithm["body"]:
+            execute_line(line, self.env, self.robot)
 
     def interpret(self):
         """Полная интерпретация программы: парсинг, исполнение вступления и основного алгоритма."""
@@ -55,36 +57,36 @@ class KumirLanguageInterpreter:
         self.execute_introduction()
         print("Выполнение основного алгоритма:")
         self.execute_algorithm(self.main_algorithm)
+        # Возвращаем обновленное окружение, позицию робота и список закрашенных клеток
         return {
             "env": self.env,
             "robot": self.robot.robot_pos,
-            "output": self.output  # возвращаем захваченный вывод
+            "coloredCells": list(self.robot.colored_cells)
         }
 
 
 # Пример использования (если запускается напрямую)
 if __name__ == "__main__":
     sample_code = r'''
-    | Вступление
+    | Это вступление
     цел длина, ширина, лог условие, лит мой текст
     длина := 10
     ширина := 15
     условие := да
     мой текст := "Пример текста"
-    вывод "Вступление выполнено. Текст: " + мой текст, нс
+    вывод "Вступление выполнено. Текст: " + мой текст
 
-    | Основной алгоритм (без имени)
+    | Это основной алгоритм (без имени)
     алг
     нач
-      вывод "Площадь равна: " + (длина * ширина), нс
-      влево
+      вывод "Площадь равна: " + (длина * ширина)
       вправо
-      вверх
       вниз
+      вправо
       закрасить
     кон
 
-    | Вспомогательный алгоритм (не вызывается)
+    | Это вспомогательный алгоритм (пока не вызывается)
     алг цел площадь
     нач
       знач := длина * ширина
