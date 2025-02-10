@@ -11,4 +11,5 @@ RESERVED_KEYWORDS = {
 
 ALLOWED_TYPES = {"цел", "вещ", "лог", "сим", "лит"}
 
-МАКСЦЕЛ = 2147483647
+MAX_INT = 2147483647
+МАКСЦЕЛ = MAX_INT

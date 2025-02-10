@@ -1,115 +1,123 @@
 # string_utils.py
 """
-Модуль для алгоритмов обработки строк в языке Кумир.
-Реализованы следующие функции:
-  - верхний регистр(строка): возвращает строку, все символы которой приведены к верхнему регистру.
-  - нижний регистр(строка): возвращает строку, все символы которой приведены к нижнему регистру.
-  - позиция(фрагмент, строка) или поз(фрагмент, строка): возвращает позицию (1-based) первого символа подстроки,
-      если не найдено — возвращает 0.
-  - позиция после(начало, фрагмент, строка) или поз после(начало, фрагмент, строка): поиск подстроки начиная с указанной позиции.
-  - вставить(фрагмент, строка, начало): вставляет фрагмент в строку начиная с указанной позиции (1-based).
-  - заменить(строка, старый фрагмент, новый фрагмент, каждый): заменяет в строке старый фрагмент на новый;
-      если параметр "каждый" равен "да" (без учета регистра) — заменяются все вхождения, если "нет" — только первое.
-  - удалить(строка, начало, количество): удаляет из строки указанное количество символов, начиная с позиции (1-based).
+Module for string processing functions in the Kumir language.
+Implemented functions:
+  - to_upper(text): returns the string with all characters converted to uppercase.
+  - to_lower(text): returns the string with all characters converted to lowercase.
+  - position(substring, text) or pos(substring, text): returns the 1-based position of the first occurrence of the substring;
+      if not found – returns 0.
+  - position_after(start, substring, text) or pos_after(start, substring, text): searches for the substring starting from the given position.
+  - insert(substring, text, start): inserts substring into text starting at the given position (1-based).
+  - replace_str(text, old_sub, new_sub, every): replaces occurrences of old_sub with new_sub;
+      if the parameter every is "да" (case-insensitive) – all occurrences are replaced, if "нет" – only the first occurrence.
+  - delete_str(text, start, count): deletes a specified number of characters from text starting at position (1-based).
 """
 
 
-def верхний_регистр(строка):
-    """Возвращает строку с приведёнными к верхнему регистру символами."""
-    return str(строка).upper()
+def upper_case(text):
+    """Returns the string with all characters converted to uppercase."""
+    return str(text).upper()
 
 
-def нижний_регистр(строка):
-    """Возвращает строку с приведёнными к нижнему регистру символами."""
-    return str(строка).lower()
+def lower_case(text):
+    """Returns the string with all characters converted to lowercase."""
+    return str(text).lower()
 
 
-def позиция(фрагмент, строка):
+def position(substring, text):
     """
-    Возвращает позицию первого символа подстроки фрагмент в строке строка (индексация с 1).
-    Если фрагмент не найден, возвращает 0.
+    Returns the 1-based position of the first occurrence of substring in text.
+    If the substring is not found, returns 0.
     """
-    s = str(строка)
-    sub = str(фрагмент)
+    s = str(text)
+    sub = str(substring)
     idx = s.find(sub)
     return idx + 1 if idx != -1 else 0
 
 
-# Сокращённый вариант:
-поз = позиция
+# Alias for backward compatibility:
+pos = position
 
 
-def позиция_после(начало, фрагмент, строка):
+def position_after(start, substring, text):
     """
-    Возвращает позицию первого символа подстроки фрагмент в строке строка,
-    начиная поиск с позиции начало (индексация с 1).
-    Если фрагмент не найден, возвращает 0.
+    Returns the 1-based position of the first occurrence of substring in text,
+    starting the search from position start.
+    If the substring is not found, returns 0.
     """
     try:
-        start = int(начало)
+        s_start = int(start)
     except Exception:
-        raise ValueError("позиция после: 'начало' должно быть целым числом")
-    s = str(строка)
-    sub = str(фрагмент)
-    if start < 1 or start > len(s) + 1:
-        raise ValueError("позиция после: 'начало' вне допустимого диапазона")
-    idx = s.find(sub, start - 1)
+        raise ValueError("position_after: 'start' must be an integer")
+    s = str(text)
+    sub = str(substring)
+    if s_start < 1 or s_start > len(s) + 1:
+        raise ValueError("position_after: 'start' is out of allowed range")
+    idx = s.find(sub, s_start - 1)
     return idx + 1 if idx != -1 else 0
 
 
-def поз_после(начало, фрагмент, строка):
-    """Сокращённый вариант функции 'позиция после'."""
-    return позиция_после(начало, фрагмент, строка)
+def pos_after(start, substring, text):
+    """Alias for position_after."""
+    return position_after(start, substring, text)
 
 
-def вставить(фрагмент, строка, начало):
+def insert(substring, text, start):
     """
-    Вставляет фрагмент в строку, начиная с позиции начало (индексация с 1).
-    Если начало равно длин(строка)+1, то фрагмент добавляется в конец строки.
-    Если начало < 1 или начало > длин(строка)+1, возбуждается ошибка.
+    Inserts substring into text starting at position start (1-based).
+    If start equals len(text)+1, the substring is appended to the end.
+    Raises an error if start is out of the allowed range.
     """
-    s = str(строка)
-    sub = str(фрагмент)
+    s = str(text)
+    sub = str(substring)
     try:
-        pos = int(начало)
+        s_start = int(start)
     except Exception:
-        raise ValueError("вставить: 'начало' должно быть целым числом")
-    if pos < 1 or pos > len(s) + 1:
-        raise ValueError("вставить: 'начало' вне допустимого диапазона")
-    return s[:pos - 1] + sub + s[pos - 1:]
+        raise ValueError("insert: 'start' must be an integer")
+    if s_start < 1 or s_start > len(s) + 1:
+        raise ValueError("insert: 'start' is out of allowed range")
+    return s[:s_start - 1] + sub + s[s_start - 1:]
 
 
-def заменить(строка, старый_фрагмент, новый_фрагмент, каждый):
+def replace(text, old_sub, new_sub, every):
     """
-    Заменяет в строке все вхождения подстроки старый_фрагмент на новый_фрагмент, если параметр каждый равен "да"
-    (без учета регистра). Если каждый равен "нет", заменяет только первое вхождение.
+    Replaces occurrences of old_sub with new_sub in text.
+    If every equals "да" (ignoring case), replaces all occurrences.
+    If every equals "нет", replaces only the first occurrence.
     """
-    s = str(строка)
-    old = str(старый_фрагмент)
-    new = str(новый_фрагмент)
-    if str(каждый).strip().lower() == "да":
+    s = str(text)
+    old = str(old_sub)
+    new = str(new_sub)
+    if str(every).strip().lower() == "да":
         return s.replace(old, new)
-    elif str(каждый).strip().lower() == "нет":
+    elif str(every).strip().lower() == "нет":
         return s.replace(old, new, 1)
     else:
-        raise ValueError("заменить: параметр 'каждый' должен быть 'да' или 'нет'")
+        raise ValueError("replace: parameter 'every' must be 'да' or 'нет'")
 
 
-def удалить(строка, начало, количество):
+def delete(text, start, count):
     """
-    Удаляет из строки указанное количество символов, начиная с позиции начало (индексация с 1).
-    Если начало + количество > длин(строка)+1, то удаляется текст до конца строки.
-    Если начало < 1 или начало > длин(строка)+1, возбуждается ошибка.
+    Deletes 'count' characters from text starting at position start (1-based).
+    If start + count > len(text)+1, deletes text until the end.
+    Raises an error if start is out of the allowed range.
     """
-    s = str(строка)
+    s = str(text)
     try:
-        pos = int(начало)
-        count = int(количество)
+        s_start = int(start)
+        cnt = int(count)
     except Exception:
-        raise ValueError("удалить: 'начало' и 'количество' должны быть целыми числами")
-    if pos < 1 or pos > len(s) + 1:
-        raise ValueError("удалить: 'начало' вне допустимого диапазона")
-    if pos + count - 1 >= len(s) + 1:
-        return s[:pos - 1]
+        raise ValueError("delete: 'start' and 'count' must be integers")
+    if s_start < 1 or s_start > len(s) + 1:
+        raise ValueError("delete: 'start' is out of allowed range")
+    if s_start + cnt - 1 >= len(s) + 1:
+        return s[:s_start - 1]
     else:
-        return s[:pos - 1] + s[pos - 1 + count:]
+        return s[:s_start - 1] + s[s_start - 1 + cnt:]
+
+
+# Aliases to match the names expected by safe_eval.py:
+to_upper = upper_case
+to_lower = lower_case
+replace_str = replace
+delete_str = delete

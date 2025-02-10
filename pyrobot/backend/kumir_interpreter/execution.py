@@ -13,9 +13,9 @@ from .constants import ALLOWED_TYPES
 
 def process_control_command(line, env):
     """
-    Обрабатывает команды контроля выполнения: утв, дано, надо.
-    Вычисляет логическое выражение (после ключевого слова) и, если результат не является истинным,
-    выбрасывает исключение, прекращающее выполнение текущего алгоритма.
+    Processes control commands: утв, дано, надо.
+    Evaluates the logical expression (after the keyword) and, if the result is not true,
+    raises an exception to terminate the current algorithm execution.
     """
     lower_line = line.lower().strip()
     for keyword in ["утв", "дано", "надо"]:
@@ -35,14 +35,14 @@ def process_control_command(line, env):
 
 def process_if_block(lines, start_index, env, robot, interpreter):
     """
-    Обрабатывает блок конструкции "если-то-[иначе]-все".
-    Возвращает индекс следующей строки после блока.
-    Синтаксис:
+    Processes the "если-то-[иначе]-все" block.
+    Returns the index of the line after the block.
+    Syntax:
         если условие
           то серия1
           [иначе серия2]
         все
-    Если условие истинно – выполняется серия1, иначе (если есть) серия2.
+    If the condition is true, series1 is executed; otherwise (if present) series2.
     """
     n = len(lines)
     cond_line = lines[start_index].strip()
@@ -97,22 +97,22 @@ def process_if_block(lines, start_index, env, robot, interpreter):
     return i + 1
 
 
-def process_выбор_block(lines, start_index, env, robot, interpreter):
+def process_select_block(lines, start_index, env, robot, interpreter):
     """
-    Обрабатывает блок конструкции "выбор-при-[иначе]-все".
-    Синтаксис:
+    Processes the "выбор-при-[иначе]-все" block.
+    Syntax:
         выбор
           при условие1 : серия1
           при условие2 : серия2
           ...
           [иначе серияN+1]
         все
-    Выполняется первая серия, для которой условие истинно; если ни одно условие не истинно, а блок "иначе" присутствует – выполняется она.
-    Возвращает индекс следующей строки после блока.
+    The first branch for which the condition is true is executed; if no condition is met and an "иначе" branch is present, it is executed.
+    Returns the index of the line after the block.
     """
     n = len(lines)
-    i = start_index + 1  # после "выбор"
-    branches = []  # список кортежей (condition_expr, series_lines)
+    i = start_index + 1  # after "выбор"
+    branches = []  # list of tuples (condition_expr, series_lines)
     else_series = []
     while i < n:
         line = lines[i].strip()
@@ -163,16 +163,16 @@ def process_выбор_block(lines, start_index, env, robot, interpreter):
 
 def execute_lines(lines, env, robot, interpreter=None):
     """
-    Исполняет список строк (например, тело алгоритма или блока цикла, ветвления и т.д.).
-    Поддерживает:
-      - Циклы:
-          * Цикл "для": начинается со строки, начинающейся с "нц для"
-          * Цикл "пока": начинается с "нц пока"
-          * Цикл "N раз": начинается с "нц" <число> "раз"
-          * Цикл "нц-кц": если ни одно специальное слово не встречается, считается бесконечным (если не используется "выход")
-      - Команды ветвления: "если" и "выбор"
-      - Прочие команды (обрабатываются функцией execute_line)
-    Если внутри цикла встречается команда "выход", цикл прерывается.
+    Executes a list of lines (for example, the body of an algorithm or a branch).
+    Supports:
+      - Loops:
+          * "нц для" loop (for loop)
+          * "нц пока" loop (while loop)
+          * "нц <number> раз" loop (N times loop)
+          * "нц-кц" loop (infinite loop if no special keyword is present)
+      - Branching commands: "если" and "выбор"
+      - Other commands (handled by execute_line)
+    If the command "выход" is encountered within a loop, the loop is terminated.
     """
     i = 0
     n = len(lines)
@@ -183,7 +183,7 @@ def execute_lines(lines, env, robot, interpreter=None):
             i = process_if_block(lines, i, env, robot, interpreter)
             continue
         if lower_line.startswith("выбор"):
-            i = process_выбор_block(lines, i, env, robot, interpreter)
+            i = process_select_block(lines, i, env, robot, interpreter)
             continue
         if lower_line.startswith("нц для"):
             tokens = lower_line.split()
@@ -232,7 +232,7 @@ def execute_lines(lines, env, robot, interpreter=None):
                     else:
                         raise e
                 current += step_val
-            i += 1  # пропускаем "кц"
+            i += 1  # skip "кц"
             continue
         if lower_line.startswith("нц пока"):
             condition_expr = line[len("нц пока"):].strip()
@@ -259,7 +259,7 @@ def execute_lines(lines, env, robot, interpreter=None):
                         break
                     else:
                         raise e
-            i += 1  # пропускаем "кц"
+            i += 1  # skip "кц"
             continue
         if lower_line.startswith("нц"):
             tokens = lower_line.split()
@@ -283,7 +283,7 @@ def execute_lines(lines, env, robot, interpreter=None):
                             break
                         else:
                             raise e
-                i += 1  # пропускаем "кц"
+                i += 1  # skip "кц"
                 continue
         if lower_line.startswith("нц") and lower_line == "нц":
             loop_body = []
@@ -301,31 +301,31 @@ def execute_lines(lines, env, robot, interpreter=None):
                         break
                     else:
                         raise e
-            i += 1  # пропускаем "кц"
+            i += 1  # skip "кц"
             continue
         if lower_line.startswith("выход"):
             raise Exception("Выход из цикла/алгоритма.")
-        # Остальные команды обрабатываем через execute_line
+        # Process remaining commands using execute_line
         execute_line(line, env, robot, interpreter)
         i += 1
 
 
 def execute_line(line, env, robot, interpreter=None):
     """
-    Исполняет одну строку кода.
-    Обрабатывает:
-      - Объявления (начинаются с одного из ALLOWED_TYPES)
-      - Присваивания (оператор ":=")
-      - Команду вывода (начинается со слова "вывод")
-      - Команду ввода (начинается со слова "ввод")
-      - Команды контроля (утв, дано, надо)
-      - Команды управления роботом
-      - Команды управления выполнением: пауза, стоп
-      - Вызов алгоритмов-процедур (если строка не распознана)
-    Если строка не распознана, выводится сообщение.
+    Executes a single line of code.
+    Handles:
+      - Declarations (starting with one of ALLOWED_TYPES)
+      - Assignments (operator ":=")
+      - Output command (starting with "вывод")
+      - Input command (starting with "ввод")
+      - Control commands (утв, дано, надо)
+      - Robot control commands
+      - Execution control commands: пауза, стоп
+      - Invocation of procedure algorithms (if the line is not recognized)
+    If the line is not recognized, prints a message.
     """
     lower_line = line.lower().strip()
-    # Объявления
+    # Declarations
     for t in ALLOWED_TYPES:
         if lower_line.startswith(t):
             try:
@@ -334,7 +334,7 @@ def execute_line(line, env, robot, interpreter=None):
                 print(f"Ошибка объявления: {e}")
             return
 
-    # Присваивания
+    # Assignments
     if ":=" in line:
         try:
             process_assignment(line, env)
@@ -342,7 +342,7 @@ def execute_line(line, env, robot, interpreter=None):
             print(f"Ошибка присваивания: {e}")
         return
 
-    # Вывод (передаём interpreter)
+    # Output (pass interpreter)
     if lower_line.startswith("вывод"):
         try:
             process_output(line, env, interpreter)
@@ -350,7 +350,7 @@ def execute_line(line, env, robot, interpreter=None):
             print(f"Ошибка команды 'вывод': {e}")
         return
 
-    # Ввод
+    # Input
     if lower_line.startswith("ввод"):
         try:
             process_input(line, env)
@@ -358,7 +358,7 @@ def execute_line(line, env, robot, interpreter=None):
             print(f"Ошибка команды 'ввод': {e}")
         return
 
-    # Команды контроля: утв, дано, надо
+    # Control commands: утв, дано, надо
     if lower_line.startswith("утв") or lower_line.startswith("дано") or lower_line.startswith("надо"):
         try:
             process_control_command(line, env)
@@ -367,18 +367,18 @@ def execute_line(line, env, robot, interpreter=None):
             raise e
         return
 
-    # Команды управления выполнением: пауза, стоп
+    # Execution control commands: пауза, стоп
     if lower_line.startswith("пауза"):
         input("Пауза. Нажмите Enter для продолжения...")
         return
     if lower_line.startswith("стоп"):
         raise Exception("Выполнение программы прервано командой 'стоп'.")
 
-    # Команды управления Роботом
+    # Robot control commands
     if process_robot_command(line, robot):
         return
 
-    # Если interpreter передан, проверяем вызов алгоритма-процедуры
+    # If interpreter is provided, check for procedure algorithm invocation
     if interpreter is not None:
         if process_algorithm_call(line, env, interpreter):
             return
@@ -388,10 +388,10 @@ def execute_line(line, env, robot, interpreter=None):
 
 def process_algorithm_call(line, env, interpreter):
     """
-    Если строка является вызовом алгоритма-процедуры,
-    выполняет тело соответствующего алгоритма.
-    Поддерживаются вызовы с параметрами (параметризацию реализуем в упрощённом виде).
-    Возвращает True, если вызов обработан.
+    If the line is a procedure algorithm call,
+    executes the corresponding algorithm body.
+    Supports calls with parameters (parameterization is implemented in a simplified manner).
+    Returns True if the call was handled.
     """
     line = line.strip()
     if "(" in line:

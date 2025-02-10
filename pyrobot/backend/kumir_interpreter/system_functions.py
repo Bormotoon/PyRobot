@@ -2,31 +2,36 @@
 import time
 
 
-def ждать(x):
+def sleep_ms(x):
     """
-    Приостанавливает выполнение программы на x миллисекунд.
-    Одна миллисекунда равна 1/1000 секунды.
+    Pauses the program for x milliseconds.
+    One millisecond is 1/1000 of a second.
 
-    Пример:
-      ждать(500)  # приостанавливает выполнение на 0.5 секунды
+    Example:
+      sleep_ms(500)  # pauses execution for 0.5 seconds
     """
     try:
         ms = int(x)
     except Exception as e:
-        raise ValueError(f"ждать: аргумент x должен быть целым числом, ошибка: {e}")
+        raise ValueError(f"sleep_ms: argument x must be an integer, error: {e}")
     time.sleep(ms / 1000.0)
 
 
-def время():
+def current_time():
     """
-    Возвращает текущее время в миллисекундах, прошедших с начала суток по местному времени.
+    Returns the current time in milliseconds since midnight (local time).
 
-    Пример:
-      t = время()  # t – количество миллисекунд от начала текущего дня
+    Example:
+      t = current_time()  # t is the number of milliseconds since the start of the current day
     """
     now = time.time()
     local = time.localtime(now)
-    # Вычисляем число секунд с начала суток:
+    # Calculate seconds since midnight:
     seconds_since_midnight = local.tm_hour * 3600 + local.tm_min * 60 + local.tm_sec + (now - int(now))
     ms = int(seconds_since_midnight * 1000)
     return ms
+
+
+# Aliases for backward compatibility (Russian names as specified in the documentation):
+ждать = sleep_ms
+время = current_time

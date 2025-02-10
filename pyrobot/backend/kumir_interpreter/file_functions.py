@@ -5,23 +5,23 @@ import sys
 import errno
 import codecs
 
-# Словарь открытых файлов: { абсолютный_путь: file_object }
+# Dictionary of open files: { absolute_path: file_object }
 _open_files = {}
 
-# Глобальные настройки
-_default_encoding = "UTF-8"  # кодировка по умолчанию
-_default_input = None  # если не None, используется вместо ввода с клавиатуры
-_default_output = None  # если не None, используется вместо стандартного вывода
+# Global settings
+_default_encoding = "UTF-8"  # default encoding
+_default_input = None  # if not None, used instead of keyboard input
+_default_output = None  # if not None, used instead of standard output
 
 
-# Функции для работы с файлами
+# Functions for working with files
 
 def _normalize_encoding(enc):
     """
-    Приводит имя кодировки к стандартному виду.
-    Допустимые кодировки (без учёта регистра и дефиса):
+    Normalizes the encoding name.
+    Allowed encodings (case- and hyphen-insensitive):
       cp1251, windows1251, windows, cp866, ibm866, dos, koi8r, koi8, koi8-р, utf8, utf, linux
-    Возвращает нормализованное имя кодировки (например, "cp1251", "cp866", "koi8-r", "utf-8") или None, если неизвестно.
+    Returns the normalized encoding name (e.g., "cp1251", "cp866", "koi8-r", "utf-8") or None if unknown.
     """
     enc = enc.replace("-", "").lower()
     if enc in ["cp1251", "windows1251", "windows"]:
@@ -36,123 +36,119 @@ def _normalize_encoding(enc):
         return None
 
 
-def установить_кодировку(имя_кодировки):
+def set_encoding(encoding_name):
     """
-    Устанавливает глобальную кодировку для работы с текстовыми файлами.
-    Принимает имя кодировки (литерал). Если имя некорректно, возбуждает исключение.
+    Sets the global encoding for text file operations.
+    Takes an encoding name (string). If the name is incorrect, raises an exception.
     """
     global _default_encoding
-    norm = _normalize_encoding(имя_кодировки)
+    norm = _normalize_encoding(encoding_name)
     if norm is None:
-        raise Exception(f"Неверное имя кодировки: {имя_кодировки}")
+        raise Exception(f"Invalid encoding name: {encoding_name}")
     _default_encoding = norm
     return
 
 
-def открыть_на_чтение(имя_файла):
+def open_for_reading(filename):
     """
-    Открывает текстовый файл с именем (литерал) для чтения с использованием текущей кодировки.
-    Если файл не существует или недоступен для чтения, возбуждается ошибка.
-    Если файл уже открыт, возбуждается ошибка.
-    Возвращает файловый объект.
+    Opens the text file with the given filename for reading using the current encoding.
+    If the file does not exist or is not readable, raises an error.
+    If the file is already open, raises an error.
+    Returns the file object.
     """
     global _open_files, _default_encoding
-    path = os.path.abspath(имя_файла)
+    path = os.path.abspath(filename)
     if path in _open_files:
-        raise Exception(f"Файл '{имя_файла}' уже открыт.")
+        raise Exception(f"File '{filename}' is already open.")
     if not os.path.exists(path):
-        raise Exception(f"Файл '{имя_файла}' не существует.")
+        raise Exception(f"File '{filename}' does not exist.")
     if not os.access(path, os.R_OK):
-        raise Exception(f"Нет прав на чтение файла '{имя_файла}'.")
+        raise Exception(f"No read permission for file '{filename}'.")
     try:
         f = open(path, "r", encoding=_default_encoding)
     except Exception as e:
-        raise Exception(f"Ошибка открытия файла '{имя_файла}' для чтения: {e}")
+        raise Exception(f"Error opening file '{filename}' for reading: {e}")
     _open_files[path] = f
     return f
 
 
-def открыть_на_запись(имя_файла):
+def open_for_writing(filename):
     """
-    Открывает текстовый файл с именем для записи (режим "w") с использованием текущей кодировки.
-    Если файл существует, его содержимое очищается.
-    Если файл уже открыт, возбуждается ошибка.
-    Возвращает файловый объект.
+    Opens the text file with the given filename for writing ("w" mode) using the current encoding.
+    If the file exists, its contents are cleared.
+    If the file is already open, raises an error.
+    Returns the file object.
     """
     global _open_files, _default_encoding
-    path = os.path.abspath(имя_файла)
+    path = os.path.abspath(filename)
     if path in _open_files:
-        raise Exception(f"Файл '{имя_файла}' уже открыт.")
-    # Проверяем, если файл существует, то проверяем права на запись;
-    # если не существует, проверяем возможность создания.
+        raise Exception(f"File '{filename}' is already open.")
     if os.path.exists(path):
         if not os.access(path, os.W_OK):
-            raise Exception(f"Нет прав на запись в файл '{имя_файла}'.")
+            raise Exception(f"No write permission for file '{filename}'.")
     else:
         parent = os.path.dirname(path)
         if not os.access(parent, os.W_OK):
-            raise Exception(f"Нет прав на создание файла в каталоге '{parent}'.")
+            raise Exception(f"No permission to create file in directory '{parent}'.")
     try:
         f = open(path, "w", encoding=_default_encoding)
     except Exception as e:
-        raise Exception(f"Ошибка открытия файла '{имя_файла}' для записи: {e}")
+        raise Exception(f"Error opening file '{filename}' for writing: {e}")
     _open_files[path] = f
     return f
 
 
-def открыть_на_добавление(имя_файла):
+def open_for_append(filename):
     """
-    Открывает текстовый файл с именем для записи в режиме добавления (режим "a") с использованием текущей кодировки.
-    Если файл уже открыт, возбуждается ошибка.
-    Возвращает файловый объект.
+    Opens the text file with the given filename for appending ("a" mode) using the current encoding.
+    If the file is already open, raises an error.
+    Returns the file object.
     """
     global _open_files, _default_encoding
-    path = os.path.abspath(имя_файла)
+    path = os.path.abspath(filename)
     if path in _open_files:
-        raise Exception(f"Файл '{имя_файла}' уже открыт.")
-    # Если файла не существует, проверяем возможность создания
+        raise Exception(f"File '{filename}' is already open.")
     parent = os.path.dirname(path)
     if not os.path.exists(path) and not os.access(parent, os.W_OK):
-        raise Exception(f"Нет прав на создание файла в каталоге '{parent}'.")
+        raise Exception(f"No permission to create file in directory '{parent}'.")
     try:
         f = open(path, "a", encoding=_default_encoding)
     except Exception as e:
-        raise Exception(f"Ошибка открытия файла '{имя_файла}' для добавления: {e}")
+        raise Exception(f"Error opening file '{filename}' for appending: {e}")
     _open_files[path] = f
     return f
 
 
-def закрыть(f):
+def close_file(f):
     """
-    Закрывает ранее открытый файл и удаляет его из глобального списка открытых файлов.
-    Если файл не является открытым, возбуждается ошибка.
+    Closes the previously opened file and removes it from the global open files dictionary.
+    If the file is not open, raises an error.
     """
     global _open_files
     path = os.path.abspath(f.name)
     try:
         f.close()
     except Exception as e:
-        raise Exception(f"Ошибка закрытия файла '{f.name}': {e}")
+        raise Exception(f"Error closing file '{f.name}': {e}")
     if path in _open_files:
         del _open_files[path]
     else:
-        raise Exception(f"Файл '{f.name}' не найден среди открытых файлов.")
+        raise Exception(f"File '{f.name}' not found among open files.")
 
 
-def начать_чтение(f):
+def reset_reading(f):
     """
-    Сбрасывает указатель чтения файла f на его начало.
+    Resets the file pointer of file f to the beginning.
     """
     try:
         f.seek(0)
     except Exception as e:
-        raise Exception(f"Ошибка установки указателя в начало файла '{f.name}': {e}")
+        raise Exception(f"Error resetting file pointer for '{f.name}': {e}")
 
 
-def конец_файла(f):
+def eof(f):
     """
-    Возвращает "да", если текущая позиция f находится в самом конце файла,
-    иначе – "нет".
+    Returns "да" if the current position in f is at the end of the file, otherwise "нет".
     """
     cur = f.tell()
     f.seek(0, os.SEEK_END)
@@ -161,37 +157,36 @@ def конец_файла(f):
     return "да" if cur >= end else "нет"
 
 
-def есть_данные(f):
+def has_data(f):
     """
-    Возвращает "да", если после текущей позиции чтения в файле f есть хотя бы один видимый символ,
-    иначе – "нет". Для упрощения проверяем, что не достигнут конец файла.
+    Returns "да" if there is at least one visible character after the current file pointer position in f,
+    otherwise "нет". For simplicity, checks that the end of file has not been reached.
     """
     cur = f.tell()
     char = f.read(1)
     f.seek(cur)
     if char == "":
         return "нет"
-    # Можно добавить проверку на пробелы, но для простоты считаем, что любой символ – видимый.
     return "да"
 
 
-def можно_открыть_на_чтение(имя_файла):
+def can_open_for_reading(filename):
     """
-    Возвращает "да", если файл с указанным именем существует и доступен для чтения, иначе "нет".
-    Не открывает файл.
+    Returns "да" if the file with the given filename exists and is readable, otherwise "нет".
+    Does not open the file.
     """
-    path = os.path.abspath(имя_файла)
+    path = os.path.abspath(filename)
     if os.path.exists(path) and os.access(path, os.R_OK):
         return "да"
     return "нет"
 
 
-def можно_открыть_на_запись(имя_файла):
+def can_open_for_writing(filename):
     """
-    Возвращает "да", если файл с указанным именем либо существует и доступен для записи, либо может быть создан,
-    иначе "нет".
+    Returns "да" if the file with the given filename either exists and is writable, or can be created,
+    otherwise "нет".
     """
-    path = os.path.abspath(имя_файла)
+    path = os.path.abspath(filename)
     if os.path.exists(path):
         if os.access(path, os.W_OK):
             return "да"
@@ -205,74 +200,74 @@ def можно_открыть_на_запись(имя_файла):
             return "нет"
 
 
-def существует(имя):
+def exists(name):
     """
-    Возвращает "да", если с заданным именем существует файл или каталог, иначе "нет".
+    Returns "да" if a file or directory with the given name exists, otherwise "нет".
     """
-    return "да" if os.path.exists(имя) else "нет"
+    return "да" if os.path.exists(name) else "нет"
 
 
-def является_каталогом(имя):
+def is_directory(name):
     """
-    Возвращает "да", если с заданным именем существует каталог, иначе "нет".
+    Returns "да" if a directory with the given name exists, otherwise "нет".
     """
-    return "да" if os.path.isdir(имя) else "нет"
+    return "да" if os.path.isdir(name) else "нет"
 
 
-def создать_каталог(имя_каталога):
+def create_directory(dirname):
     """
-    Создает каталог с заданным именем (абсолютным или относительным).
-    Если создание прошло успешно, возвращает "да", иначе возбуждает исключение.
+    Creates a directory with the given name (absolute or relative).
+    Returns "да" if successful, otherwise raises an exception.
     """
     try:
-        os.makedirs(имя_каталога, exist_ok=False)
+        os.makedirs(dirname, exist_ok=False)
         return "да"
     except Exception as e:
-        raise Exception(f"Ошибка создания каталога '{имя_каталога}': {e}")
+        raise Exception(f"Error creating directory '{dirname}': {e}")
 
 
-def удалить_файл(имя_файла):
+def delete_file(filename):
     """
-    Удаляет файл с заданным именем.
-    Если удаление прошло успешно, возвращает "да", иначе возбуждает исключение.
+    Deletes the file with the given filename.
+    Returns "да" if successful, otherwise raises an exception.
     """
     try:
-        os.remove(имя_файла)
+        os.remove(filename)
         return "да"
     except Exception as e:
-        raise Exception(f"Ошибка удаления файла '{имя_файла}': {e}")
+        raise Exception(f"Error deleting file '{filename}': {e}")
 
 
-def удалить_каталог(имя_каталога):
+def delete_directory(dirname):
     """
-    Удаляет пустой каталог с заданным именем.
-    Если удаление прошло успешно, возвращает "да", иначе возбуждает исключение.
+    Deletes the empty directory with the given name.
+    Returns "да" if successful, otherwise raises an exception.
     """
     try:
-        os.rmdir(имя_каталога)
+        os.rmdir(dirname)
         return "да"
     except Exception as e:
-        raise Exception(f"Ошибка удаления каталога '{имя_каталога}': {e}")
+        raise Exception(f"Error deleting directory '{dirname}': {e}")
 
 
-def полный_путь(имя):
+def full_path(name):
     """
-    Возвращает абсолютный путь для заданного имени файла или каталога.
+    Returns the absolute path for the given file or directory name.
     """
-    return os.path.abspath(имя)
+    return os.path.abspath(name)
 
 
-def РАБОЧИЙ_КАТАЛОГ():
+def WORKING_DIRECTORY():
     """
-    Возвращает абсолютный путь текущего рабочего каталога.
+    Returns the absolute path of the current working directory.
     """
     return os.getcwd()
 
 
-def КАТАЛОГ_ПРОГРАММЫ():
+def PROGRAM_DIRECTORY():
     """
-    Возвращает абсолютный путь каталога, в котором находится выполняемая программа.
-    Если программа не сохранена, возвращает "./".
+    Returns the absolute path of the directory containing the running program.
+    If the program is not saved, returns "./".
     """
     if hasattr(sys, 'argv') and sys.argv and os.path.isfile(sys.argv[0]):
         return os.path.dirname(os.path.abspath(sys.argv[0]))
@@ -280,54 +275,53 @@ def КАТАЛОГ_ПРОГРАММЫ():
         return "./"
 
 
-def НАЗНАЧИТЬ_ВВОД(имя_файла):
+def set_input(filename):
     """
-    Если имя_файла не пустое и файл существует и доступен для чтения,
-    устанавливает его в качестве источника ввода для оператора "ввод".
-    Если имя_файла – пустая строка, восстанавливает ввод с клавиатуры.
-    Возвращает "да" при успехе.
+    If the filename is non-empty and the file exists and is readable,
+    sets it as the input source for the "ввод" operator.
+    If the filename is an empty string, restores keyboard input.
+    Returns "да" on success.
     """
     global _default_input
-    if имя_файла.strip() == "":
+    if filename.strip() == "":
         _default_input = None
         return "да"
-    # Проверяем возможность открытия
-    if можно_открыть_на_чтение(имя_файла) == "да":
+    if can_open_for_reading(filename) == "да":
         try:
-            _default_input = open(имя_файла, "r", encoding=_default_encoding)
+            _default_input = open(filename, "r", encoding=_default_encoding)
             return "да"
         except Exception as e:
-            raise Exception(f"Ошибка открытия файла '{имя_файла}' для ввода: {e}")
+            raise Exception(f"Error opening file '{filename}' for input: {e}")
     else:
-        raise Exception(f"Файл '{имя_файла}' недоступен для чтения.")
+        raise Exception(f"File '{filename}' is not readable.")
 
 
-def НАЗНАЧИТЬ_ВЫВОД(имя_файла):
+def set_output(filename):
     """
-    Если имя_файла не пустое и файл существует и доступен для записи (или может быть создан),
-    устанавливает его в качестве приемника вывода для оператора "вывод".
-    Если имя_файла – пустая строка, восстанавливает вывод на экран.
-    Возвращает "да" при успехе.
+    If the filename is non-empty and the file exists and is writable (or can be created),
+    sets it as the output destination for the "вывод" operator.
+    If the filename is an empty string, restores output to the screen.
+    Returns "да" on success.
     """
     global _default_output
-    if имя_файла.strip() == "":
+    if filename.strip() == "":
         _default_output = None
         return "да"
-    if можно_открыть_на_запись(имя_файла) == "да":
+    if can_open_for_writing(filename) == "да":
         try:
-            _default_output = open(имя_файла, "w", encoding=_default_encoding)
+            _default_output = open(filename, "w", encoding=_default_encoding)
             return "да"
         except Exception as e:
-            raise Exception(f"Ошибка открытия файла '{имя_файла}' для вывода: {e}")
+            raise Exception(f"Error opening file '{filename}' for output: {e}")
     else:
-        raise Exception(f"Файл '{имя_файла}' недоступен для записи.")
+        raise Exception(f"File '{filename}' is not writable.")
 
 
 class ConsoleFile:
     """
-    Псевдо-файл, связанный с терминалом.
-    Попытка закрыть такой файл приводит к ошибке.
-    Чтение вызывает ввод с клавиатуры, запись выводит текст на экран.
+    A pseudo-file associated with the terminal.
+    Attempting to close such a file raises an error.
+    Reading triggers keyboard input; writing prints text to the screen.
     """
 
     def __init__(self):
@@ -336,26 +330,27 @@ class ConsoleFile:
 
     def write(self, s):
         if self.closed:
-            raise Exception("Ошибка: попытка записи в закрытый файл 'консоль'.")
-        print(s, end="")  # вывод без добавления перевода строки
+            raise Exception("Error: Attempt to write to closed file 'консоль'.")
+        print(s, end="")  # Print without adding a newline
 
     def read(self, n=-1):
         if self.closed:
-            raise Exception("Ошибка: попытка чтения из закрытого файла 'консоль'.")
+            raise Exception("Error: Attempt to read from closed file 'консоль'.")
         return input()
 
     def close(self):
-        raise Exception("Нельзя закрыть файл 'консоль'.")
+        raise Exception("Cannot close file 'консоль'.")
 
 
-def консоль():
+def console_file():
     """
-    Возвращает псевдо-файл, связанный с терминалом.
+    Returns a pseudo-file associated with the terminal.
     """
     return ConsoleFile()
 
 
-# Функции для получения текущих настроек ввода/вывода
+# Functions to get the current input/output settings
+
 def get_default_input():
     global _default_input
     return _default_input

@@ -1,5 +1,3 @@
-// RobotSimulator.jsx
-
 import React, {memo, useCallback, useEffect, useReducer, useRef} from 'react';
 import {ThemeProvider} from '@mui/material/styles';
 import CodeEditor from './CodeEditor/CodeEditor';
@@ -147,7 +145,6 @@ const RobotSimulator = memo(() => {
 				dispatch({type: 'SET_IS_RUNNING', payload: false});
 			});
 	}, [state.code]);
-
 
 	const handleReset = useCallback(() => {
 		dispatch({type: 'SET_ROBOT_POS', payload: {x: 0, y: 0}});

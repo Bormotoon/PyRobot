@@ -6,47 +6,49 @@ import re
 from .kumir_interpreter.robot_interpreter import KumirInterpreter
 
 # ---------------------------------------------------------------------
-# Константы и настройки
+# Constants and settings
 # ---------------------------------------------------------------------
 
-# Зарезервированные ключевые слова (неполный, но включающий основные из документации)
-RESERVED_KEYWORDS = {"алг", "нач", "кон", "исп", "кон_исп", "дано", "надо", "арг", "рез", "аргрез", "знач", "цел",
-    "вещ", "лог", "сим", "лит", "таб", "целтаб", "вещтаб", "логтаб", "симтаб", "литтаб", "и", "или", "не", "да", "нет",
-    "утв", "выход", "ввод", "вывод", "нс", "если", "то", "иначе", "все", "выбор", "при", "нц", "кц", "кц_при", "раз",
-    "пока", "для", "от", "до", "шаг"}
+# Reserved keywords (incomplete list including the main ones from the documentation)
+RESERVED_KEYWORDS = {
+    "алг", "нач", "кон", "исп", "кон_исп", "дано", "надо", "арг", "рез", "аргрез", "знач", "цел",
+    "вещ", "лог", "сим", "лит", "таб", "целтаб", "вещтаб", "логтаб", "симтаб", "литтаб", "и", "или", "не",
+    "да", "нет", "утв", "выход", "ввод", "вывод", "нс", "если", "то", "иначе", "все", "выбор", "при", "нц",
+    "кц", "кц_при", "раз", "пока", "для", "от", "до", "шаг"
+}
 
-# Допустимые типы величин
+# Allowed variable types
 ALLOWED_TYPES = {"цел", "вещ", "лог", "сим", "лит"}
 
-# Максимальные значения для целых
-МАКСЦЕЛ = 2147483647
+# Maximum integer value (as defined in the documentation)
+MAX_INT = 2147483647
+# Для обратной совместимости оставляем псевдоним:
+МАКСЦЕЛ = MAX_INT
 
 
 # ---------------------------------------------------------------------
-# Вспомогательные функции для работы с именами и константами
+# Helper functions for names and constants
 # ---------------------------------------------------------------------
 
 def is_valid_identifier(identifier, var_type):
     """
-    Проверяет, что identifier соответствует требованиям:
-    - Identifier состоит из одного или нескольких слов, разделённых пробелами.
-    - Первое слово не начинается с цифры.
-    - Ни одно из слов (за исключением допустимого встраивания "не" в логических величинах)
-      не является зарезервированным ключевым словом.
+    Checks that the identifier meets the requirements:
+      - Consists of one or more words separated by spaces.
+      - The first word does not start with a digit.
+      - None of the words (except the allowed insertion of "не" in logical variables)
+        is a reserved keyword.
     """
     words = identifier.strip().split()
     if not words:
         return False
-    # Проверяем первое слово: не должно начинаться с цифры
     if re.match(r'^\d', words[0]):
         return False
     for word in words:
-        # Для логических величин допускается, что слово "не" встречается, если не первое
+        # For logical variables, the word "не" is allowed if it is not the first word
         if word.lower() in RESERVED_KEYWORDS:
             if var_type == "лог" and word.lower() == "не" and word != words[0]:
                 continue
             return False
-        # Каждое слово должно состоять только из букв (латинских или кириллических), цифр, @ и _
         if not re.match(r'^[A-Za-zА-Яа-яЁё@_][A-Za-zА-Яа-яЁё0-9@_]*$', word):
             return False
     return True
@@ -54,27 +56,27 @@ def is_valid_identifier(identifier, var_type):
 
 def convert_hex_constants(expr):
     """
-    Заменяет все вхождения шестнадцатеричных констант, начинающихся с '$',
-    на строку, понятную Python (например, '$100' -> '0x100').
+    Replaces all hexadecimal constants starting with '$' with a Python-compatible format.
+    For example: '$100' -> '0x100'
     """
     return re.sub(r'\$(?P<hex>[A-Fa-f0-9]+)', r'0x\g<hex>', expr)
 
 
 def safe_eval(expr, eval_env):
     """
-    Вычисляет выражение с использованием безопасного окружения.
-    Подставляет шестнадцатеричные константы.
+    Evaluates the expression using a safe environment.
+    Also replaces hexadecimal constants.
     """
     expr = convert_hex_constants(expr)
     safe_globals = {"__builtins__": None, "sin": math.sin, "cos": math.cos, "sqrt": math.sqrt, "int": int,
-        "float": float, }
+                    "float": float}
     return eval(expr, safe_globals, eval_env)
 
 
 def get_eval_env(env):
     """
-    Строит словарь для вычисления выражений, извлекая значения из нашего окружения.
-    Наше окружение хранится в виде: env[var_name] = {"type": ..., "value": ...}
+    Builds a dictionary for evaluating expressions by extracting the values from our environment.
+    Our environment is stored as: env[var_name] = {"type": ..., "value": ...}
     """
     result = {}
     for var, info in env.items():
@@ -83,85 +85,132 @@ def get_eval_env(env):
 
 
 # ---------------------------------------------------------------------
-# Обработка объявлений величин
+# Processing of variable declarations
 # ---------------------------------------------------------------------
 
 def process_declaration(line, env):
     """
-    Обрабатывает строку объявления величин.
-    Формат: <тип> [таб] <список идентификаторов, разделённых запятыми>
-    Например:
-      цел длина, ширина
-      вещ таб матрица[1:3, 1:4]   (табличные величины пока не поддерживаем полностью)
-      лит мой текст
-    После разбора для каждого идентификатора добавляем в env запись:
-      env[имя] = {"type": тип, "value": None, "kind": "global"}
-    Если имя не соответствует требованиям, генерируется исключение.
+    Processes a declaration line.
+    Format: <type> [таб] <comma-separated list of identifiers>
+    For example: цел длина, ширина, лог условие, лит мой текст
+    For table variables, the value is initialized as an empty dictionary.
     """
     tokens = line.split()
     if not tokens:
-        return
+        return False
 
     decl_type = tokens[0].lower()
     if decl_type not in ALLOWED_TYPES:
-        # Если объявление начинается не с одного из допустимых типов, не обрабатываем его здесь.
         return False
 
-    # Если следующий токен равен "таб", то это табличная величина (пока не реализуем)
     idx = 1
     is_table = False
     if idx < len(tokens) and tokens[idx].lower().startswith("таб"):
         is_table = True
         idx += 1
 
-    # Остальная часть строки считается списком идентификаторов, разделённых запятыми
     rest = " ".join(tokens[idx:])
     identifiers = [ident.strip() for ident in rest.split(",") if ident.strip()]
     if not identifiers:
-        raise Exception("Объявление типа без указания имен величин.")
+        raise Exception("Declaration without any variable names.")
 
     for ident in identifiers:
         if not is_valid_identifier(ident, decl_type):
-            raise Exception(f"Некорректное имя величины: '{ident}'")
+            raise Exception(f"Invalid variable name: '{ident}'")
         if ident in env:
-            raise Exception(f"Величина '{ident}' уже объявлена.")
-        env[ident] = {"type": decl_type, "value": None, "kind": "global", "is_table": is_table}
+            raise Exception(f"Variable '{ident}' already declared.")
+        env[ident] = {"type": decl_type, "value": {} if is_table else None, "kind": "global", "is_table": is_table}
     return True
 
 
 # ---------------------------------------------------------------------
-# Обработка присваиваний и команд вывода
+# Processing of assignments and output commands
 # ---------------------------------------------------------------------
 
 def process_assignment(line, env):
     """
-    Обрабатывает присваивание вида: <идентификатор> := <выражение>
-    Проверяет, что идентификатор объявлен, вычисляет правую часть и приводит результат к типу величины.
-    Обновляет значение переменной в env.
+    Processes an assignment of the form: VARIABLE := EXPRESSION.
+    Checks that the variable is declared, evaluates the expression and converts the result to the variable’s type.
+    Updates the variable’s value in env.
     """
     parts = line.split(":=")
     if len(parts) != 2:
-        raise Exception("Неверный синтаксис присваивания.")
+        raise Exception("Invalid assignment syntax.")
     left, right = parts[0].strip(), parts[1].strip()
+
+    # If assignment for an array element (e.g. a[i] or b[i,j])
+    if "[" in left and left.endswith("]"):
+        import re
+        match = re.match(
+            r"^([A-Za-zА-Яа-яЁё@_][A-Za-zА-Яа-яЁё0-9@_]*(?:\s+[A-Za-zА-Яа-яЁё@_][A-Za-zА-Яа-яЁё0-9@_]*)*)\[(.+)\]$",
+            left)
+        if not match:
+            raise Exception(f"Invalid syntax for array element assignment: {left}")
+        var_name = match.group(1).strip()
+        indices_expr = match.group(2).strip()
+        index_tokens = [token.strip() for token in indices_expr.split(",")]
+        eval_env = get_eval_env(env)
+        try:
+            indices = tuple(safe_eval(token, eval_env) for token in index_tokens)
+        except Exception as e:
+            raise Exception(f"Error evaluating indices in '{left}': {e}")
+        if var_name not in env or not env[var_name].get("is_table"):
+            raise Exception(f"Variable '{var_name}' is not declared as a table.")
+        target_type = env[var_name]["type"]
+        try:
+            value = safe_eval(right, eval_env)
+        except Exception as e:
+            raise Exception(f"Error evaluating expression '{right}': {e}")
+        try:
+            if target_type == "цел":
+                value = int(value)
+                if not (-MAX_INT <= value <= MAX_INT):
+                    raise Exception("Value out of range for integer type.")
+            elif target_type == "вещ":
+                value = float(value)
+            elif target_type == "лог":
+                if isinstance(value, bool):
+                    pass
+                elif isinstance(value, str):
+                    low_val = value.lower()
+                    if low_val == "да":
+                        value = True
+                    elif low_val == "нет":
+                        value = False
+                    else:
+                        raise Exception("Invalid logical value.")
+                else:
+                    value = bool(value)
+            elif target_type in {"сим", "лит"}:
+                value = str(value)
+                if target_type == "сим" and len(value) != 1:
+                    raise Exception("Character variable must be exactly one symbol.")
+            else:
+                raise Exception(f"Unsupported variable type: {target_type}")
+        except Exception as e:
+            raise Exception(f"Error converting value for '{left}': {e}")
+        if env[var_name]["value"] is None:
+            env[var_name]["value"] = {}
+        env[var_name]["value"][indices] = value
+        return
+
+    # Assignment for a simple variable
     if left not in env:
-        raise Exception(f"Переменная '{left}' не объявлена.")
-    # Вычисляем выражение в безопасном окружении
+        raise Exception(f"Variable '{left}' is not declared.")
     eval_env = get_eval_env(env)
     try:
         value = safe_eval(right, eval_env)
     except Exception as e:
-        raise Exception(f"Ошибка вычисления выражения '{right}': {e}")
-    # Приводим значение к объявленному типу
+        raise Exception(f"Error evaluating expression '{right}': {e}")
     target_type = env[left]["type"]
     try:
         if target_type == "цел":
             value = int(value)
-            if not (-МАКСЦЕЛ <= value <= МАКСЦЕЛ):
-                raise Exception("Значение вне допустимого диапазона для целого типа.")
+            if not (-MAX_INT <= value <= MAX_INT):
+                raise Exception("Value out of range for integer type.")
         elif target_type == "вещ":
             value = float(value)
         elif target_type == "лог":
-            # Допускаем bool или строковое представление "да"/"нет"
             if isinstance(value, bool):
                 pass
             elif isinstance(value, str):
@@ -171,28 +220,26 @@ def process_assignment(line, env):
                 elif low_val == "нет":
                     value = False
                 else:
-                    raise Exception("Неверное логическое значение.")
+                    raise Exception("Invalid logical value.")
             else:
                 value = bool(value)
         elif target_type in {"сим", "лит"}:
-            # Для символьной величины проверяем, что строка длиной 1 (сим) или любую (лит)
             value = str(value)
             if target_type == "сим" and len(value) != 1:
-                raise Exception("Символьная величина должна быть ровно один символ.")
+                raise Exception("Character variable must be exactly one symbol.")
         else:
-            # Неизвестный тип
-            raise Exception(f"Неподдерживаемый тип величины: {target_type}")
+            raise Exception(f"Unsupported variable type: {target_type}")
     except Exception as e:
-        raise Exception(f"Ошибка приведения значения для переменной '{left}': {e}")
+        raise Exception(f"Error converting value for variable '{left}': {e}")
     env[left]["value"] = value
 
 
 def process_output(line, env):
     """
-    Обрабатывает команду вывода. Ожидается, что строка начинается с 'вывод'.
-    Вычисляет выражение после слова 'вывод' и выводит результат.
+    Processes an output command.
+    Format: вывод expr1, ..., exprN
+    Evaluates the expression after the word 'вывод' and prints the result.
     """
-    # Удаляем ключевое слово "вывод"
     content = line[5:].strip()
     eval_env = get_eval_env(env)
     try:
@@ -203,38 +250,42 @@ def process_output(line, env):
 
 
 # ---------------------------------------------------------------------
-# Функция для делегирования команд исполнителю "Робот"
+# Function to delegate robot commands
 # ---------------------------------------------------------------------
 
 def process_robot_command(line, robot):
     """
-    Если строка соответствует одной из команд управления роботом, вызывает соответствующую функцию.
-    Поддерживаются команды: влево, вправо, вверх, вниз, закрасить.
+    If the line corresponds to one of the robot control commands, calls the corresponding function.
+    Supported commands: влево, вправо, вверх, вниз, закрасить.
     """
     cmd = line.lower().strip()
-    robot_commands = {"влево": robot.go_left, "вправо": robot.go_right, "вверх": robot.go_up, "вниз": robot.go_down,
-        "закрасить": robot.do_paint}
+    robot_commands = {
+        "влево": robot.go_left,
+        "вправо": robot.go_right,
+        "вверх": robot.go_up,
+        "вниз": robot.go_down,
+        "закрасить": robot.do_paint
+    }
     if cmd in robot_commands:
         try:
             robot_commands[cmd]()
         except Exception as e:
-            print(f"Ошибка при выполнении команды '{line}': {e}")
+            print(f"Error executing command '{line}': {e}")
         return True
     return False
 
 
 # ---------------------------------------------------------------------
-# Предварительная обработка и разбиение на строки/алгоритмы
+# Preprocessing and splitting into lines/algorithms
 # ---------------------------------------------------------------------
 
 def preprocess_code(code):
     """
-    Разбивает исходный код на строки, удаляет комментарии (строки, начинающиеся с '|' или '#')
-    и объединяет несколько команд в одну с помощью точки с запятой.
+    Splits the source code into lines, removes comments (lines starting with '|' or '#'),
+    and combines multiple commands into one using semicolons.
     """
     lines = []
     for line in code.splitlines():
-        # Удаляем комментарии: если встречается символ '|' или '#' – отбрасываем всё после него.
         if '|' in line:
             line = line.split('|')[0]
         if '#' in line:
@@ -242,7 +293,6 @@ def preprocess_code(code):
         line = line.strip()
         if not line:
             continue
-        # Разбиваем по точке с запятой
         parts = [part.strip() for part in line.split(';') if part.strip()]
         lines.extend(parts)
     return lines
@@ -250,8 +300,8 @@ def preprocess_code(code):
 
 def separate_sections(lines):
     """
-    Разделяет входные строки на вступление (до первого алгоритма) и алгоритмы.
-    Алгоритм определяется строкой, начинающейся с "алг".
+    Splits the input lines into an introduction (before the first algorithm) and algorithms.
+    An algorithm is determined by a line starting with "алг".
     """
     introduction = []
     algorithms = []
@@ -267,21 +317,19 @@ def separate_sections(lines):
             in_algo = False
         elif lower_line == "нач":
             if current_algo is None:
-                raise Exception("Ошибка: 'нач' без 'алг'")
+                raise Exception("Error: 'нач' without 'алг'")
             in_algo = True
         elif lower_line == "кон":
             if current_algo is None or not in_algo:
-                raise Exception("Ошибка: 'кон' без 'нач'")
-            in_algo = False  # После "кон" алгоритм считается завершённым
+                raise Exception("Error: 'кон' without 'нач'")
+            in_algo = False  # After "кон", the algorithm is considered complete
         else:
             if current_algo is None:
-                # До первого алгоритма – вступление
                 introduction.append(line)
             else:
                 if in_algo:
                     current_algo["body"].append(line)
                 else:
-                    # Строки между "алг" и "нач" считаем частью заголовка
                     current_algo["header"] += " " + line
     if current_algo is not None:
         algorithms.append(current_algo)
@@ -290,27 +338,25 @@ def separate_sections(lines):
 
 def parse_algorithm_header(header_line):
     """
-    Разбирает заголовок алгоритма.
-    Из строки, начинающейся с "алг", извлекается имя алгоритма (если задано) и описание параметров.
-    Пример:
+    Parses the algorithm header, extracting the algorithm name (if provided) and the parameter description.
+    Example:
       алг тест (рез цел m, n, лит т, арг вещ y)
-    Возвращает словарь с ключами:
-      - "raw": исходное содержимое заголовка (без "алг")
-      - "name": имя алгоритма (если есть)
-      - "params": список параметров в виде кортежей (mode, type, name)
+    Returns a dictionary with keys:
+      - "raw": the original header (without "алг")
+      - "name": the algorithm name (if any)
+      - "params": a list of parameters as tuples (mode, type, name)
     """
     header_line = header_line.strip()
     if header_line.lower().startswith("алг"):
-        header_line = header_line[3:].strip()  # удаляем "алг"
+        header_line = header_line[3:].strip()  # remove "алг"
     params = []
     name_part = header_line
     if "(" in header_line:
         parts = header_line.split("(", 1)
         name_part = parts[0].strip()
         params_part = parts[1].rsplit(")", 1)[0]
-        # Простой разбор параметров (разделён пробелами)
         tokens = params_part.split()
-        mode = "арг"  # режим по умолчанию
+        mode = "арг"  # default mode
         current_type = None
         current_names = []
         i = 0
@@ -346,72 +392,70 @@ def parse_algorithm_header(header_line):
 
 
 # ---------------------------------------------------------------------
-# Функция исполнения одной строки кода (вступление или тело алгоритма)
+# Function to execute a single line of code (from the introduction or algorithm body)
 # ---------------------------------------------------------------------
 
 def execute_line(line, env, robot):
     """
-    Исполняет одну строку кода.
-    Поддерживаются:
-      - Объявления величин (начинаются с цел, вещ, лог, сим, лит)
-      - Присваивания (оператор ":=")
-      - Команда вывода (начинается со слова "вывод")
-      - Команды управления роботом (влево, вправо, вверх, вниз, закрасить)
-    Для неизвестных строк выводится сообщение.
+    Executes a single line of code.
+    Supports:
+      - Variable declarations (starting with цел, вещ, лог, сим, лит)
+      - Assignments (using ":=")
+      - Output command (starting with "вывод")
+      - Robot control commands (влево, вправо, вверх, вниз, закрасить)
+    If the line is not recognized, prints a message.
     """
     lower_line = line.lower()
-    # Объявление величин
+    # Variable declaration
     for t in ALLOWED_TYPES:
         if lower_line.startswith(t):
-            # Попытка обработки объявления
             try:
                 process_declaration(line, env)
             except Exception as e:
-                print(f"Ошибка объявления: {e}")
+                print(f"Declaration error: {e}")
             return
 
-    # Присваивание
+    # Assignment
     if ":=" in line:
         try:
             process_assignment(line, env)
         except Exception as e:
-            print(f"Ошибка присваивания: {e}")
+            print(f"Assignment error: {e}")
         return
 
-    # Вывод
+    # Output
     if lower_line.startswith("вывод"):
         try:
             process_output(line, env)
         except Exception as e:
-            print(f"Ошибка команды 'вывод': {e}")
+            print(f"Output command error: {e}")
         return
 
-    # Команды управления Роботом
+    # Robot control commands
     if process_robot_command(line, robot):
         return
 
-    # Если строка не распознана, сообщаем об этом.
-    print(f"Неизвестная команда: {line}")
+    print(f"Unknown command: {line}")
 
 
 # ---------------------------------------------------------------------
-# Класс интерпретатора языка Кумир
+# Kumir Language Interpreter class
 # ---------------------------------------------------------------------
 
 class KumirLanguageInterpreter:
     def __init__(self, code):
         self.code = code
-        # Окружение для переменных: словарь вида { var_name: {"type": ..., "value": ..., "kind": ..., "is_table": ...} }
+        # Environment for variables: a dictionary of the form { var_name: {"type": ..., "value": ..., "kind": ..., "is_table": ...} }
         self.env = {}
-        self.algorithms = {}  # Словарь для вспомогательных алгоритмов по имени
+        self.algorithms = {}  # Dictionary for helper algorithms by name
         self.main_algorithm = None
-        # Создаем экземпляр исполнителя "Робот"
+        # Create an instance of the robot executor
         self.robot = KumirInterpreter()
 
     def parse(self):
         """
-        Обрабатывает исходный код: предварительная обработка, разделение на вступление и алгоритмы,
-        разбор заголовков алгоритмов.
+        Processes the source code: preprocessing, splitting into introduction and algorithms,
+        and parsing algorithm headers.
         """
         lines = preprocess_code(self.code)
         introduction, algo_sections = separate_sections(lines)
@@ -419,41 +463,41 @@ class KumirLanguageInterpreter:
         self.algo_sections = algo_sections
 
         if algo_sections:
-            # Первый алгоритм считается основным
+            # The first algorithm is considered the main one
             self.main_algorithm = algo_sections[0]
             header_info = parse_algorithm_header(self.main_algorithm["header"])
             self.main_algorithm["header_info"] = header_info
-            # Остальные алгоритмы сохраняем в таблице, если они имеют имя
+            # Save additional algorithms by name if provided
             for alg in algo_sections[1:]:
                 info = parse_algorithm_header(alg["header"])
                 alg["header_info"] = info
                 if info["name"]:
                     self.algorithms[info["name"]] = alg
         else:
-            raise Exception("Нет алгоритмов в программе.")
+            raise Exception("No algorithms found in the program.")
 
     def execute_introduction(self):
-        """Исполняет вступление (команды до первого алгоритма)."""
+        """Executes the introduction (commands before the first algorithm)."""
         for line in self.introduction:
             execute_line(line, self.env, self.robot)
 
     def execute_algorithm(self, algorithm):
-        """Исполняет тело алгоритма (строки между 'нач' и 'кон')."""
+        """Executes the body of an algorithm (lines between 'нач' and 'кон')."""
         for line in algorithm["body"]:
             execute_line(line, self.env, self.robot)
 
     def interpret(self):
-        """Полная интерпретация программы: парсинг, исполнение вступления и основного алгоритма."""
+        """Full interpretation of the program: parsing, executing the introduction and the main algorithm."""
         self.parse()
         self.execute_introduction()
-        print("Выполнение основного алгоритма:")
+        print("Executing main algorithm:")
         self.execute_algorithm(self.main_algorithm)
-        # Результат – обновленное окружение и текущая позиция робота.
+        # Return the updated environment and the current robot position.
         return {"env": self.env, "robot": self.robot.robot_pos}
 
 
 # ---------------------------------------------------------------------
-# Пример использования
+# Example usage
 # ---------------------------------------------------------------------
 
 if __name__ == "__main__":

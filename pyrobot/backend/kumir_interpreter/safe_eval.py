@@ -1,62 +1,62 @@
-# safe_eval.py (обновленный фрагмент)
+# safe_eval.py (updated fragment)
 
 import math
 from .identifiers import convert_hex_constants
-from .builtins import цел_в_лит, вещ_в_лит, лит_в_вещ, лит_в_цел, Цел, Вещ, Лог
+from .builtins import int_to_str, float_to_str, str_to_float, str_to_int, Int, Float, Bool
 from .math_functions import (
     sqrt, abs_val, iabs, sign,
-    sin_val, cos_val, tg, ctg, arcsin_val, arccos_val, arctg, arcctg,
+    sin_val, cos_val, tan_val, cot, arcsin_val, arccos_val, arctan_val, arccot,
     ln, lg, exp_val,
     min_val, max_val, imin, imax, div, mod, int_part,
-    rnd, rand, irnd, irand, МАКСЦЕЛ, МАКСВЕЩ
+    rnd, rand, irnd, irand, max_int, max_float
 )
-from .text_functions import длин, код, юникод, символ, юнисимвол
+from .text_functions import length, char_code, unicode_code, char, unicode_char
 
 from .string_utils import (
-    верхний_регистр, нижний_регистр,
-    позиция, поз, позиция_после, поз_после,
-    вставить, заменить, удалить
+    to_upper, to_lower,
+    position, pos, position_after, pos_after,
+    insert, replace_str, delete_str
 )
 
 from .file_functions import (
-    открыть_на_чтение, открыть_на_запись, открыть_на_добавление, закрыть,
-    начать_чтение, конец_файла, есть_данные,
-    установить_кодировку, можно_открыть_на_чтение, можно_открыть_на_запись,
-    существует, является_каталогом, создать_каталог, удалить_файл, удалить_каталог,
-    полный_путь, РАБОЧИЙ_КАТАЛОГ, КАТАЛОГ_ПРОГРАММЫ,
-    НАЗНАЧИТЬ_ВВОД, НАЗНАЧИТЬ_ВЫВОД, консоль
+    open_for_reading, open_for_writing, open_for_append, close_file,
+    reset_reading, eof, has_data,
+    set_encoding, can_open_for_reading, can_open_for_writing,
+    exists, is_directory, create_directory, delete_file, delete_directory,
+    full_path, WORKING_DIRECTORY, PROGRAM_DIRECTORY,
+    set_input, set_output, console_file
 )
-from .system_functions import ждать, время  # новый импорт
+from .system_functions import sleep_ms, current_time  # новый импорт
 
 
 def safe_eval(expr, eval_env):
     expr = convert_hex_constants(expr)
     safe_globals = {
         "__builtins__": None,
-        # Математические функции
+        # Math functions
         "sin": sin_val,
         "cos": cos_val,
         "sqrt": sqrt,
         "int": int_part,
         "float": float,
-        # Функции преобразования чисел
-        "цел_в_лит": цел_в_лит,
-        "вещ_в_лит": вещ_в_лит,
-        "лит_в_вещ": лит_в_вещ,
-        "лит_в_цел": лит_в_цел,
-        "Цел": Цел,
-        "Вещ": Вещ,
-        "Лог": Лог,
-        # Дополнительные математические функции
+        # Number conversion functions
+        "int_to_str": int_to_str,
+        "float_to_str": float_to_str,
+        "str_to_float": str_to_float,
+        "str_to_int": str_to_int,
+        "Int": Int,
+        "Float": Float,
+        "Bool": Bool,
+        # Additional math functions
         "abs": abs_val,
         "iabs": iabs,
         "sign": sign,
-        "tg": tg,
-        "ctg": ctg,
+        "tan": tan_val,  # 'tan' теперь ссылается на функцию tan_val (аналог tg)
+        "cot": cot,  # 'cot' теперь ссылается на функцию cot (аналог ctg)
         "arcsin": arcsin_val,
         "arccos": arccos_val,
-        "arctg": arctg,
-        "arcctg": arcctg,
+        "arctan": arctan_val,  # 'arctan' теперь ссылается на функцию arctan_val (аналог arctg)
+        "arccot": arccot,
         "ln": ln,
         "lg": lg,
         "exp": exp_val,
@@ -70,49 +70,49 @@ def safe_eval(expr, eval_env):
         "rand": rand,
         "irnd": irnd,
         "irand": irand,
-        "МАКСЦЕЛ": МАКСЦЕЛ,
-        "МАКСВЕЩ": МАКСВЕЩ,
-        # Функции работы с текстом
-        "длин": длин,
-        "код": код,
-        "юникод": юникод,
-        "символ": символ,
-        "юнисимвол": юнисимвол,
-        # Функции обработки строк
-        "верхний регистр": верхний_регистр,
-        "нижний регистр": нижний_регистр,
-        "позиция": позиция,
-        "поз": поз,
-        "позиция после": позиция_после,
-        "поз после": поз_после,
-        "вставить": вставить,
-        "заменить": заменить,
-        "удалить": удалить,
-        # Функции работы с файлами
-        "открыть на чтение": открыть_на_чтение,
-        "открыть на запись": открыть_на_запись,
-        "открыть на добавление": открыть_на_добавление,
-        "закрыть": закрыть,
-        "начать чтение": начать_чтение,
-        "конец файла": конец_файла,
-        "есть данные": есть_данные,
-        "установить кодировку": установить_кодировку,
-        "можно открыть на чтение": можно_открыть_на_чтение,
-        "можно открыть на запись": можно_открыть_на_запись,
-        "существует": существует,
-        "является каталогом": является_каталогом,
-        "создать каталог": создать_каталог,
-        "удалить_файл": удалить_файл,
-        "удалить_каталог": удалить_каталог,
-        "полный путь": полный_путь,
-        "РАБОЧИЙ КАТАЛОГ": РАБОЧИЙ_КАТАЛОГ,
-        "КАТАЛОГ ПРОГРАММЫ": КАТАЛОГ_ПРОГРАММЫ,
-        "НАЗНАЧИТЬ ВВОД": НАЗНАЧИТЬ_ВВОД,
-        "НАЗНАЧИТЬ ВЫВОД": НАЗНАЧИТЬ_ВЫВОД,
-        "консоль": консоль,
-        # Системные функции
-        "ждать": ждать,
-        "время": время,
+        "MAX_INT": max_int(),  # возвращаем максимальное целое число
+        "MAX_FLOAT": max_float(),  # возвращаем максимальное вещественное число
+        # Text functions
+        "length": length,
+        "char_code": char_code,
+        "unicode_code": unicode_code,
+        "char": char,
+        "unicode_char": unicode_char,
+        # String processing functions
+        "to_upper": to_upper,
+        "to_lower": to_lower,
+        "position": position,
+        "pos": pos,
+        "position_after": position_after,
+        "pos_after": pos_after,
+        "insert": insert,
+        "replace_str": replace_str,
+        "delete_str": delete_str,
+        # File functions
+        "open_for_reading": open_for_reading,
+        "open_for_writing": open_for_writing,
+        "open_for_append": open_for_append,
+        "close_file": close_file,
+        "reset_reading": reset_reading,
+        "eof": eof,
+        "has_data": has_data,
+        "set_encoding": set_encoding,
+        "can_open_for_reading": can_open_for_reading,
+        "can_open_for_writing": can_open_for_writing,
+        "exists": exists,
+        "is_directory": is_directory,
+        "create_directory": create_directory,
+        "delete_file": delete_file,
+        "delete_directory": delete_directory,
+        "full_path": full_path,
+        "WORKING_DIRECTORY": WORKING_DIRECTORY,
+        "PROGRAM_DIRECTORY": PROGRAM_DIRECTORY,
+        "set_input": set_input,
+        "set_output": set_output,
+        "console_file": console_file,
+        # System functions
+        "sleep_ms": sleep_ms,
+        "current_time": current_time,
     }
     return eval(expr, safe_globals, eval_env)
 

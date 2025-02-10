@@ -1,6 +1,6 @@
 # declarations.py
 
-from .constants import ALLOWED_TYPES, МАКСЦЕЛ
+from .constants import ALLOWED_TYPES, MAX_INT  # заменено МАКСЦЕЛ → MAX_INT (алиас уже установлен)
 from .identifiers import is_valid_identifier
 from .safe_eval import safe_eval, get_eval_env
 from .file_functions import get_default_output, get_default_input
@@ -8,10 +8,10 @@ from .file_functions import get_default_output, get_default_input
 
 def process_declaration(line, env):
     """
-    Обрабатывает строку объявления величин.
-    Формат: <тип> [таб] <список идентификаторов через запятую>
-    Например: цел длина, ширина, лог условие, лит мой текст
-    Для табличных величин значение инициализируется как пустой словарь.
+    Processes a declaration statement.
+    Format: <type> [tab] <comma-separated list of identifiers>
+    Example: цел длина, ширина, лог условие, лит мой текст
+    For table variables, the value is initialized as an empty dictionary.
     """
     tokens = line.split()
     if not tokens:
@@ -48,15 +48,15 @@ def process_declaration(line, env):
 
 def process_assignment(line, env):
     """
-    Обрабатывает присваивание вида: ВЕЛИЧИНА := ВЫРАЖЕНИЕ.
-    Поддерживает присваивание для простых величин и для элементов таблиц.
+    Processes an assignment statement: VARIABLE := EXPRESSION.
+    Supports assignment to simple variables and table elements.
     """
     parts = line.split(":=")
     if len(parts) != 2:
         raise Exception("Неверный синтаксис присваивания.")
     left, right = parts[0].strip(), parts[1].strip()
 
-    # Если присваивание для таблицы (например, a[i] или b[i,j])
+    # Assignment to a table element (e.g. a[i] or b[i,j])
     if "[" in left and left.endswith("]"):
         import re
         match = re.match(
@@ -82,7 +82,7 @@ def process_assignment(line, env):
         try:
             if target_type == "цел":
                 value = int(value)
-                if not (-МАКСЦЕЛ <= value <= МАКСЦЕЛ):
+                if not (-MAX_INT <= value <= MAX_INT):
                     raise Exception("Значение вне допустимого диапазона для целого типа.")
             elif target_type == "вещ":
                 value = float(value)
@@ -112,7 +112,7 @@ def process_assignment(line, env):
         env[var_name]["value"][indices] = value
         return
 
-    # Присваивание для простой величины
+    # Assignment for a simple variable
     if left not in env:
         raise Exception(f"Переменная '{left}' не объявлена.")
     eval_env = get_eval_env(env)
@@ -124,7 +124,7 @@ def process_assignment(line, env):
     try:
         if target_type == "цел":
             value = int(value)
-            if not (-МАКСЦЕЛ <= value <= МАКСЦЕЛ):
+            if not (-MAX_INT <= value <= MAX_INT):
                 raise Exception("Значение вне допустимого диапазона для целого типа.")
         elif target_type == "вещ":
             value = float(value)
@@ -154,12 +154,12 @@ def process_assignment(line, env):
 
 def process_output(line, env, interpreter=None):
     """
-    Обрабатывает команду вывода.
-    Формат: вывод выражение1, ..., выражениеN
-    Если первое выражение – переменная типа файл, то вывод происходит в этот файл,
-    иначе – если задан стандартный вывод (через НАЗНАЧИТЬ ВЫВОД), то запись производится в него.
-    Ключевое слово нс трактуется как перевод на новую строку.
-    Если передан параметр interpreter, вывод добавляется в его буфер (интерpreter.output).
+    Processes an output command.
+    Format: вывод expression1, ..., expressionN
+    If the first expression is a file-type variable, output is directed to that file;
+    otherwise, if standard output is set (via НАЗНАЧИТЬ ВЫВОД), output is written there.
+    The keyword нс is interpreted as a newline.
+    If the parameter interpreter is provided, the output is appended to its buffer (interpreter.output).
     """
     content = line[5:].strip()
     expressions = [expr.strip() for expr in content.split(",") if expr.strip()]
@@ -189,11 +189,10 @@ def process_output(line, env, interpreter=None):
 
 def process_input(line, env):
     """
-    Обрабатывает команду ввода.
-    Формат: ввод выражение1, ..., выражениеN
-    Если стандартный ввод задан (через НАЗНАЧИТЬ ВВОД), читаем из него,
-    иначе – запрашиваем ввод с клавиатуры.
-    Присваивает введённые значения соответствующим переменным.
+    Processes an input command.
+    Format: ввод expression1, ..., expressionN
+    If standard input is set (via НАЗНАЧИТЬ ВВОД), it is used; otherwise, input is requested from the keyboard.
+    The entered values are assigned to the corresponding variables.
     """
     content = line[4:].strip()
     targets = [t.strip() for t in content.split(",") if t.strip()]
