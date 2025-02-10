@@ -8,7 +8,7 @@ import {Delete, Stop, PlayArrow, Refresh} from '@mui/icons-material';
 
 import './CodeEditor.css';
 
-// --- Списки ключевых слов ---
+// --- Keywords lists (user-visible, must remain in Russian) ---
 const structuralKeywords = [
 	"алг", "нач", "кон", "исп", "кон_исп", "использовать"
 ];
@@ -37,7 +37,7 @@ const robotCommands = [
 	"температура", "радиация"
 ];
 
-// --- Функция генерации RegExp для ключевых слов ---
+// --- Function to generate RegExp for keywords ---
 function makeKumirRegex(words) {
 	const alternatives = words.join("|");
 	return {
@@ -72,8 +72,8 @@ const CodeEditor = memo(({
 	                         onStop,
 	                         onStart,
 	                         onReset,
-	                         statusText,    // Строка с текущим статусом (например, позиция робота, маркеры и т.д.)
-	                         consoleOutput  // Строка с выводом (ответами сервера)
+	                         statusText,    // Current status (e.g. robot position, markers, etc.)
+	                         consoleOutput  // Console output (server responses)
                          }) => {
 	const highlightCode = useCallback((inputCode) => {
 		return Prism.highlight(inputCode, Prism.languages.kumir, 'kumir');
@@ -93,7 +93,7 @@ const CodeEditor = memo(({
 				className="react-simple-code-editor"
 			/>
 
-			{/* Панель управления: кнопки */}
+			{/* Control panel: buttons */}
 			<div className="editor-controls">
 				<Button
 					variant="contained"
@@ -134,14 +134,14 @@ const CodeEditor = memo(({
 				</Button>
 			</div>
 
-			{/* Статус */}
+			{/* Status display */}
 			<Card className="status-card">
 				<Typography variant="body2" className="status-text">
 					{statusText}
 				</Typography>
 			</Card>
 
-			{/* Консоль для вывода ответов сервера */}
+			{/* Console for server responses */}
 			<Card className="console-card">
 				<Typography variant="body2" className="console-text">
 					{consoleOutput}

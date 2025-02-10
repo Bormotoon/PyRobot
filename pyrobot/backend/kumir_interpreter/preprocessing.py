@@ -2,8 +2,8 @@
 
 def preprocess_code(code):
     """
-    Разбивает исходный код на строки, удаляет комментарии (начинающиеся с '|' или '#')
-    и разбивает строки по точке с запятой.
+    Splits the source code into lines, removes comments (lines starting with '|' or '#'),
+    and splits lines using the semicolon.
     """
     lines = []
     for line in code.splitlines():
@@ -21,8 +21,8 @@ def preprocess_code(code):
 
 def separate_sections(lines):
     """
-    Разделяет строки кода на вступление (до первого алгоритма) и алгоритмы.
-    Алгоритм определяется строкой, начинающейся с "алг".
+    Splits the code lines into an introduction (before the first algorithm)
+    and algorithms. An algorithm is defined by a line starting with "алг".
     """
     introduction = []
     algorithms = []
@@ -59,12 +59,13 @@ def separate_sections(lines):
 
 def parse_algorithm_header(header_line):
     """
-    Разбирает заголовок алгоритма, выделяя имя алгоритма и описание параметров (если есть).
-    Пример: алг тест (рез цел m, n, лит т, арг вещ y)
-    Возвращает словарь с ключами:
-      - "raw": исходный заголовок (без "алг")
-      - "name": имя алгоритма (если задано)
-      - "params": список параметров в виде кортежей (mode, type, name)
+    Parses the algorithm header, extracting the algorithm name and parameter description (if any).
+    Example:
+      алг тест (рез цел m, n, лит т, арг вещ y)
+    Returns a dictionary with keys:
+      - "raw": the original header (without "алг")
+      - "name": the algorithm name (if specified)
+      - "params": a list of tuples (mode, type, name) representing the parameters.
     """
     header_line = header_line.strip()
     if header_line.lower().startswith("алг"):

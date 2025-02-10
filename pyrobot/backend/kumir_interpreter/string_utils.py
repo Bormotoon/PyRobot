@@ -14,102 +14,102 @@
 """
 
 
-def верхний_регистр(строка):
+def upper_case(text):
     """Возвращает строку с приведёнными к верхнему регистру символами."""
-    return str(строка).upper()
+    return str(text).upper()
 
 
-def нижний_регистр(строка):
+def lower_case(text):
     """Возвращает строку с приведёнными к нижнему регистру символами."""
-    return str(строка).lower()
+    return str(text).lower()
 
 
-def позиция(фрагмент, строка):
+def position(substring, text):
     """
-    Возвращает позицию первого символа подстроки фрагмент в строке строка (индексация с 1).
-    Если фрагмент не найден, возвращает 0.
+    Возвращает позицию первого символа подстроки substring в строке text (индексация с 1).
+    Если подстрока не найдена, возвращает 0.
     """
-    s = str(строка)
-    sub = str(фрагмент)
+    s = str(text)
+    sub = str(substring)
     idx = s.find(sub)
     return idx + 1 if idx != -1 else 0
 
 
 # Сокращённый вариант:
-поз = позиция
+pos = position
 
 
-def позиция_после(начало, фрагмент, строка):
+def position_after(start, substring, text):
     """
-    Возвращает позицию первого символа подстроки фрагмент в строке строка,
-    начиная поиск с позиции начало (индексация с 1).
-    Если фрагмент не найден, возвращает 0.
+    Возвращает позицию первого символа подстроки substring в строке text,
+    начиная поиск с позиции start (индексация с 1).
+    Если подстрока не найдена, возвращает 0.
     """
     try:
-        start = int(начало)
+        s_start = int(start)
     except Exception:
-        raise ValueError("позиция после: 'начало' должно быть целым числом")
-    s = str(строка)
-    sub = str(фрагмент)
-    if start < 1 or start > len(s) + 1:
-        raise ValueError("позиция после: 'начало' вне допустимого диапазона")
-    idx = s.find(sub, start - 1)
+        raise ValueError("position_after: 'start' должно быть целым числом")
+    s = str(text)
+    sub = str(substring)
+    if s_start < 1 or s_start > len(s) + 1:
+        raise ValueError("position_after: 'start' вне допустимого диапазона")
+    idx = s.find(sub, s_start - 1)
     return idx + 1 if idx != -1 else 0
 
 
-def поз_после(начало, фрагмент, строка):
-    """Сокращённый вариант функции 'позиция после'."""
-    return позиция_после(начало, фрагмент, строка)
+def pos_after(start, substring, text):
+    """Сокращённый вариант функции 'position_after'."""
+    return position_after(start, substring, text)
 
 
-def вставить(фрагмент, строка, начало):
+def insert(substring, text, start):
     """
-    Вставляет фрагмент в строку, начиная с позиции начало (индексация с 1).
-    Если начало равно длин(строка)+1, то фрагмент добавляется в конец строки.
-    Если начало < 1 или начало > длин(строка)+1, возбуждается ошибка.
+    Вставляет substring в text, начиная с позиции start (индексация с 1).
+    Если start равно длине(text)+1, то substring добавляется в конец строки.
+    Если start < 1 или start > длина(text)+1, возбуждается ошибка.
     """
-    s = str(строка)
-    sub = str(фрагмент)
+    s = str(text)
+    sub = str(substring)
     try:
-        pos = int(начало)
+        s_start = int(start)
     except Exception:
-        raise ValueError("вставить: 'начало' должно быть целым числом")
-    if pos < 1 or pos > len(s) + 1:
-        raise ValueError("вставить: 'начало' вне допустимого диапазона")
-    return s[:pos - 1] + sub + s[pos - 1:]
+        raise ValueError("insert: 'start' должно быть целым числом")
+    if s_start < 1 or s_start > len(s) + 1:
+        raise ValueError("insert: 'start' вне допустимого диапазона")
+    return s[:s_start - 1] + sub + s[s_start - 1:]
 
 
-def заменить(строка, старый_фрагмент, новый_фрагмент, каждый):
+def replace(text, old_sub, new_sub, every):
     """
-    Заменяет в строке все вхождения подстроки старый_фрагмент на новый_фрагмент, если параметр каждый равен "да"
-    (без учета регистра). Если каждый равен "нет", заменяет только первое вхождение.
+    Заменяет в строке text все вхождения подстроки old_sub на new_sub, если параметр every равен "да"
+    (без учета регистра). Если every равен "нет", заменяет только первое вхождение.
     """
-    s = str(строка)
-    old = str(старый_фрагмент)
-    new = str(новый_фрагмент)
-    if str(каждый).strip().lower() == "да":
+    s = str(text)
+    old = str(old_sub)
+    new = str(new_sub)
+    if str(every).strip().lower() == "да":
         return s.replace(old, new)
-    elif str(каждый).strip().lower() == "нет":
+    elif str(every).strip().lower() == "нет":
         return s.replace(old, new, 1)
     else:
-        raise ValueError("заменить: параметр 'каждый' должен быть 'да' или 'нет'")
+        raise ValueError("replace: параметр 'every' должен быть 'да' или 'нет'")
 
 
-def удалить(строка, начало, количество):
+def delete(text, start, count):
     """
-    Удаляет из строки указанное количество символов, начиная с позиции начало (индексация с 1).
-    Если начало + количество > длин(строка)+1, то удаляется текст до конца строки.
-    Если начало < 1 или начало > длин(строка)+1, возбуждается ошибка.
+    Удаляет из строки text указанное количество символов, начиная с позиции start (индексация с 1).
+    Если start + count > длина(text)+1, то удаляется текст до конца строки.
+    Если start < 1 или start > длина(text)+1, возбуждается ошибка.
     """
-    s = str(строка)
+    s = str(text)
     try:
-        pos = int(начало)
-        count = int(количество)
+        s_start = int(start)
+        cnt = int(count)
     except Exception:
-        raise ValueError("удалить: 'начало' и 'количество' должны быть целыми числами")
-    if pos < 1 or pos > len(s) + 1:
-        raise ValueError("удалить: 'начало' вне допустимого диапазона")
-    if pos + count - 1 >= len(s) + 1:
-        return s[:pos - 1]
+        raise ValueError("delete: 'start' и 'count' должны быть целыми числами")
+    if s_start < 1 or s_start > len(s) + 1:
+        raise ValueError("delete: 'start' вне допустимого диапазона")
+    if s_start + cnt - 1 >= len(s) + 1:
+        return s[:s_start - 1]
     else:
-        return s[:pos - 1] + s[pos - 1 + count:]
+        return s[:s_start - 1] + s[s_start - 1 + cnt:]

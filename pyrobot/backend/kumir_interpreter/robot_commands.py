@@ -7,11 +7,11 @@ def process_robot_command(line, robot):
     """
     cmd = line.lower().strip()
     robot_commands = {
-        "влево": robot.go_left,
-        "вправо": robot.go_right,
-        "вверх": robot.go_up,
-        "вниз": robot.go_down,
-        "закрасить": robot.do_paint
+        "влево": robot.left,
+        "вправо": robot.right,
+        "вверх": robot.up,
+        "вниз": robot.down,
+        "закрасить": robot.paint
     }
     if cmd in robot_commands:
         try:

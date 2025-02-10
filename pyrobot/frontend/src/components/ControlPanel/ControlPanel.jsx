@@ -17,7 +17,7 @@ import {
 	Remove,
 } from '@mui/icons-material';
 import {getHint} from '../hints';
-import './ControlPanel.css'; // Стили с .control-panel и .control-button
+import './ControlPanel.css'; // Стили для .control-panel и .control-button
 
 // Импорт компонента диалога с инструкцией
 import HelpDialog from '../Help/HelpDialog';
@@ -235,9 +235,7 @@ const ControlPanel = memo(({
 			setWalls(new Set());
 			setColoredCells(new Set());
 			setMarkers({});
-			const lines = content.split('\n').filter(line => {
-				return !line.startsWith(';') && line.trim() !== '';
-			});
+			const lines = content.split('\n').filter(line => line.trim() !== '' && !line.startsWith(';'));
 			const [wFile, hFile] = lines[0].split(/\s+/).map(Number);
 			setWidth(wFile);
 			setHeight(hFile);
@@ -281,7 +279,7 @@ const ControlPanel = memo(({
 				<CardHeader title="Управление"/>
 				<CardContent>
 					<Grid container spacing={2}>
-						{/* Кнопки направления */}
+						{/* Direction buttons */}
 						<Grid item xs={12} style={{textAlign: 'center'}}>
 							<Button
 								onClick={() => moveRobot('up')}
@@ -333,7 +331,7 @@ const ControlPanel = memo(({
 							</Button>
 						</Grid>
 
-						{/* Маркеры */}
+						{/* Markers */}
 						<Grid item xs={6}>
 							<Button
 								onClick={putMarker}
@@ -359,7 +357,7 @@ const ControlPanel = memo(({
 							</Button>
 						</Grid>
 
-						{/* Покраска / Очистка клетки */}
+						{/* Paint / Clear cell */}
 						<Grid item xs={6}>
 							<Button
 								onClick={paintCell}
@@ -385,28 +383,28 @@ const ControlPanel = memo(({
 							</Button>
 						</Grid>
 
-						{/* Режим рисования */}
+						{/* Toggle edit mode */}
 						<Grid item xs={12}>
 							<Button
 								onClick={toggleEditMode}
 								color="secondary"
 								variant="contained"
 								className="control-button"
-								aria-label="Тоггл Режим Рисования"
+								aria-label="Toggle Edit Mode"
 							>
 								<Edit style={{marginRight: '8px'}}/>
 								{editMode ? 'Выключить Режим рисования' : 'Включить Режим рисования'}
 							</Button>
 						</Grid>
 
-						{/* Изменение размеров поля */}
+						{/* Field size adjustments */}
 						<Grid item xs={6}>
 							<Button
 								onClick={increaseWidth}
 								color="primary"
 								variant="contained"
 								className="control-button"
-								aria-label="Поле шире"
+								aria-label="Increase Field Width"
 							>
 								<Add style={{marginRight: '8px'}}/>
 								Поле шире
@@ -418,7 +416,7 @@ const ControlPanel = memo(({
 								color="primary"
 								variant="contained"
 								className="control-button"
-								aria-label="Поле уже"
+								aria-label="Decrease Field Width"
 							>
 								<Remove style={{marginRight: '8px'}}/>
 								Поле уже
@@ -431,7 +429,7 @@ const ControlPanel = memo(({
 								color="primary"
 								variant="contained"
 								className="control-button"
-								aria-label="Поле выше"
+								aria-label="Increase Field Height"
 							>
 								<Add style={{marginRight: '8px'}}/>
 								Поле выше
@@ -443,22 +441,21 @@ const ControlPanel = memo(({
 								color="primary"
 								variant="contained"
 								className="control-button"
-								aria-label="Поле ниже"
+								aria-label="Decrease Field Height"
 							>
 								<Remove style={{marginRight: '8px'}}/>
 								Поле ниже
 							</Button>
 						</Grid>
 
-						{/* Помощь / Импорт */}
+						{/* Help / Import */}
 						<Grid item xs={6}>
 							<Button
-								// Вместо установки статусного сообщения, открываем диалог помощи
 								onClick={() => setHelpOpen(true)}
 								color="info"
 								variant="contained"
 								className="control-button"
-								aria-label="Помощь"
+								aria-label="Help"
 							>
 								<HelpOutline style={{marginRight: '8px'}}/>
 								Помощь
@@ -470,7 +467,7 @@ const ControlPanel = memo(({
 								color="secondary"
 								variant="contained"
 								className="control-button"
-								aria-label="Импорт .fil"
+								aria-label="Import .fil"
 							>
 								<FileUpload style={{marginRight: '8px'}}/>
 								Импорт .fil
@@ -485,7 +482,7 @@ const ControlPanel = memo(({
 					</Grid>
 				</CardContent>
 			</Card>
-			{/* Диалог помощи */}
+			{/* Help dialog */}
 			<HelpDialog open={helpOpen} onClose={() => setHelpOpen(false)}/>
 		</>
 	);

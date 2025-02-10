@@ -1,80 +1,100 @@
 # text_functions.py
 """
-Модуль для обработки текста в языке КУМИР.
-Реализованы следующие функции:
-  - длин(строка): возвращает количество символов в строке.
-  - код(c): возвращает порядковый номер символа c в таблице CP-1251.
-  - юникод(c): возвращает Unicode-код символа c.
-  - символ(n): возвращает символ по CP-1251 коду n.
-  - юнисимвол(n): возвращает символ по Unicode-коду n.
+Module for text processing functions in the Kumir language.
+Implemented functions:
+  - length(text): returns the number of characters in the string.
+  - get_cp1251_code(c): returns the code (ordinal number) of the character c in the CP-1251 encoding.
+  - get_unicode_code(c): returns the Unicode code of the character c.
+  - char_from_cp1251(n): returns the character corresponding to the CP-1251 code n.
+  - unicode_char(n): returns the character corresponding to the Unicode code n.
 """
 
 
-def длин(строка):
+def length(text):
     """
-    Возвращает количество символов в строке.
+    Returns the number of characters in the string.
 
-    Пример:
-      длин("Привет") → 6
+    Example:
+      length("Привет") → 6
     """
-    return len(str(строка))
+    return len(str(text))
 
 
-def код(c):
+# Alias for backward compatibility:
+длин = length
+
+
+def get_cp1251_code(c):
     """
-    Возвращает порядковый номер символа c в таблице CP-1251.
-    Если c не является строкой длиной 1, возбуждает исключение.
+    Returns the ordinal number of the character c in the CP-1251 encoding.
+    If c is not a string of length 1, raises an exception.
 
-    Пример:
-      код("А") → 192   (в CP-1251 буква А имеет код 192)
+    Example:
+      get_cp1251_code("А") → 192  (in CP-1251, the letter А has code 192)
     """
     s = str(c)
     if len(s) != 1:
-        raise ValueError("Функция 'код' принимает строку длиной 1")
+        raise ValueError("Function 'get_cp1251_code' expects a string of length 1")
     try:
         encoded = s.encode('cp1251')
     except Exception as e:
-        raise ValueError(f"Ошибка кодирования символа '{s}' в CP-1251: {e}")
+        raise ValueError(f"Error encoding character '{s}' in CP-1251: {e}")
     return encoded[0]
 
 
-def юникод(c):
-    """
-    Возвращает Unicode-код символа c.
+# Alias for backward compatibility:
+код = get_cp1251_code
 
-    Пример:
-      юникод("А") → 1040
+
+def get_unicode_code(c):
+    """
+    Returns the Unicode code of the character c.
+
+    Example:
+      get_unicode_code("А") → 1040
     """
     s = str(c)
     if len(s) != 1:
-        raise ValueError("Функция 'юникод' принимает строку длиной 1")
+        raise ValueError("Function 'get_unicode_code' expects a string of length 1")
     return ord(s)
 
 
-def символ(n):
-    """
-    Возвращает символ, соответствующий CP-1251 коду n.
-    Если число n не соответствует допустимому байту, возбуждает исключение.
+# Alias for backward compatibility:
+юникод = get_unicode_code
 
-    Пример:
-      символ(192) → "А"
+
+def char_from_cp1251(n):
+    """
+    Returns the character corresponding to the CP-1251 code n.
+    If the number n is not a valid byte, raises an exception.
+
+    Example:
+      char_from_cp1251(192) → "А"
     """
     try:
         n_int = int(n)
         b = bytes([n_int])
         return b.decode('cp1251')
     except Exception as e:
-        raise ValueError(f"Ошибка преобразования числа {n} в символ CP-1251: {e}")
+        raise ValueError(f"Error converting number {n} to a CP-1251 character: {e}")
 
 
-def юнисимвол(n):
+# Alias for backward compatibility:
+символ = char_from_cp1251
+
+
+def unicode_char(n):
     """
-    Возвращает символ, соответствующий Unicode-коду n.
+    Returns the character corresponding to the Unicode code n.
 
-    Пример:
-      юнисимвол(1040) → "А"
+    Example:
+      unicode_char(1040) → "А"
     """
     try:
         return chr(int(n))
     except Exception as e:
-        raise ValueError(f"Ошибка преобразования числа {n} в Unicode символ: {e}")
+        raise ValueError(f"Error converting number {n} to a Unicode character: {e}")
+
+
+# Alias for backward compatibility:
+юнисимвол = unicode_char
