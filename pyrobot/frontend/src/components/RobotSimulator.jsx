@@ -240,7 +240,7 @@ const RobotSimulator = memo(() => {
 		// Ограничение позиции робота, чтобы она не выходила за границы поля
 		const newPos = clampRobotPos(state.robotPos, state.width, state.height);
 		dispatch({type: 'SET_ROBOT_POS', payload: newPos});
-	}, [state.width, state.height]);
+	}, [state.width, state.height, state.robotPos]);
 
 	// Формирование текстового сообщения со статусом симулятора для отображения в редакторе
 	const statusText = [`Позиция робота: (${state.robotPos.x}, ${state.robotPos.y})`, `Маркеров: ${Object.keys(state.markers).length}`, `Раскрашенных клеток: ${state.coloredCells.size}`,].join('\n');
