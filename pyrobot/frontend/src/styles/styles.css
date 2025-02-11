@@ -1,28 +1,42 @@
-/* styles.css */
+/*
+ * @file styles.css
+ * @description Глобальные стили для приложения симулятора робота.
+ * Файл содержит корневые CSS-переменные для единообразных отступов, цветов, шрифтов, теней,
+ * базовые ресеты, общие стили для контейнеров, карточек и адаптивные стили для различных экранов.
+ */
 
 /* 1) Корневые переменные */
+/* Здесь определяются переменные, используемые по всему приложению для поддержания консистентного стиля */
 :root {
-    --spacing: 8px;
-    --half-spacing: 4px;
-    --border-radius: 8px;
-    --small-border-radius: 4px;
-    --box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    --button-box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.3);
+    /* Отступы */
+    --spacing: 8px; /* Основной отступ */
+    --half-spacing: 4px; /* Половина основного отступа */
 
-    --background-color-app: #f9f9f9;
-    --background-color-card: #fff;
-    --background-color-code-editor: #ffffff;
-    --text-color-code-editor: #333333;
-    --background-color-canvas: #289628;
-    --background-color-edit-mode: #6496ff;
-    --background-color-dialog: #f5f5f5;
-    --text-color-status: #333;
+    /* Скругления */
+    --border-radius: 8px; /* Основное скругление углов */
+    --small-border-radius: 4px; /* Меньшее скругление для некоторых элементов */
 
-    --font-family-monospace: 'Fira Code', monospace;
-    --font-size-status: 14px;
+    /* Тени */
+    --box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Легкая тень для контейнеров и карточек */
+    --button-box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.3); /* Более заметная тень для кнопок */
+
+    /* Цвета фонов и текста */
+    --background-color-app: #f9f9f9; /* Фон всего приложения */
+    --background-color-card: #fff; /* Фон карточек и контейнеров */
+    --background-color-code-editor: #ffffff; /* Фон редактора кода */
+    --text-color-code-editor: #333333; /* Цвет текста в редакторе кода */
+    --background-color-canvas: #289628; /* Фон игрового поля (canvas) */
+    --background-color-edit-mode: #6496ff; /* Фон canvas в режиме редактирования */
+    --background-color-dialog: #f5f5f5; /* Фон диалоговых окон */
+    --text-color-status: #333; /* Цвет текстовых сообщений и подсказок */
+
+    /* Шрифты */
+    --font-family-monospace: 'Fira Code', monospace; /* Моноширинный шрифт для отображения кода */
+    --font-size-status: 14px; /* Размер шрифта для статусных сообщений */
 }
 
 /* 2) Базовые ресеты */
+/* Обеспечивает единообразие отступов, размеров и коробочной модели во всех браузерах */
 html,
 body {
     height: 100%;
@@ -31,68 +45,72 @@ body {
 *,
 *::before,
 *::after {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
+    box-sizing: border-box; /* Рассчитывать размеры с учетом внутренних отступов и границ */
+    margin: 0; /* Убираем внешние отступы */
+    padding: 0; /* Убираем внутренние отступы */
 }
 
 body {
-    font-family: Arial, sans-serif;
+    font-family: Arial, sans-serif; /* Основной шрифт приложения */
 }
 
 /* 3) Общие стили для контейнеров и карточек */
+/* Задает базовый внешний вид для контейнеров, карточек, игрового поля и статусных сообщений */
 .container,
 .card,
 .field-card,
 .status-card {
-    background: var(--background-color-card);
-    border-radius: var(--border-radius);
-    box-shadow: var(--box-shadow);
+    background: var(--background-color-card); /* Фон, заданный переменной */
+    border-radius: var(--border-radius); /* Скругление углов */
+    box-shadow: var(--box-shadow); /* Тень для визуального выделения */
 }
 
 .card,
 .field-card,
 .status-card {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
+    display: flex; /* Используем flex-контейнер для выравнивания содержимого */
+    flex-direction: column; /* Располагаем элементы по вертикали */
+    justify-content: center; /* Центрируем по вертикали */
+    align-items: center; /* Центрируем по горизонтали */
 }
 
 /* Контейнер приложения */
+/* Центрирует основные компоненты приложения */
 .container {
     display: flex;
-    justify-content: center;
-    align-items: flex-start;
-    height: 100%;
-    overflow: hidden;
+    justify-content: center; /* Горизонтальное центрирование */
+    align-items: flex-start; /* Выравнивание по верхнему краю */
+    height: 100%; /* Занимает всю высоту родительского элемента */
+    overflow: hidden; /* Скрывает переполнение */
     min-height: 0;
 }
 
-/* Основной контейнер приложения – делаем позиционирование относительным */
+/* Основной контейнер приложения – позиционирование относительно */
+/* Позволяет использовать абсолютное позиционирование для внутренних элементов (например, подсказок) */
 .app-container {
-    position: relative; /* Добавлено для возможности абсолютного позиционирования подсказок */
+    position: relative;
     display: flex;
-    flex-direction: row;
-    align-items: stretch;
-    background-color: var(--background-color-app);
+    flex-direction: row; /* Располагает дочерние элементы в строку */
+    align-items: stretch; /* Растягивает дочерние элементы по высоте */
+    background-color: var(--background-color-app); /* Фон приложения */
     width: 100%;
-    height: 100vh;
+    height: 100vh; /* Высота равна высоте окна браузера */
     overflow: hidden;
     min-height: 0;
 }
 
 /* Адаптивность */
+/* Медиа-запросы для адаптации макета под различные размеры экранов */
 @media (max-width: 1200px) {
     .container {
-        flex-wrap: wrap;
+        flex-wrap: wrap; /* Перенос элементов на следующую строку при уменьшении ширины экрана */
     }
 }
 
 @media (max-width: 768px) {
     .container,
     .app-container {
-        flex-direction: column;
+        flex-direction: column; /* Переход на колонночное расположение для узких экранов */
         height: 100%;
     }
 }

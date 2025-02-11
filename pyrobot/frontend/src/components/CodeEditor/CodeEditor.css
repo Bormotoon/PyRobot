@@ -1,170 +1,257 @@
-/* CodeEditor.css */
+/*
+ * @file CodeEditor.css
+ * @description Стили для компонента редактора кода, панели управления, консоли и отображения статуса.
+ * Файл определяет внешний вид главного контейнера редактора, самого редактора кода (react-simple-code-editor),
+ * панели с кнопками управления, а также стили для подсветки синтаксиса (Prism.js) и консоли с ответами сервера.
+ */
 
-/* Главный контейнер редактора */
+/* Главный контейнер редактора кода */
 .code-editor {
+    /* Задает гибкий размер, позволяющий элементу занимать 25% пространства родителя */
     flex: 1 1 25%;
+    /* Определяет порядок элемента в flex-контейнере */
     order: 1;
+    /* Внешний отступ */
     margin: var(--spacing);
+    /* Внутренний отступ */
     padding: var(--spacing);
+    /* Фоновый цвет, заданный переменной */
     background: var(--background-color-code-editor);
+    /* Цвет текста, заданный переменной */
     color: var(--text-color-code-editor);
+    /* Использование flex-контейнера для внутренней компоновки */
     display: flex;
+    /* Расположение дочерних элементов по вертикали */
     flex-direction: column;
+    /* Равномерное распределение свободного пространства между элементами */
     justify-content: space-between;
+    /* Скрытие содержимого, выходящего за пределы контейнера */
     overflow: hidden;
+    /* Скругление углов контейнера */
     border-radius: var(--border-radius);
+    /* Тень для создания эффекта подъема над фоном */
     box-shadow: var(--box-shadow);
+    /* Минимальная высота, чтобы элемент не сжимался */
     min-height: 0;
 }
 
-/* Сам react-simple-code-editor */
+/* Стили для редактора кода (react-simple-code-editor) внутри главного контейнера */
 .code-editor .react-simple-code-editor {
+    /* Гибкий рост и сжатие элемента, занимающий все доступное пространство */
     flex: 1 1 auto;
+    /* Ширина 100% от родительского контейнера */
     width: 100%;
+    /* Внутренний отступ */
     padding: var(--spacing);
+    /* Граница редактора с тонкой линией */
     border: 1px solid #ccc;
+    /* Скругление углов границы */
     border-radius: var(--small-border-radius);
+    /* Отступ снизу для разделения от следующих элементов */
     margin-bottom: var(--spacing);
+    /* Плавная анимация изменения высоты */
     transition: height 0.3s ease;
+    /* Наследование фонового цвета от родительского элемента */
     background: inherit;
+    /* Наследование цвета текста от родительского элемента */
     color: inherit;
+    /* Моноширинный шрифт для корректного отображения кода */
     font-family: 'Roboto Mono', monospace !important;
+    /* Размер шрифта */
     font-size: 14px;
+    /* Вертикальная прокрутка при переполнении содержимого */
     overflow-y: auto !important;
+    /* Минимальная высота редактора */
     min-height: 0;
+    /* Автоматический перенос строк */
     white-space: pre-wrap !important;
+    /* Перенос слов при необходимости */
     word-break: break-all !important;
+    /* Выравнивание текста по левому краю */
     text-align: left !important;
+    /* Корректный расчет размеров с учетом отступов и границ */
     box-sizing: border-box !important;
 }
 
-/* Панель управления: кнопки в одну строку */
+/* Стили для панели управления с кнопками (размещены в одну строку) */
 .editor-controls {
+    /* Использование flex-контейнера для горизонтального расположения кнопок */
     display: flex;
+    /* Расположение элементов по горизонтали */
     flex-direction: row;
+    /* Равномерное распределение кнопок по доступной ширине */
     justify-content: space-around;
+    /* Зазор между кнопками, заданный переменной */
     gap: var(--spacing);
+    /* Отступ сверху для отделения панели от редактора */
     margin-top: var(--spacing);
 }
 
-/* Кнопки управления (только иконки) */
+/* Стили для кнопок управления (иконки) */
 .editor-button {
+    /* Отображение в виде flex-контейнера для центрирования содержимого */
     display: flex;
+    /* Центрирование по вертикали */
     align-items: center;
+    /* Центрирование по горизонтали */
     justify-content: center;
-    /* Размер кнопки можно регулировать по необходимости */
+    /* Фиксированные размеры кнопки */
     width: 40px;
     height: 40px;
+    /* Цвет текста/иконок кнопки */
     color: #fff;
+    /* Убираем стандартные границы */
     border: none;
+    /* Скругление углов кнопки */
     border-radius: var(--small-border-radius);
+    /* Тень для визуального отделения кнопки от фона */
     box-shadow: var(--button-box-shadow);
+    /* Курсор в виде руки при наведении */
     cursor: pointer;
+    /* Плавный переход для изменения цвета фона и прозрачности */
     transition: background-color 0.2s, opacity 0.2s;
 }
 
-/* Ховер-эффект для кнопок */
+/* Эффект при наведении: уменьшение непрозрачности кнопки */
 .editor-button:hover {
     opacity: 0.9;
 }
 
-/* Масштабируемые иконки внутри кнопок */
+/* Стили для иконок внутри кнопок: масштабирование в зависимости от размера экрана */
 .editor-button .MuiSvgIcon-root {
     font-size: clamp(16px, 3vw, 22px);
 }
 
-/* Блок статуса (перенесён из Field) */
-/* Можно использовать существующие стили .status-card и .status-text */
+/* Стили для карточки статуса, отображающей информацию (например, позиция робота) */
 .status-card {
+    /* Растягивается по ширине родительского контейнера */
     align-self: stretch;
+    /* Отступ сверху */
     margin-top: var(--spacing);
+    /* Скругление углов карточки */
     border-radius: var(--border-radius);
+    /* Тень для отделения от фона */
     box-shadow: var(--box-shadow);
-    min-height: calc(3*1.15em) !important;
+    /* Минимальная высота, достаточная для отображения информации */
+    min-height: calc(3 * 1.15em) !important;
 }
 
+/* Стили для текста внутри карточки статуса */
 .status-text {
+    /* Разрешение переноса строк для корректного отображения многострочного текста */
     white-space: pre-line;
+    /* Минимальная высота текста */
     min-height: 80px;
+    /* Максимальная высота текста с появлением вертикальной прокрутки */
     max-height: 120px;
+    /* Вертикальная прокрутка, если текст превышает максимальную высоту */
     overflow-y: auto;
+    /* Внутренний отступ для удобочитаемости текста */
     padding: var(--spacing);
+    /* Скругление углов */
     border-radius: var(--small-border-radius);
+    /* Фоновый цвет карточки */
     background: #fefefe;
+    /* Межстрочное расстояние */
     line-height: 1.3;
 }
 
-/* Prism-token стили остаются без изменений */
+/* Стили для подсветки синтаксиса (Prism.js) */
 
+/* Подсветка структурных ключевых слов */
 .code-editor .token.keyword-struct {
     color: #0d58ee;
     font-weight: bold;
 }
 
+/* Подсветка ключевых слов типов */
 .code-editor .token.keyword-type {
     color: #0451a5;
     font-weight: bold;
 }
 
+/* Подсветка булевых ключевых слов */
 .code-editor .token.keyword-bool {
     color: #008080;
     font-weight: bold;
 }
 
+/* Подсветка ключевых слов ввода-вывода */
 .code-editor .token.keyword-io {
     color: #995c00;
     font-weight: bold;
 }
 
+/* Подсветка ключевых слов управления потоком */
 .code-editor .token.keyword-flow {
     color: #9c27b0;
     font-weight: bold;
 }
 
+/* Стили для комментариев в коде */
 .code-editor .token.comment {
     color: #7d8590;
     font-style: italic;
 }
 
+/* Стили для строковых литералов */
 .code-editor .token.string {
     color: #007c9c;
 }
 
+/* Стили для числовых литералов */
 .code-editor .token.number {
     color: #0e76c8;
 }
 
+/* Стили для операторов */
 .code-editor .token.operator {
     color: #24292e;
 }
 
+/* Стили для команд робота */
 .code-editor .token.robot-command {
     color: #008000;
     font-weight: bold;
 }
 
-/* Блок консоли */
-/* Переопределяем стили для блока консоли */
+/* Стили для блока консоли, отображающего ответы сервера */
+
+/* Карточка консоли */
 .console-card {
+    /* Отступ сверху */
     margin-top: var(--spacing) !important;
+    /* Внутренние отступы */
     padding: var(--spacing) !important;
+    /* Фоновый цвет карточки */
     background: #fefefe !important;
+    /* Скругление углов карточки */
     border-radius: var(--border-radius) !important;
+    /* Тень для отделения от остального контента */
     box-shadow: var(--box-shadow) !important;
-    max-height: calc(10 * 1.05em) !important; /* Фиксированная максимальная высота ~10 строк */
-    overflow-y: auto !important; /* Вертикальная прокрутка при переполнении */
+    /* Максимальная высота карточки, рассчитанная примерно на 10 строк текста */
+    max-height: calc(10 * 1.05em) !important;
+    /* Вертикальная прокрутка, если содержимое превышает максимальную высоту */
+    overflow-y: auto !important;
+    /* Отображение элемента как блочного */
     display: block !important;
+    /* Корректный расчет размеров с учетом внутренних отступов и границ */
     box-sizing: border-box !important;
 }
 
-/* Переопределяем стили для текста консоли */
+/* Стили для текста внутри консоли */
 .console-text {
-    font-family: 'Roboto Mono', monospace !important; /* Моноширинный шрифт */
+    /* Моноширинный шрифт для удобства чтения вывода */
+    font-family: 'Roboto Mono', monospace !important;
+    /* Размер шрифта */
     font-size: 14px !important;
+    /* Автоматический перенос строк */
     white-space: pre-wrap !important;
+    /* Перенос слов при необходимости */
     word-break: break-all !important;
-    text-align: left !important; /* Выравнивание по левому краю */
+    /* Выравнивание текста по левому краю */
+    text-align: left !important;
+    /* Внутренние отступы слева и справа для эстетики */
     padding-left: 1em;
     padding-right: 1em;
 }
-

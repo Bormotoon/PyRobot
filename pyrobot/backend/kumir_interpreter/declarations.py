@@ -1,62 +1,89 @@
-# declarations.py
+"""
+Модуль declarations.py
+@description Реализует функции для обработки объявлений, присваиваний, вывода и ввода в интерпретаторе языка KUMIR.
+Функции обеспечивают парсинг строк с декларациями и присваиваниями, а также обработку команд вывода и ввода.
+"""
 
-from .constants import ALLOWED_TYPES, MAX_INT  # заменено МАКСЦЕЛ → MAX_INT (алиас уже установлен)
-from .identifiers import is_valid_identifier
-from .safe_eval import safe_eval, get_eval_env
-from .file_functions import get_default_output, get_default_input
+from .constants import ALLOWED_TYPES, MAX_INT  # Импорт допустимых типов и максимального значения для целых чисел
+from .file_functions import get_default_output, get_default_input  # Функции для получения стандартного вывода и ввода
+from .identifiers import is_valid_identifier  # Функция для проверки корректности идентификатора
+from .safe_eval import safe_eval, get_eval_env  # Функции для безопасного вычисления выражений и получения окружения
 
 
 def process_declaration(line, env):
     """
-    Processes a declaration statement.
-    Format: <type> [tab] <comma-separated list of identifiers>
-    Example: цел длина, ширина, лог условие, лит мой текст
-    For table variables, the value is initialized as an empty dictionary.
+    Обрабатывает оператор объявления переменных.
+    Формат: <тип> [таб] <список идентификаторов, разделенных запятыми>
+    Пример: цел длина, ширина, лог условие, лит мой текст
+    Для таблиц значение инициализируется как пустой словарь.
+
+    Параметры:
+      line (str): Строка с оператором объявления.
+      env (dict): Окружение, в котором регистрируются переменные.
+
+    Возвращаемое значение:
+      bool: True, если объявление успешно обработано, иначе False.
+
+    Исключения:
+      Генерируется Exception, если:
+        - Объявление не содержит имен величин.
+        - Имя величины некорректно.
+        - Величина с таким именем уже объявлена.
     """
     tokens = line.split()
     if not tokens:
         return False
 
+    # Первый токен - тип величины, приводим к нижнему регистру
     decl_type = tokens[0].lower()
     if decl_type not in ALLOWED_TYPES:
         return False
 
     idx = 1
     is_table = False
+    # Если следующий токен начинается с "таб", то это объявление таблицы
     if idx < len(tokens) and tokens[idx].lower().startswith("таб"):
         is_table = True
         idx += 1
 
+    # Остальные токены объединяются в одну строку и разделяются запятыми для получения списка идентификаторов
     rest = " ".join(tokens[idx:])
     identifiers = [ident.strip() for ident in rest.split(",") if ident.strip()]
     if not identifiers:
         raise Exception("Объявление типа без указания имен величин.")
 
     for ident in identifiers:
+        # Проверяем корректность имени величины с учетом ее типа
         if not is_valid_identifier(ident, decl_type):
             raise Exception(f"Некорректное имя величины: '{ident}'")
+        # Если величина уже объявлена в окружении, выдаем ошибку
         if ident in env:
             raise Exception(f"Величина '{ident}' уже объявлена.")
-        env[ident] = {
-            "type": decl_type,
-            "value": {} if is_table else None,
-            "kind": "global",
-            "is_table": is_table
-        }
+        # Инициализируем переменную с заданным типом и пустым значением (или пустым словарем для таблицы)
+        env[ident] = {"type": decl_type, "value": {} if is_table else None, "kind": "global", "is_table": is_table}
     return True
 
 
 def process_assignment(line, env):
     """
-    Processes an assignment statement: VARIABLE := EXPRESSION.
-    Supports assignment to simple variables and table elements.
+    Обрабатывает оператор присваивания переменной.
+    Поддерживается присваивание для простых переменных и элементов таблицы.
+    Формат: VARIABLE := EXPRESSION
+
+    Параметры:
+      line (str): Строка с оператором присваивания.
+      env (dict): Окружение, содержащее объявленные переменные.
+
+    Исключения:
+      Генерируется Exception при ошибках синтаксиса, отсутствии переменной,
+      ошибках вычисления выражения или приведении типа.
     """
     parts = line.split(":=")
     if len(parts) != 2:
         raise Exception("Неверный синтаксис присваивания.")
     left, right = parts[0].strip(), parts[1].strip()
 
-    # Assignment to a table element (e.g. a[i] or b[i,j])
+    # Присваивание для элемента таблицы (например, a[i] или b[i,j])
     if "[" in left and left.endswith("]"):
         import re
         match = re.match(
@@ -66,12 +93,15 @@ def process_assignment(line, env):
             raise Exception(f"Неверный синтаксис для присваивания элемента таблицы: {left}")
         var_name = match.group(1).strip()
         indices_expr = match.group(2).strip()
+        # Разбиваем выражение индексов по запятым
         index_tokens = [token.strip() for token in indices_expr.split(",")]
         eval_env = get_eval_env(env)
         try:
+            # Вычисляем индексы с помощью безопасного вычисления
             indices = tuple(safe_eval(token, eval_env) for token in index_tokens)
         except Exception as e:
             raise Exception(f"Ошибка вычисления индексов в '{left}': {e}")
+        # Проверяем, что переменная объявлена как таблица
         if var_name not in env or not env[var_name].get("is_table"):
             raise Exception(f"Переменная '{var_name}' не объявлена как таблица.")
         target_type = env[var_name]["type"]
@@ -80,6 +110,7 @@ def process_assignment(line, env):
         except Exception as e:
             raise Exception(f"Ошибка вычисления выражения '{right}': {e}")
         try:
+            # Приведение значения к требуемому типу в зависимости от типа величины
             if target_type == "цел":
                 value = int(value)
                 if not (-MAX_INT <= value <= MAX_INT):
@@ -107,12 +138,14 @@ def process_assignment(line, env):
                 raise Exception(f"Неподдерживаемый тип величины: {target_type}")
         except Exception as e:
             raise Exception(f"Ошибка приведения значения для '{left}': {e}")
+        # Если значение таблицы еще не инициализировано, создаем пустой словарь
         if env[var_name]["value"] is None:
             env[var_name]["value"] = {}
+        # Присваиваем вычисленное значение элементу таблицы с указанными индексами
         env[var_name]["value"][indices] = value
         return
 
-    # Assignment for a simple variable
+    # Присваивание для простой переменной
     if left not in env:
         raise Exception(f"Переменная '{left}' не объявлена.")
     eval_env = get_eval_env(env)
@@ -149,22 +182,30 @@ def process_assignment(line, env):
             raise Exception(f"Неподдерживаемый тип величины: {target_type}")
     except Exception as e:
         raise Exception(f"Ошибка приведения значения для переменной '{left}': {e}")
+    # Присваиваем вычисленное значение переменной
     env[left]["value"] = value
 
 
 def process_output(line, env, interpreter=None):
     """
-    Processes an output command.
-    Format: вывод expression1, ..., expressionN
-    If the first expression is a file-type variable, output is directed to that file;
-    otherwise, if standard output is set (via НАЗНАЧИТЬ ВЫВОД), output is written there.
-    The keyword нс is interpreted as a newline.
-    If the parameter interpreter is provided, the output is appended to its buffer (interpreter.output).
+    Обрабатывает команду вывода.
+    Формат: вывод expression1, ..., expressionN
+    Если первое выражение является переменной файлового типа, вывод направляется в этот файл;
+    иначе, если стандартный вывод установлен (через НАЗНАЧИТЬ ВЫВОД), вывод записывается туда.
+    Ключевое слово "нс" интерпретируется как перевод строки.
+    Если передан параметр interpreter, вывод добавляется в его буфер (interpreter.output).
+
+    Параметры:
+      line (str): Строка с командой вывода.
+      env (dict): Окружение, содержащее переменные.
+      interpreter (object, опционально): Объект интерпретатора для буферизации вывода.
     """
+    # Извлекаем содержимое команды вывода, отбрасывая ключевое слово "вывод"
     content = line[5:].strip()
     expressions = [expr.strip() for expr in content.split(",") if expr.strip()]
     eval_env = get_eval_env(env)
     output_str = ""
+    # Обрабатываем каждое выражение
     for expr in expressions:
         if expr.lower() == "нс":
             output_str += "\n"
@@ -172,8 +213,10 @@ def process_output(line, env, interpreter=None):
             try:
                 value = safe_eval(expr, eval_env)
             except Exception:
+                # Если вычисление не удалось, используем исходное выражение
                 value = expr
             output_str += str(value)
+    # Пытаемся получить стандартный выходной поток
     default_out = get_default_output()
     if default_out is not None:
         try:
@@ -189,11 +232,19 @@ def process_output(line, env, interpreter=None):
 
 def process_input(line, env):
     """
-    Processes an input command.
-    Format: ввод expression1, ..., expressionN
-    If standard input is set (via НАЗНАЧИТЬ ВВОД), it is used; otherwise, input is requested from the keyboard.
-    The entered values are assigned to the corresponding variables.
+    Обрабатывает команду ввода.
+    Формат: ввод expression1, ..., expressionN
+    Если стандартный вход установлен (через НАЗНАЧИТЬ ВВОД), он используется;
+    иначе запрашивается ввод с клавиатуры.
+    Введенные значения присваиваются соответствующим переменным.
+
+    Параметры:
+      line (str): Строка с командой ввода.
+      env (dict): Окружение, содержащее переменные.
+
+    Выводит предупреждение, если введено меньше значений, чем требуется.
     """
+    # Извлекаем имена переменных для присваивания, отбрасывая ключевое слово "ввод"
     content = line[4:].strip()
     targets = [t.strip() for t in content.split(",") if t.strip()]
     default_in = get_default_input()
@@ -231,6 +282,7 @@ def process_input(line, env):
             except Exception as e:
                 print(f"Ошибка преобразования значения для '{target}': {e}")
                 continue
+            # Присваиваем полученное значение переменной
             env[target]["value"] = val
         else:
             print(f"Переменная '{target}' не объявлена.")

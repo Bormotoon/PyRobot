@@ -1,94 +1,141 @@
-# text_functions.py
 """
-Module for text processing functions in the Kumir language.
-Implemented functions:
-  - length(text): returns the number of characters in the string.
-  - char_code(c): returns the code (ordinal number) of the character c in the CP-1251 encoding.
-  - unicode_code(c): returns the Unicode code of the character c.
-  - char(n): returns the character corresponding to the CP-1251 code n.
-  - unicode_char(n): returns the character corresponding to the Unicode code n.
+Модуль text_functions.py
+@description Модуль для функций обработки текста в языке KUMIR.
+Реализованы следующие функции:
+  - length(text): возвращает количество символов в строке.
+  - char_code(c): возвращает порядковый номер символа c в кодировке CP-1251.
+  - unicode_code(c): возвращает Unicode-код символа c.
+  - char(n): возвращает символ, соответствующий коду CP-1251 n.
+  - unicode_char(n): возвращает символ, соответствующий Unicode-коду n.
 """
 
 
 def length(text):
     """
-    Returns the number of characters in the string.
+    Возвращает количество символов в строке.
 
-    Example:
+    Пример:
       length("Привет") → 6
+
+    Параметры:
+      text (str): Исходная строка.
+
+    Возвращаемое значение:
+      int: Количество символов в строке.
     """
+    # Приводим входной параметр к строковому типу и используем функцию len для подсчёта символов.
     return len(str(text))
 
 
-# Alias for backward compatibility:
+# Alias для обратной совместимости:
 длин = length
 
 
 def char_code(c):
     """
-    Returns the ordinal number of the character c in the CP-1251 encoding.
-    If c is not a string of length 1, raises an exception.
+    Возвращает порядковый номер символа c в кодировке CP-1251.
+    Если c не является строкой длины 1, генерируется исключение.
 
-    Example:
-      char_code("А") → 192   (in CP-1251, the letter А has code 192)
+    Пример:
+      char_code("А") → 192  (в CP-1251 буква "А" имеет код 192)
+
+    Параметры:
+      c (str): Символ, для которого нужно получить код.
+
+    Возвращаемое значение:
+      int: Порядковый номер символа в кодировке CP-1251.
+
+    Исключения:
+      ValueError: Если входной аргумент не является строкой длины 1 или при ошибке кодирования.
     """
     s = str(c)
     if len(s) != 1:
         raise ValueError("Function 'char_code' expects a string of length 1")
     try:
+        # Пробуем закодировать символ в кодировке CP-1251
         encoded = s.encode('cp1251')
     except Exception as e:
         raise ValueError(f"Error encoding character '{s}' in CP-1251: {e}")
+    # Возвращаем первый байт, который и является кодом символа в данной кодировке
     return encoded[0]
 
 
-# Alias for backward compatibility:
+# Alias для обратной совместимости:
 код = char_code
 
 
 def unicode_code(c):
     """
-    Returns the Unicode code of the character c.
+    Возвращает Unicode-код символа c.
 
-    Example:
+    Пример:
       unicode_code("А") → 1040
+
+    Параметры:
+      c (str): Символ, для которого необходимо получить Unicode-код.
+
+    Возвращаемое значение:
+      int: Unicode-код символа.
+
+    Исключения:
+      ValueError: Если c не является строкой длины 1.
     """
     s = str(c)
     if len(s) != 1:
         raise ValueError("Function 'unicode_code' expects a string of length 1")
+    # Используем встроенную функцию ord для получения Unicode-кода символа.
     return ord(s)
 
 
-# Alias for backward compatibility:
+# Alias для обратной совместимости:
 юникод = unicode_code
 
 
 def char(n):
     """
-    Returns the character corresponding to the CP-1251 code n.
-    If the number n is not a valid byte, raises an exception.
+    Возвращает символ, соответствующий коду n в кодировке CP-1251.
+    Если число n не является корректным байтом, генерируется исключение.
 
-    Example:
+    Пример:
       char(192) → "А"
+
+    Параметры:
+      n (int): Числовое значение, представляющее код символа в CP-1251.
+
+    Возвращаемое значение:
+      str: Символ, соответствующий заданному коду.
+
+    Исключения:
+      ValueError: Если число n не может быть корректно преобразовано в символ по CP-1251.
     """
     try:
         n_int = int(n)
+        # Создаем объект bytes из одного байта и декодируем его с использованием кодировки CP-1251.
         b = bytes([n_int])
         return b.decode('cp1251')
     except Exception as e:
         raise ValueError(f"Error converting number {n} to a CP-1251 character: {e}")
 
 
-# Alias for backward compatibility:
+# Alias для обратной совместимости:
 символ = char
 
 
 def unicode_char(n):
     """
-    Returns the character corresponding to the Unicode code n.
+    Возвращает символ, соответствующий Unicode-коду n.
 
-    Example:
+    Пример:
       unicode_char(1040) → "А"
+
+    Параметры:
+      n (int): Числовое значение, представляющее Unicode-код символа.
+
+    Возвращаемое значение:
+      str: Символ, соответствующий заданному Unicode-коду.
+
+    Исключения:
+      ValueError: Если n не может быть корректно преобразовано в символ.
     """
     try:
         return chr(int(n))
@@ -96,5 +143,5 @@ def unicode_char(n):
         raise ValueError(f"Error converting number {n} to a Unicode character: {e}")
 
 
-# Alias for backward compatibility:
+# Alias для обратной совместимости:
 юнисимвол = unicode_char

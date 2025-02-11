@@ -1,76 +1,113 @@
-# builtins.py
 """
-Implementation of the built-in functions for the KUMIR language for converting numbers to their
-string representations and converting strings to numeric and logical values.
+Реализация встроенных функций для языка KUMIR, предназначенных для преобразования числовых значений в их
+строковые представления, а также для преобразования строк в числовые и логические значения.
 """
 
 
-# --- New internal (English) function names ---
+# --- Новые внутренние (на английском) имена функций ---
 
 def int_to_str(number):
     """
-    Returns the string representation of an integer.
+    Возвращает строковое представление целого числа.
 
-    KUMIR prototype:
+    Прототип KUMIR:
       алг лит цел_в_лит(цел число)
+
+    Параметры:
+      number (int): Целое число, которое необходимо преобразовать в строку.
+
+    Возвращаемое значение:
+      str: Строковое представление переданного числа.
     """
+    # Преобразуем целое число в строку с помощью встроенной функции str()
     return str(number)
 
 
 def float_to_str(number):
     """
-    Returns the string representation of a float.
+    Возвращает строковое представление числа с плавающей точкой.
 
-    KUMIR prototype:
+    Прототип KUMIR:
       алг лит вещ_в_лит(вещ число)
+
+    Параметры:
+      number (float): Число с плавающей точкой для преобразования в строку.
+
+    Возвращаемое значение:
+      str: Строковое представление переданного числа.
     """
+    # Преобразуем число с плавающей точкой в строку
     return str(number)
 
 
 def str_to_float(string, success):
     """
-    Converts the given string to a float.
-    If the string contains a valid floating‐point number, returns (number, "да");
-    otherwise returns (0.0, "нет").
+    Преобразует заданную строку в число с плавающей точкой.
+    Если строка содержит корректное представление числа, возвращает (число, "да");
+    иначе возвращает (0.0, "нет").
 
-    KUMIR prototype:
+    Прототип KUMIR:
       алг вещ лит_в_вещ(лит строка, рез лог успех)
 
-    Note: In this implementation, we do not modify the variable success in the environment,
-    but return a tuple (value, success). User code should handle the returned tuple accordingly.
+    Примечание:
+      В данной реализации переменная success не изменяется в окружении, а возвращается в виде части кортежа.
+      Пользовательский код должен обрабатывать возвращаемый кортеж соответствующим образом.
+
+    Параметры:
+      string (str): Строка для преобразования.
+      success: Параметр, предназначенный для обозначения успешности преобразования (не используется напрямую).
+
+    Возвращаемое значение:
+      tuple: Кортеж (числовое значение, индикатор успеха в виде строки "да" или "нет").
     """
     try:
         result = float(string)
+        # Если преобразование успешно, возвращаем результат и строку "да"
         return result, "да"
     except:
+        # В случае ошибки возвращаем 0.0 и строку "нет"
         return 0.0, "нет"
 
 
 def str_to_int(string, success):
     """
-    Converts the given string to an integer.
-    If the string contains a valid integer, returns (number, "да");
-    otherwise returns (0, "нет").
+    Преобразует заданную строку в целое число.
+    Если строка корректно представляет целое число, возвращает (число, "да");
+    иначе возвращает (0, "нет").
 
-    KUMIR prototype:
+    Прототип KUMIR:
       алг цел лит_в_цел(лит строка, рез лог успех)
 
-    Note: Similar to str_to_float, a tuple (value, success) is returned.
+    Параметры:
+      string (str): Строка для преобразования.
+      success: Параметр, предназначенный для обозначения успешности преобразования (не используется напрямую).
+
+    Возвращаемое значение:
+      tuple: Кортеж (целое число, индикатор успеха в виде строки "да" или "нет").
     """
     try:
         result = int(string)
+        # Успешное преобразование: возвращаем число и "да"
         return result, "да"
     except:
+        # В случае ошибки возвращаем 0 и "нет"
         return 0, "нет"
 
 
 def Int(string, default):
     """
-    Converts the given string to an integer.
-    If the string is not a valid integer, returns the default value.
+    Преобразует заданную строку в целое число.
+    Если строка не является корректным представлением целого числа, возвращает значение по умолчанию.
 
-    KUMIR prototype:
+    Прототип KUMIR:
       алг цел Цел(лит строка, цел по умолчанию)
+
+    Параметры:
+      string (str): Строка для преобразования в целое число.
+      default (int): Значение по умолчанию, которое возвращается, если преобразование не удалось.
+
+    Возвращаемое значение:
+      int: Преобразованное целое число или значение по умолчанию.
     """
     try:
         return int(string)
@@ -80,11 +117,18 @@ def Int(string, default):
 
 def Float(string, default):
     """
-    Converts the given string to a float.
-    If the string is not a valid float, returns the default value.
+    Преобразует заданную строку в число с плавающей точкой.
+    Если строка не является корректным представлением числа с плавающей точкой, возвращает значение по умолчанию.
 
-    KUMIR prototype:
+    Прототип KUMIR:
       алг вещ Вещ(лит строка, вещ по умолчанию)
+
+    Параметры:
+      string (str): Строка для преобразования в число с плавающей точкой.
+      default (float): Значение по умолчанию, возвращаемое при ошибке преобразования.
+
+    Возвращаемое значение:
+      float: Преобразованное число с плавающей точкой или значение по умолчанию.
     """
     try:
         return float(string)
@@ -94,14 +138,22 @@ def Float(string, default):
 
 def Bool(string, default):
     """
-    Converts the given string to a boolean.
-    Recognizes the following strings as True: "да", "1", "истина";
-    as False: "нет", "0", "ложь".
-    If the string does not match any of these, returns the default value.
+    Преобразует заданную строку в логическое значение.
+    Распознает следующие строки как True: "да", "1", "истина";
+    как False: "нет", "0", "ложь".
+    Если строка не соответствует ни одному из этих вариантов, возвращает значение по умолчанию.
 
-    KUMIR prototype:
+    Прототип KUMIR:
       алг лог Лог(лит строка, лог по умолчанию)
+
+    Параметры:
+      string (str): Строка для преобразования в логическое значение.
+      default (bool): Значение по умолчанию, если строка не соответствует ожидаемым вариантам.
+
+    Возвращаемое значение:
+      bool: Преобразованное логическое значение или значение по умолчанию.
     """
+    # Приводим строку к нижнему регистру и удаляем лишние пробелы
     s = str(string).strip().lower()
     if s in ["да", "1", "истина"]:
         return True
@@ -111,12 +163,12 @@ def Bool(string, default):
         return default
 
 
-# --- Aliases for backward compatibility (names as in the KUMIR documentation) ---
+# --- Алиасы для обратной совместимости (имена, как указано в документации KUMIR) ---
 
-цел_в_лит = int_to_str
-вещ_в_лит = float_to_str
-лит_в_вещ = str_to_float
-лит_в_цел = str_to_int
-Цел = Int
-Вещ = Float
-Лог = Bool
+цел_в_лит = int_to_str  # Алиас для преобразования целого числа в строку
+вещ_в_лит = float_to_str  # Алиас для преобразования числа с плавающей точкой в строку
+лит_в_вещ = str_to_float  # Алиас для преобразования строки в число с плавающей точкой
+лит_в_цел = str_to_int  # Алиас для преобразования строки в целое число
+Цел = Int  # Алиас для функции преобразования строки в целое число с значением по умолчанию
+Вещ = Float  # Алиас для функции преобразования строки в число с плавающей точкой с значением по умолчанию
+Лог = Bool  # Алиас для функции преобразования строки в логическое значение

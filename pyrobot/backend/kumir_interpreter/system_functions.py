@@ -1,37 +1,54 @@
-# system_functions.py
 import time
 
 
 def sleep_ms(x):
     """
-    Pauses the program for x milliseconds.
-    One millisecond is 1/1000 of a second.
+    Приостанавливает выполнение программы на указанное количество миллисекунд.
 
-    Example:
-      sleep_ms(500)  # pauses execution for 0.5 seconds
+    Одна миллисекунда равна 1/1000 секунды.
+
+    Параметры:
+      x (int или число): Количество миллисекунд, на которое необходимо приостановить выполнение.
+
+    Возвращаемое значение:
+      None
+
+    Пример:
+      sleep_ms(500)  # Приостанавливает выполнение на 0.5 секунд.
+
+    Исключения:
+      ValueError: Если аргумент x не может быть приведён к целому числу.
     """
     try:
         ms = int(x)
     except Exception as e:
         raise ValueError(f"sleep_ms: argument x must be an integer, error: {e}")
+    # Переводим миллисекунды в секунды и вызываем функцию time.sleep
     time.sleep(ms / 1000.0)
 
 
 def current_time():
     """
-    Returns the current time in milliseconds since midnight (local time).
+    Возвращает текущее время в миллисекундах, прошедших с полуночи (локальное время).
 
-    Example:
-      t = current_time()  # t is the number of milliseconds since the start of the current day
+    Пример:
+      t = current_time()  # t - количество миллисекунд с начала текущего дня.
+
+    Возвращаемое значение:
+      int: Количество миллисекунд, прошедших с полуночи.
     """
+    # Получаем текущее время в секундах (с плавающей точкой)
     now = time.time()
+    # Преобразуем текущее время в локальное время (структура time.struct_time)
     local = time.localtime(now)
-    # Calculate seconds since midnight:
+    # Вычисляем количество секунд с полуночи:
+    # часы * 3600 + минуты * 60 + секунды + дробная часть текущей секунды.
     seconds_since_midnight = local.tm_hour * 3600 + local.tm_min * 60 + local.tm_sec + (now - int(now))
+    # Переводим секунды в миллисекунды и возвращаем результат в виде целого числа.
     ms = int(seconds_since_midnight * 1000)
     return ms
 
 
-# Aliases for backward compatibility (Russian names as specified in the documentation):
+# Алиасы для обратной совместимости (русские имена, как указано в документации):
 ждать = sleep_ms
 время = current_time
