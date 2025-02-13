@@ -2,7 +2,8 @@
 Модуль server.py
 @description Серверная часть приложения для интерпретации кода на языке KUMIR.
 Реализован с использованием Flask и Flask-CORS для обеспечения взаимодействия с фронтендом.
-Принимает POST-запросы на маршрутах /execute для выполнения кода и /reset для сброса состояния симулятора.
+Принимает POST-запросы на маршрутах /execute для выполнения кода, /reset для сброса состояния симулятора,
+а также /updateField для обновления состояния игрового поля.
 """
 
 import logging
@@ -15,13 +16,17 @@ from pyrobot.backend.kumir_interpreter.interpreter import KumirLanguageInterpret
 
 # Создаем экземпляр приложения Flask
 app = Flask(__name__)
-# Настраиваем CORS для приложения, разрешая запросы с фронтенд-домена (укажите ваш домен, если отличается)
-CORS(app,
-     resources={r"/execute": {"origins": "http://localhost:3000"}, r"/reset": {"origins": "http://localhost:3000"}})
+# Настраиваем CORS для приложения, разрешая запросы с фронтенд-домена
+CORS(app, resources={r"/execute": {"origins": "http://localhost:3000"}, r"/reset": {"origins": "http://localhost:3000"},
+                     r"/updateField": {"origins": "http://localhost:3000"}})
 
 # Настройка логирования: уровень DEBUG для подробной отладки
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger('FlaskServer')
+
+# Глобальная переменная для хранения текущего состояния игрового поля,
+# обновляемого из фронтенда при редактировании.
+global_field_state = None
 
 
 @app.route('/execute', methods=['POST'])
@@ -33,35 +38,28 @@ def execute_code():
     Если код пустой, возвращается ошибка с кодом 400.
     При успешном выполнении создается новый экземпляр интерпретатора, выполняется интерпретация кода,
     и возвращается JSON с результатом, содержащим success, message, а также обновленное окружение,
-    позицию робота и другие данные (если есть).
-
-    Возвращаемое значение:
-      JSON-ответ с результатом выполнения или сообщением об ошибке.
+    позицию робота и (если обновлено) актуальное состояние поля из global_field_state.
     """
     data = request.json
-    # Извлекаем исходный код из JSON-запроса; если поле отсутствует, используем пустую строку
     code = data.get('code', '')
     logger.info("Получен код для выполнения.")
     logger.debug(f"Код:\n{code}")
 
-    # Если код пустой, возвращаем ошибку
     if not code.strip():
         logger.warning("Получен пустой код.")
         return jsonify({'success': False, 'message': 'Код не предоставлен.'}), 400
 
     try:
-        # Для каждого запроса создается новый экземпляр интерпретатора,
-        # чтобы избежать влияния предыдущих состояний.
         interpreter = KumirLanguageInterpreter(code)
         result = interpreter.interpret()
         logger.info("Код выполнен успешно.")
         logger.debug(f"Результат: {result}")
-        # Возвращаем успешный JSON-ответ. Распаковываем словарь result, который содержит данные окружения,
-        # позицию робота и другие параметры (например, output, если используется).
+        # Если состояние поля было обновлено, включаем его в результат.
+        if global_field_state is not None:
+            result['field'] = global_field_state
         return jsonify({'success': True, 'message': 'Код выполнен успешно.', **result}), 200
 
     except Exception as e:
-        # Логируем исключение и возвращаем ответ с кодом 500, сообщая о неизвестной ошибке.
         logger.exception("Неизвестная ошибка при выполнении кода.")
         return jsonify({'success': False, 'message': f'Неизвестная ошибка: {str(e)}'}), 500
 
@@ -73,14 +71,32 @@ def reset_simulator():
 
     В новой архитектуре состояние интерпретатора не хранится глобально,
     поэтому достаточно вернуть сообщение о сбросе.
-
-    Возвращаемое значение:
-      JSON-ответ с успешным сообщением о сбросе симулятора.
     """
     logger.info("Запрос на сброс симулятора получен. (Глобальное состояние не сохраняется.)")
     return jsonify({'success': True, 'message': 'Симулятор сброшен.'}), 200
 
 
+@app.route('/updateField', methods=['POST'])
+def update_field():
+    """
+    Обрабатывает запрос на обновление состояния игрового поля.
+
+    Ожидается JSON с параметрами поля:
+      - width, height, cellSize,
+      - robotPos (объект {x, y}),
+      - walls, permanentWalls (массивы строк),
+      - markers (объект),
+      - coloredCells (массив строк).
+
+    Сохраняет полученное состояние в глобальной переменной global_field_state.
+    """
+    global global_field_state
+    data = request.json
+    logger.info("Получено обновление состояния поля.")
+    logger.debug(f"Field state: {data}")
+    global_field_state = data
+    return jsonify({'success': True, 'message': 'Поле обновлено на сервере.'}), 200
+
+
 if __name__ == '__main__':
-    # Запускаем сервер Flask в режиме отладки на порту 5000.
     app.run(debug=True, port=5000)
