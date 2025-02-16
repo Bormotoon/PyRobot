@@ -1,45 +1,28 @@
 """
 Модуль server.py
 @description Серверная часть приложения для интерпретации кода на языке KUMIR.
-Реализован с использованием Flask и Flask-CORS для обеспечения взаимодействия с фронтендом.
-Принимает POST-запросы на маршрутах /execute для выполнения кода, /reset для сброса состояния симулятора,
-а также /updateField для обновления состояния игрового поля.
+Реализован с использованием Flask и Flask-CORS для взаимодействия с фронтендом.
 """
 
 import logging
-
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
-# Импортируем класс интерпретатора языка KUMIR из соответствующего модуля проекта.
 from pyrobot.backend.kumir_interpreter.interpreter import KumirLanguageInterpreter
 
-# Создаем экземпляр приложения Flask
 app = Flask(__name__)
-# Настраиваем CORS для приложения, разрешая запросы с фронтенд-домена
-CORS(app, resources={r"/execute": {"origins": "http://localhost:3000"}, r"/reset": {"origins": "http://localhost:3000"},
+CORS(app, resources={r"/execute": {"origins": "http://localhost:3000"},
+                     r"/reset": {"origins": "http://localhost:3000"},
                      r"/updateField": {"origins": "http://localhost:3000"}})
 
-# Настройка логирования: уровень DEBUG для подробной отладки
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger('FlaskServer')
 
-# Глобальная переменная для хранения текущего состояния игрового поля,
-# обновляемого из фронтенда при редактировании.
 global_field_state = None
 
 
 @app.route('/execute', methods=['POST'])
 def execute_code():
-    """
-    Обрабатывает запрос на выполнение кода.
-
-    Ожидается JSON с полем "code", содержащим исходный код программы на языке KUMIR.
-    Если код пустой, возвращается ошибка с кодом 400.
-    При успешном выполнении создается новый экземпляр интерпретатора, выполняется интерпретация кода,
-    и возвращается JSON с результатом, содержащим success, message, а также обновленное окружение,
-    позицию робота и (если обновлено) актуальное состояние поля из global_field_state.
-    """
     data = request.json
     code = data.get('code', '')
     logger.info("Получен код для выполнения.")
@@ -51,13 +34,17 @@ def execute_code():
 
     try:
         interpreter = KumirLanguageInterpreter(code)
-        result = interpreter.interpret()
+        # Выполнение в batch-режиме: все шаги выполняются сразу, без задержек
+        result = interpreter.interpret(step_by_step=False, step_delay=0)
         logger.info("Код выполнен успешно.")
         logger.debug(f"Результат: {result}")
-        # Если состояние поля было обновлено, включаем его в результат.
+        # Извлекаем finalState и trace, формируя плоский объект ответа
+        final_state = result.get("finalState", {})
+        trace = result.get("trace", [])
         if global_field_state is not None:
-            result['field'] = global_field_state
-        return jsonify({'success': True, 'message': 'Код выполнен успешно.', **result}), 200
+            final_state['field'] = global_field_state
+        response = {'success': True, 'message': 'Код выполнен успешно.', **final_state, 'trace': trace}
+        return jsonify(response), 200
 
     except Exception as e:
         logger.exception("Неизвестная ошибка при выполнении кода.")
@@ -66,30 +53,12 @@ def execute_code():
 
 @app.route('/reset', methods=['POST'])
 def reset_simulator():
-    """
-    Обрабатывает запрос на сброс симулятора.
-
-    В новой архитектуре состояние интерпретатора не хранится глобально,
-    поэтому достаточно вернуть сообщение о сбросе.
-    """
     logger.info("Запрос на сброс симулятора получен. (Глобальное состояние не сохраняется.)")
     return jsonify({'success': True, 'message': 'Симулятор сброшен.'}), 200
 
 
 @app.route('/updateField', methods=['POST'])
 def update_field():
-    """
-    Обрабатывает запрос на обновление состояния игрового поля.
-
-    Ожидается JSON с параметрами поля:
-      - width, height, cellSize,
-      - robotPos (объект {x, y}),
-      - walls, permanentWalls (массивы строк),
-      - markers (объект),
-      - coloredCells (массив строк).
-
-    Сохраняет полученное состояние в глобальной переменной global_field_state.
-    """
     global global_field_state
     data = request.json
     logger.info("Получено обновление состояния поля.")
