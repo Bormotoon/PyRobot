@@ -106,55 +106,73 @@ const ControlPanel = memo(({
 	 * @param {string} direction - Направление перемещения ('up', 'down', 'left', 'right').
 	 */
 	const moveRobot = useCallback((direction) => {
-		setRobotPos((prevPos) => {
-			// Создаем копию предыдущей позиции робота
-			let newPos = {...prevPos};
-			let hintKey = '';
-			let actionKey = '';
+		let newPos = {...robotPos};
+		let hintKey = '';
+		let actionKey = '';
 
-			if (direction === 'up') {
-				hintKey = 'moveRobotUp';
-				actionKey = 'moveRobotUpBlocked';
-				// Если можно переместиться вверх
-				if (newPos.y > 0 && !walls.has(`${newPos.x},${newPos.y},${newPos.x + 1},${newPos.y}`) && !permanentWalls.has(`${newPos.x},${newPos.y},${newPos.x + 1},${newPos.y}`)) {
-					newPos.y -= 1;
-				} else {
-					setStatusMessage(getHint(actionKey, editMode));
-					return prevPos;
-				}
-			} else if (direction === 'down') {
-				hintKey = 'moveRobotDown';
-				actionKey = 'moveRobotDownBlocked';
-				if (newPos.y < height - 1 && !walls.has(`${newPos.x},${newPos.y + 1},${newPos.x + 1},${newPos.y + 1}`) && !permanentWalls.has(`${newPos.x},${newPos.y + 1},${newPos.x + 1},${newPos.y + 1}`)) {
-					newPos.y += 1;
-				} else {
-					setStatusMessage(getHint(actionKey, editMode));
-					return prevPos;
-				}
-			} else if (direction === 'left') {
-				hintKey = 'moveRobotLeft';
-				actionKey = 'moveRobotLeftBlocked';
-				if (newPos.x > 0 && !walls.has(`${newPos.x},${newPos.y},${newPos.x},${newPos.y + 1}`) && !permanentWalls.has(`${newPos.x},${newPos.y},${newPos.x},${newPos.y + 1}`)) {
-					newPos.x -= 1;
-				} else {
-					setStatusMessage(getHint(actionKey, editMode));
-					return prevPos;
-				}
-			} else if (direction === 'right') {
-				hintKey = 'moveRobotRight';
-				actionKey = 'moveRobotRightBlocked';
-				if (newPos.x < width - 1 && !walls.has(`${newPos.x + 1},${newPos.y},${newPos.x + 1},${newPos.y + 1}`) && !permanentWalls.has(`${newPos.x + 1},${newPos.y},${newPos.x + 1},${newPos.y + 1}`)) {
-					newPos.x += 1;
-				} else {
-					setStatusMessage(getHint(actionKey, editMode));
-					return prevPos;
-				}
+		if (direction === 'up') {
+			hintKey = 'moveRobotUp';
+			actionKey = 'moveRobotUpBlocked';
+			if (newPos.y > 0 && !walls.has(`${newPos.x},${newPos.y},${newPos.x + 1},${newPos.y}`) && !permanentWalls.has(`${newPos.x},${newPos.y},${newPos.x + 1},${newPos.y}`)) {
+				newPos.y -= 1;
+			} else {
+				setStatusMessage(getHint(actionKey, editMode));
+				return;
 			}
+		} else if (direction === 'down') {
+			hintKey = 'moveRobotDown';
+			actionKey = 'moveRobotDownBlocked';
+			if (newPos.y < height - 1 && !walls.has(`${newPos.x},${newPos.y + 1},${newPos.x + 1},${newPos.y + 1}`) && !permanentWalls.has(`${newPos.x},${newPos.y + 1},${newPos.x + 1},${newPos.y + 1}`)) {
+				newPos.y += 1;
+			} else {
+				setStatusMessage(getHint(actionKey, editMode));
+				return;
+			}
+		} else if (direction === 'left') {
+			hintKey = 'moveRobotLeft';
+			actionKey = 'moveRobotLeftBlocked';
+			if (newPos.x > 0 && !walls.has(`${newPos.x},${newPos.y},${newPos.x},${newPos.y + 1}`) && !permanentWalls.has(`${newPos.x},${newPos.y},${newPos.x},${newPos.y + 1}`)) {
+				newPos.x -= 1;
+			} else {
+				setStatusMessage(getHint(actionKey, editMode));
+				return;
+			}
+		} else if (direction === 'right') {
+			hintKey = 'moveRobotRight';
+			actionKey = 'moveRobotRightBlocked';
+			if (newPos.x < width - 1 && !walls.has(`${newPos.x + 1},${newPos.y},${newPos.x + 1},${newPos.y + 1}`) && !permanentWalls.has(`${newPos.x + 1},${newPos.y},${newPos.x + 1},${newPos.y + 1}`)) {
+				newPos.x += 1;
+			} else {
+				setStatusMessage(getHint(actionKey, editMode));
+				return;
+			}
+		}
 
-			setStatusMessage(getHint(hintKey, editMode));
-			return newPos;
-		});
-	}, [height, width, walls, permanentWalls, editMode, setStatusMessage, setRobotPos]);
+		// Обновляем локальное состояние робота и выводим сообщение
+		setRobotPos(newPos);
+		setStatusMessage(getHint(hintKey, editMode));
+
+		// Формируем объект текущего состояния поля
+		const fieldState = {
+			width,
+			height,
+			cellSize,
+			robotPos: newPos,
+			walls: Array.from(walls),
+			permanentWalls: Array.from(permanentWalls),
+			markers: markers,
+			coloredCells: Array.from(coloredCells)
+		};
+
+		// Отправляем обновлённое состояние поля на сервер
+		fetch('http://localhost:5000/updateField', {
+			method: 'POST',
+			headers: {'Content-Type': 'application/json'},
+			body: JSON.stringify(fieldState)
+		}).catch(error => console.error("Ошибка обновления поля на сервере:", error));
+
+	}, [robotPos, walls, permanentWalls, markers, coloredCells, width, height, cellSize, editMode, setRobotPos, setStatusMessage]);
+
 
 	/**
 	 * Функция для установки маркера в текущей позиции робота.
