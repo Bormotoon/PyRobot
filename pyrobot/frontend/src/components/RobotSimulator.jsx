@@ -2,8 +2,7 @@
  * @file RobotSimulator.jsx
  * @description Главный компонент симулятора робота. Этот компонент объединяет редактор кода, панель управления и игровое поле.
  * Компонент использует Material‑UI тему, отображает подробные статусные сообщения и выводит результаты работы сервера в консоль.
- * В режиме редактирования изменения поля (размер, стены, маркеры, окрашенные клетки) не отправляются на сервер в реальном времени.
- * При отключении режима редактирования (переход editMode с true на false) текущее состояние поля передаётся на сервер.
+ * Теперь все изменения состояния поля сразу отправляются на сервер через единый useEffect.
  */
 
 import React, {memo, useCallback, useEffect, useReducer, useRef} from 'react';
@@ -14,31 +13,20 @@ import Field from './Field/Field';
 import theme from '../styles/theme';
 import {getHint} from './hints';
 
-/**
- * Начальное состояние симулятора.
- */
 const initialState = {
-	// Исходный код программы для робота
-	code: `использовать Робот\nалг\nнач\n  вправо\n  вниз\n  вправо\nкон`, // Флаг выполнения программы
-	isRunning: false, // Текст статусного сообщения
-	statusMessage: getHint('initial'), // Вывод от сервера (например, результат выполнения кода)
-	consoleOutput: "", // Параметры поля: ширина, высота и размер клетки
-	width: 7, height: 7, cellSize: 50, // Начальная позиция робота на поле
-	robotPos: {x: 0, y: 0}, // Множество временных стен (редактируемых)
-	walls: new Set(), // Множество постоянных стен (например, границы поля)
-	permanentWalls: new Set(), // Объект для хранения маркеров на поле
-	markers: {}, // Множество закрашенных клеток
-	coloredCells: new Set(), // Флаг, определяющий, включён ли режим редактирования
+	code: `использовать Робот\nалг\nнач\n  вправо\n  вниз\n  вправо\nкон`,
+	isRunning: false,
+	statusMessage: getHint('initial'),
+	consoleOutput: "",
+	width: 7, height: 7, cellSize: 50,
+	robotPos: {x: 0, y: 0},
+	walls: new Set(),
+	permanentWalls: new Set(),
+	markers: {},
+	coloredCells: new Set(),
 	editMode: false,
 };
 
-/**
- * Редьюсер для управления состоянием симулятора.
- *
- * @param {Object} state - Текущее состояние симулятора.
- * @param {Object} action - Объект действия с типом и полезной нагрузкой.
- * @returns {Object} Новое состояние после применения действия.
- */
 function reducer(state, action) {
 	switch (action.type) {
 		case 'SET_CODE':
@@ -84,13 +72,6 @@ function reducer(state, action) {
 	}
 }
 
-/**
- * Функция для установки постоянных стен по периметру игрового поля.
- *
- * @param {number} width - Ширина поля.
- * @param {number} height - Высота поля.
- * @returns {Set} Множество строк, описывающих стены в формате "x1,y1,x2,y2".
- */
 function setupPermanentWalls(width, height) {
 	const newWalls = new Set();
 	for (let x = 0; x < width; x++) {
@@ -104,35 +85,15 @@ function setupPermanentWalls(width, height) {
 	return newWalls;
 }
 
-/**
- * Функция для ограничения позиции робота так, чтобы он не выходил за пределы поля.
- *
- * @param {Object} robotPos - Текущая позиция робота {x, y}.
- * @param {number} width - Ширина поля.
- * @param {number} height - Высота поля.
- * @returns {Object} Новая позиция, ограниченная значениями от 0 до width - 1 и от 0 до height - 1.
- */
 function clampRobotPos(robotPos, width, height) {
 	const clampedX = Math.min(Math.max(robotPos.x, 0), width - 1);
 	const clampedY = Math.min(Math.max(robotPos.y, 0), height - 1);
 	return {x: clampedX, y: clampedY};
 }
 
-/**
- * Основной компонент симулятора робота.
- *
- * Объединяет подкомпоненты редактора кода, панели управления и игрового поля.
- * В режиме редактирования изменения поля не отправляются на сервер в реальном времени.
- * После отключения режима редактирования (переход editMode с true на false) текущее состояние поля передаётся на сервер.
- * При изменении размеров поля позиция робота корректируется так, чтобы он оставался внутри внешних стен.
- *
- * @returns {JSX.Element} Элемент симулятора робота.
- */
 const RobotSimulator = memo(() => {
 	const [state, dispatch] = useReducer(reducer, initialState);
 	const canvasRef = useRef(null);
-
-	// Реф для отслеживания предыдущего значения editMode
 	const prevEditMode = useRef(state.editMode);
 
 	const handleClearCode = useCallback(() => {
@@ -152,14 +113,15 @@ const RobotSimulator = memo(() => {
 		}
 		dispatch({type: 'SET_IS_RUNNING', payload: true});
 		fetch('http://localhost:5000/execute', {
-			method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({code: state.code}),
+			method: 'POST',
+			headers: {'Content-Type': 'application/json'},
+			body: JSON.stringify({code: state.code}),
 		})
 			.then(response => response.json())
 			.then(data => {
 				if (data.success) {
 					dispatch({type: 'SET_STATUS_MESSAGE', payload: 'Код выполнен успешно.'});
 					dispatch({type: 'SET_CONSOLE_OUTPUT', payload: data.output || ""});
-					// Если режим редактирования выключен, обновляем позицию робота с ответа сервера.
 					if (!state.editMode) {
 						dispatch({type: 'SET_ROBOT_POS', payload: data.robot});
 					}
@@ -193,10 +155,6 @@ const RobotSimulator = memo(() => {
 		dispatch({type: 'SET_CONSOLE_OUTPUT', payload: ""});
 	}, []);
 
-	/**
-	 * useEffect для обновления постоянных стен и корректировки позиции робота при изменении размеров поля.
-	 * При каждом изменении ширины или высоты поля позиция робота корректируется так, чтобы он оставался внутри.
-	 */
 	useEffect(() => {
 		const newWalls = setupPermanentWalls(state.width, state.height);
 		dispatch({type: 'SET_PERMANENT_WALLS', payload: newWalls});
@@ -204,15 +162,11 @@ const RobotSimulator = memo(() => {
 		if (newPos.x !== state.robotPos.x || newPos.y !== state.robotPos.y) {
 			dispatch({type: 'SET_ROBOT_POS', payload: newPos});
 		}
-	}, [state.width, state.height]);
+	}, [state.width, state.height, state.robotPos]);
 
-	/**
-	 * useEffect для отправки текущего состояния поля на сервер после отключения режима редактирования.
-	 * Отслеживает изменение state.editMode: если предыдущим значением было true, а текущим false,
-	 * отправляет обновленное состояние поля на сервер через эндпоинт /updateField.
-	 */
+	// Новый useEffect для централизованного обновления состояния поля на сервере с дебаунсом (200 мс)
 	useEffect(() => {
-		if (prevEditMode.current && !state.editMode) {
+		const timeout = setTimeout(() => {
 			const fieldState = {
 				width: state.width,
 				height: state.height,
@@ -224,17 +178,39 @@ const RobotSimulator = memo(() => {
 				coloredCells: Array.from(state.coloredCells),
 			};
 			fetch('http://localhost:5000/updateField', {
-				method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(fieldState),
+				method: 'POST',
+				headers: {'Content-Type': 'application/json'},
+				body: JSON.stringify(fieldState),
 			}).catch(e => console.error("Ошибка обновления поля на сервере:", e));
+		}, 200);
+		return () => clearTimeout(timeout);
+	}, [
+		state.width,
+		state.height,
+		state.cellSize,
+		state.robotPos,
+		state.walls,
+		state.permanentWalls,
+		state.markers,
+		state.coloredCells,
+	]);
+
+	useEffect(() => {
+		if (prevEditMode.current && !state.editMode) {
+			// Этот эффект уже не нужен, так как обновление происходит централизованно
 		}
 		prevEditMode.current = state.editMode;
-	}, [state.editMode, state.width, state.height, state.cellSize, state.robotPos, state.walls, state.permanentWalls, state.markers, state.coloredCells]);
+	}, [state.editMode]);
 
-	const statusText = [`Позиция робота: (${state.robotPos.x}, ${state.robotPos.y})`, `Маркеров: ${Object.keys(state.markers).length}`, `Раскрашенных клеток: ${state.coloredCells.size}`,].join('\n');
+	const statusText = [
+		`Позиция робота: (${state.robotPos.x}, ${state.robotPos.y})`,
+		`Маркеров: ${Object.keys(state.markers).length}`,
+		`Раскрашенных клеток: ${state.coloredCells.size}`,
+	].join('\n');
 
-	return (<ThemeProvider theme={theme}>
+	return (
+		<ThemeProvider theme={theme}>
 			<div className="app-container">
-				{/* Компонент редактора кода */}
 				<CodeEditor
 					code={state.code}
 					setCode={(newCode) => dispatch({type: 'SET_CODE', payload: newCode})}
@@ -247,7 +223,6 @@ const RobotSimulator = memo(() => {
 					consoleOutput={state.consoleOutput}
 				/>
 
-				{/* Панель управления симулятором */}
 				<ControlPanel
 					robotPos={state.robotPos}
 					setRobotPos={(pos) => dispatch({type: 'SET_ROBOT_POS', payload: pos})}
@@ -269,7 +244,6 @@ const RobotSimulator = memo(() => {
 					setStatusMessage={(msg) => dispatch({type: 'SET_STATUS_MESSAGE', payload: msg})}
 				/>
 
-				{/* Компонент поля, где отображается робот */}
 				<Field
 					canvasRef={canvasRef}
 					robotPos={state.robotPos}
@@ -289,7 +263,8 @@ const RobotSimulator = memo(() => {
 					setStatusMessage={(msg) => dispatch({type: 'SET_STATUS_MESSAGE', payload: msg})}
 				/>
 			</div>
-		</ThemeProvider>);
+		</ThemeProvider>
+	);
 });
 
 export default RobotSimulator;

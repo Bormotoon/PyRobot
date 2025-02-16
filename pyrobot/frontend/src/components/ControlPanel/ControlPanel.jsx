@@ -4,9 +4,6 @@
  * Панель позволяет управлять перемещением робота, установкой и снятием маркеров, окраской клеток,
  * а также изменением размеров игрового поля. Кроме того, предусмотрены функции импорта поля из файла
  * (.FIL) и вызова диалога помощи.
- *
- * При импорте .FIL файла происходит парсинг содержимого, обновляется отображаемое поле и
- * отправляется обновлённое состояние на сервер.
  */
 
 import React, {memo, useCallback, useRef, useState} from 'react';
@@ -40,13 +37,9 @@ import HelpDialog from '../Help/HelpDialog';
  */
 const parseWallCode = (code, x, y) => {
 	const arr = [];
-	// Если установлен бит 8, добавляем верхнюю стену
 	if (code & 8) arr.push(`${x},${y},${x + 1},${y}`);
-	// Если установлен бит 4, добавляем правую стену
 	if (code & 4) arr.push(`${x + 1},${y},${x + 1},${y + 1}`);
-	// Если установлен бит 2, добавляем нижнюю стену
 	if (code & 2) arr.push(`${x},${y + 1},${x + 1},${y + 1}`);
-	// Если установлен бит 1, добавляем левую стену
 	if (code & 1) arr.push(`${x},${y},${x},${y + 1}`);
 	return arr;
 };
@@ -95,16 +88,9 @@ const ControlPanel = memo(({
 	                           setEditMode,
 	                           setStatusMessage,
                            }) => {
-	// Ссылка на скрытый input для импорта файла поля
 	const fileInputRef = useRef(null);
-	// Локальное состояние для управления видимостью диалога помощи
 	const [helpOpen, setHelpOpen] = useState(false);
 
-	/**
-	 * Функция для перемещения робота в указанном направлении.
-	 *
-	 * @param {string} direction - Направление перемещения ('up', 'down', 'left', 'right').
-	 */
 	const moveRobot = useCallback((direction) => {
 		let newPos = {...robotPos};
 		let hintKey = '';
@@ -148,66 +134,22 @@ const ControlPanel = memo(({
 			}
 		}
 
-		// Обновляем локальное состояние робота и выводим сообщение
 		setRobotPos(newPos);
 		setStatusMessage(getHint(hintKey, editMode));
+		// Удалён вызов fetch обновления – обновление состояния теперь централизовано в RobotSimulator.
+	}, [robotPos, walls, permanentWalls, editMode, setRobotPos, setStatusMessage, width]);
 
-		// Формируем объект текущего состояния поля
-		const fieldState = {
-			width,
-			height,
-			cellSize,
-			robotPos: newPos,
-			walls: Array.from(walls),
-			permanentWalls: Array.from(permanentWalls),
-			markers: markers,
-			coloredCells: Array.from(coloredCells)
-		};
-
-		// Отправляем обновлённое состояние поля на сервер
-		fetch('http://localhost:5000/updateField', {
-			method: 'POST',
-			headers: {'Content-Type': 'application/json'},
-			body: JSON.stringify(fieldState)
-		}).catch(error => console.error("Ошибка обновления поля на сервере:", error));
-
-	}, [robotPos, walls, permanentWalls, markers, coloredCells, width, height, cellSize, editMode, setRobotPos, setStatusMessage]);
-
-
-	/**
-	 * Функция для установки маркера в текущей позиции робота.
-	 */
 	const putMarker = () => {
 		const posKey = `${robotPos.x},${robotPos.y}`;
 		if (!markers[posKey]) {
 			const newMarkers = {...markers, [posKey]: 1};
 			setMarkers(newMarkers);
 			setStatusMessage(getHint('putMarker', editMode));
-
-			const fieldState = {
-				width,
-				height,
-				cellSize,
-				robotPos,
-				walls: Array.from(walls),
-				permanentWalls: Array.from(permanentWalls),
-				markers: newMarkers,
-				coloredCells: Array.from(coloredCells),
-			};
-
-			fetch('http://localhost:5000/updateField', {
-				method: 'POST',
-				headers: {'Content-Type': 'application/json'},
-				body: JSON.stringify(fieldState),
-			}).catch(error => console.error("Ошибка обновления поля на сервере:", error));
 		} else {
 			setStatusMessage(getHint('markerAlreadyExists', editMode));
 		}
 	};
 
-	/**
-	 * Функция для снятия маркера с текущей позиции робота.
-	 */
 	const pickMarker = () => {
 		const posKey = `${robotPos.x},${robotPos.y}`;
 		if (markers[posKey]) {
@@ -215,31 +157,11 @@ const ControlPanel = memo(({
 			delete newMarkers[posKey];
 			setMarkers(newMarkers);
 			setStatusMessage(getHint('pickMarker', editMode));
-
-			const fieldState = {
-				width,
-				height,
-				cellSize,
-				robotPos,
-				walls: Array.from(walls),
-				permanentWalls: Array.from(permanentWalls),
-				markers: newMarkers,
-				coloredCells: Array.from(coloredCells),
-			};
-
-			fetch('http://localhost:5000/updateField', {
-				method: 'POST',
-				headers: {'Content-Type': 'application/json'},
-				body: JSON.stringify(fieldState),
-			}).catch(error => console.error("Ошибка обновления поля на сервере:", error));
 		} else {
 			setStatusMessage(getHint('noMarkerHere', editMode));
 		}
 	};
 
-	/**
-	 * Функция для окрашивания текущей клетки.
-	 */
 	const paintCell = () => {
 		const posKey = `${robotPos.x},${robotPos.y}`;
 		if (!coloredCells.has(posKey)) {
@@ -247,31 +169,11 @@ const ControlPanel = memo(({
 			newColored.add(posKey);
 			setColoredCells(newColored);
 			setStatusMessage(getHint('paintCell', editMode));
-
-			const fieldState = {
-				width,
-				height,
-				cellSize,
-				robotPos,
-				walls: Array.from(walls),
-				permanentWalls: Array.from(permanentWalls),
-				markers,
-				coloredCells: Array.from(newColored),
-			};
-
-			fetch('http://localhost:5000/updateField', {
-				method: 'POST',
-				headers: {'Content-Type': 'application/json'},
-				body: JSON.stringify(fieldState),
-			}).catch(error => console.error("Ошибка обновления поля на сервере:", error));
 		} else {
 			setStatusMessage(getHint('cellAlreadyPainted', editMode));
 		}
 	};
 
-	/**
-	 * Функция для очистки окрашенной клетки.
-	 */
 	const clearCell = () => {
 		const posKey = `${robotPos.x},${robotPos.y}`;
 		if (coloredCells.has(posKey)) {
@@ -279,32 +181,11 @@ const ControlPanel = memo(({
 			newColored.delete(posKey);
 			setColoredCells(newColored);
 			setStatusMessage(getHint('clearCell', editMode));
-
-			const fieldState = {
-				width,
-				height,
-				cellSize,
-				robotPos,
-				walls: Array.from(walls),
-				permanentWalls: Array.from(permanentWalls),
-				markers,
-				coloredCells: Array.from(newColored),
-			};
-
-			fetch('http://localhost:5000/updateField', {
-				method: 'POST',
-				headers: {'Content-Type': 'application/json'},
-				body: JSON.stringify(fieldState),
-			}).catch(error => console.error("Ошибка обновления поля на сервере:", error));
 		} else {
 			setStatusMessage(getHint('cellAlreadyClear', editMode));
 		}
 	};
 
-	/**
-	 * Функция для переключения режима редактирования.
-	 * При включении выводится сообщение о входе в режим, при выключении — о выходе.
-	 */
 	const toggleEditMode = () => {
 		const newMode = !editMode;
 		setEditMode(newMode);
@@ -315,10 +196,6 @@ const ControlPanel = memo(({
 		}
 	};
 
-	/**
-	 * Функция для увеличения ширины игрового поля.
-	 * Работает только в режиме редактирования.
-	 */
 	const increaseWidth = () => {
 		if (!editMode) {
 			setStatusMessage(getHint('editModeRequired', editMode));
@@ -328,10 +205,6 @@ const ControlPanel = memo(({
 		setStatusMessage(getHint('increaseWidth', editMode));
 	};
 
-	/**
-	 * Функция для уменьшения ширины игрового поля.
-	 * Работает только в режиме редактирования; ширина не может быть меньше 1.
-	 */
 	const decreaseWidth = () => {
 		if (!editMode) {
 			setStatusMessage(getHint('editModeRequired', editMode));
@@ -345,10 +218,6 @@ const ControlPanel = memo(({
 		}
 	};
 
-	/**
-	 * Функция для увеличения высоты игрового поля.
-	 * Работает только в режиме редактирования.
-	 */
 	const increaseHeight = () => {
 		if (!editMode) {
 			setStatusMessage(getHint('editModeRequired', editMode));
@@ -358,10 +227,6 @@ const ControlPanel = memo(({
 		setStatusMessage(getHint('increaseHeight', editMode));
 	};
 
-	/**
-	 * Функция для уменьшения высоты игрового поля.
-	 * Работает только в режиме редактирования; высота не может быть меньше 1.
-	 */
 	const decreaseHeight = () => {
 		if (!editMode) {
 			setStatusMessage(getHint('editModeRequired', editMode));
@@ -375,20 +240,10 @@ const ControlPanel = memo(({
 		}
 	};
 
-	/**
-	 * Функция для обработки импорта файла поля.
-	 * Инициирует клик по скрытому input для выбора файла.
-	 */
 	const handleImportField = () => {
 		fileInputRef.current.click();
 	};
 
-	/**
-	 * Обработчик изменения выбранного файла для импорта.
-	 * Считывает содержимое файла и вызывает парсинг.
-	 *
-	 * @param {Event} e - Событие изменения файла.
-	 */
 	const handleFileChange = async (e) => {
 		const file = e.target.files[0];
 		if (!file) return;
@@ -399,33 +254,19 @@ const ControlPanel = memo(({
 		} catch (error) {
 			setStatusMessage(getHint('importError', editMode) + error.message);
 		} finally {
-			// Сброс значения input для возможности повторного выбора одного и того же файла
 			e.target.value = "";
 		}
 	};
 
-	/**
-	 * Функция для парсинга и применения содержимого файла поля.
-	 * После обновления локальных состояний также отправляет новое состояние поля на сервер.
-	 *
-	 * @param {string} content - Содержимое файла.
-	 */
 	const parseAndApplyFieldFile = (content) => {
 		try {
-			// Разбиваем содержимое файла на строки, исключая пустые строки и комментарии (начинающиеся с ';')
 			const lines = content.split('\n').filter(line => line.trim() !== '' && !line.startsWith(';'));
-
-			// Первая строка: размеры поля (ширина и высота)
 			const [wFile, hFile] = lines[0].split(/\s+/).map(Number);
-			// Вторая строка: начальная позиция робота
 			const [rx, ry] = lines[1].split(/\s+/).map(Number);
-
-			// Инициализируем новые множества для стен, окрашенных клеток и объект маркеров
 			const newWalls = new Set();
 			const newColored = new Set();
 			const newMarkers = {};
 
-			// Обрабатываем оставшиеся строки файла с информацией о клетках
 			for (let i = 2; i < lines.length; i++) {
 				const parts = lines[i].split(/\s+/);
 				const xx = parseInt(parts[0], 10);
@@ -434,17 +275,13 @@ const ControlPanel = memo(({
 				const color = parts[3];
 				const point = parts[8];
 
-				// Если значение color равно '1', добавляем клетку в набор окрашенных
 				if (color === '1') newColored.add(`${xx},${yy}`);
-				// Если значение point равно '1', устанавливаем маркер
 				if (point === '1') newMarkers[`${xx},${yy}`] = 1;
 
-				// Парсим код стен для данной клетки и добавляем каждую стену в набор
 				const wallsParsed = parseWallCode(wcode, xx, yy);
 				wallsParsed.forEach(w => newWalls.add(w));
 			}
 
-			// Функция для вычисления постоянных стен по периметру поля
 			const computePermanentWalls = (width, height) => {
 				const pWalls = new Set();
 				for (let x = 0; x < width; x++) {
@@ -458,48 +295,24 @@ const ControlPanel = memo(({
 				return pWalls;
 			};
 
-			// Формируем новый объект состояния с дополнительной меткой времени,
-			// чтобы гарантировать обновление, даже если файл идентичен предыдущему
-			const newFieldState = {
-				width: wFile,
-				height: hFile,
-				cellSize, // используем текущий размер клетки
-				robotPos: {x: rx, y: ry},
-				walls: Array.from(newWalls),
-				permanentWalls: Array.from(computePermanentWalls(wFile, hFile)),
-				markers: newMarkers,
-				coloredCells: Array.from(newColored),
-				updateTime: Date.now()  // добавленная метка времени для принудительного обновления
-			};
-
-			// Принудительно отправляем новое состояние поля на сервер
-			fetch('http://localhost:5000/updateField', {
-				method: 'POST',
-				headers: {'Content-Type': 'application/json'},
-				body: JSON.stringify(newFieldState),
-			}).catch(e => console.error("Ошибка обновления поля на сервере после импорта:", e));
-
-			// Обновляем локальное состояние полностью
 			setWidth(wFile);
 			setHeight(hFile);
 			setRobotPos({x: rx, y: ry});
 			setWalls(newWalls);
 			setColoredCells(newColored);
 			setMarkers(newMarkers);
-
 			setStatusMessage("Поле успешно обновлено из файла.");
 		} catch (error) {
 			setStatusMessage("Ошибка при импорте файла: " + error.message);
 		}
 	};
 
-	// Разметка панели управления
-	return (<>
+	return (
+		<>
 			<Card className="control-panel">
 				<CardHeader title="Управление"/>
 				<CardContent>
 					<Grid container spacing={2}>
-						{/* Кнопки для перемещения робота */}
 						<Grid item xs={12} style={{textAlign: 'center'}}>
 							<Button
 								onClick={() => moveRobot('up')}
@@ -548,7 +361,6 @@ const ControlPanel = memo(({
 								Вниз
 							</Button>
 						</Grid>
-						{/* Кнопки для работы с маркерами */}
 						<Grid item xs={6}>
 							<Button
 								onClick={putMarker}
@@ -573,7 +385,6 @@ const ControlPanel = memo(({
 								Поднять маркер
 							</Button>
 						</Grid>
-						{/* Кнопки для окрашивания и очистки клетки */}
 						<Grid item xs={6}>
 							<Button
 								onClick={paintCell}
@@ -598,7 +409,6 @@ const ControlPanel = memo(({
 								Очистить
 							</Button>
 						</Grid>
-						{/* Кнопка для переключения режима редактирования */}
 						<Grid item xs={12}>
 							<Button
 								onClick={toggleEditMode}
@@ -611,7 +421,6 @@ const ControlPanel = memo(({
 								{editMode ? 'Выключить Режим рисования' : 'Включить Режим рисования'}
 							</Button>
 						</Grid>
-						{/* Кнопки для изменения размеров игрового поля */}
 						<Grid item xs={6}>
 							<Button
 								onClick={increaseWidth}
@@ -660,7 +469,6 @@ const ControlPanel = memo(({
 								Поле ниже
 							</Button>
 						</Grid>
-						{/* Кнопки для вызова диалога помощи и импорта файла */}
 						<Grid item xs={6}>
 							<Button
 								onClick={() => setHelpOpen(true)}
@@ -684,7 +492,6 @@ const ControlPanel = memo(({
 								<FileUpload style={{marginRight: '8px'}}/>
 								Импорт .fil
 							</Button>
-							{/* Скрытый input для выбора файла */}
 							<input
 								type="file"
 								ref={fileInputRef}
@@ -695,9 +502,9 @@ const ControlPanel = memo(({
 					</Grid>
 				</CardContent>
 			</Card>
-			{/* Диалог помощи */}
 			<HelpDialog open={helpOpen} onClose={() => setHelpOpen(false)}/>
-		</>);
+		</>
+	);
 });
 
 export default ControlPanel;
