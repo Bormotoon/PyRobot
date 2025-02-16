@@ -398,6 +398,9 @@ const ControlPanel = memo(({
 			setStatusMessage(getHint('importSuccess', editMode));
 		} catch (error) {
 			setStatusMessage(getHint('importError', editMode) + error.message);
+		} finally {
+			// Сброс значения input для возможности повторного выбора одного и того же файла
+			e.target.value = "";
 		}
 	};
 
@@ -409,25 +412,15 @@ const ControlPanel = memo(({
 	 */
 	const parseAndApplyFieldFile = (content) => {
 		try {
-			// Сброс текущих данных поля
-			setRobotPos({x: 0, y: 0});
-			setWalls(new Set());
-			setColoredCells(new Set());
-			setMarkers({});
+			// Разбиваем содержимое файла на строки, исключая пустые строки и комментарии (начинающиеся с ';')
+			const lines = content.split('\n').filter(line => line.trim() !== '' && !line.startsWith(';'));
 
-			// Разбиваем содержимое файла на строки, исключая пустые и строки-комментарии (начинающиеся с ';')
-			const lines = content.split('\n').filter((line) => line.trim() !== '' && !line.startsWith(';'));
-
-			// Первая строка файла содержит размеры поля
+			// Первая строка: размеры поля (ширина и высота)
 			const [wFile, hFile] = lines[0].split(/\s+/).map(Number);
-			setWidth(wFile);
-			setHeight(hFile);
-
-			// Вторая строка файла содержит начальную позицию робота
+			// Вторая строка: начальная позиция робота
 			const [rx, ry] = lines[1].split(/\s+/).map(Number);
-			setRobotPos({x: rx, y: ry});
 
-			// Инициализируем новые множества для стен, окрашенных клеток и маркеров
+			// Инициализируем новые множества для стен, окрашенных клеток и объект маркеров
 			const newWalls = new Set();
 			const newColored = new Set();
 			const newMarkers = {};
@@ -440,21 +433,18 @@ const ControlPanel = memo(({
 				const wcode = parseInt(parts[2], 10);
 				const color = parts[3];
 				const point = parts[8];
-				// Если значение color равно '1', добавляем клетку в множество окрашенных
+
+				// Если значение color равно '1', добавляем клетку в набор окрашенных
 				if (color === '1') newColored.add(`${xx},${yy}`);
 				// Если значение point равно '1', устанавливаем маркер
 				if (point === '1') newMarkers[`${xx},${yy}`] = 1;
-				// Парсим код стен для данной клетки и добавляем каждую стену в множество
+
+				// Парсим код стен для данной клетки и добавляем каждую стену в набор
 				const wallsParsed = parseWallCode(wcode, xx, yy);
-				wallsParsed.forEach((w) => newWalls.add(w));
+				wallsParsed.forEach(w => newWalls.add(w));
 			}
 
-			// Применяем полученные данные
-			setWalls(newWalls);
-			setColoredCells(newColored);
-			setMarkers(newMarkers);
-
-			// Вычисляем постоянные стены для новых размеров поля
+			// Функция для вычисления постоянных стен по периметру поля
 			const computePermanentWalls = (width, height) => {
 				const pWalls = new Set();
 				for (let x = 0; x < width; x++) {
@@ -468,23 +458,38 @@ const ControlPanel = memo(({
 				return pWalls;
 			};
 
+			// Формируем новый объект состояния с дополнительной меткой времени,
+			// чтобы гарантировать обновление, даже если файл идентичен предыдущему
 			const newFieldState = {
 				width: wFile,
 				height: hFile,
-				cellSize: cellSize, // Используем текущий размер клетки
+				cellSize, // используем текущий размер клетки
 				robotPos: {x: rx, y: ry},
 				walls: Array.from(newWalls),
 				permanentWalls: Array.from(computePermanentWalls(wFile, hFile)),
 				markers: newMarkers,
 				coloredCells: Array.from(newColored),
+				updateTime: Date.now()  // добавленная метка времени для принудительного обновления
 			};
 
-			// Отправляем новое состояние поля на сервер
+			// Принудительно отправляем новое состояние поля на сервер
 			fetch('http://localhost:5000/updateField', {
-				method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(newFieldState),
-			}).catch((e) => console.error("Ошибка обновления поля на сервере после импорта:", e));
+				method: 'POST',
+				headers: {'Content-Type': 'application/json'},
+				body: JSON.stringify(newFieldState),
+			}).catch(e => console.error("Ошибка обновления поля на сервере после импорта:", e));
+
+			// Обновляем локальное состояние полностью
+			setWidth(wFile);
+			setHeight(hFile);
+			setRobotPos({x: rx, y: ry});
+			setWalls(newWalls);
+			setColoredCells(newColored);
+			setMarkers(newMarkers);
+
+			setStatusMessage("Поле успешно обновлено из файла.");
 		} catch (error) {
-			setStatusMessage(getHint('parseError', editMode) + error.message);
+			setStatusMessage("Ошибка при импорте файла: " + error.message);
 		}
 	};
 
