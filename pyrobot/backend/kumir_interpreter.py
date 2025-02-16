@@ -555,93 +555,68 @@ class KumirLanguageInterpreter:
     """
     Интерпретатор языка KUMIR.
 
-    Обеспечивает обработку исходного кода, его предварительную обработку, разделение на вступление и алгоритмы,
-    парсинг заголовков алгоритмов, а затем выполнение вступительной части и основного алгоритма.
+    Обеспечивает полный цикл обработки исходного кода:
+      - Предварительную обработку (удаление комментариев, разделение на вступление и алгоритмы).
+      - Парсинг заголовков алгоритмов.
+      - Выполнение вступительной части (команды до основного алгоритма).
+      - Выполнение основного алгоритма.
 
     Атрибуты:
       code (str): Исходный код программы.
-      env (dict): Окружение переменных (например, {"имя": {"type": ..., "value": ..., ...}}).
-      algorithms (dict): Словарь вспомогательных алгоритмов по именам.
-      main_algorithm (dict): Основной алгоритм (первый найденный алгоритм).
-      robot (KumirInterpreter): Экземпляр интерпретатора робота, управляющий перемещениями и действиями робота.
+      env (dict): Окружение переменных.
+      algorithms (dict): Словарь вспомогательных алгоритмов по имени.
+      main_algorithm (dict): Основной алгоритм (первый из секций алгоритмов).
+      robot (KumirInterpreter): Экземпляр интерпретатора робота.
+      output (str): Буфер для захвата вывода команды "вывод".
     """
 
     def __init__(self, code):
-        """
-        Инициализирует интерпретатор с заданным исходным кодом.
-
-        Параметры:
-          code (str): Исходный код программы на языке KUMIR.
-        """
         self.code = code
-        self.env = {}  # Окружение для переменных
-        self.algorithms = {}  # Вспомогательные алгоритмы по имени
-        self.main_algorithm = None  # Основной алгоритм
-        # Создаем экземпляр интерпретатора робота
+        self.env = {}
+        self.algorithms = {}
+        self.main_algorithm = None
         self.robot = KumirInterpreter()
+        self.output = ""  # Буфер для захвата вывода
 
     def parse(self):
-        """
-        Обрабатывает исходный код: выполняет предварительную обработку, разделение на вступление и алгоритмы,
-        а также парсинг заголовков алгоритмов.
-
-        Процесс:
-          1. Код обрабатывается функцией preprocess_code.
-          2. Полученные строки разделяются на вступительную часть и секции алгоритмов с помощью separate_sections.
-          3. Первый алгоритм считается основным, остальные сохраняются по именам.
-
-        Исключения:
-          Генерируется Exception, если в программе отсутствуют алгоритмы.
-        """
         lines = preprocess_code(self.code)
         introduction, algo_sections = separate_sections(lines)
         self.introduction = introduction
         self.algo_sections = algo_sections
 
         if algo_sections:
-            # Первый алгоритм считается основным
             self.main_algorithm = algo_sections[0]
             header_info = parse_algorithm_header(self.main_algorithm["header"])
             self.main_algorithm["header_info"] = header_info
-            # Остальные алгоритмы сохраняются в словаре по имени, если имя указано
             for alg in algo_sections[1:]:
                 info = parse_algorithm_header(alg["header"])
                 alg["header_info"] = info
                 if info["name"]:
                     self.algorithms[info["name"]] = alg
         else:
-            raise Exception("No algorithms found in the program.")
+            raise Exception("No algorithms in the program.")
 
     def execute_introduction(self):
-        """
-        Выполняет вступительную часть программы (команды до первого алгоритма).
-        Каждая строка вступления выполняется с помощью execute_line, что обновляет окружение и состояние робота.
-        """
+        # Передаём self как четвертый параметр, чтобы функции (например, process_output) могли обновлять output
         for line in self.introduction:
-            execute_line(line, self.env, self.robot)
+            execute_line(line, self.env, self.robot, self)
 
     def execute_algorithm(self, algorithm):
-        """
-        Выполняет тело алгоритма (строки между командами 'нач' и 'кон').
-
-        Параметры:
-          algorithm (dict): Секция алгоритма с ключом "body", содержащим список строк кода.
-        """
         for line in algorithm["body"]:
-            execute_line(line, self.env, self.robot)
+            execute_line(line, self.env, self.robot, self)
 
     def interpret(self):
-        """
-        Полное выполнение программы: парсинг, выполнение вступления и основного алгоритма.
-
-        Возвращаемое значение:
-          dict: Содержит обновленное окружение переменных и текущую позицию робота.
-        """
         self.parse()
         self.execute_introduction()
-        print("Executing main algorithm:")
+        print("Выполнение основного алгоритма:")
         self.execute_algorithm(self.main_algorithm)
-        return {"env": self.env, "robot": self.robot.robot_pos}
+        # Возвращаем также накопленный вывод, чтобы сервер получил результат выполнения
+        return {
+            "env": self.env,
+            "robot": self.robot.robot_pos,
+            "coloredCells": list(self.robot.colored_cells),
+            "output": self.output
+        }
 
 
 # ---------------------------------------------------------------------
