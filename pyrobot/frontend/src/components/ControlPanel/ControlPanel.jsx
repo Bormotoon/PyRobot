@@ -180,10 +180,26 @@ const ControlPanel = memo(({
 	const putMarker = () => {
 		const posKey = `${robotPos.x},${robotPos.y}`;
 		if (!markers[posKey]) {
-			const newMarkers = {...markers};
-			newMarkers[posKey] = 1;
+			const newMarkers = {...markers, [posKey]: 1};
 			setMarkers(newMarkers);
 			setStatusMessage(getHint('putMarker', editMode));
+
+			const fieldState = {
+				width,
+				height,
+				cellSize,
+				robotPos,
+				walls: Array.from(walls),
+				permanentWalls: Array.from(permanentWalls),
+				markers: newMarkers,
+				coloredCells: Array.from(coloredCells),
+			};
+
+			fetch('http://localhost:5000/updateField', {
+				method: 'POST',
+				headers: {'Content-Type': 'application/json'},
+				body: JSON.stringify(fieldState),
+			}).catch(error => console.error("Ошибка обновления поля на сервере:", error));
 		} else {
 			setStatusMessage(getHint('markerAlreadyExists', editMode));
 		}
@@ -199,6 +215,23 @@ const ControlPanel = memo(({
 			delete newMarkers[posKey];
 			setMarkers(newMarkers);
 			setStatusMessage(getHint('pickMarker', editMode));
+
+			const fieldState = {
+				width,
+				height,
+				cellSize,
+				robotPos,
+				walls: Array.from(walls),
+				permanentWalls: Array.from(permanentWalls),
+				markers: newMarkers,
+				coloredCells: Array.from(coloredCells),
+			};
+
+			fetch('http://localhost:5000/updateField', {
+				method: 'POST',
+				headers: {'Content-Type': 'application/json'},
+				body: JSON.stringify(fieldState),
+			}).catch(error => console.error("Ошибка обновления поля на сервере:", error));
 		} else {
 			setStatusMessage(getHint('noMarkerHere', editMode));
 		}
@@ -210,10 +243,27 @@ const ControlPanel = memo(({
 	const paintCell = () => {
 		const posKey = `${robotPos.x},${robotPos.y}`;
 		if (!coloredCells.has(posKey)) {
-			const newSet = new Set(coloredCells);
-			newSet.add(posKey);
-			setColoredCells(newSet);
+			const newColored = new Set(coloredCells);
+			newColored.add(posKey);
+			setColoredCells(newColored);
 			setStatusMessage(getHint('paintCell', editMode));
+
+			const fieldState = {
+				width,
+				height,
+				cellSize,
+				robotPos,
+				walls: Array.from(walls),
+				permanentWalls: Array.from(permanentWalls),
+				markers,
+				coloredCells: Array.from(newColored),
+			};
+
+			fetch('http://localhost:5000/updateField', {
+				method: 'POST',
+				headers: {'Content-Type': 'application/json'},
+				body: JSON.stringify(fieldState),
+			}).catch(error => console.error("Ошибка обновления поля на сервере:", error));
 		} else {
 			setStatusMessage(getHint('cellAlreadyPainted', editMode));
 		}
@@ -225,10 +275,27 @@ const ControlPanel = memo(({
 	const clearCell = () => {
 		const posKey = `${robotPos.x},${robotPos.y}`;
 		if (coloredCells.has(posKey)) {
-			const newSet = new Set(coloredCells);
-			newSet.delete(posKey);
-			setColoredCells(newSet);
+			const newColored = new Set(coloredCells);
+			newColored.delete(posKey);
+			setColoredCells(newColored);
 			setStatusMessage(getHint('clearCell', editMode));
+
+			const fieldState = {
+				width,
+				height,
+				cellSize,
+				robotPos,
+				walls: Array.from(walls),
+				permanentWalls: Array.from(permanentWalls),
+				markers,
+				coloredCells: Array.from(newColored),
+			};
+
+			fetch('http://localhost:5000/updateField', {
+				method: 'POST',
+				headers: {'Content-Type': 'application/json'},
+				body: JSON.stringify(fieldState),
+			}).catch(error => console.error("Ошибка обновления поля на сервере:", error));
 		} else {
 			setStatusMessage(getHint('cellAlreadyClear', editMode));
 		}
