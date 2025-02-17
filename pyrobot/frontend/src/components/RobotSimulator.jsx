@@ -1,8 +1,8 @@
 /**
  * @file RobotSimulator.jsx
- * @description Главный компонент симулятора робота. Этот компонент объединяет редактор кода, панель управления и игровое поле.
- * Компонент использует Material‑UI тему, отображает подробные статусные сообщения и выводит результаты работы сервера в консоль.
- * Теперь все изменения состояния поля сразу отправляются на сервер через единый useEffect.
+ * @description Главный компонент симулятора робота.
+ * Объединяет редактор кода, панель управления и игровое поле.
+ * Лог-сообщения теперь выводятся внутри компонента CodeEditor (в блоке с классом "console-card").
  */
 
 import React, {memo, useCallback, useEffect, useReducer, useRef} from 'react';
@@ -12,13 +12,15 @@ import ControlPanel from './ControlPanel/ControlPanel';
 import Field from './Field/Field';
 import theme from '../styles/theme';
 import {getHint} from './hints';
+import logger from '../Logger';
 
 const initialState = {
 	code: `использовать Робот\nалг\nнач\n  вправо\n  вниз\n  вправо\nкон`,
 	isRunning: false,
 	statusMessage: getHint('initial'),
-	consoleOutput: "",
-	width: 7, height: 7, cellSize: 50,
+	width: 7,
+	height: 7,
+	cellSize: 50,
 	robotPos: {x: 0, y: 0},
 	walls: new Set(),
 	permanentWalls: new Set(),
@@ -35,8 +37,6 @@ function reducer(state, action) {
 			return {...state, isRunning: action.payload};
 		case 'SET_STATUS_MESSAGE':
 			return {...state, statusMessage: action.payload};
-		case 'SET_CONSOLE_OUTPUT':
-			return {...state, consoleOutput: action.payload};
 		case 'SET_ROBOT_POS':
 			return {...state, robotPos: action.payload};
 		case 'SET_WIDTH':
@@ -58,12 +58,12 @@ function reducer(state, action) {
 		case 'SET_MARKERS':
 			return {
 				...state,
-				markers: typeof action.payload === 'function' ? action.payload(state.markers) : action.payload,
+				markers: typeof action.payload === 'function' ? action.payload(state.markers) : action.payload
 			};
 		case 'SET_COLORED_CELLS':
 			return {
 				...state,
-				coloredCells: typeof action.payload === 'function' ? action.payload(state.coloredCells) : new Set(action.payload),
+				coloredCells: typeof action.payload === 'function' ? action.payload(state.coloredCells) : new Set(action.payload)
 			};
 		case 'SET_EDIT_MODE':
 			return {...state, editMode: action.payload};
@@ -72,6 +72,12 @@ function reducer(state, action) {
 	}
 }
 
+/**
+ * Функция, создающая постоянные стены по периметру поля.
+ * @param {number} width - Ширина поля.
+ * @param {number} height - Высота поля.
+ * @returns {Set<string>} Множество строк с описанием стен.
+ */
 function setupPermanentWalls(width, height) {
 	const newWalls = new Set();
 	for (let x = 0; x < width; x++) {
@@ -85,30 +91,47 @@ function setupPermanentWalls(width, height) {
 	return newWalls;
 }
 
+/**
+ * Функция, ограничивающая позицию робота в пределах поля.
+ * @param {Object} robotPos - Текущая позиция робота.
+ * @param {number} width - Ширина поля.
+ * @param {number} height - Высота поля.
+ * @returns {Object} Новая позиция робота с координатами, не выходящими за пределы поля.
+ */
 function clampRobotPos(robotPos, width, height) {
 	const clampedX = Math.min(Math.max(robotPos.x, 0), width - 1);
 	const clampedY = Math.min(Math.max(robotPos.y, 0), height - 1);
 	return {x: clampedX, y: clampedY};
 }
 
+/**
+ * Компонент RobotSimulator.
+ * Обеспечивает работу симулятора: редактор кода, панель управления и игровое поле.
+ * Лог-сообщения выводятся внутри компонента CodeEditor.
+ */
 const RobotSimulator = memo(() => {
 	const [state, dispatch] = useReducer(reducer, initialState);
 	const canvasRef = useRef(null);
 	const prevEditMode = useRef(state.editMode);
 
+	// Функции управления симулятором, вызывающие методы логирования через logger
+
 	const handleClearCode = useCallback(() => {
 		dispatch({type: 'SET_CODE', payload: ''});
 		dispatch({type: 'SET_STATUS_MESSAGE', payload: 'Код программы очищен.'});
+		logger.log_event('Код программы очищен.');
 	}, []);
 
 	const handleStop = useCallback(() => {
 		dispatch({type: 'SET_IS_RUNNING', payload: false});
 		dispatch({type: 'SET_STATUS_MESSAGE', payload: 'Выполнение остановлено.'});
+		logger.log_event('Выполнение остановлено.');
 	}, []);
 
 	const handleStart = useCallback(() => {
 		if (!state.code.trim()) {
 			dispatch({type: 'SET_STATUS_MESSAGE', payload: 'Ошибка: программа пустая.'});
+			logger.log_error('Программа пустая.');
 			return;
 		}
 		dispatch({type: 'SET_IS_RUNNING', payload: true});
@@ -121,24 +144,24 @@ const RobotSimulator = memo(() => {
 			.then(data => {
 				if (data.success) {
 					dispatch({type: 'SET_STATUS_MESSAGE', payload: 'Код выполнен успешно.'});
-					dispatch({type: 'SET_CONSOLE_OUTPUT', payload: data.output || ""});
+					logger.log_event('Код выполнен успешно.');
 					if (!state.editMode) {
 						dispatch({type: 'SET_ROBOT_POS', payload: data.robot});
 					}
 					dispatch({type: 'SET_COLORED_CELLS', payload: new Set(data.coloredCells)});
 				} else {
 					dispatch({type: 'SET_STATUS_MESSAGE', payload: 'Ошибка: ' + data.message});
-					dispatch({type: 'SET_CONSOLE_OUTPUT', payload: ""});
+					logger.log_error(`Ошибка выполнения: ${data.message}`);
 				}
 				dispatch({type: 'SET_IS_RUNNING', payload: false});
 			})
 			.catch(error => {
 				console.error('Ошибка выполнения запроса:', error);
 				dispatch({type: 'SET_STATUS_MESSAGE', payload: 'Ошибка выполнения запроса.'});
-				dispatch({type: 'SET_CONSOLE_OUTPUT', payload: ""});
+				logger.log_error('Ошибка выполнения запроса.');
 				dispatch({type: 'SET_IS_RUNNING', payload: false});
 			});
-	}, [state.code, state.editMode]);
+	}, [state.code, state.editMode, state]);
 
 	const handleReset = useCallback(() => {
 		dispatch({type: 'SET_ROBOT_POS', payload: {x: 0, y: 0}});
@@ -147,12 +170,10 @@ const RobotSimulator = memo(() => {
 		dispatch({type: 'SET_MARKERS', payload: {}});
 		dispatch({type: 'SET_WIDTH', payload: 7});
 		dispatch({type: 'SET_HEIGHT', payload: 7});
-		dispatch({
-			type: 'SET_CODE', payload: `использовать Робот\nалг\nнач\n  # Ваши команды здесь\nкон`,
-		});
+		dispatch({type: 'SET_CODE', payload: `использовать Робот\nалг\nнач\n  # Ваши команды здесь\nкон`});
 		dispatch({type: 'SET_IS_RUNNING', payload: false});
 		dispatch({type: 'SET_STATUS_MESSAGE', payload: 'Симулятор сброшен (демо).'});
-		dispatch({type: 'SET_CONSOLE_OUTPUT', payload: ""});
+		logger.log_event('Симулятор сброшен (демо).');
 	}, []);
 
 	useEffect(() => {
@@ -164,7 +185,6 @@ const RobotSimulator = memo(() => {
 		}
 	}, [state.width, state.height, state.robotPos]);
 
-	// Новый useEffect для централизованного обновления состояния поля на сервере с дебаунсом (200 мс)
 	useEffect(() => {
 		const timeout = setTimeout(() => {
 			const fieldState = {
@@ -184,20 +204,11 @@ const RobotSimulator = memo(() => {
 			}).catch(e => console.error("Ошибка обновления поля на сервере:", e));
 		}, 200);
 		return () => clearTimeout(timeout);
-	}, [
-		state.width,
-		state.height,
-		state.cellSize,
-		state.robotPos,
-		state.walls,
-		state.permanentWalls,
-		state.markers,
-		state.coloredCells,
-	]);
+	}, [state.width, state.height, state.cellSize, state.robotPos, state.walls, state.permanentWalls, state.markers, state.coloredCells]);
 
 	useEffect(() => {
 		if (prevEditMode.current && !state.editMode) {
-			// Этот эффект уже не нужен, так как обновление происходит централизованно
+			// Этот эффект не требуется
 		}
 		prevEditMode.current = state.editMode;
 	}, [state.editMode]);
@@ -205,12 +216,13 @@ const RobotSimulator = memo(() => {
 	const statusText = [
 		`Позиция робота: (${state.robotPos.x}, ${state.robotPos.y})`,
 		`Маркеров: ${Object.keys(state.markers).length}`,
-		`Раскрашенных клеток: ${state.coloredCells.size}`,
+		`Раскрашенных клеток: ${state.coloredCells.size}`
 	].join('\n');
 
 	return (
 		<ThemeProvider theme={theme}>
 			<div className="app-container">
+				{/* Компонент редактора кода, в котором внутри карточки консоли отображается лог */}
 				<CodeEditor
 					code={state.code}
 					setCode={(newCode) => dispatch({type: 'SET_CODE', payload: newCode})}
@@ -220,7 +232,6 @@ const RobotSimulator = memo(() => {
 					onStart={handleStart}
 					onReset={handleReset}
 					statusText={statusText}
-					consoleOutput={state.consoleOutput}
 				/>
 
 				<ControlPanel

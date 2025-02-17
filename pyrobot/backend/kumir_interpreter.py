@@ -1,7 +1,14 @@
+"""
+kumir_interpreter.py
+Описание: Интерпретатор языка KUMIR.
+Обеспечивает парсинг, токенизацию, выполнение кода и логирование каждого шага выполнения.
+"""
+
 import math
 import re
 import time
 
+# Импорт интерпретатора робота из вложенного модуля
 from .kumir_interpreter.robot_interpreter import KumirInterpreter
 
 # ---------------------------------------------------------------------
@@ -10,10 +17,8 @@ from .kumir_interpreter.robot_interpreter import KumirInterpreter
 
 RESERVED_KEYWORDS = {"алг", "нач", "кон", "исп", "кон_исп", "дано", "надо", "арг", "рез", "аргрез", "знач", "цел",
                      "вещ", "лог", "сим", "лит", "таб", "целтаб", "вещтаб", "логтаб", "симтаб", "литтаб", "и", "или",
-                     "не", "да", "нет",
-                     "утв", "выход", "ввод", "вывод", "нс", "если", "то", "иначе", "все", "выбор", "при", "нц", "кц",
-                     "кц_при", "раз",
-                     "пока", "для", "от", "до", "шаг"}
+                     "не", "да", "нет", "утв", "выход", "ввод", "вывод", "нс", "если", "то", "иначе", "все", "выбор",
+                     "при", "нц", "кц", "кц_при", "раз", "пока", "для", "от", "до", "шаг"}
 
 ALLOWED_TYPES = {"цел", "вещ", "лог", "сим", "лит"}
 MAX_INT = 2147483647
@@ -25,6 +30,12 @@ MAX_INT = 2147483647
 # ---------------------------------------------------------------------
 
 def is_valid_identifier(identifier, var_type):
+    """
+    Проверяет корректность идентификатора для переменной.
+    @param identifier: str - имя переменной.
+    @param var_type: str - тип переменной.
+    @returns: bool - True, если идентификатор корректен, иначе False.
+    """
     words = identifier.strip().split()
     if not words:
         return False
@@ -41,10 +52,21 @@ def is_valid_identifier(identifier, var_type):
 
 
 def convert_hex_constants(expr):
+    """
+    Заменяет шестнадцатеричные константы (начинающиеся с '$') на формат, понятный Python.
+    @param expr: str - исходное выражение.
+    @returns: str - преобразованное выражение.
+    """
     return re.sub(r'\$(?P<hex>[A-Fa-f0-9]+)', r'0x\g<hex>', expr)
 
 
 def safe_eval(expr, eval_env):
+    """
+    Безопасно вычисляет выражение с использованием ограниченного набора встроенных функций.
+    @param expr: str - выражение для вычисления.
+    @param eval_env: dict - окружение переменных.
+    @returns: результат вычисления.
+    """
     expr = convert_hex_constants(expr)
     safe_globals = {"__builtins__": None, "sin": math.sin, "cos": math.cos, "sqrt": math.sqrt, "int": int,
                     "float": float}
@@ -52,6 +74,11 @@ def safe_eval(expr, eval_env):
 
 
 def get_eval_env(env):
+    """
+    Формирует окружение для вычисления выражений из переменных.
+    @param env: dict - окружение переменных.
+    @returns: dict - словарь переменных с их значениями.
+    """
     result = {}
     for var, info in env.items():
         result[var] = info.get("value")
@@ -63,6 +90,13 @@ def get_eval_env(env):
 # ---------------------------------------------------------------------
 
 def process_declaration(line, env):
+    """
+    Обрабатывает оператор объявления переменной.
+    @param line: str - строка объявления.
+    @param env: dict - окружение переменных.
+    @returns: bool - True, если объявление обработано.
+    @raises Exception: если объявление некорректно.
+    """
     tokens = line.split()
     if not tokens:
         return False
@@ -88,6 +122,12 @@ def process_declaration(line, env):
 
 
 def process_assignment(line, env):
+    """
+    Обрабатывает оператор присваивания.
+    @param line: str - строка присваивания.
+    @param env: dict - окружение переменных.
+    @raises Exception: если синтаксис или преобразование некорректны.
+    """
     parts = line.split(":=")
     if len(parts) != 2:
         raise Exception("Invalid assignment syntax.")
@@ -187,6 +227,11 @@ def process_assignment(line, env):
 
 
 def process_output(line, env):
+    """
+    Обрабатывает команду вывода и печатает результат.
+    @param line: str - строка команды вывода.
+    @param env: dict - окружение переменных.
+    """
     content = line[5:].strip()
     eval_env = get_eval_env(env)
     try:
@@ -197,12 +242,18 @@ def process_output(line, env):
 
 
 def process_robot_command(line, robot):
+    """
+    Обрабатывает команду управления роботом.
+    @param line: str - команда.
+    @param robot: объект робота.
+    @returns: bool - True, если команда выполнена, иначе False.
+    """
     cmd = line.lower().strip()
     robot_commands = {"влево": robot.go_left, "вправо": robot.go_right, "вверх": robot.go_up, "вниз": robot.go_down,
                       "закрасить": robot.do_paint}
     if cmd in robot_commands:
         try:
-            robot_commands[cmd]()
+            robot_commands[cmd]()  # Выполнение команды
         except Exception as e:
             print(f"Error executing command '{line}': {e}")
         return True
@@ -210,6 +261,11 @@ def process_robot_command(line, robot):
 
 
 def preprocess_code(code):
+    """
+    Предварительно обрабатывает код: удаляет комментарии и лишние пробелы, разбивает строки.
+    @param code: str - исходный код.
+    @returns: list of str - список строк.
+    """
     lines = []
     for line in code.splitlines():
         if '|' in line:
@@ -225,6 +281,11 @@ def preprocess_code(code):
 
 
 def separate_sections(lines):
+    """
+    Разделяет строки кода на вступление и секции алгоритмов.
+    @param lines: list of str - строки кода.
+    @returns: tuple (introduction, algorithms)
+    """
     introduction = []
     algorithms = []
     current_algo = None
@@ -258,6 +319,11 @@ def separate_sections(lines):
 
 
 def parse_algorithm_header(header_line):
+    """
+    Разбирает заголовок алгоритма для извлечения имени и параметров.
+    @param header_line: str - строка заголовка.
+    @returns: dict - информация о заголовке (raw, name, params).
+    """
     header_line = header_line.strip()
     if header_line.lower().startswith("алг"):
         header_line = header_line[3:].strip()
@@ -285,8 +351,7 @@ def parse_algorithm_header(header_line):
                     current_type = tokens[i]
                     i += 1
                     while i < len(tokens) and tokens[i] not in ["арг", "рез", "аргрез"]:
-                        name = tokens[i].strip(",")
-                        current_names.append(name)
+                        current_names.append(tokens[i].replace(",", ""))
                         i += 1
                 else:
                     break
@@ -294,74 +359,92 @@ def parse_algorithm_header(header_line):
                 if current_type is None:
                     current_type = token
                 else:
-                    current_names.append(token.strip(","))
+                    current_names.append(tokens[i].replace(",", ""))
                 i += 1
         if current_names and current_type is not None:
             for n in current_names:
                 params.append((mode, current_type, n))
-    header_info = {"raw": header_line, "name": name_part if name_part else None, "params": params}
-    return header_info
+    return {"raw": header_line, "name": name_part if name_part else None, "params": params}
 
 
 def execute_line(line, env, robot, interpreter=None):
+    """
+    Выполняет одну строку кода.
+    Если параметр interpreter передан, записывает в его буфер self.output сообщения до и после выполнения команды.
+    @param line: str - строка команды.
+    @param env: dict - окружение переменных.
+    @param robot: объект робота.
+    @param interpreter: (опционально) объект интерпретатора, в который записывается лог.
+    """
+    if interpreter is not None:
+        interpreter.output += f"Выполняется команда: {line}\n"
+        interpreter.logger.info(f"Выполняется команда: {line}")
     lower_line = line.lower()
-    for t in ALLOWED_TYPES:
-        if lower_line.startswith(t):
-            try:
-                process_declaration(line, env)
-            except Exception as e:
-                print(f"Declaration error: {e}")
-            return
-    if ":=" in line:
-        try:
+    executed = False
+    try:
+        if any(lower_line.startswith(t) for t in ALLOWED_TYPES):
+            process_declaration(line, env)
+            executed = True
+        elif ":=" in line:
             process_assignment(line, env)
-        except Exception as e:
-            print(f"Assignment error: {e}")
-        return
-    if lower_line.startswith("вывод"):
-        try:
+            executed = True
+        elif lower_line.startswith("вывод"):
             process_output(line, env)
             if interpreter is not None:
-                interpreter.output += str(line) + "\n"
-        except Exception as e:
-            print(f"Output command error: {e}")
-        return
-    if process_robot_command(line, robot):
-        return
-    print(f"Unknown command: {line}")
+                interpreter.output += f"Вывод: {line}\n"
+            executed = True
+        elif process_robot_command(line, robot):
+            executed = True
+        else:
+            print(f"Unknown command: {line}")
+    except Exception as e:
+        print(f"Error executing line: {line}, error: {e}")
+        if interpreter is not None:
+            interpreter.output += f"Ошибка при выполнении команды: {line} - {e}\n"
+    if interpreter is not None:
+        interpreter.output += f"Команда выполнена: {line}\n"
+        interpreter.logger.info(f"Команда выполнена: {line}")
 
 
 class KumirLanguageInterpreter:
     """
-    Интерпретатор языка KUMIR с поддержкой пошагового исполнения.
-    Формирует трассировку выполнения – для каждой команды фиксирует состояние до и после её выполнения.
+    Интерпретатор языка КУМИР с поддержкой пошагового исполнения.
+    Записывает лог каждого шага в буфер self.output.
     """
 
     def __init__(self, code):
+        """
+        Инициализирует интерпретатор с исходным кодом.
+        @param code: str - исходный код программы.
+        """
         self.code = code
         self.env = {}
         self.algorithms = {}
         self.main_algorithm = None
         self.robot = KumirInterpreter()
-        self.output = ""
+        self.output = ""  # Буфер для логирования каждого шага
+        self.logger = self.robot.logger
 
     def get_state(self):
-        return {
-            "env": self.env.copy(),
-            "robot": self.robot.robot_pos.copy(),
-            "coloredCells": list(self.robot.colored_cells)
-        }
+        """
+        Возвращает текущее состояние интерпретатора.
+        @returns: dict - копия окружения, позиция робота и список окрашенных клеток.
+        """
+        return {"env": self.env.copy(), "robot": self.robot.robot_pos.copy(),
+                "coloredCells": list(self.robot.colored_cells)}
 
     def parse(self):
+        """
+        Парсит исходный код, разделяя его на вступление и алгоритмы.
+        @raises Exception: если алгоритмы не найдены.
+        """
         lines = preprocess_code(self.code)
-        introduction, algo_sections = separate_sections(lines)
-        self.introduction = introduction
-        self.algo_sections = algo_sections
-        if algo_sections:
-            self.main_algorithm = algo_sections[0]
+        self.introduction, self.algo_sections = separate_sections(lines)
+        if self.algo_sections:
+            self.main_algorithm = self.algo_sections[0]
             header_info = parse_algorithm_header(self.main_algorithm["header"])
             self.main_algorithm["header_info"] = header_info
-            for alg in algo_sections[1:]:
+            for alg in self.algo_sections[1:]:
                 info = parse_algorithm_header(alg["header"])
                 alg["header_info"] = info
                 if info["name"]:
@@ -370,61 +453,56 @@ class KumirLanguageInterpreter:
             raise Exception("No algorithms in the program.")
 
     def execute_introduction(self, trace, step_delay=0, step_by_step=False):
+        """
+        Выполняет вступительную часть программы, записывая лог каждого шага.
+        @param trace: list - список событий.
+        @param step_delay: int - задержка между шагами.
+        @param step_by_step: bool - режим пошагового исполнения.
+        """
         for idx, line in enumerate(self.introduction):
-            event_before = {
-                "phase": "introduction",
-                "commandIndex": idx,
-                "command": line,
-                "stateBefore": self.get_state(),
-                "outputBefore": self.output
-            }
+            event_before = {"phase": "introduction", "commandIndex": idx, "command": line,
+                "stateBefore": self.get_state(), "outputBefore": self.output}
             trace.append(event_before)
             execute_line(line, self.env, self.robot, self)
-            event_after = {
-                "phase": "introduction",
-                "commandIndex": idx,
-                "command": line,
-                "stateAfter": self.get_state(),
-                "outputAfter": self.output
-            }
+            event_after = {"phase": "introduction", "commandIndex": idx, "command": line,
+                "stateAfter": self.get_state(), "outputAfter": self.output}
             trace.append(event_after)
             if step_by_step:
                 time.sleep(step_delay)
 
     def execute_algorithm(self, algorithm, trace, step_delay=0, step_by_step=False):
+        """
+        Выполняет основной алгоритм, записывая лог каждого шага.
+        @param algorithm: dict - объект алгоритма.
+        @param trace: list - список событий.
+        @param step_delay: int - задержка между шагами.
+        @param step_by_step: bool - режим пошагового исполнения.
+        """
         for idx, line in enumerate(algorithm["body"]):
-            event_before = {
-                "phase": "main",
-                "commandIndex": idx,
-                "command": line,
-                "stateBefore": self.get_state(),
-                "outputBefore": self.output
-            }
+            event_before = {"phase": "main", "commandIndex": idx, "command": line, "stateBefore": self.get_state(),
+                "outputBefore": self.output}
             trace.append(event_before)
             execute_line(line, self.env, self.robot, self)
-            event_after = {
-                "phase": "main",
-                "commandIndex": idx,
-                "command": line,
-                "stateAfter": self.get_state(),
-                "outputAfter": self.output
-            }
+            event_after = {"phase": "main", "commandIndex": idx, "command": line, "stateAfter": self.get_state(),
+                "outputAfter": self.output}
             trace.append(event_after)
             if step_by_step:
                 time.sleep(step_delay)
 
     def interpret(self, step_by_step=True, step_delay=0):
+        """
+        Интерпретирует и выполняет программу, записывая лог каждого шага.
+        @param step_by_step: bool - режим пошагового исполнения.
+        @param step_delay: int - задержка между шагами.
+        @returns: dict - финальное состояние и трассировка выполнения.
+        """
         self.parse()
         trace = []
         self.execute_introduction(trace, step_delay, step_by_step)
-        print("Выполнение основного алгоритма:")
+        self.logger.info("Выполнение основного алгоритма:")
         self.execute_algorithm(self.main_algorithm, trace, step_delay, step_by_step)
-        final_state = {
-            "env": self.env,
-            "robot": self.robot.robot_pos,
-            "coloredCells": list(self.robot.colored_cells),
-            "output": self.output
-        }
+        final_state = {"env": self.env, "robot": self.robot.robot_pos, "coloredCells": list(self.robot.colored_cells),
+            "output": self.output}
         return {"trace": trace, "finalState": final_state}
 
 

@@ -1,3 +1,9 @@
+"""
+robot_interpreter.py
+Описание: Интерпретатор робота для языка KUMIR.
+Обеспечивает хранение состояния робота, выполнение команд и логирование отладки.
+"""
+
 import logging
 import re
 
@@ -13,29 +19,24 @@ class KumirInterpreter:
     """
     Интерпретатор робота для языка KUMIR.
 
-    Обеспечивает:
-      - Хранение состояния робота (позиция, стены, маркеры, закрашенные клетки).
-      - Логирование событий для отладки.
-      - Интерпретацию кода: токенизация, парсинг, выполнение команд.
-
     Атрибуты:
-      robot_pos (dict): Текущая позиция робота, представлена словарем с ключами "x" и "y".
-      walls (set): Множество строк, представляющих стены в формате "x1,y1,x2,y2".
-      markers (dict): Словарь, хранящий маркеры; ключи – координаты, значения – параметры маркера.
-      colored_cells (set): Множество закрашенных клеток (строки вида "x,y").
-      logger (Logger): Логгер для отладки работы интерпретатора.
+      robot_pos (dict): Текущая позиция робота в виде {'x': int, 'y': int}.
+      walls (set): Множество строк с описанием стен.
+      markers (dict): Объект с маркерами на поле.
+      colored_cells (set): Множество закрашенных клеток (формат "x,y").
+      logger (Logger): Логгер для отладки.
     """
 
     def __init__(self):
         """
-        Инициализирует состояние интерпретатора робота и настраивает логирование.
+        Инициализирует состояние робота и настраивает логирование.
         """
         self.robot_pos = {"x": 0, "y": 0}
         self.walls = set()
         self.markers = {}
         self.colored_cells = set()
 
-        # Конфигурация логирования: создается логгер с именем 'KumirInterpreter'
+        # Настройка логгера
         self.logger = logging.getLogger('KumirInterpreter')
         handler = logging.StreamHandler()
         formatter = logging.Formatter('%(asctime)s - KumirInterpreter - %(levelname)s - %(message)s')
@@ -45,9 +46,7 @@ class KumirInterpreter:
 
     def reset(self):
         """
-        Сбрасывает состояние интерпретатора робота к начальному:
-          - Сброс позиции робота в (0, 0).
-          - Очистка всех стен, маркеров и закрашенных клеток.
+        Сбрасывает состояние робота: позиция в (0, 0), очистка стен, маркеров и окрашенных клеток.
         """
         self.logger.info("Interpreter state has been reset.")
         self.robot_pos = {"x": 0, "y": 0}
@@ -59,12 +58,8 @@ class KumirInterpreter:
         """
         Интерпретирует и выполняет заданный код на языке KUMIR.
 
-        Параметры:
-          code (str): Строка, содержащая код на языке KUMIR.
-
-        Возвращаемое значение:
-          dict: Результат выполнения, содержащий ключи "robotPos", "walls", "markers", "coloredCells".
-                В случае ошибки возвращается словарь с "success": False и сообщением об ошибке.
+        @param code: str - исходный код.
+        @returns: dict - результат выполнения с данными робота и поля.
         """
         self.logger.info("Starting code interpretation.")
         self.logger.debug(f"Input code:\n{code}")
@@ -86,13 +81,10 @@ class KumirInterpreter:
 
     def tokenize(self, code):
         """
-        Разбивает код на токены (строки), пропуская пустые строки и комментарии (начинающиеся с '#').
+        Разбивает код на строки (токены), удаляя пустые строки и комментарии.
 
-        Параметры:
-          code (str): Исходный код.
-
-        Возвращаемое значение:
-          list of str: Список токенов (строк) кода.
+        @param code: str - исходный код.
+        @returns: list of str - список токенов.
         """
         tokens = []
         lines = code.strip().split('\n')
@@ -106,16 +98,11 @@ class KumirInterpreter:
 
     def parse(self, tokens):
         """
-        Преобразует список токенов в AST (абстрактное синтаксическое дерево).
+        Преобразует список токенов в абстрактное синтаксическое дерево (AST).
 
-        Параметры:
-          tokens (list of str): Список токенов кода.
-
-        Возвращаемое значение:
-          list of dict: AST, где каждый узел представляет команду или блок.
-
-        Исключения:
-          KumirInterpreterError: Если обнаружены ошибки синтаксиса (например, 'нач' без 'алг').
+        @param tokens: list of str - список токенов.
+        @returns: list of dict - AST.
+        @raises KumirInterpreterError: если синтаксис некорректен.
         """
         ast = []
         current_algorithm = None
@@ -154,21 +141,16 @@ class KumirInterpreter:
 
     def parse_command(self, command_str):
         """
-        Преобразует строку команды в словарь, описывающий команду.
+        Преобразует строку команды в объект команды.
 
-        Параметры:
-          command_str (str): Строка команды.
-
-        Возвращаемое значение:
-          dict: Словарь с описанием команды (тип и дополнительные параметры).
-
-        Исключения:
-          KumirInterpreterError: Если команда не распознана.
+        @param command_str: str - строка команды.
+        @returns: dict - объект команды.
+        @raises KumirInterpreterError: если команда неизвестна.
         """
         command_str_lower = command_str.lower().strip()
         self.logger.debug(f"Parsing command: {command_str_lower}")
 
-        # --- Команды перемещения (action commands) ---
+        # Команды перемещения (action commands)
         if command_str_lower == "влево":
             return {"type": "action", "command": "left"}
         elif command_str_lower == "вправо":
@@ -180,7 +162,7 @@ class KumirInterpreter:
         elif command_str_lower == "закрасить":
             return {"type": "action", "command": "paint"}
 
-        # --- Команды условий по направлению ---
+        # Команды условий по направлению
         if re.match(r'^(слева|справа|сверху|снизу)\s+(стена|свободно)$', command_str_lower):
             direction, status = command_str_lower.split()
             direction_map = {"слева": "left", "справа": "right", "сверху": "up", "снизу": "down"}
@@ -188,13 +170,13 @@ class KumirInterpreter:
             return {"type": "condition", "direction": direction_map.get(direction, direction),
                     "status": status_map.get(status, status)}
 
-        # --- Команды проверки состояния клетки ---
+        # Команды проверки состояния клетки
         if re.match(r'^клетка\s+(закрашена|чистая)$', command_str_lower):
             parts = command_str_lower.split()
             cell_status_map = {"закрашена": "painted", "чистая": "clear"}
             return {"type": "condition_cell", "status": cell_status_map.get(parts[1], parts[1])}
 
-        # --- Команды измерения (measurement commands) ---
+        # Команды измерения
         if command_str_lower in ["температура", "радиация"]:
             measurement_map = {"температура": "temperature", "радиация": "radiation"}
             return {"type": "measurement", "command": measurement_map.get(command_str_lower, command_str_lower)}
@@ -205,11 +187,8 @@ class KumirInterpreter:
         """
         Выполняет AST и возвращает итоговое состояние.
 
-        Параметры:
-          ast (list of dict): Абстрактное синтаксическое дерево команд.
-
-        Возвращаемое значение:
-          dict: Состояние робота и окружающей среды (позиция, стены, маркеры, закрашенные клетки).
+        @param ast: list of dict - AST.
+        @returns: dict - состояние робота, стен, маркеров и окрашенных клеток.
         """
         self.logger.info("Starting AST execution.")
         for node in ast:
@@ -221,17 +200,13 @@ class KumirInterpreter:
                     self.execute_command(command)
         self.logger.info("AST execution completed.")
         return {"robotPos": self.robot_pos, "walls": list(self.walls), "markers": self.markers,
-            "coloredCells": list(self.colored_cells)}
+                "coloredCells": list(self.colored_cells)}
 
     def execute_command(self, command):
         """
-        Выполняет одну команду, определенную в виде словаря.
-
-        Параметры:
-          command (dict): Команда, содержащая тип и параметры для выполнения.
-
-        Исключения:
-          KumirInterpreterError: Если команда имеет неизвестный тип или не может быть выполнена.
+        Выполняет одну команду, представленную в виде объекта.
+        @param command: dict - объект команды.
+        @raises KumirInterpreterError: если команда неизвестна.
         """
         self.logger.debug(f"Executing command: {command}")
         cmd_type = command["type"]
@@ -250,29 +225,24 @@ class KumirInterpreter:
                 self.do_paint()
             else:
                 raise KumirInterpreterError(f"Unknown action command: {action}")
-
         elif cmd_type == "condition":
             direction = command["direction"]
             status = command["status"]
             condition_result = self.check_direction(direction, status)
             self.logger.info(f"Condition [{direction} {status}]: {condition_result}")
-
         elif cmd_type == "condition_cell":
             status = command["status"]
             condition_result = self.check_cell(status)
             self.logger.info(f"Condition [cell {status}]: {condition_result}")
-
         elif cmd_type == "measurement":
             measure = command["command"]
             value = self.do_measurement(measure)
             self.logger.info(f"Measurement '{measure}': result = {value}")
-
         else:
             raise KumirInterpreterError(f"Unknown command type: {cmd_type}")
 
-    # --- Методы действий робота ---
     def go_left(self):
-        """Перемещает робота на одну клетку влево (если нет стены или границы)."""
+        """Перемещает робота влево, если движение разрешено."""
         new_x = self.robot_pos["x"] - 1
         self.logger.debug(f"Attempting to move left to X={new_x}, Y={self.robot_pos['y']}")
         if self.is_move_allowed(new_x, self.robot_pos["y"]):
@@ -282,7 +252,7 @@ class KumirInterpreter:
             raise KumirInterpreterError("Robot cannot move left (wall or border).")
 
     def go_right(self):
-        """Перемещает робота на одну клетку вправо."""
+        """Перемещает робота вправо, если движение разрешено."""
         new_x = self.robot_pos["x"] + 1
         self.logger.debug(f"Attempting to move right to X={new_x}, Y={self.robot_pos['y']}")
         if self.is_move_allowed(new_x, self.robot_pos["y"]):
@@ -292,7 +262,7 @@ class KumirInterpreter:
             raise KumirInterpreterError("Robot cannot move right (wall or border).")
 
     def go_up(self):
-        """Перемещает робота на одну клетку вверх."""
+        """Перемещает робота вверх, если движение разрешено."""
         new_y = self.robot_pos["y"] - 1
         self.logger.debug(f"Attempting to move up to X={self.robot_pos['x']}, Y={new_y}")
         if self.is_move_allowed(self.robot_pos["x"], new_y):
@@ -302,7 +272,7 @@ class KumirInterpreter:
             raise KumirInterpreterError("Robot cannot move up (wall or border).")
 
     def go_down(self):
-        """Перемещает робота на одну клетку вниз."""
+        """Перемещает робота вниз, если движение разрешено."""
         new_y = self.robot_pos["y"] + 1
         self.logger.debug(f"Attempting to move down to X={self.robot_pos['x']}, Y={new_y}")
         if self.is_move_allowed(self.robot_pos["x"], new_y):
@@ -312,7 +282,7 @@ class KumirInterpreter:
             raise KumirInterpreterError("Robot cannot move down (wall or border).")
 
     def do_paint(self):
-        """Закрашивает текущую клетку, если она еще не закрашена."""
+        """Закрашивает текущую клетку, если она не закрашена."""
         pos_str = f"{self.robot_pos['x']},{self.robot_pos['y']}"
         self.logger.debug(f"Attempting to paint cell: {pos_str}")
         if pos_str not in self.colored_cells:
@@ -321,17 +291,12 @@ class KumirInterpreter:
         else:
             raise KumirInterpreterError("Cell is already painted.")
 
-    # --- Методы проверки условий ---
     def check_direction(self, direction, status):
         """
-        Проверяет, есть ли стена или клетка свободна в указанном направлении.
-
-        Параметры:
-          direction (str): Направление движения ("left", "right", "up", "down").
-          status (str): Ожидаемый статус ("wall" для наличия стены, "free" для свободной клетки).
-
-        Возвращаемое значение:
-          bool: True, если условие выполнено, иначе False.
+        Проверяет наличие стены или свободное пространство в указанном направлении.
+        @param direction: str - направление ("left", "right", "up", "down").
+        @param status: str - ожидаемый статус ("wall" или "free").
+        @returns: bool - True, если условие выполнено, иначе False.
         """
         self.logger.debug(f"Checking condition: {direction} {status}")
         dx, dy = 0, 0
@@ -356,30 +321,23 @@ class KumirInterpreter:
             result = (wall in self.walls)
             self.logger.debug(f"Wall {'exists' if result else 'does not exist'} along path {wall}.")
             return result
-
         elif status == "free":
             in_bounds = (0 <= target_x <= 10 and 0 <= target_y <= 10)
             no_wall = (wall not in self.walls)
             result = (in_bounds and no_wall)
             self.logger.debug(f"Free: {'yes' if result else 'no'}.")
             return result
-
         else:
             raise KumirInterpreterError(f"Unknown status: {status}")
 
     def check_cell(self, status):
         """
-        Проверяет, закрашена ли клетка, в которой находится робот.
-
-        Параметры:
-          status (str): Ожидаемый статус клетки ("painted" для закрашенной, "clear" для незакрашенной).
-
-        Возвращаемое значение:
-          bool: True, если состояние клетки соответствует ожидаемому, иначе False.
+        Проверяет, закрашена ли текущая клетка робота.
+        @param status: str - ожидаемый статус ("painted" или "clear").
+        @returns: bool - True, если условие выполнено, иначе False.
         """
         pos_str = f"{self.robot_pos['x']},{self.robot_pos['y']}"
         self.logger.debug(f"Checking cell state: {pos_str} - {status}")
-
         if status == "painted":
             result = (pos_str in self.colored_cells)
             self.logger.debug(f"Cell painted: {'yes' if result else 'no'}.")
@@ -391,37 +349,26 @@ class KumirInterpreter:
         else:
             raise KumirInterpreterError(f"Unknown cell status: {status}")
 
-    # --- Методы измерения ---
     def do_measurement(self, measure):
         """
-        Выполняет команду измерения: "temperature" или "radiation".
-
-        Параметры:
-          measure (str): Тип измерения ("temperature" или "radiation").
-
-        Возвращаемое значение:
-          float: Результат измерения.
+        Выполняет измерение (например, температуры или радиации).
+        @param measure: str - тип измерения.
+        @returns: float - результат измерения.
         """
         self.logger.debug(f"Performing measurement: {measure}")
         if measure == "temperature":
-            return 25.0  # Фиксированное значение температуры
+            return 25.0
         elif measure == "radiation":
-            return 10.5  # Фиксированное значение радиации
+            return 10.5
         else:
             raise KumirInterpreterError(f"Unknown measurement: {measure}")
 
-    # --- Вспомогательные методы ---
     def is_move_allowed(self, x, y):
         """
         Проверяет, разрешено ли перемещение робота в клетку (x, y).
-        Перемещение разрешается, если координаты находятся в пределах поля (0..10) и по пути нет стены.
-
-        Параметры:
-          x (int): Целевая координата X.
-          y (int): Целевая координата Y.
-
-        Возвращаемое значение:
-          bool: True, если перемещение возможно, иначе False.
+        @param x: int - целевая координата X.
+        @param y: int - целевая координата Y.
+        @returns: bool - True, если перемещение возможно, иначе False.
         """
         self.logger.debug(f"Checking if move is allowed to X={x}, Y={y}")
         if x < 0 or y < 0 or x > 10 or y > 10:

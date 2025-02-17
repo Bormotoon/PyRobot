@@ -1,0 +1,257 @@
+/* UserLog.css */
+
+/* Стиль контейнера лога – белый фон, стандартный шрифт и размер, как в остальном приложении */
+.user-log.console-card {
+    background-color: #ffffff; /* Белый фон контейнера */
+    padding: 10px;
+    overflow-y: auto;
+    max-height: 300px;
+    white-space: pre-wrap;
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+}
+
+/* Базовый стиль для каждой строки лога */
+.log-message {
+    padding: 5px;
+    color: #000000; /* Чёрный текст */
+}
+
+/* Фоновые цвета для категорий – базовый вариант */
+.log-movement {
+    background-color: #cce5ff;
+}
+
+.log-event {
+    background-color: #d4edda;
+}
+
+.log-command {
+    background-color: #ffe5d0;
+}
+
+.log-measurement {
+    background-color: #e6e0f8;
+}
+
+.log-error {
+    background-color: #f8d7da;
+}
+
+.log-declaration {
+    background-color: #d1f2eb;
+}
+
+.log-assignment {
+    background-color: #fff3cd;
+}
+
+.log-output {
+    background-color: #e9ecef;
+}
+
+.log-input {
+    background-color: #fce4ec;
+}
+
+.log-control {
+    background-color: #c3e6cb;
+}
+
+.log-conversion {
+    background-color: #e9d8fd;
+}
+
+.log-math {
+    background-color: #d1ecf1;
+}
+
+.log-string {
+    background-color: #d1f0ff;
+}
+
+.log-file {
+    background-color: #ffd8cc;
+}
+
+.log-system {
+    background-color: #e2e3e5;
+}
+
+.log-random {
+    background-color: #f1f3f5;
+}
+
+.log-loop {
+    background-color: #fff9cc;
+}
+
+.log-if {
+    background-color: #e5d8fc;
+}
+
+.log-select {
+    background-color: #e9d8fd;
+}
+
+.log-pause {
+    background-color: #fde2e4;
+}
+
+.log-stop {
+    background-color: #f8d7da;
+}
+
+.log-exit {
+    background-color: #f8d7da;
+}
+
+.log-marker {
+    background-color: #d1eef3;
+}
+
+.log-cell {
+    background-color: #d4f8d4;
+}
+
+.log-editmode {
+    background-color: #e2e3e5;
+}
+
+.log-dimension {
+    background-color: #f0e0f8;
+}
+
+.log-fileimport {
+    background-color: #cce5ff;
+}
+
+.log-drag {
+    background-color: #fff3cd;
+}
+
+.log-wall {
+    background-color: #ffdab9;
+}
+
+.log-canvasmarker {
+    background-color: #d1f2eb;
+}
+
+/* Альтернативные оттенки для чередования (применяются при наличии класса .alt) */
+.log-movement.alt {
+    background-color: #b3d8ff;
+}
+
+.log-event.alt {
+    background-color: #b8e2c8;
+}
+
+.log-command.alt {
+    background-color: #ffd1b3;
+}
+
+.log-measurement.alt {
+    background-color: #d1c8f3;
+}
+
+.log-error.alt {
+    background-color: #f1c1c6;
+}
+
+.log-declaration.alt {
+    background-color: #bce8e0;
+}
+
+.log-assignment.alt {
+    background-color: #fff0b3;
+}
+
+.log-output.alt {
+    background-color: #dfe2e6;
+}
+
+.log-input.alt {
+    background-color: #f8cdd9;
+}
+
+.log-control.alt {
+    background-color: #a8d8b9;
+}
+
+.log-conversion.alt {
+    background-color: #e0c2fa;
+}
+
+.log-math.alt {
+    background-color: #c0e2ec;
+}
+
+.log-string.alt {
+    background-color: #c0eaff;
+}
+
+.log-file.alt {
+    background-color: #ffc2b3;
+}
+
+.log-system.alt {
+    background-color: #d6d7d9;
+}
+
+.log-random.alt {
+    background-color: #e3e5e8;
+}
+
+.log-loop.alt {
+    background-color: #fff3b3;
+}
+
+.log-if.alt {
+    background-color: #d9c4f8;
+}
+
+.log-select.alt {
+    background-color: #e0c2fa;
+}
+
+.log-pause.alt {
+    background-color: #fbd0d2;
+}
+
+.log-stop.alt,
+.log-exit.alt {
+    background-color: #f1c1c6;
+}
+
+.log-marker.alt {
+    background-color: #bce4e9;
+}
+
+.log-cell.alt {
+    background-color: #c8f1c8;
+}
+
+.log-editmode.alt {
+    background-color: #d6d7d9;
+}
+
+.log-dimension.alt {
+    background-color: #e3cce8;
+}
+
+.log-fileimport.alt {
+    background-color: #b3d8ff;
+}
+
+.log-drag.alt {
+    background-color: #fff0b3;
+}
+
+.log-wall.alt {
+    background-color: #ffc4a3;
+}
+
+.log-canvasmarker.alt {
+    background-color: #bce8e0;
+}

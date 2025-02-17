@@ -1,9 +1,7 @@
 /**
  * @file ControlPanel.jsx
  * @description Компонент панели управления симулятором робота.
- * Панель позволяет управлять перемещением робота, установкой и снятием маркеров, окраской клеток,
- * а также изменением размеров игрового поля. Кроме того, предусмотрены функции импорта поля из файла
- * (.FIL) и вызова диалога помощи.
+ * Позволяет управлять перемещением робота, маркерами, окраской клеток и размерами поля.
  */
 
 import React, {memo, useCallback, useRef, useState} from 'react';
@@ -24,17 +22,11 @@ import {
 	Remove,
 } from '@mui/icons-material';
 import {getHint} from '../hints';
-import './ControlPanel.css'; // Стили для панели управления
+import './ControlPanel.css';
 import HelpDialog from '../Help/HelpDialog';
+// Обновлён импорт логгера: теперь импортируем синглтон logger
+import logger from '../../Logger';
 
-/**
- * Функция для парсинга кода стен для заданной клетки.
- *
- * @param {number} code - Числовой код, определяющий наличие стен.
- * @param {number} x - Координата x клетки.
- * @param {number} y - Координата y клетки.
- * @returns {string[]} Массив строк, каждая из которых описывает стену в формате "x1,y1,x2,y2".
- */
 const parseWallCode = (code, x, y) => {
 	const arr = [];
 	if (code & 8) arr.push(`${x},${y},${x + 1},${y}`);
@@ -44,30 +36,6 @@ const parseWallCode = (code, x, y) => {
 	return arr;
 };
 
-/**
- * Компонент панели управления.
- *
- * @param {Object} props - Свойства компонента.
- * @param {Object} props.robotPos - Текущая позиция робота ({x, y}).
- * @param {function} props.setRobotPos - Функция для обновления позиции робота.
- * @param {Set} props.walls - Множество временных стен.
- * @param {function} props.setWalls - Функция для обновления множества стен.
- * @param {Set} props.permanentWalls - Множество постоянных стен.
- * @param {Object} props.markers - Объект с маркерами, ключами являются координаты.
- * @param {function} props.setMarkers - Функция для обновления маркеров.
- * @param {Set} props.coloredCells - Множество закрашенных клеток.
- * @param {function} props.setColoredCells - Функция для обновления закрашенных клеток.
- * @param {number} props.width - Ширина игрового поля.
- * @param {function} props.setWidth - Функция для изменения ширины поля.
- * @param {number} props.height - Высота игрового поля.
- * @param {function} props.setHeight - Функция для изменения высоты поля.
- * @param {number} props.cellSize - Размер клетки.
- * @param {function} props.setCellSize - Функция для изменения размера клетки.
- * @param {boolean} props.editMode - Флаг, указывающий, включен ли режим редактирования.
- * @param {function} props.setEditMode - Функция для переключения режима редактирования.
- * @param {function} props.setStatusMessage - Функция для обновления статусного сообщения.
- * @returns {JSX.Element} Разметка панели управления.
- */
 const ControlPanel = memo(({
 	                           robotPos,
 	                           setRobotPos,
@@ -91,6 +59,10 @@ const ControlPanel = memo(({
 	const fileInputRef = useRef(null);
 	const [helpOpen, setHelpOpen] = useState(false);
 
+	/**
+	 * Функция перемещения робота.
+	 * @param {string} direction - Направление перемещения.
+	 */
 	const moveRobot = useCallback((direction) => {
 		let newPos = {...robotPos};
 		let hintKey = '';
@@ -99,52 +71,74 @@ const ControlPanel = memo(({
 		if (direction === 'up') {
 			hintKey = 'moveRobotUp';
 			actionKey = 'moveRobotUpBlocked';
-			if (newPos.y > 0 && !walls.has(`${newPos.x},${newPos.y},${newPos.x + 1},${newPos.y}`) && !permanentWalls.has(`${newPos.x},${newPos.y},${newPos.x + 1},${newPos.y}`)) {
+			if (
+				newPos.y > 0 &&
+				!walls.has(`${newPos.x},${newPos.y},${newPos.x + 1},${newPos.y}`) &&
+				!permanentWalls.has(`${newPos.x},${newPos.y},${newPos.x + 1},${newPos.y}`)
+			) {
 				newPos.y -= 1;
 			} else {
 				setStatusMessage(getHint(actionKey, editMode));
+				logger.log_movement(`Попытка перемещения вверх заблокирована. Текущая позиция: (${robotPos.x}, ${robotPos.y})`);
 				return;
 			}
 		} else if (direction === 'down') {
 			hintKey = 'moveRobotDown';
 			actionKey = 'moveRobotDownBlocked';
-			if (newPos.y < height - 1 && !walls.has(`${newPos.x},${newPos.y + 1},${newPos.x + 1},${newPos.y + 1}`) && !permanentWalls.has(`${newPos.x},${newPos.y + 1},${newPos.x + 1},${newPos.y + 1}`)) {
+			if (
+				newPos.y < height - 1 &&
+				!walls.has(`${newPos.x},${newPos.y + 1},${newPos.x + 1},${newPos.y + 1}`) &&
+				!permanentWalls.has(`${newPos.x},${newPos.y + 1},${newPos.x + 1},${newPos.y + 1}`)
+			) {
 				newPos.y += 1;
 			} else {
 				setStatusMessage(getHint(actionKey, editMode));
+				logger.log_movement(`Попытка перемещения вниз заблокирована. Текущая позиция: (${robotPos.x}, ${robotPos.y})`);
 				return;
 			}
 		} else if (direction === 'left') {
 			hintKey = 'moveRobotLeft';
 			actionKey = 'moveRobotLeftBlocked';
-			if (newPos.x > 0 && !walls.has(`${newPos.x},${newPos.y},${newPos.x},${newPos.y + 1}`) && !permanentWalls.has(`${newPos.x},${newPos.y},${newPos.x},${newPos.y + 1}`)) {
+			if (
+				newPos.x > 0 &&
+				!walls.has(`${newPos.x},${newPos.y},${newPos.x},${newPos.y + 1}`) &&
+				!permanentWalls.has(`${newPos.x},${newPos.y},${newPos.x},${newPos.y + 1}`)
+			) {
 				newPos.x -= 1;
 			} else {
 				setStatusMessage(getHint(actionKey, editMode));
+				logger.log_movement(`Попытка перемещения влево заблокирована. Текущая позиция: (${robotPos.x}, ${robotPos.y})`);
 				return;
 			}
 		} else if (direction === 'right') {
 			hintKey = 'moveRobotRight';
 			actionKey = 'moveRobotRightBlocked';
-			if (newPos.x < width - 1 && !walls.has(`${newPos.x + 1},${newPos.y},${newPos.x + 1},${newPos.y + 1}`) && !permanentWalls.has(`${newPos.x + 1},${newPos.y},${newPos.x + 1},${newPos.y + 1}`)) {
+			if (
+				newPos.x < width - 1 &&
+				!walls.has(`${newPos.x + 1},${newPos.y},${newPos.x + 1},${newPos.y + 1}`) &&
+				!permanentWalls.has(`${newPos.x + 1},${newPos.y},${newPos.x + 1},${newPos.y + 1}`)
+			) {
 				newPos.x += 1;
 			} else {
 				setStatusMessage(getHint(actionKey, editMode));
+				logger.log_movement(`Попытка перемещения вправо заблокирована. Текущая позиция: (${robotPos.x}, ${robotPos.y})`);
 				return;
 			}
 		}
 
 		setRobotPos(newPos);
 		setStatusMessage(getHint(hintKey, editMode));
-		// Удалён вызов fetch обновления – обновление состояния теперь централизовано в RobotSimulator.
-	}, [robotPos, walls, permanentWalls, editMode, setRobotPos, setStatusMessage, width]);
+		logger.log_movement(`Робот перемещён ${direction}. Новая позиция: (${newPos.x}, ${newPos.y})`);
+	}, [robotPos, walls, permanentWalls, editMode, setRobotPos, setStatusMessage, width, height]);
 
+	// Функции для управления маркерами и окраской клеток
 	const putMarker = () => {
 		const posKey = `${robotPos.x},${robotPos.y}`;
 		if (!markers[posKey]) {
 			const newMarkers = {...markers, [posKey]: 1};
 			setMarkers(newMarkers);
 			setStatusMessage(getHint('putMarker', editMode));
+			logger.log_event(`Маркер установлен в позиции: (${robotPos.x}, ${robotPos.y})`);
 		} else {
 			setStatusMessage(getHint('markerAlreadyExists', editMode));
 		}
@@ -157,6 +151,7 @@ const ControlPanel = memo(({
 			delete newMarkers[posKey];
 			setMarkers(newMarkers);
 			setStatusMessage(getHint('pickMarker', editMode));
+			logger.log_event(`Маркер снят из позиции: (${robotPos.x}, ${robotPos.y})`);
 		} else {
 			setStatusMessage(getHint('noMarkerHere', editMode));
 		}
@@ -169,6 +164,7 @@ const ControlPanel = memo(({
 			newColored.add(posKey);
 			setColoredCells(newColored);
 			setStatusMessage(getHint('paintCell', editMode));
+			logger.log_event(`Клетка (${robotPos.x}, ${robotPos.y}) закрашена.`);
 		} else {
 			setStatusMessage(getHint('cellAlreadyPainted', editMode));
 		}
@@ -181,6 +177,7 @@ const ControlPanel = memo(({
 			newColored.delete(posKey);
 			setColoredCells(newColored);
 			setStatusMessage(getHint('clearCell', editMode));
+			logger.log_event(`Клетка (${robotPos.x}, ${robotPos.y}) очищена.`);
 		} else {
 			setStatusMessage(getHint('cellAlreadyClear', editMode));
 		}
@@ -191,8 +188,10 @@ const ControlPanel = memo(({
 		setEditMode(newMode);
 		if (newMode) {
 			setStatusMessage(getHint('enterEditMode', newMode));
+			logger.log_event("Режим редактирования включён.");
 		} else {
 			setStatusMessage(getHint('exitEditMode', newMode));
+			logger.log_event("Режим редактирования выключен.");
 		}
 	};
 
@@ -203,6 +202,7 @@ const ControlPanel = memo(({
 		}
 		setWidth(width + 1);
 		setStatusMessage(getHint('increaseWidth', editMode));
+		logger.log_event(`Ширина поля увеличена до ${width + 1}.`);
 	};
 
 	const decreaseWidth = () => {
@@ -213,6 +213,7 @@ const ControlPanel = memo(({
 		if (width > 1) {
 			setWidth(width - 1);
 			setStatusMessage(getHint('decreaseWidth', editMode));
+			logger.log_event(`Ширина поля уменьшена до ${width - 1}.`);
 		} else {
 			setStatusMessage(getHint('widthCannotBeLessThan1', editMode));
 		}
@@ -225,6 +226,7 @@ const ControlPanel = memo(({
 		}
 		setHeight(height + 1);
 		setStatusMessage(getHint('increaseHeight', editMode));
+		logger.log_event(`Высота поля увеличена до ${height + 1}.`);
 	};
 
 	const decreaseHeight = () => {
@@ -235,6 +237,7 @@ const ControlPanel = memo(({
 		if (height > 1) {
 			setHeight(height - 1);
 			setStatusMessage(getHint('decreaseHeight', editMode));
+			logger.log_event(`Высота поля уменьшена до ${height - 1}.`);
 		} else {
 			setStatusMessage(getHint('heightCannotBeLessThan1', editMode));
 		}
@@ -251,8 +254,10 @@ const ControlPanel = memo(({
 			const content = await file.text();
 			parseAndApplyFieldFile(content);
 			setStatusMessage(getHint('importSuccess', editMode));
+			logger.log_event("Файл поля успешно импортирован.");
 		} catch (error) {
 			setStatusMessage(getHint('importError', editMode) + error.message);
+			logger.log_event(`Ошибка при импорте файла: ${error.message}`);
 		} finally {
 			e.target.value = "";
 		}
@@ -282,19 +287,6 @@ const ControlPanel = memo(({
 				wallsParsed.forEach(w => newWalls.add(w));
 			}
 
-			const computePermanentWalls = (width, height) => {
-				const pWalls = new Set();
-				for (let x = 0; x < width; x++) {
-					pWalls.add(`${x},0,${x + 1},0`);
-					pWalls.add(`${x},${height},${x + 1},${height}`);
-				}
-				for (let y = 0; y < height; y++) {
-					pWalls.add(`0,${y},0,${y + 1}`);
-					pWalls.add(`${width},${y},${width},${y + 1}`);
-				}
-				return pWalls;
-			};
-
 			setWidth(wFile);
 			setHeight(hFile);
 			setRobotPos({x: rx, y: ry});
@@ -302,8 +294,10 @@ const ControlPanel = memo(({
 			setColoredCells(newColored);
 			setMarkers(newMarkers);
 			setStatusMessage("Поле успешно обновлено из файла.");
+			logger.log_event("Поле обновлено из импортированного файла.");
 		} catch (error) {
 			setStatusMessage("Ошибка при импорте файла: " + error.message);
+			logger.log_event(`Ошибка при импорте файла: ${error.message}`);
 		}
 	};
 
@@ -313,6 +307,8 @@ const ControlPanel = memo(({
 				<CardHeader title="Управление"/>
 				<CardContent>
 					<Grid container spacing={2}>
+						{/* Здесь размещены кнопки управления (перемещения, маркеры, окраска и т.д.)
+                Каждая кнопка вызывает соответствующую функцию и логирует событие через logger */}
 						<Grid item xs={12} style={{textAlign: 'center'}}>
 							<Button
 								onClick={() => moveRobot('up')}
@@ -361,6 +357,7 @@ const ControlPanel = memo(({
 								Вниз
 							</Button>
 						</Grid>
+						{/* Остальные кнопки (маркер, покраска, изменение размеров поля, импорт и т.д.) остаются аналогичными */}
 						<Grid item xs={6}>
 							<Button
 								onClick={putMarker}
