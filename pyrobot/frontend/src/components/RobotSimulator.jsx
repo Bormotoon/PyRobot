@@ -2,7 +2,7 @@
  * @file RobotSimulator.jsx
  * @description Главный компонент симулятора робота.
  * Объединяет редактор кода, панель управления и игровое поле.
- * Лог-сообщения теперь выводятся внутри компонента CodeEditor (в блоке с классом "console-card").
+ * Лог-сообщения выводятся внутри компонента CodeEditor (в блоке с классом "console-card").
  */
 
 import React, {memo, useCallback, useEffect, useReducer, useRef} from 'react';
@@ -114,8 +114,6 @@ const RobotSimulator = memo(() => {
 	const canvasRef = useRef(null);
 	const prevEditMode = useRef(state.editMode);
 
-	// Функции управления симулятором, вызывающие методы логирования через logger
-
 	const handleClearCode = useCallback(() => {
 		dispatch({type: 'SET_CODE', payload: ''});
 		dispatch({type: 'SET_STATUS_MESSAGE', payload: 'Код программы очищен.'});
@@ -137,6 +135,7 @@ const RobotSimulator = memo(() => {
 		dispatch({type: 'SET_IS_RUNNING', payload: true});
 		fetch('http://localhost:5000/execute', {
 			method: 'POST',
+			credentials: 'include', // Отправка cookie вместе с запросом
 			headers: {'Content-Type': 'application/json'},
 			body: JSON.stringify({code: state.code}),
 		})
@@ -162,7 +161,6 @@ const RobotSimulator = memo(() => {
 				dispatch({type: 'SET_IS_RUNNING', payload: false});
 			});
 	}, [state.code, state.editMode]);
-
 
 	const handleReset = useCallback(() => {
 		dispatch({type: 'SET_ROBOT_POS', payload: {x: 0, y: 0}});
@@ -200,6 +198,7 @@ const RobotSimulator = memo(() => {
 			};
 			fetch('http://localhost:5000/updateField', {
 				method: 'POST',
+				credentials: 'include', // Отправка cookie вместе с запросом
 				headers: {'Content-Type': 'application/json'},
 				body: JSON.stringify(fieldState),
 			}).catch(e => console.error("Ошибка обновления поля на сервере:", e));
@@ -223,7 +222,6 @@ const RobotSimulator = memo(() => {
 	return (
 		<ThemeProvider theme={theme}>
 			<div className="app-container">
-				{/* Компонент редактора кода, в котором внутри карточки консоли отображается лог */}
 				<CodeEditor
 					code={state.code}
 					setCode={(newCode) => dispatch({type: 'SET_CODE', payload: newCode})}
@@ -234,7 +232,6 @@ const RobotSimulator = memo(() => {
 					onReset={handleReset}
 					statusText={statusText}
 				/>
-
 				<ControlPanel
 					robotPos={state.robotPos}
 					setRobotPos={(pos) => dispatch({type: 'SET_ROBOT_POS', payload: pos})}
@@ -255,7 +252,6 @@ const RobotSimulator = memo(() => {
 					setEditMode={(val) => dispatch({type: 'SET_EDIT_MODE', payload: val})}
 					setStatusMessage={(msg) => dispatch({type: 'SET_STATUS_MESSAGE', payload: msg})}
 				/>
-
 				<Field
 					canvasRef={canvasRef}
 					robotPos={state.robotPos}

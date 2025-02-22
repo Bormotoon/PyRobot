@@ -108,7 +108,8 @@ class UserLog extends Component {
 		// Объект для отслеживания предыдущей строки для каждой категории
 		const lastAlt = {};
 
-		return (<div className="user-log console-card" ref={this.logContainer}>
+		return (
+			<div className="user-log console-card" ref={this.logContainer}>
 				{lines.map((line, index) => {
 					const category = this.getLogCategoryClass(line) || 'default';
 					if (lastAlt[category] === undefined) {
@@ -121,11 +122,14 @@ class UserLog extends Component {
 						}
 					}
 					const altClass = lastAlt[category] ? 'alt' : '';
-					return (<div key={index} className={`log-message ${category} ${altClass}`}>
+					return (
+						<div key={index} className={`log-message ${category} ${altClass}`}>
 							{line}
-						</div>);
+						</div>
+					);
 				})}
-			</div>);
+			</div>
+		);
 	}
 }
 

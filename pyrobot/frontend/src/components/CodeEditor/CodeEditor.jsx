@@ -34,7 +34,8 @@ const robotCommands = ["Робот", "влево", "вправо", "вверх",
 function makeKumirRegex(words) {
 	const alternatives = words.join("|"); // Объединяем ключевые слова через "|"
 	return {
-		pattern: new RegExp(`(^|\\s)(?:${alternatives})(?=$|\\s)`, "i"), lookbehind: true
+		pattern: new RegExp(`(^|\\s)(?:${alternatives})(?=$|\\s)`, "i"),
+		lookbehind: true
 	};
 }
 
@@ -48,7 +49,8 @@ Prism.languages.kumir = {
 	"robot-command": makeKumirRegex(robotCommands),
 	comment: /#.*/, // Комментарии начинаются с символа "#"
 	string: {
-		pattern: /(["'])(?:(?!\1).)*\1/, greedy: true
+		pattern: /(["'])(?:(?!\1).)*\1/,
+		greedy: true
 	},
 	number: {
 		pattern: /-?\$[0-9A-Fa-f]+|-?\d+(?:\.\d+)?(?:[еeЕE][-+]?\d+)?/
@@ -72,7 +74,15 @@ Prism.languages.kumir = {
  * @returns {JSX.Element} Разметка редактора кода.
  */
 const CodeEditor = memo(({
-	                         code, setCode, isRunning, onClearCode, onStop, onStart, onReset, statusText, consoleOutput
+	                         code,
+	                         setCode,
+	                         isRunning,
+	                         onClearCode,
+	                         onStop,
+	                         onStart,
+	                         onReset,
+	                         statusText,
+	                         consoleOutput
                          }) => {
 	/**
 	 * Функция подсветки синтаксиса с использованием Prism.js.
@@ -83,7 +93,8 @@ const CodeEditor = memo(({
 		return Prism.highlight(inputCode, Prism.languages.kumir, 'kumir');
 	}, []);
 
-	return (<div className="code-editor">
+	return (
+		<div className="code-editor">
 			{/* Заголовок редактора */}
 			<Typography variant="h5" gutterBottom>
 				Редактор Кода
@@ -127,7 +138,8 @@ const CodeEditor = memo(({
 			<Card className="console-card">
 				<UserLog/>
 			</Card>
-		</div>);
+		</div>
+	);
 });
 
 export default CodeEditor;

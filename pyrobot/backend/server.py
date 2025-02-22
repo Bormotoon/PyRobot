@@ -6,9 +6,13 @@ import logging
 
 # Инициализация приложения Flask
 app = Flask(__name__)
-CORS(app, resources={r"/execute": {"origins": "http://localhost:3000"},
-                     r"/reset": {"origins": "http://localhost:3000"},
-                     r"/updateField": {"origins": "http://localhost:3000"}})
+CORS(app,
+     supports_credentials=True,
+     resources={
+         r"/execute": {"origins": "http://localhost:3000"},
+         r"/reset": {"origins": "http://localhost:3000"},
+         r"/updateField": {"origins": "http://localhost:3000"}
+     })
 
 # Настройка секретного ключа и конфигурации сессии
 app.config['SECRET_KEY'] = 'your-secret-key'  # Замените на надежное значение
@@ -16,6 +20,10 @@ app.config['SESSION_TYPE'] = 'redis'
 app.config['SESSION_PERMANENT'] = False
 app.config['SESSION_USE_SIGNER'] = True
 app.config['SESSION_REDIS'] = redis.Redis(host='localhost', port=6379, db=0)
+# Для локальной разработки используем 'Lax', чтобы cookie сохранялись при HTTP-соединениях
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SECURE'] = False
+app.config['SESSION_COOKIE_DOMAIN'] = 'localhost'  # если потребуется
 
 # Инициализация Flask-Session
 Session(app)
@@ -25,13 +33,11 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger('FlaskServer')
 
 
-# Пример работы с сессиями:
 @app.route('/updateField', methods=['POST'])
 def update_field():
     data = request.json
     logger.info("Получено обновление состояния поля.")
     logger.debug(f"Field state: {data}")
-    # Сохраняем состояние поля в сессии для текущего пользователя
     session['field_state'] = data
     return jsonify({'success': True, 'message': 'Поле обновлено на сервере.'}), 200
 
@@ -48,23 +54,33 @@ def execute_code():
         return jsonify({'success': False, 'message': 'Код не предоставлен.'}), 400
 
     try:
-        # Здесь можно извлечь состояние поля из сессии, если оно нужно интерпретатору
         field_state = session.get('field_state')
-        # Передача состояния в интерпретатор (если требуется) или использование его для логики выполнения
-
-        # Пример создания интерпретатора и выполнения кода
         from pyrobot.backend.kumir_interpreter.interpreter import KumirLanguageInterpreter
         interpreter = KumirLanguageInterpreter(code)
-        result = interpreter.interpret(step_by_step=False, step_delay=0)
+        interpreter.parse()
+        trace = []
+        interpreter.execute_introduction(trace, step_delay=0, step_by_step=False)
+        if field_state is not None and 'robotPos' in field_state:
+            interpreter.robot.robot_pos = field_state['robotPos']
+            logger.debug(f"Начальная позиция робота переустановлена в: {field_state['robotPos']}")
+        interpreter.execute_algorithm(interpreter.main_algorithm, trace, step_delay=0, step_by_step=False)
+        final_state = {
+            "env": interpreter.env,
+            "robot": interpreter.robot.robot_pos,
+            "coloredCells": list(interpreter.robot.colored_cells),
+            "output": interpreter.output
+        }
+        result = {"trace": trace, "finalState": final_state}
         logger.info("Код выполнен успешно.")
         logger.debug(f"Результат: {result}")
-
-        final_state = result.get("finalState", {})
         if field_state is not None:
             final_state['field'] = field_state
-
-        response = {'success': True, 'message': 'Код выполнен успешно.', **final_state,
-                    'trace': result.get("trace", [])}
+        response = {
+            'success': True,
+            'message': 'Код выполнен успешно.',
+            **final_state,
+            'trace': trace
+        }
         return jsonify(response), 200
 
     except Exception as e:
@@ -75,7 +91,6 @@ def execute_code():
 @app.route('/reset', methods=['POST'])
 def reset_simulator():
     logger.info("Запрос на сброс симулятора получен. (Состояние сессии будет очищено.)")
-    # Очищаем данные сессии для данного пользователя
     session.pop('field_state', None)
     return jsonify({'success': True, 'message': 'Симулятор сброшен.'}), 200
 

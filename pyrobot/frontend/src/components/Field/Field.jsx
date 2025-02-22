@@ -257,7 +257,8 @@ const Field = memo(({
 		}
 	}, [isDraggingRobot, handleMouseMove, handleMouseUp]);
 
-	return (<div className="field-area">
+	return (
+		<div className="field-area">
 			<Card className="field-card">
 				<canvas
 					ref={canvasRef}
@@ -273,7 +274,8 @@ const Field = memo(({
 					{statusMessage}
 				</Typography>
 			</Card>
-		</div>);
+		</div>
+	);
 });
 
 export default Field;
