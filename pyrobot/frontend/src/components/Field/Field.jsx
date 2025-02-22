@@ -39,18 +39,6 @@ const Field = memo(({
 		drawField(canvasRef.current, {coloredCells, robotPos, markers, walls, permanentWalls, width, height, cellSize});
 	}, [canvasRef, coloredCells, robotPos, markers, walls, permanentWalls, width, height, cellSize]);
 
-	// Глобальное отслеживание событий мыши для перетаскивания робота
-	useEffect(() => {
-		if (isDraggingRobot) {
-			window.addEventListener('mousemove', handleMouseMove);
-			window.addEventListener('mouseup', handleMouseUp);
-			return () => {
-				window.removeEventListener('mousemove', handleMouseMove);
-				window.removeEventListener('mouseup', handleMouseUp);
-			};
-		}
-	}, [isDraggingRobot]);
-
 	/**
 	 * Получает координаты курсора относительно canvas.
 	 * @param {MouseEvent} event - Событие мыши.
@@ -208,7 +196,6 @@ const Field = memo(({
 		if (x === null || y === null) return;
 		const {gridX, gridY} = toGridCoords(x, y);
 		setRobotPos({x: gridX, y: gridY});
-		// Убрано: logger.log_robot_drag_update({ x: gridX, y: gridY });
 	}, [isDraggingRobot, getCanvasCoords, toGridCoords, setRobotPos]);
 
 	/**
@@ -257,6 +244,18 @@ const Field = memo(({
 			return copy;
 		});
 	}, [editMode, getCanvasCoords, isOutsideCanvas, toGridCoords, setMarkers, setStatusMessage]);
+
+	// Глобальное отслеживание событий мыши для перетаскивания робота
+	useEffect(() => {
+		if (isDraggingRobot) {
+			window.addEventListener('mousemove', handleMouseMove);
+			window.addEventListener('mouseup', handleMouseUp);
+			return () => {
+				window.removeEventListener('mousemove', handleMouseMove);
+				window.removeEventListener('mouseup', handleMouseUp);
+			};
+		}
+	}, [isDraggingRobot, handleMouseMove, handleMouseUp]);
 
 	return (<div className="field-area">
 			<Card className="field-card">

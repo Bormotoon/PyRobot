@@ -161,7 +161,8 @@ const RobotSimulator = memo(() => {
 				logger.log_error('Ошибка выполнения запроса.');
 				dispatch({type: 'SET_IS_RUNNING', payload: false});
 			});
-	}, [state.code, state.editMode, state]);
+	}, [state.code, state.editMode]);
+
 
 	const handleReset = useCallback(() => {
 		dispatch({type: 'SET_ROBOT_POS', payload: {x: 0, y: 0}});
