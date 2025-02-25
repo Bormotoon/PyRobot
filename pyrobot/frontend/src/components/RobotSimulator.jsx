@@ -149,17 +149,20 @@ const RobotSimulator = memo(() => {
 					}
 					dispatch({type: 'SET_COLORED_CELLS', payload: new Set(data.coloredCells)});
 				} else {
-					dispatch({type: 'SET_STATUS_MESSAGE', payload: 'Ошибка: ' + data.message});
-					logger.log_error(`Ошибка выполнения: ${data.message}`);
+					const errorMsg = 'Ошибка: ' + data.message + (data.output ? "\n" + data.output : "");
+					dispatch({type: 'SET_STATUS_MESSAGE', payload: errorMsg});
+					logger.log_error(errorMsg);
 				}
 				dispatch({type: 'SET_IS_RUNNING', payload: false});
 			})
+
 			.catch(error => {
 				console.error('Ошибка выполнения запроса:', error);
 				dispatch({type: 'SET_STATUS_MESSAGE', payload: 'Ошибка выполнения запроса.'});
 				logger.log_error('Ошибка выполнения запроса.');
 				dispatch({type: 'SET_IS_RUNNING', payload: false});
 			});
+
 	}, [state.code, state.editMode]);
 
 	const handleReset = useCallback(() => {
