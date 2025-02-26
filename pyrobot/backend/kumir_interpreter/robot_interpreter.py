@@ -18,30 +18,24 @@ class KumirInterpreterError(Exception):
 class KumirInterpreter:
 	"""
 	Интерпретатор робота для языка KUMIR.
-
-	Атрибуты:
-	  robot_pos (dict): Текущая позиция робота в виде {'x': int, 'y': int}.
-	  walls (set): Множество строк с описанием стен.
-	  markers (dict): Объект с маркерами на поле.
-	  colored_cells (set): Множество закрашенных клеток (формат "x,y").
-	  logger (Logger): Логгер для отладки.
 	"""
 
 	def __init__(self):
-		"""
-		Инициализирует состояние робота и настраивает логирование.
-		"""
 		self.robot_pos = {"x": 0, "y": 0}
 		self.walls = set()
 		self.markers = {}
 		self.colored_cells = set()
 
-		# Настройка логгера
+		# Получаем логгер с именем 'KumirInterpreter'
 		self.logger = logging.getLogger('KumirInterpreter')
-		handler = logging.StreamHandler()
-		formatter = logging.Formatter('%(asctime)s - KumirInterpreter - %(levelname)s - %(message)s')
-		handler.setFormatter(formatter)
-		self.logger.addHandler(handler)
+		# Добавляем обработчик только если его ещё нет
+		if not self.logger.handlers:
+			handler = logging.StreamHandler()
+			formatter = logging.Formatter('%(asctime)s - KumirInterpreter - %(levelname)s - %(message)s')
+			handler.setFormatter(formatter)
+			self.logger.addHandler(handler)
+		# Отключаем передачу сообщений вверх по цепочке, чтобы избежать дублирования
+		self.logger.propagate = False
 		self.logger.setLevel(logging.DEBUG)
 
 	def reset(self):
