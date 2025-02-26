@@ -1,11 +1,4 @@
-/**
- * @file RobotSimulator.jsx
- * @description Главный компонент симулятора робота.
- * Объединяет редактор кода, панель управления и игровое поле.
- * Лог-сообщения выводятся внутри компонента CodeEditor (в блоке с классом "console-card").
- */
-
-import React, {memo, useCallback, useEffect, useReducer, useRef} from 'react';
+import React, {memo, useCallback, useEffect, useReducer, useRef, useState} from 'react';
 import {ThemeProvider} from '@mui/material/styles';
 import CodeEditor from './CodeEditor/CodeEditor';
 import ControlPanel from './ControlPanel/ControlPanel';
@@ -13,6 +6,9 @@ import Field from './Field/Field';
 import theme from '../styles/theme';
 import {getHint} from './hints';
 import logger from '../Logger';
+import io from 'socket.io-client';
+import {Typography} from '@mui/material';
+
 
 const initialState = {
 	code: `использовать Робот\nалг\nнач\n  вправо\n  вниз\n  вправо\nкон`,
@@ -58,12 +54,12 @@ function reducer(state, action) {
 		case 'SET_MARKERS':
 			return {
 				...state,
-				markers: typeof action.payload === 'function' ? action.payload(state.markers) : action.payload
+				markers: typeof action.payload === 'function' ? action.payload(state.markers) : action.payload,
 			};
 		case 'SET_COLORED_CELLS':
 			return {
 				...state,
-				coloredCells: typeof action.payload === 'function' ? action.payload(state.coloredCells) : new Set(action.payload)
+				coloredCells: typeof action.payload === 'function' ? action.payload(state.coloredCells) : new Set(action.payload),
 			};
 		case 'SET_EDIT_MODE':
 			return {...state, editMode: action.payload};
@@ -72,12 +68,6 @@ function reducer(state, action) {
 	}
 }
 
-/**
- * Функция, создающая постоянные стены по периметру поля.
- * @param {number} width - Ширина поля.
- * @param {number} height - Высота поля.
- * @returns {Set<string>} Множество строк с описанием стен.
- */
 function setupPermanentWalls(width, height) {
 	const newWalls = new Set();
 	for (let x = 0; x < width; x++) {
@@ -91,28 +81,32 @@ function setupPermanentWalls(width, height) {
 	return newWalls;
 }
 
-/**
- * Функция, ограничивающая позицию робота в пределах поля.
- * @param {Object} robotPos - Текущая позиция робота.
- * @param {number} width - Ширина поля.
- * @param {number} height - Высота поля.
- * @returns {Object} Новая позиция робота с координатами, не выходящими за пределы поля.
- */
 function clampRobotPos(robotPos, width, height) {
 	const clampedX = Math.min(Math.max(robotPos.x, 0), width - 1);
 	const clampedY = Math.min(Math.max(robotPos.y, 0), height - 1);
 	return {x: clampedX, y: clampedY};
 }
 
-/**
- * Компонент RobotSimulator.
- * Обеспечивает работу симулятора: редактор кода, панель управления и игровое поле.
- * Лог-сообщения выводятся внутри компонента CodeEditor.
- */
 const RobotSimulator = memo(() => {
 	const [state, dispatch] = useReducer(reducer, initialState);
+	const [progress, setProgress] = useState(null);
 	const canvasRef = useRef(null);
+	const socketRef = useRef(null);
 	const prevEditMode = useRef(state.editMode);
+
+	useEffect(() => {
+		// Подключаемся к WebSocket-серверу
+		socketRef.current = io('http://localhost:5000');
+		socketRef.current.on('execution_progress', (data) => {
+			setProgress(data);
+			logger.log_event(`Прогресс: Фаза ${data.phase}, команда ${data.commandIndex}`);
+		});
+		return () => {
+			if (socketRef.current) {
+				socketRef.current.disconnect();
+			}
+		};
+	}, []);
 
 	const handleClearCode = useCallback(() => {
 		dispatch({type: 'SET_CODE', payload: ''});
@@ -133,14 +127,15 @@ const RobotSimulator = memo(() => {
 			return;
 		}
 		dispatch({type: 'SET_IS_RUNNING', payload: true});
+		setProgress(null);
 		fetch('http://localhost:5000/execute', {
 			method: 'POST',
-			credentials: 'include', // Отправка cookie вместе с запросом
+			credentials: 'include',
 			headers: {'Content-Type': 'application/json'},
 			body: JSON.stringify({code: state.code}),
 		})
-			.then(response => response.json())
-			.then(data => {
+			.then((response) => response.json())
+			.then((data) => {
 				if (data.success) {
 					dispatch({type: 'SET_STATUS_MESSAGE', payload: 'Код выполнен успешно.'});
 					logger.log_event('Код выполнен успешно.');
@@ -155,14 +150,12 @@ const RobotSimulator = memo(() => {
 				}
 				dispatch({type: 'SET_IS_RUNNING', payload: false});
 			})
-
-			.catch(error => {
+			.catch((error) => {
 				console.error('Ошибка выполнения запроса:', error);
 				dispatch({type: 'SET_STATUS_MESSAGE', payload: 'Ошибка выполнения запроса.'});
 				logger.log_error('Ошибка выполнения запроса.');
 				dispatch({type: 'SET_IS_RUNNING', payload: false});
 			});
-
 	}, [state.code, state.editMode]);
 
 	const handleReset = useCallback(() => {
@@ -201,13 +194,22 @@ const RobotSimulator = memo(() => {
 			};
 			fetch('http://localhost:5000/updateField', {
 				method: 'POST',
-				credentials: 'include', // Отправка cookie вместе с запросом
+				credentials: 'include',
 				headers: {'Content-Type': 'application/json'},
 				body: JSON.stringify(fieldState),
-			}).catch(e => console.error("Ошибка обновления поля на сервере:", e));
+			}).catch((e) => console.error("Ошибка обновления поля на сервере:", e));
 		}, 200);
 		return () => clearTimeout(timeout);
-	}, [state.width, state.height, state.cellSize, state.robotPos, state.walls, state.permanentWalls, state.markers, state.coloredCells]);
+	}, [
+		state.width,
+		state.height,
+		state.cellSize,
+		state.robotPos,
+		state.walls,
+		state.permanentWalls,
+		state.markers,
+		state.coloredCells,
+	]);
 
 	useEffect(() => {
 		if (prevEditMode.current && !state.editMode) {
@@ -219,8 +221,23 @@ const RobotSimulator = memo(() => {
 	const statusText = [
 		`Позиция робота: (${state.robotPos.x}, ${state.robotPos.y})`,
 		`Маркеров: ${Object.keys(state.markers).length}`,
-		`Раскрашенных клеток: ${state.coloredCells.size}`
+		`Раскрашенных клеток: ${state.coloredCells.size}`,
 	].join('\n');
+
+	// Функция отображения прогресса
+	const renderProgress = () => {
+		if (!progress) return null;
+		return (
+			<div className="progress-bar">
+				<Typography variant="body2">
+					Фаза: {progress.phase}, Команда: {progress.commandIndex}
+				</Typography>
+				<Typography variant="body2">
+					Вывод: {progress.output}
+				</Typography>
+			</div>
+		);
+	};
 
 	return (
 		<ThemeProvider theme={theme}>
@@ -273,6 +290,7 @@ const RobotSimulator = memo(() => {
 					statusMessage={state.statusMessage}
 					setStatusMessage={(msg) => dispatch({type: 'SET_STATUS_MESSAGE', payload: msg})}
 				/>
+				{renderProgress()}
 			</div>
 		</ThemeProvider>
 	);
