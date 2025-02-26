@@ -194,22 +194,39 @@ def process_output(line, env):
 	print(value)
 
 
-def process_robot_command(line, robot):
-	cmd = line.lower().strip()
-	robot_commands = {"влево": robot.go_left, "вправо": robot.go_right, "вверх": robot.go_up, "вниз": robot.go_down,
-					  "закрасить": robot.do_paint}
+def process_robot_command(line, robot, interpreter=None):
+	cmd = line.strip().lower()
+	robot_commands = {
+		"влево": robot.go_left,
+		"вправо": robot.go_right,
+		"вверх": robot.go_up,
+		"вниз": robot.go_down,
+		"закрасить": robot.do_paint
+	}
 	if cmd in robot_commands:
 		try:
+			# Вызываем команду и обрабатываем возможные исключения
 			robot_commands[cmd]()
+			if interpreter is not None:
+				success_msg = f"Команда '{cmd}' успешно выполнена."
+				interpreter.output += success_msg + "\n"
+				interpreter.logger.info(success_msg)
+			return True
 		except Exception as e:
-			print(f"Error executing command '{line}': {e}")
-		return True
+			# Записываем сообщение об ошибке в вывод интерпретатора, если он предоставлен
+			if interpreter is not None:
+				error_msg = f"Ошибка при выполнении команды '{cmd}': {str(e)}"
+				interpreter.output += error_msg + "\n"
+				interpreter.logger.error(error_msg)
+			# Пробрасываем исключение дальше для обработки в execute_algorithm
+			raise
 	return False
 
 
 def preprocess_code(code):
 	lines = []
 	for line in code.splitlines():
+		# Удаляем всё, что идёт после символа '|' или '#'
 		if '|' in line:
 			line = line.split('|')[0]
 		if '#' in line:
@@ -217,6 +234,10 @@ def preprocess_code(code):
 		line = line.strip()
 		if not line:
 			continue
+		# Если строка равна "использовать робот" (без учета регистра), пропускаем её
+		if line.lower() == "использовать робот":
+			continue
+		# Разбиваем строку по символу ';'
 		parts = [part.strip() for part in line.split(';') if part.strip()]
 		lines.extend(parts)
 	return lines
@@ -292,7 +313,7 @@ def parse_algorithm_header(header_line):
 				if current_type is None:
 					current_type = token
 				else:
-					current_names.append(token.strip(","))
+					current_names.append(tokens[i].strip(","))
 				i += 1
 		if current_names and current_type is not None:
 			for n in current_names:
@@ -302,36 +323,33 @@ def parse_algorithm_header(header_line):
 
 
 def execute_line(line, env, robot, interpreter=None):
-	lower_line = line.lower()
-	# Флаг, что команда обработана успешно
-	executed_successfully = True
-	try:
-		if any(lower_line.startswith(t) for t in ALLOWED_TYPES):
-			process_declaration(line, env)
-		elif ":=" in line:
-			process_assignment(line, env)
-		elif lower_line.startswith("вывод"):
-			process_output(line, env)
-			if interpreter is not None:
-				interpreter.output += f"Вывод: {line}\n"
-		elif process_robot_command(line, robot):
-			# Команда робота выполнена внутри process_robot_command
-			pass
-		else:
-			unknown_msg = f"Unknown command: {line}"
-			if interpreter is not None:
-				interpreter.output += unknown_msg + "\n"
-			executed_successfully = False
-	except Exception as e:
-		error_message = f"Ошибка при выполнении команды: {line} - {e}"
+	# Нормализуем строку для сравнения
+	normalized_line = ' '.join(line.strip().lower().split())
+	# Если служебная команда "использовать робот", обрабатываем её как заглушку
+	if normalized_line == "использовать робот":
 		if interpreter is not None:
-			interpreter.output += error_message + "\n"
-			# Логируем ошибку через логгер робота (который мы пробросили в interpreter.logger)
-			interpreter.logger.error(error_message)
-		executed_successfully = False
+			interpreter.output += "Команда 'использовать Робот' выполнена (заглушка).\n"
+			interpreter.logger.info("Команда 'использовать Робот' выполнена (заглушка).")
+		return
 
-	# Если команда отработала без исключения, добавляем сообщение об успехе.
-	if interpreter is not None and executed_successfully:
+	# Выполнение команд без try/except, чтобы ошибка сразу пробрасывалась
+	if any(normalized_line.startswith(t) for t in ALLOWED_TYPES):
+		process_declaration(line, env)
+	elif ":=" in line:
+		process_assignment(line, env)
+	elif normalized_line.startswith("вывод"):
+		process_output(line, env)
+		if interpreter is not None:
+			interpreter.output += f"Вывод: {line}\n"
+	elif process_robot_command(line, robot, interpreter):  # Передаем interpreter
+		pass
+	else:
+		unknown_msg = f"Unknown command: {line}"
+		if interpreter is not None:
+			interpreter.output += unknown_msg + "\n"
+		raise Exception(unknown_msg)
+
+	if interpreter is not None:
 		success_msg = f"Команда выполнена: {line}"
 		interpreter.output += success_msg + "\n"
 		interpreter.logger.info(success_msg)
@@ -403,9 +421,45 @@ class KumirLanguageInterpreter:
 				"outputBefore": self.output
 			}
 			trace.append(event_before)
-			execute_line(line, self.env, self.robot, self)
+			try:
+				execute_line(line, self.env, self.robot, self)
+			except Exception as e:
+				error_event = {
+					"phase": "main",
+					"commandIndex": idx,
+					"command": line,
+					"error": str(e),
+					"stateAfter": self.get_state(),
+					"outputAfter": self.output
+				}
+				trace.append(error_event)
+
+				# Записываем сообщение об ошибке в вывод и пробрасываем исключение дальше
+				error_msg = f"Ошибка в строке {idx + 1}: {line} - {str(e)}"
+				self.output += error_msg + "\n"
+				self.logger.error(error_msg)
+
+				# Обновить трассировку ошибкой, но не прерывать выполнение
+				if progress_callback:
+					progress_callback({
+						"phase": "main",
+						"commandIndex": idx,
+						"output": self.output,
+						"robotPos": self.robot.robot_pos,
+						"error": str(e)
+					})
+
+				# Вместо прерывания всего выполнения, возвращаем информацию об ошибке
+				return {"success": False, "error": str(e), "errorIndex": idx}
+
 			if progress_callback:
-				progress_callback({"phase": "main", "commandIndex": idx, "output": self.output})
+				progress_callback({
+					"phase": "main",
+					"commandIndex": idx,
+					"output": self.output,
+					"robotPos": self.robot.robot_pos
+				})
+
 			event_after = {
 				"phase": "main",
 				"commandIndex": idx,
@@ -414,26 +468,59 @@ class KumirLanguageInterpreter:
 				"outputAfter": self.output
 			}
 			trace.append(event_after)
+
 			if step_by_step:
 				time.sleep(step_delay)
 
+		# Если все команды выполнились успешно
+		return {"success": True}
 
-def interpret(self, step_by_step=True, step_delay=0):
-	try:
-		self.parse()
-		trace = []
-		self.execute_introduction(trace, step_delay, step_by_step)
-		self.logger.info("Выполнение основного алгоритма:")
-		self.execute_algorithm(self.main_algorithm, trace, step_delay, step_by_step)
-		final_state = {"env": self.env, "robot": self.robot.robot_pos, "coloredCells": list(self.robot.colored_cells),
-					   "output": self.output}
-		return {"trace": trace, "finalState": final_state, "success": True}
-	except Exception as e:
-		error_message = f"Ошибка: {str(e)}"
-		self.output += error_message + "\n"
-		final_state = {"env": self.env, "robot": self.robot.robot_pos, "coloredCells": list(self.robot.colored_cells),
-					   "output": self.output}
-		return {"trace": [], "finalState": final_state, "success": False, "message": error_message}
+	def interpret(self, step_by_step=True, step_delay=0):
+		try:
+			self.parse()
+			trace = []
+			self.execute_introduction(trace, step_delay, step_by_step)
+			self.logger.info("Выполнение основного алгоритма:")
+
+			# Выполняем алгоритм и получаем результат
+			algo_result = self.execute_algorithm(self.main_algorithm, trace, step_delay, step_by_step)
+
+			final_state = {
+				"env": self.env,
+				"robot": self.robot.robot_pos,
+				"coloredCells": list(self.robot.colored_cells),
+				"output": self.output
+			}
+
+			if not algo_result.get("success", True):
+				# Если в выполнении алгоритма была ошибка
+				error_message = algo_result.get("error", "Неизвестная ошибка")
+				return {
+					"trace": trace,
+					"finalState": final_state,
+					"success": False,
+					"message": error_message,
+					"errorIndex": algo_result.get("errorIndex")
+				}
+
+			# Если всё выполнилось успешно
+			return {"trace": trace, "finalState": final_state, "success": True}
+
+		except Exception as e:
+			error_message = f"Ошибка: {str(e)}"
+			self.output += error_message + "\n"
+			final_state = {
+				"env": self.env,
+				"robot": self.robot.robot_pos,
+				"coloredCells": list(self.robot.colored_cells),
+				"output": self.output
+			}
+			return {
+				"trace": [],
+				"finalState": final_state,
+				"success": False,
+				"message": error_message
+			}
 
 
 if __name__ == "__main__":

@@ -49,42 +49,69 @@ def execute_code():
 
 	if not code.strip():
 		logger.warning("Получен пустой код.")
-		return jsonify({'success': False, 'message': 'Код не предоставлен.'}), 400
+		return jsonify({'success': False, 'message': 'Код не предоставлен.'}), 200
 
 	field_state = session.get('field_state')
 	from pyrobot.backend.kumir_interpreter.interpreter import KumirLanguageInterpreter
 	interpreter = KumirLanguageInterpreter(code)
-	interpreter.parse()
-	trace = []
-
-	# Callback для передачи промежуточного прогресса через WebSocket
-	def progress_callback(progress_data):
-		# Отправляем данные в комнату, соответствующую session.sid
-		sid = session.get('sid')
-		if sid:
-			socketio.emit('execution_progress', progress_data, room=sid)
 
 	try:
+		interpreter.parse()
+		trace = []
+
+		# Callback для передачи промежуточного прогресса через WebSocket
+		def progress_callback(progress_data):
+			sid = session.get('sid')
+			if sid:
+				socketio.emit('execution_progress', progress_data, room=sid)
+
+		# Выполняем вступление
 		interpreter.execute_introduction(trace, step_delay=0, step_by_step=False, progress_callback=progress_callback)
+
+		# Устанавливаем начальное состояние робота, если оно предоставлено
 		if field_state is not None and 'robotPos' in field_state:
 			interpreter.robot.robot_pos = field_state['robotPos']
 			logger.debug(f"Начальная позиция робота переустановлена в: {field_state['robotPos']}")
 		if field_state is not None and 'walls' in field_state:
 			interpreter.robot.walls = set(field_state['walls'])
 			logger.debug(f"Стеновые данные обновлены: {interpreter.robot.walls}")
-		interpreter.execute_algorithm(interpreter.main_algorithm, trace, step_delay=0, step_by_step=False,
-									  progress_callback=progress_callback)
+
+		# Выполняем основной алгоритм
+		algo_result = interpreter.execute_algorithm(
+			interpreter.main_algorithm,
+			trace,
+			step_delay=0,
+			step_by_step=False,
+			progress_callback=progress_callback
+		)
+
 		final_state = {
 			"env": interpreter.env,
 			"robot": interpreter.robot.robot_pos,
 			"coloredCells": list(interpreter.robot.colored_cells),
 			"output": interpreter.output
 		}
-		result = {"trace": trace, "finalState": final_state}
-		logger.info("Код выполнен успешно.")
-		logger.debug(f"Результат: {result}")
+
 		if field_state is not None:
 			final_state['field'] = field_state
+
+		# Проверяем результат выполнения алгоритма
+		if not algo_result.get("success", True):
+			error_message = algo_result.get("error", "Неизвестная ошибка в алгоритме")
+			logger.error(f"Ошибка в алгоритме: {error_message}")
+			return jsonify({
+				'success': False,
+				'message': error_message,
+				'output': interpreter.output,
+				'errorIndex': algo_result.get("errorIndex"),
+				**final_state,
+				'trace': trace
+			}), 200
+
+		# Если всё успешно
+		logger.info("Код выполнен успешно.")
+		logger.debug(f"Результат: {final_state}")
+
 		response = {
 			'success': True,
 			'message': 'Код выполнен успешно.',
@@ -92,14 +119,16 @@ def execute_code():
 			'trace': trace
 		}
 		return jsonify(response), 200
+
 	except Exception as e:
 		logger.exception("Ошибка при выполнении кода.")
-		output = interpreter.output if interpreter is not None else ""
+		output = interpreter.output if hasattr(interpreter, 'output') else ""
+		# Возвращаем ответ с success: False, но HTTP-код 200
 		return jsonify({
 			'success': False,
 			'message': f'Ошибка: {str(e)}',
 			'output': output
-		}), 500
+		}), 200
 
 
 @app.route('/reset', methods=['POST'])

@@ -253,13 +253,9 @@ def process_robot_command(line, robot):
 
 
 def preprocess_code(code):
-	"""
-	Предварительно обрабатывает код: удаляет комментарии и лишние пробелы, разбивает строки.
-	@param code: str - исходный код.
-	@returns: list of str - список строк.
-	"""
 	lines = []
 	for line in code.splitlines():
+		# Удаляем всё, что идёт после символа '|' или '#'
 		if '|' in line:
 			line = line.split('|')[0]
 		if '#' in line:
@@ -267,6 +263,10 @@ def preprocess_code(code):
 		line = line.strip()
 		if not line:
 			continue
+		# Если строка равна "использовать робот" (без учета регистра), пропускаем её
+		if line.lower() == "использовать робот":
+			continue
+		# Разбиваем строку по символу ';' (если их несколько)
 		parts = [part.strip() for part in line.split(';') if part.strip()]
 		lines.extend(parts)
 	return lines
@@ -360,38 +360,44 @@ def parse_algorithm_header(header_line):
 
 
 def execute_line(line, env, robot, interpreter=None):
-	if interpreter is not None:
-		interpreter.output += f"Выполняется команда: {line}\n"
-		interpreter.logger.info(f"Выполняется команда: {line}")
-	lower_line = line.lower()
-	executed = False
+	# Приводим строку к нижнему регистру и нормализуем пробелы
+	normalized_line = ' '.join(line.strip().lower().split())
+	# Если команда равна "использовать робот", считаем её успешно выполненной как заглушку
+	if normalized_line == "использовать робот":
+		if interpreter is not None:
+			interpreter.output += "Команда 'использовать Робот' выполнена (заглушка).\n"
+			interpreter.logger.info("Команда 'использовать Робот' выполнена (заглушка).")
+		return
+
 	try:
-		if any(lower_line.startswith(t) for t in ALLOWED_TYPES):
+		if any(normalized_line.startswith(t) for t in ALLOWED_TYPES):
 			process_declaration(line, env)
-			executed = True
 		elif ":=" in line:
 			process_assignment(line, env)
-			executed = True
-		elif lower_line.startswith("вывод"):
+		elif normalized_line.startswith("вывод"):
 			process_output(line, env)
 			if interpreter is not None:
 				interpreter.output += f"Вывод: {line}\n"
-			executed = True
 		elif process_robot_command(line, robot):
-			executed = True
+			# Команда робота выполнена внутри process_robot_command
+			pass
 		else:
-			print(f"Unknown command: {line}")
+			unknown_msg = f"Unknown command: {line}"
+			print(unknown_msg)
+			if interpreter is not None:
+				interpreter.output += unknown_msg + "\n"
 	except Exception as e:
 		error_message = f"Ошибка при выполнении команды: {line} - {e}"
 		print(error_message)
 		if interpreter is not None:
 			interpreter.output += error_message + "\n"
-		interpreter.logger.error(error_message)
-		# Прерываем выполнение, пробрасывая исключение дальше:
-		raise e
+			interpreter.logger.error(error_message)
+		return
+
 	if interpreter is not None:
-		interpreter.output += f"Команда выполнена: {line}\n"
-		interpreter.logger.info(f"Команда выполнена: {line}")
+		success_msg = f"Команда выполнена: {line}"
+		interpreter.output += success_msg + "\n"
+		interpreter.logger.info(success_msg)
 
 
 class KumirLanguageInterpreter:

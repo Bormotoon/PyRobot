@@ -1,5 +1,5 @@
 import React, {memo, useCallback, useEffect, useReducer, useRef, useState} from 'react';
-import {ThemeProvider} from '@mui/material/styles';
+import {ThemeProvider, Typography} from '@mui/material';
 import CodeEditor from './CodeEditor/CodeEditor';
 import ControlPanel from './ControlPanel/ControlPanel';
 import Field from './Field/Field';
@@ -7,8 +7,6 @@ import theme from '../styles/theme';
 import {getHint} from './hints';
 import logger from '../Logger';
 import io from 'socket.io-client';
-import {Typography} from '@mui/material';
-
 
 const initialState = {
 	code: `использовать Робот\nалг\nнач\n  вправо\n  вниз\n  вправо\nкон`,
@@ -94,12 +92,17 @@ const RobotSimulator = memo(() => {
 	const socketRef = useRef(null);
 	const prevEditMode = useRef(state.editMode);
 
+	// Подключение к WebSocket-серверу
 	useEffect(() => {
-		// Подключаемся к WebSocket-серверу
 		socketRef.current = io('http://localhost:5000');
 		socketRef.current.on('execution_progress', (data) => {
+			// data: { phase, commandIndex, output, robotPos }
 			setProgress(data);
-			logger.log_event(`Прогресс: Фаза ${data.phase}, команда ${data.commandIndex}`);
+			logger.log_event(`Прогресс: Фаза ${data.phase}, Команда ${data.commandIndex}`);
+			// Если сервер отправил обновлённую позицию робота, обновляем её
+			if (data.robotPos) {
+				dispatch({type: 'SET_ROBOT_POS', payload: data.robotPos});
+			}
 		});
 		return () => {
 			if (socketRef.current) {
@@ -136,6 +139,7 @@ const RobotSimulator = memo(() => {
 		})
 			.then((response) => response.json())
 			.then((data) => {
+				// После завершения выполнения кода обновляем финальное состояние
 				if (data.success) {
 					dispatch({type: 'SET_STATUS_MESSAGE', payload: 'Код выполнен успешно.'});
 					logger.log_event('Код выполнен успешно.');
@@ -224,11 +228,11 @@ const RobotSimulator = memo(() => {
 		`Раскрашенных клеток: ${state.coloredCells.size}`,
 	].join('\n');
 
-	// Функция отображения прогресса
+	// Отображение прогресса выполнения
 	const renderProgress = () => {
 		if (!progress) return null;
 		return (
-			<div className="progress-bar">
+			<div className="progress-bar" style={{padding: '8px', backgroundColor: '#f0f0f0', marginTop: '16px'}}>
 				<Typography variant="body2">
 					Фаза: {progress.phase}, Команда: {progress.commandIndex}
 				</Typography>
