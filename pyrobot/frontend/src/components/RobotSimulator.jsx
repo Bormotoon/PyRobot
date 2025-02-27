@@ -88,18 +88,17 @@ function clampRobotPos(robotPos, width, height) {
 const RobotSimulator = memo(() => {
 	const [state, dispatch] = useReducer(reducer, initialState);
 	const [progress, setProgress] = useState(null);
+	// Новое состояние для уровня скорости анимации (0–4)
+	const [animationSpeedLevel, setAnimationSpeedLevel] = useState(2);
 	const canvasRef = useRef(null);
 	const socketRef = useRef(null);
 	const prevEditMode = useRef(state.editMode);
 
-	// Подключение к WebSocket-серверу
 	useEffect(() => {
 		socketRef.current = io('http://localhost:5000');
 		socketRef.current.on('execution_progress', (data) => {
-			// data: { phase, commandIndex, output, robotPos }
 			setProgress(data);
 			logger.log_event(`Прогресс: Фаза ${data.phase}, Команда ${data.commandIndex}`);
-			// Если сервер отправил обновлённую позицию робота, обновляем её
 			if (data.robotPos) {
 				dispatch({type: 'SET_ROBOT_POS', payload: data.robotPos});
 			}
@@ -123,6 +122,24 @@ const RobotSimulator = memo(() => {
 		logger.log_event('Выполнение остановлено.');
 	}, []);
 
+	// Функция анимации пошаговой трассировки
+	const animateTrace = useCallback(async (trace) => {
+		const delayForLevel = (level) => 2000 - level * 500;
+		for (const event of trace) {
+			if (event.stateAfter) {
+				if (event.stateAfter.robot) {
+					dispatch({type: 'SET_ROBOT_POS', payload: event.stateAfter.robot});
+				}
+				if (event.stateAfter.coloredCells) {
+					dispatch({type: 'SET_COLORED_CELLS', payload: new Set(event.stateAfter.coloredCells)});
+				}
+				dispatch({type: 'SET_STATUS_MESSAGE', payload: `Фаза: ${event.phase}, Команда: ${event.command}`});
+			}
+			await new Promise(resolve => setTimeout(resolve, delayForLevel(animationSpeedLevel)));
+		}
+	}, [animationSpeedLevel]);
+
+
 	const handleStart = useCallback(() => {
 		if (!state.code.trim()) {
 			dispatch({type: 'SET_STATUS_MESSAGE', payload: 'Ошибка: программа пустая.'});
@@ -138,11 +155,13 @@ const RobotSimulator = memo(() => {
 			body: JSON.stringify({code: state.code}),
 		})
 			.then((response) => response.json())
-			.then((data) => {
-				// После завершения выполнения кода обновляем финальное состояние
+			.then(async (data) => {
+				// Всегда запускаем анимацию трассировки, даже если произошла ошибка
+				if (data.trace && data.trace.length > 0) {
+					await animateTrace(data.trace);
+				}
 				if (data.success) {
 					dispatch({type: 'SET_STATUS_MESSAGE', payload: 'Код выполнен успешно.'});
-					logger.log_event('Код выполнен успешно.');
 					if (!state.editMode) {
 						dispatch({type: 'SET_ROBOT_POS', payload: data.robot});
 					}
@@ -151,6 +170,11 @@ const RobotSimulator = memo(() => {
 					const errorMsg = 'Ошибка: ' + data.message + (data.output ? "\n" + data.output : "");
 					dispatch({type: 'SET_STATUS_MESSAGE', payload: errorMsg});
 					logger.log_error(errorMsg);
+					// Обновляем позицию робота, используя состояние из последнего события трассировки, если оно есть
+					const lastEvent = data.trace[data.trace.length - 1];
+					if (lastEvent && lastEvent.stateAfter && lastEvent.stateAfter.robot) {
+						dispatch({type: 'SET_ROBOT_POS', payload: lastEvent.stateAfter.robot});
+					}
 				}
 				dispatch({type: 'SET_IS_RUNNING', payload: false});
 			})
@@ -160,7 +184,8 @@ const RobotSimulator = memo(() => {
 				logger.log_error('Ошибка выполнения запроса.');
 				dispatch({type: 'SET_IS_RUNNING', payload: false});
 			});
-	}, [state.code, state.editMode]);
+	}, [state.code, state.editMode, animationSpeedLevel, animateTrace]);
+
 
 	const handleReset = useCallback(() => {
 		dispatch({type: 'SET_ROBOT_POS', payload: {x: 0, y: 0}});
@@ -228,7 +253,6 @@ const RobotSimulator = memo(() => {
 		`Раскрашенных клеток: ${state.coloredCells.size}`,
 	].join('\n');
 
-	// Отображение прогресса выполнения
 	const renderProgress = () => {
 		if (!progress) return null;
 		return (
@@ -255,6 +279,8 @@ const RobotSimulator = memo(() => {
 					onStart={handleStart}
 					onReset={handleReset}
 					statusText={statusText}
+					speedLevel={animationSpeedLevel}
+					onSpeedChange={setAnimationSpeedLevel}
 				/>
 				<ControlPanel
 					robotPos={state.robotPos}

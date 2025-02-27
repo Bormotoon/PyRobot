@@ -2,18 +2,16 @@
  * @file CodeEditor.jsx
  * @description Компонент редактора кода для симулятора робота.
  * Обеспечивает возможность редактирования программ на языке KUMIR, подсвечивает синтаксис с помощью Prism.js,
- * а также отображает статус программы и вывод консоли. Теперь вывод консоли заменён на компонент UserLog,
- * который рендерится внутри карточки с классом "console-card".
+ * а также отображает статус программы и вывод консоли. Теперь над выводом лога добавлен слайдер регулировки скорости.
  */
 
 import React, {memo, useCallback} from 'react';
-import {Button, Card, Typography} from '@mui/material';
+import {Button, Card, Slider, Typography} from '@mui/material';
 import Editor from 'react-simple-code-editor';
 import Prism from 'prismjs';
 import {Delete, PlayArrow, Refresh, Stop} from '@mui/icons-material';
 
 import './CodeEditor.css';
-// Импорт компонента логирования, который теперь рендерится внутри карточки консоли
 import UserLog from '../UserLog/UserLog';
 
 /**
@@ -32,14 +30,13 @@ const robotCommands = ["Робот", "влево", "вправо", "вверх",
  * @returns {Object} Объект с полем pattern (регулярное выражение) и флагом lookbehind.
  */
 function makeKumirRegex(words) {
-	const alternatives = words.join("|"); // Объединяем ключевые слова через "|"
+	const alternatives = words.join("|");
 	return {
 		pattern: new RegExp(`(^|\\s)(?:${alternatives})(?=$|\\s)`, "i"),
 		lookbehind: true
 	};
 }
 
-// Определяем язык "kumir" для Prism.js с использованием сгенерированных регулярных выражений.
 Prism.languages.kumir = {
 	"keyword-struct": makeKumirRegex(structuralKeywords),
 	"keyword-type": makeKumirRegex(typeKeywords),
@@ -47,7 +44,7 @@ Prism.languages.kumir = {
 	"keyword-io": makeKumirRegex(ioKeywords),
 	"keyword-flow": makeKumirRegex(flowKeywords),
 	"robot-command": makeKumirRegex(robotCommands),
-	comment: /#.*/, // Комментарии начинаются с символа "#"
+	comment: /#.*/,
 	string: {
 		pattern: /(["'])(?:(?!\1).)*\1/,
 		greedy: true
@@ -61,17 +58,12 @@ Prism.languages.kumir = {
 /**
  * Компонент редактора кода.
  *
- * @param {Object} props - Свойства компонента:
- *   - code (string): Исходный код программы.
- *   - setCode (function): Функция для обновления кода.
- *   - isRunning (boolean): Флаг выполнения программы.
- *   - onClearCode (function): Функция для очистки кода.
- *   - onStop (function): Функция для остановки выполнения.
- *   - onStart (function): Функция для запуска выполнения.
- *   - onReset (function): Функция для сброса состояния.
- *   - statusText (string): Текст текущего статуса симулятора.
- *   - consoleOutput (string): Вывод консоли (теперь не используется напрямую).
- * @returns {JSX.Element} Разметка редактора кода.
+ * Новые пропсы:
+ *   - speedLevel (number): текущее значение слайдера скорости (0–4)
+ *   - onSpeedChange (function): callback для изменения значения слайдера скорости
+ *
+ * @param {Object} props
+ * @returns {JSX.Element}
  */
 const CodeEditor = memo(({
 	                         code,
@@ -82,25 +74,19 @@ const CodeEditor = memo(({
 	                         onStart,
 	                         onReset,
 	                         statusText,
-	                         consoleOutput
+	                         consoleOutput,
+	                         speedLevel,
+	                         onSpeedChange
                          }) => {
-	/**
-	 * Функция подсветки синтаксиса с использованием Prism.js.
-	 * @param {string} inputCode - Исходный код.
-	 * @returns {string} HTML с подсвеченным синтаксисом.
-	 */
 	const highlightCode = useCallback((inputCode) => {
 		return Prism.highlight(inputCode, Prism.languages.kumir, 'kumir');
 	}, []);
 
 	return (
 		<div className="code-editor">
-			{/* Заголовок редактора */}
 			<Typography variant="h5" gutterBottom>
 				Редактор Кода
 			</Typography>
-
-			{/* Редактор с подсветкой синтаксиса */}
 			<Editor
 				value={code}
 				onValueChange={setCode}
@@ -108,8 +94,6 @@ const CodeEditor = memo(({
 				padding={10}
 				className="react-simple-code-editor"
 			/>
-
-			{/* Панель управления редактором */}
 			<div className="editor-controls">
 				<Button variant="contained" color="info" className="editor-button" onClick={onClearCode}>
 					<Delete/>
@@ -126,15 +110,32 @@ const CodeEditor = memo(({
 					<Refresh/>
 				</Button>
 			</div>
-
-			{/* Карточка статуса симулятора */}
+			{/* Новый блок слайдера */}
+			<div className="speed-slider-container" style={{marginTop: '16px', marginBottom: '16px'}}>
+				<Typography variant="subtitle1" gutterBottom>
+					Скорость исполнения:
+				</Typography>
+				<Slider
+					value={speedLevel}
+					onChange={(e, newValue) => onSpeedChange(newValue)}
+					step={1}
+					marks={[
+						{value: 0, label: '2 сек/шаг'},
+						{value: 1, label: '1.5 сек/шаг'},
+						{value: 2, label: '1 сек/шаг'},
+						{value: 3, label: '0.5 сек/шаг'},
+						{value: 4, label: 'Мгновенно'},
+					]}
+					min={0}
+					max={4}
+					valueLabelDisplay="auto"
+				/>
+			</div>
 			<Card className="status-card">
 				<Typography variant="body2" className="status-text">
 					{statusText}
 				</Typography>
 			</Card>
-
-			{/* Карточка консоли с выводом лога через компонент UserLog */}
 			<Card className="console-card">
 				<UserLog/>
 			</Card>
