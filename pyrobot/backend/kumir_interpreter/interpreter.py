@@ -4,23 +4,15 @@ import time
 
 from .robot_interpreter import KumirInterpreter
 
-# ---------------------------------------------------------------------
-# Константы и настройки
-# ---------------------------------------------------------------------
-
+# Константы
 RESERVED_KEYWORDS = {"алг", "нач", "кон", "исп", "кон_исп", "дано", "надо", "арг", "рез", "аргрез", "знач", "цел",
 					 "вещ", "лог", "сим", "лит", "таб", "целтаб", "вещтаб", "логтаб", "симтаб", "литтаб", "и", "или",
 					 "не", "да", "нет", "утв", "выход", "ввод", "вывод", "нс", "если", "то", "иначе", "все", "выбор",
 					 "при", "нц", "кц", "кц_при", "раз", "пока", "для", "от", "до", "шаг"}
-
 ALLOWED_TYPES = {"цел", "вещ", "лог", "сим", "лит"}
 MAX_INT = 2147483647
 МАКСЦЕЛ = MAX_INT
 
-
-# ---------------------------------------------------------------------
-# Вспомогательные функции
-# ---------------------------------------------------------------------
 
 def is_valid_identifier(identifier, var_type):
 	words = identifier.strip().split()
@@ -55,10 +47,6 @@ def get_eval_env(env):
 		result[var] = info.get("value")
 	return result
 
-
-# ---------------------------------------------------------------------
-# Обработка объявлений, присваиваний и вывода
-# ---------------------------------------------------------------------
 
 def process_declaration(line, env):
 	tokens = line.split()
@@ -205,7 +193,6 @@ def process_robot_command(line, robot, interpreter=None):
 	}
 	if cmd in robot_commands:
 		try:
-			# Вызываем команду и обрабатываем возможные исключения
 			robot_commands[cmd]()
 			if interpreter is not None:
 				success_msg = f"Команда '{cmd}' успешно выполнена."
@@ -213,12 +200,7 @@ def process_robot_command(line, robot, interpreter=None):
 				interpreter.logger.info(success_msg)
 			return True
 		except Exception as e:
-			# Записываем сообщение об ошибке в вывод интерпретатора, если он предоставлен
-			if interpreter is not None:
-				error_msg = f"Ошибка при выполнении команды '{cmd}': {str(e)}"
-				interpreter.output += error_msg + "\n"
-				interpreter.logger.error(error_msg)
-			# Пробрасываем исключение дальше для обработки в execute_algorithm
+			# Убираем дублирующее логирование ошибки здесь – ошибка будет обработана в execute_algorithm
 			raise
 	return False
 
@@ -226,7 +208,6 @@ def process_robot_command(line, robot, interpreter=None):
 def preprocess_code(code):
 	lines = []
 	for line in code.splitlines():
-		# Удаляем всё, что идёт после символа '|' или '#'
 		if '|' in line:
 			line = line.split('|')[0]
 		if '#' in line:
@@ -234,10 +215,8 @@ def preprocess_code(code):
 		line = line.strip()
 		if not line:
 			continue
-		# Если строка равна "использовать робот" (без учета регистра), пропускаем её
 		if line.lower() == "использовать робот":
 			continue
-		# Разбиваем строку по символу ';'
 		parts = [part.strip() for part in line.split(';') if part.strip()]
 		lines.extend(parts)
 	return lines
@@ -323,16 +302,12 @@ def parse_algorithm_header(header_line):
 
 
 def execute_line(line, env, robot, interpreter=None):
-	# Нормализуем строку для сравнения
 	normalized_line = ' '.join(line.strip().lower().split())
-	# Если служебная команда "использовать робот", обрабатываем её как заглушку
 	if normalized_line == "использовать робот":
 		if interpreter is not None:
 			interpreter.output += "Команда 'использовать Робот' выполнена (заглушка).\n"
 			interpreter.logger.info("Команда 'использовать Робот' выполнена (заглушка).")
 		return
-
-	# Выполнение команд без try/except, чтобы ошибка сразу пробрасывалась
 	if any(normalized_line.startswith(t) for t in ALLOWED_TYPES):
 		process_declaration(line, env)
 	elif ":=" in line:
@@ -341,7 +316,7 @@ def execute_line(line, env, robot, interpreter=None):
 		process_output(line, env)
 		if interpreter is not None:
 			interpreter.output += f"Вывод: {line}\n"
-	elif process_robot_command(line, robot, interpreter):  # Передаем interpreter
+	elif process_robot_command(line, robot, interpreter):
 		pass
 	else:
 		unknown_msg = f"Unknown command: {line}"
@@ -363,7 +338,6 @@ class KumirLanguageInterpreter:
 		self.main_algorithm = None
 		self.robot = KumirInterpreter()
 		self.output = ""
-		# Используем логгер робота как логгер для интерпретатора
 		self.logger = self.robot.logger
 
 	def get_state(self):
@@ -433,13 +407,9 @@ class KumirLanguageInterpreter:
 					"outputAfter": self.output
 				}
 				trace.append(error_event)
-
-				# Записываем сообщение об ошибке в вывод и пробрасываем исключение дальше
 				error_msg = f"Ошибка в строке {idx + 1}: {line} - {str(e)}"
 				self.output += error_msg + "\n"
 				self.logger.error(error_msg)
-
-				# Обновить трассировку ошибкой, но не прерывать выполнение
 				if progress_callback:
 					progress_callback({
 						"phase": "main",
@@ -448,10 +418,7 @@ class KumirLanguageInterpreter:
 						"robotPos": self.robot.robot_pos,
 						"error": str(e)
 					})
-
-				# Вместо прерывания всего выполнения, возвращаем информацию об ошибке
 				return {"success": False, "error": str(e), "errorIndex": idx}
-
 			if progress_callback:
 				progress_callback({
 					"phase": "main",
@@ -459,7 +426,6 @@ class KumirLanguageInterpreter:
 					"output": self.output,
 					"robotPos": self.robot.robot_pos
 				})
-
 			event_after = {
 				"phase": "main",
 				"commandIndex": idx,
@@ -468,11 +434,8 @@ class KumirLanguageInterpreter:
 				"outputAfter": self.output
 			}
 			trace.append(event_after)
-
 			if step_by_step:
 				time.sleep(step_delay)
-
-		# Если все команды выполнились успешно
 		return {"success": True}
 
 	def interpret(self, step_by_step=True, step_delay=0):
@@ -481,19 +444,14 @@ class KumirLanguageInterpreter:
 			trace = []
 			self.execute_introduction(trace, step_delay, step_by_step)
 			self.logger.info("Выполнение основного алгоритма:")
-
-			# Выполняем алгоритм и получаем результат
 			algo_result = self.execute_algorithm(self.main_algorithm, trace, step_delay, step_by_step)
-
 			final_state = {
 				"env": self.env,
 				"robot": self.robot.robot_pos,
 				"coloredCells": list(self.robot.colored_cells),
 				"output": self.output
 			}
-
 			if not algo_result.get("success", True):
-				# Если в выполнении алгоритма была ошибка
 				error_message = algo_result.get("error", "Неизвестная ошибка")
 				return {
 					"trace": trace,
@@ -502,10 +460,7 @@ class KumirLanguageInterpreter:
 					"message": error_message,
 					"errorIndex": algo_result.get("errorIndex")
 				}
-
-			# Если всё выполнилось успешно
 			return {"trace": trace, "finalState": final_state, "success": True}
-
 		except Exception as e:
 			error_message = f"Ошибка: {str(e)}"
 			self.output += error_message + "\n"
