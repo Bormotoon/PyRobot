@@ -10,7 +10,6 @@ import {Card, Typography} from '@mui/material';
 import {drawField} from '../canvasDrawing';
 import {getHint} from '../hints';
 import './Field.css';
-// Импорт логгера из Logger.js (путь обновлён)
 import logger from '../../Logger';
 
 const Field = memo(({
@@ -36,14 +35,10 @@ const Field = memo(({
 	// Перерисовка поля при изменении зависимостей
 	useEffect(() => {
 		if (!canvasRef.current) return;
+		console.log('Field useEffect triggered - robotPos:', robotPos, 'coloredCells:', Array.from(coloredCells)); // Отладка
 		drawField(canvasRef.current, {coloredCells, robotPos, markers, walls, permanentWalls, width, height, cellSize});
 	}, [canvasRef, coloredCells, robotPos, markers, walls, permanentWalls, width, height, cellSize]);
 
-	/**
-	 * Получает координаты курсора относительно canvas.
-	 * @param {MouseEvent} event - Событие мыши.
-	 * @returns {Object} Объект с координатами {x, y} или {x: null, y: null}, если canvas недоступен.
-	 */
 	const getCanvasCoords = useCallback((event) => {
 		const canvas = canvasRef.current;
 		if (!canvas) return {x: null, y: null};
@@ -74,22 +69,10 @@ const Field = memo(({
 		return {x: offsetX * scaleX, y: offsetY * scaleY};
 	}, [canvasRef]);
 
-	/**
-	 * Проверяет, находится ли точка за пределами игрового поля.
-	 * @param {number} px - Координата X.
-	 * @param {number} py - Координата Y.
-	 * @returns {boolean} Истина, если точка за пределами.
-	 */
 	const isOutsideCanvas = useCallback((px, py) => {
 		return px < 0 || py < 0 || px >= width * cellSize || py >= height * cellSize;
 	}, [width, height, cellSize]);
 
-	/**
-	 * Преобразует координаты пикселей в координаты сетки.
-	 * @param {number} px - Координата X в пикселях.
-	 * @param {number} py - Координата Y в пикселях.
-	 * @returns {Object} Объект с координатами сетки {gridX, gridY}.
-	 */
 	const toGridCoords = useCallback((px, py) => {
 		let gx = Math.floor(px / cellSize);
 		let gy = Math.floor(py / cellSize);
@@ -98,13 +81,6 @@ const Field = memo(({
 		return {gridX: gx, gridY: gy};
 	}, [cellSize, width, height]);
 
-	/**
-	 * Обрабатывает клики по canvas для установки/удаления стен или окраски клеток.
-	 * @param {number} gx - Координата X ячейки.
-	 * @param {number} gy - Координата Y ячейки.
-	 * @param {number} px - Точная координата X.
-	 * @param {number} py - Точная координата Y.
-	 */
 	const handleWallsAndCells = useCallback((gx, gy, px, py) => {
 		const margin = 5;
 		const xRem = px % cellSize;
@@ -155,10 +131,6 @@ const Field = memo(({
 		}
 	}, [cellSize, permanentWalls, setWalls, setColoredCells, setStatusMessage]);
 
-	/**
-	 * Обработчик нажатия кнопки мыши на canvas.
-	 * @param {MouseEvent} e - Событие мыши.
-	 */
 	const handleMouseDown = useCallback((e) => {
 		if (e.button !== 0) return;
 		e.preventDefault();
@@ -183,11 +155,6 @@ const Field = memo(({
 		handleWallsAndCells(gridX, gridY, x, y);
 	}, [editMode, robotPos, getCanvasCoords, isOutsideCanvas, toGridCoords, setStatusMessage, handleWallsAndCells]);
 
-	/**
-	 * Обработчик движения мыши при перетаскивании робота.
-	 * Логирование обновления позиции убрано, чтобы записывать состояние только при отпускании кнопки.
-	 * @param {MouseEvent} e - Событие мыши.
-	 */
 	const handleMouseMove = useCallback((e) => {
 		if (!isDraggingRobot) return;
 		e.preventDefault();
@@ -198,11 +165,6 @@ const Field = memo(({
 		setRobotPos({x: gridX, y: gridY});
 	}, [isDraggingRobot, getCanvasCoords, toGridCoords, setRobotPos]);
 
-	/**
-	 * Обработчик отпускания кнопки мыши.
-	 * Записывает финальное состояние перетаскивания в лог.
-	 * @param {MouseEvent} e - Событие мыши.
-	 */
 	const handleMouseUp = useCallback((e) => {
 		if (!isDraggingRobot) return;
 		e.preventDefault();
@@ -212,10 +174,6 @@ const Field = memo(({
 		logger.log_robot_drag_end(robotPos);
 	}, [isDraggingRobot, setStatusMessage, robotPos]);
 
-	/**
-	 * Обработчик правого клика на canvas.
-	 * @param {MouseEvent} e - Событие мыши.
-	 */
 	const handleCanvasRightClick = useCallback((e) => {
 		e.preventDefault();
 		e.stopPropagation();
@@ -245,7 +203,6 @@ const Field = memo(({
 		});
 	}, [editMode, getCanvasCoords, isOutsideCanvas, toGridCoords, setMarkers, setStatusMessage]);
 
-	// Глобальное отслеживание событий мыши для перетаскивания робота
 	useEffect(() => {
 		if (isDraggingRobot) {
 			window.addEventListener('mousemove', handleMouseMove);
