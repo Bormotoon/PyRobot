@@ -28,7 +28,7 @@ const initialState = {
 	steps: [],
 	currentStep: 0,
 	speed: 500,
-	error: '', // Добавляем поле для ошибки
+	error: '',
 };
 
 function reducer(state, action) {
@@ -70,7 +70,7 @@ function reducer(state, action) {
 		case 'SET_EDIT_MODE':
 			return {...state, editMode: action.payload};
 		case 'SET_STEPS':
-			return {...state, steps: action.payload, currentStep: 0, isRunning: true, error: ''}; // Сбрасываем ошибку
+			return {...state, steps: action.payload, currentStep: 0, isRunning: true, error: ''};
 		case 'SET_CURRENT_STEP':
 			return {...state, currentStep: action.payload};
 		case 'SET_SPEED':
@@ -161,7 +161,10 @@ const RobotSimulator = memo(() => {
 					dispatch({type: 'SET_STATUS_MESSAGE', payload: errorMsg});
 					dispatch({type: 'SET_ERROR', payload: errorMsg});
 					logger.log_error(errorMsg);
-					dispatch({type: 'SET_STEPS', payload: data.steps || []});
+					if (!state.editMode) {
+						console.log('Received steps with error:', data.steps);
+						dispatch({type: 'SET_STEPS', payload: data.steps || []});
+					}
 					dispatch({type: 'SET_IS_RUNNING', payload: false});
 				}
 			})
@@ -204,29 +207,45 @@ const RobotSimulator = memo(() => {
 
 	useEffect(() => {
 		const timeout = setTimeout(() => {
-			const fieldState = {
-				width: state.width,
-				height: state.height,
-				cellSize: state.cellSize,
-				robotPos: state.robotPos,
-				walls: Array.from(state.walls),
-				permanentWalls: Array.from(state.permanentWalls),
-				markers: state.markers,
-				coloredCells: Array.from(state.coloredCells),
-			};
 			const prevFieldState = JSON.parse(sessionStorage.getItem('prevFieldState') || '{}');
-			if (JSON.stringify(fieldState) !== JSON.stringify(prevFieldState)) {
+			const newFieldState = {};
+
+			if (prevFieldState.robotPos?.x !== state.robotPos.x || prevFieldState.robotPos?.y !== state.robotPos.y) {
+				newFieldState.robotPos = [state.robotPos.x, state.robotPos.y];
+			}
+			if (JSON.stringify(prevFieldState.walls) !== JSON.stringify(Array.from(state.walls))) {
+				newFieldState.walls = Array.from(state.walls);
+			}
+			if (JSON.stringify(prevFieldState.markers) !== JSON.stringify(state.markers)) {
+				newFieldState.markers = state.markers;
+			}
+			if (JSON.stringify(prevFieldState.coloredCells) !== JSON.stringify(Array.from(state.coloredCells))) {
+				newFieldState.coloredCells = Array.from(state.coloredCells);
+			}
+			if (prevFieldState.width !== state.width) newFieldState.width = state.width;
+			if (prevFieldState.height !== state.height) newFieldState.height = state.height;
+			if (prevFieldState.cellSize !== state.cellSize) newFieldState.cellSize = state.cellSize;
+
+			if (Object.keys(newFieldState).length > 0) {
 				fetch('http://localhost:5000/updateField', {
 					method: 'POST',
 					credentials: 'include',
 					headers: {'Content-Type': 'application/json'},
-					body: JSON.stringify(fieldState),
+					body: JSON.stringify(newFieldState),
 				}).catch(e => console.error("Ошибка обновления поля на сервере:", e));
-				sessionStorage.setItem('prevFieldState', JSON.stringify(fieldState));
+				sessionStorage.setItem('prevFieldState', JSON.stringify({
+					width: state.width,
+					height: state.height,
+					cellSize: state.cellSize,
+					robotPos: state.robotPos,
+					walls: Array.from(state.walls),
+					markers: state.markers,
+					coloredCells: Array.from(state.coloredCells),
+				}));
 			}
 		}, 200);
 		return () => clearTimeout(timeout);
-	}, [state.width, state.height, state.cellSize, state.robotPos, state.walls, state.permanentWalls, state.markers, state.coloredCells]);
+	}, [state.width, state.height, state.cellSize, state.robotPos, state.walls, state.markers, state.coloredCells]);
 
 	useEffect(() => {
 		if (prevEditMode.current && !state.editMode) {
@@ -283,7 +302,7 @@ const RobotSimulator = memo(() => {
 					onReset={handleReset}
 					statusText={statusText}
 					steps={state.steps}
-					error={state.error} // Передаем ошибку
+					error={state.error}
 				/>
 				<ControlPanel
 					robotPos={state.robotPos}

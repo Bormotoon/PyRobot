@@ -25,12 +25,41 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger('FlaskServer')
 
 
+def setup_permanent_walls(width, height):
+    walls = set()
+    for x in range(width):
+        walls.add(f"{x},0,{x + 1},0")
+        walls.add(f"{x},{height},{x + 1},{height}")
+    for y in range(height):
+        walls.add(f"0,{y},0,{y + 1}")
+        walls.add(f"{width},{y},{width},{y + 1}")
+    return walls
+
+
 @app.route('/updateField', methods=['POST'])
 def update_field():
     data = request.json
     logger.info("Получено обновление состояния поля.")
-    logger.debug(f"Field state: {data}")
-    session['field_state'] = data
+    logger.debug(f"Field delta: {data}")
+
+    field_state = session.get('field_state', {})
+    base_state = session.get('base_state', {'width': 7, 'height': 7, 'cellSize': 50})
+
+    if 'robotPos' in data:
+        field_state['robotPos'] = {'x': data['robotPos'][0], 'y': data['robotPos'][1]}
+    if 'walls' in data:
+        field_state['walls'] = data['walls']
+    if 'markers' in data:
+        field_state['markers'] = data['markers']
+    if 'coloredCells' in data:
+        field_state['coloredCells'] = data['coloredCells']
+
+    for key in ['width', 'height', 'cellSize']:
+        if key in data:
+            base_state[key] = data[key]
+
+    session['field_state'] = field_state
+    session['base_state'] = base_state
     return jsonify({'success': True, 'message': 'Поле обновлено на сервере.'}), 200
 
 
@@ -47,17 +76,18 @@ def execute_code():
 
     interpreter = None
     try:
-        field_state = session.get('field_state')
+        field_state = session.get('field_state', {})
+        base_state = session.get('base_state', {'width': 7, 'height': 7, 'cellSize': 50})
         from pyrobot.backend.kumir_interpreter.interpreter import KumirLanguageInterpreter
         interpreter = KumirLanguageInterpreter(code)
         interpreter.parse()
         trace = []
         interpreter.execute_introduction(trace, step_delay=0, step_by_step=False)
-        interpreter.robot.robot_pos = {'x': 0, 'y': 0}
-        interpreter.robot.colored_cells = set()
-        if field_state is not None and 'walls' in field_state:
-            interpreter.robot.walls = set(field_state['walls'])
-            logger.debug(f"Стеновые данные обновлены: {interpreter.robot.walls}")
+        interpreter.robot.robot_pos = field_state.get('robotPos', {'x': 0, 'y': 0})
+        interpreter.robot.colored_cells = set(field_state.get('coloredCells', []))
+        interpreter.robot.walls = set(field_state.get('walls', [])) | setup_permanent_walls(base_state['width'],
+                                                                                            base_state['height'])
+        logger.debug(f"Стеновые данные обновлены: {interpreter.robot.walls}")
         interpreter.execute_algorithm(interpreter.main_algorithm, trace, step_delay=0, step_by_step=False)
 
         steps = [
@@ -92,8 +122,9 @@ def execute_code():
 
 @app.route('/reset', methods=['POST'])
 def reset_simulator():
-    logger.info("Запрос на сброс симулятора получен. (Состояние сессии будет очищено.)")
+    logger.info("Запрос на сброс симулятора получен.")
     session.pop('field_state', None)
+    session.pop('base_state', None)
     return jsonify({'success': True, 'message': 'Симулятор сброшен.'}), 200
 
 
