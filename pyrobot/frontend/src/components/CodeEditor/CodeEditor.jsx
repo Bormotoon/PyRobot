@@ -1,9 +1,6 @@
 /**
  * @file CodeEditor.jsx
  * @description Компонент редактора кода для симулятора робота.
- * Обеспечивает возможность редактирования программ на языке KUMIR, подсвечивает синтаксис с помощью Prism.js,
- * а также отображает статус программы и вывод консоли. Теперь вывод консоли заменён на компонент UserLog,
- * который рендерится внутри карточки с классом "console-card".
  */
 
 import React, {memo, useCallback, useState} from 'react';
@@ -55,22 +52,23 @@ const CodeEditor = memo(({
 	                         onStop,
 	                         onStart,
 	                         onReset,
-	                         statusText
+	                         statusText,
+	                         steps = [],
+	                         error = '', // Добавляем пропс error
                          }) => {
 	const highlightCode = useCallback((inputCode) => {
 		return Prism.highlight(inputCode, Prism.languages.kumir, 'kumir');
 	}, []);
 
-	const [speed, setSpeed] = useState(2); // Значение ползунка от 0 до 4 (соответствует скоростям)
-
-	const speedValues = [2000, 1000, 500, 250, 0]; // Задержки в мс: 2с, 1с, 0.5с, 0.25с, 0с
+	const [speed, setSpeed] = useState(2);
+	const speedValues = [2000, 1000, 500, 250, 0];
 
 	const handleSpeedChange = (event, newValue) => {
 		setSpeed(newValue);
 	};
 
 	const handleStartWithSpeed = () => {
-		onStart(speedValues[speed]); // Передаем текущую задержку в handleStart
+		onStart(speedValues[speed]);
 	};
 
 	return (
@@ -110,7 +108,6 @@ const CodeEditor = memo(({
 				</Typography>
 			</Card>
 
-			{/* Ползунок скорости */}
 			<div style={{padding: '10px', width: '100%'}}>
 				<Typography gutterBottom>Скорость исполнения</Typography>
 				<Slider
@@ -131,7 +128,7 @@ const CodeEditor = memo(({
 			</div>
 
 			<Card className="console-card">
-				<UserLog/>
+				<UserLog steps={steps} error={error}/>
 			</Card>
 		</div>
 	);

@@ -1,8 +1,6 @@
 /**
  * @file RobotSimulator.jsx
  * @description Главный компонент симулятора робота.
- * Объединяет редактор кода, панель управления и игровое поле.
- * Лог-сообщения выводятся внутри компонента CodeEditor (в блоке с классом "console-card").
  */
 
 import React, {memo, useCallback, useEffect, useReducer, useRef} from 'react';
@@ -30,6 +28,7 @@ const initialState = {
 	steps: [],
 	currentStep: 0,
 	speed: 500,
+	error: '', // Добавляем поле для ошибки
 };
 
 function reducer(state, action) {
@@ -71,7 +70,7 @@ function reducer(state, action) {
 		case 'SET_EDIT_MODE':
 			return {...state, editMode: action.payload};
 		case 'SET_STEPS':
-			return {...state, steps: action.payload, currentStep: 0, isRunning: true};
+			return {...state, steps: action.payload, currentStep: 0, isRunning: true, error: ''}; // Сбрасываем ошибку
 		case 'SET_CURRENT_STEP':
 			return {...state, currentStep: action.payload};
 		case 'SET_SPEED':
@@ -84,7 +83,10 @@ function reducer(state, action) {
 				steps: [],
 				currentStep: 0,
 				isRunning: false,
+				error: '',
 			};
+		case 'SET_ERROR':
+			return {...state, error: action.payload};
 		default:
 			return state;
 	}
@@ -155,15 +157,18 @@ const RobotSimulator = memo(() => {
 						dispatch({type: 'SET_STEPS', payload: data.steps || []});
 					}
 				} else {
-					const errorMsg = 'Ошибка: ' + data.message + (data.output ? "\n" + data.output : "");
+					const errorMsg = data.message + (data.output ? "\n" + data.output : "");
 					dispatch({type: 'SET_STATUS_MESSAGE', payload: errorMsg});
+					dispatch({type: 'SET_ERROR', payload: errorMsg});
 					logger.log_error(errorMsg);
+					dispatch({type: 'SET_STEPS', payload: data.steps || []});
 					dispatch({type: 'SET_IS_RUNNING', payload: false});
 				}
 			})
 			.catch(error => {
 				console.error('Ошибка выполнения запроса:', error);
 				dispatch({type: 'SET_STATUS_MESSAGE', payload: 'Ошибка выполнения запроса.'});
+				dispatch({type: 'SET_ERROR', payload: 'Ошибка выполнения запроса.'});
 				logger.log_error('Ошибка выполнения запроса.');
 				dispatch({type: 'SET_IS_RUNNING', payload: false});
 			});
@@ -277,6 +282,8 @@ const RobotSimulator = memo(() => {
 					onStart={handleStart}
 					onReset={handleReset}
 					statusText={statusText}
+					steps={state.steps}
+					error={state.error} // Передаем ошибку
 				/>
 				<ControlPanel
 					robotPos={state.robotPos}

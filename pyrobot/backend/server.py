@@ -70,18 +70,22 @@ def execute_code():
 
         logger.info("Код выполнен успешно.")
         logger.debug(f"Шаги: {steps}")
-        response = {
-            'success': True,
-            'steps': steps
-        }
-        return jsonify(response), 200
+        return jsonify({'success': True, 'steps': steps}), 200
 
     except Exception as e:
         logger.exception("Ошибка при выполнении кода.")
         output = interpreter.output if interpreter is not None else ""
+        steps = [
+            {
+                "robot": event["stateAfter"]["robot"],
+                "coloredCells": event["stateAfter"]["coloredCells"]
+            }
+            for event in trace if "stateAfter" in event
+        ] if 'trace' in locals() else []
         return jsonify({
             'success': False,
             'message': f'Ошибка: {str(e)}',
+            'steps': steps,
             'output': output
         }), 500
 

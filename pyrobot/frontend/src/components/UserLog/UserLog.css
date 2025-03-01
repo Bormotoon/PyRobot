@@ -255,3 +255,11 @@
 .log-canvasmarker.alt {
     background-color: #bce8e0;
 }
+
+.log-step {
+    color: #2196f3; /* Синий цвет для шагов */
+}
+
+.log-step.alt {
+    color: #64b5f6; /* Светлее для чередования */
+}
