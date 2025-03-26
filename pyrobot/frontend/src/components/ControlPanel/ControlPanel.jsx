@@ -1,263 +1,296 @@
 /**
  * @file ControlPanel.jsx
  * @description Компонент панели управления симулятором робота.
- * Позволяет управлять перемещением робота, маркерами, окраской клеток и размерами поля.
  */
 
 import React, {memo, useCallback, useRef, useState} from 'react';
-import {Button, Card, CardContent, CardHeader, Grid, Tooltip} from '@mui/material'; // Added Tooltip
+import {Button, Card, CardContent, CardHeader, Grid, Tooltip} from '@mui/material';
 import {
-	Add as AddIcon,
-	AddLocation as AddLocationIcon,
-	ArrowBack as ArrowBackIcon,
-	ArrowDownward as ArrowDownwardIcon,
-	ArrowForward as ArrowForwardIcon,
-	ArrowUpward as ArrowUpwardIcon,
-	Brush as BrushIcon,
-	Clear as ClearIcon,
-	DeleteOutline as DeleteOutlineIcon,
-	Edit as EditIcon,
-	FileUpload as FileUploadIcon,
-	HelpOutline as HelpOutlineIcon,
-	Remove as RemoveIcon,
+	Add as AddIcon, AddLocation as AddLocationIcon, ArrowBack as ArrowBackIcon,
+	ArrowDownward as ArrowDownwardIcon, ArrowForward as ArrowForwardIcon, ArrowUpward as ArrowUpwardIcon,
+	Brush as BrushIcon, Clear as ClearIcon, DeleteOutline as DeleteOutlineIcon, Edit as EditIcon,
+	FileUpload as FileUploadIcon, HelpOutline as HelpOutlineIcon, Remove as RemoveIcon
 } from '@mui/icons-material';
 import {getHint} from '../hints';
 import './ControlPanel.css';
 import HelpDialog from '../Help/HelpDialog';
-import logger from '../../Logger'; // Correct path assumed
+import logger from '../../Logger';
 
 // Helper function to parse wall code from .fil file
 const parseWallCode = (code, x, y) => {
 	const wallSegments = [];
-	// Bit flags: 8=Top, 4=Right, 2=Bottom, 1=Left
-	if (code & 8) wallSegments.push(`${x},${y},${x + 1},${y}`);         // Top wall of cell (x, y)
-	if (code & 4) wallSegments.push(`${x + 1},${y},${x + 1},${y + 1}`); // Right wall of cell (x, y)
-	if (code & 2) wallSegments.push(`${x},${y + 1},${x + 1},${y + 1}`); // Bottom wall of cell (x, y)
-	if (code & 1) wallSegments.push(`${x},${y},${x},${y + 1}`);         // Left wall of cell (x, y)
+	if (code & 8) wallSegments.push(`${x},${y},${x + 1},${y}`);         // Top
+	if (code & 4) wallSegments.push(`${x + 1},${y},${x + 1},${y + 1}`); // Right
+	if (code & 2) wallSegments.push(`${x},${y + 1},${x + 1},${y + 1}`); // Bottom
+	if (code & 1) wallSegments.push(`${x},${y},${x},${y + 1}`);         // Left
 	return wallSegments;
 };
 
 const ControlPanel = memo(({
-	                           robotPos,
-	                           setRobotPos,
-	                           walls, // User-defined walls
-	                           setWalls,
-	                           permanentWalls, // Boundary walls
-	                           markers,
-	                           setMarkers,
-	                           coloredCells,
-	                           setColoredCells,
-	                           width,
-	                           setWidth,
-	                           height,
-	                           setHeight,
-	                           // cellSize is now managed by Field component via zoom
-	                           // setCellSize,
-	                           editMode,
-	                           setEditMode,
-	                           setStatusMessage,
+	                           robotPos, setRobotPos, walls, setWalls, permanentWalls,
+	                           markers, setMarkers, coloredCells, setColoredCells,
+	                           symbols, setSymbols, // <-- Receive symbols state and setter
+	                           width, setWidth, height, setHeight,
+	                           editMode, setEditMode, setStatusMessage,
                            }) => {
 	const fileInputRef = useRef(null);
 	const [helpOpen, setHelpOpen] = useState(false);
 
-	/**
-	 * Check if a move from (x, y) in a given direction is blocked by a wall.
-	 * Walls are represented as strings "x1,y1,x2,y2".
-	 * permanentWalls contains the outer boundary walls.
-	 * walls contains user-defined inner walls.
-	 */
+	// isBlocked function
 	const isBlocked = useCallback((x, y, direction) => {
 		let wallKey = '';
 		switch (direction) {
 			case 'up':
-				if (y <= 0) return true; // Blocked by top boundary implicitly handled by permanentWalls
-				wallKey = `${x},${y},${x + 1},${y}`; // Horizontal wall between (x, y-1) and (x, y)
+				if (y <= 0) return true;
+				wallKey = `${x},${y},${x + 1},${y}`;
 				break;
 			case 'down':
-				if (y >= height - 1) return true; // Blocked by bottom boundary
-				wallKey = `${x},${y + 1},${x + 1},${y + 1}`; // Horizontal wall between (x, y) and (x, y+1)
+				if (y >= height - 1) return true;
+				wallKey = `${x},${y + 1},${x + 1},${y + 1}`;
 				break;
 			case 'left':
-				if (x <= 0) return true; // Blocked by left boundary
-				wallKey = `${x},${y},${x},${y + 1}`; // Vertical wall between (x-1, y) and (x, y)
+				if (x <= 0) return true;
+				wallKey = `${x},${y},${x},${y + 1}`;
 				break;
 			case 'right':
-				if (x >= width - 1) return true; // Blocked by right boundary
-				wallKey = `${x + 1},${y},${x + 1},${y + 1}`; // Vertical wall between (x, y) and (x+1, y)
+				if (x >= width - 1) return true;
+				wallKey = `${x + 1},${y},${x + 1},${y + 1}`;
 				break;
 			default:
-				return true; // Unknown direction is blocked
+				return true;
 		}
 		return permanentWalls.has(wallKey) || walls.has(wallKey);
 	}, [walls, permanentWalls, width, height]);
 
-	/**
-	 * Function to attempt moving the robot.
-	 * @param {string} direction - 'up', 'down', 'left', or 'right'.
-	 */
+	// moveRobot function
 	const moveRobot = useCallback((direction) => {
 		let {x, y} = robotPos;
 		let newX = x, newY = y;
-		let moveBlocked = false;
-		let hintKeySuccess = '';
-		let hintKeyBlocked = '';
-		let logDirection = '';
-
+		let blocked = false, hS = '', hB = '', logDir = '';
 		switch (direction) {
 			case 'up':
-				hintKeySuccess = 'moveRobotUp';
-				hintKeyBlocked = 'moveRobotUpBlocked';
-				logDirection = 'вверх';
-				if (!isBlocked(x, y, 'up')) newY--; else moveBlocked = true;
+				hS = 'moveRobotUp';
+				hB = 'moveRobotUpBlocked';
+				logDir = 'вверх';
+				if (!isBlocked(x, y, 'up')) newY--; else blocked = true;
 				break;
 			case 'down':
-				hintKeySuccess = 'moveRobotDown';
-				hintKeyBlocked = 'moveRobotDownBlocked';
-				logDirection = 'вниз';
-				if (!isBlocked(x, y, 'down')) newY++; else moveBlocked = true;
+				hS = 'moveRobotDown';
+				hB = 'moveRobotDownBlocked';
+				logDir = 'вниз';
+				if (!isBlocked(x, y, 'down')) newY++; else blocked = true;
 				break;
 			case 'left':
-				hintKeySuccess = 'moveRobotLeft';
-				hintKeyBlocked = 'moveRobotLeftBlocked';
-				logDirection = 'влево';
-				if (!isBlocked(x, y, 'left')) newX--; else moveBlocked = true;
+				hS = 'moveRobotLeft';
+				hB = 'moveRobotLeftBlocked';
+				logDir = 'влево';
+				if (!isBlocked(x, y, 'left')) newX--; else blocked = true;
 				break;
 			case 'right':
-				hintKeySuccess = 'moveRobotRight';
-				hintKeyBlocked = 'moveRobotRightBlocked';
-				logDirection = 'вправо';
-				if (!isBlocked(x, y, 'right')) newX++; else moveBlocked = true;
+				hS = 'moveRobotRight';
+				hB = 'moveRobotRightBlocked';
+				logDir = 'вправо';
+				if (!isBlocked(x, y, 'right')) newX++; else blocked = true;
 				break;
 			default:
-				logger.log_error(`Неизвестное направление движения: ${direction}`);
+				logger.log_error(`Неизвестное направление: ${direction}`);
 				return;
 		}
-
-		if (moveBlocked) {
-			setStatusMessage(getHint(hintKeyBlocked, editMode));
-			logger.log_movement(`Попытка перемещения ${logDirection} заблокирована. Позиция: (${x}, ${y})`);
+		if (blocked) {
+			setStatusMessage(getHint(hB, editMode));
+			logger.log_movement(`Блок ${logDir} в (${x}, ${y})`);
 		} else {
-			const newPos = {x: newX, y: newY};
-			setRobotPos(newPos); // Update state
-			setStatusMessage(getHint(hintKeySuccess, editMode));
-			logger.log_movement(`Робот перемещён ${logDirection}. Новая позиция: (${newX}, ${newY})`);
+			setRobotPos({x: newX, y: newY});
+			setStatusMessage(getHint(hS, editMode));
+			logger.log_movement(`Робот ${logDir} -> (${newX}, ${newY})`);
 		}
-	}, [robotPos, isBlocked, editMode, setRobotPos, setStatusMessage, logger]); // Added logger to dependencies
+	}, [robotPos, isBlocked, editMode, setRobotPos, setStatusMessage]);
 
-	// --- Marker and Cell Manipulation ---
-
+	// Marker and Cell functions
 	const putMarker = useCallback(() => {
-		const posKey = `${robotPos.x},${robotPos.y}`;
-		if (markers[posKey]) {
+		const k = `${robotPos.x},${robotPos.y}`;
+		if (markers[k]) {
 			setStatusMessage(getHint('markerAlreadyExists', editMode));
-			logger.log_marker(`Попытка поставить маркер, но он уже есть в (${robotPos.x}, ${robotPos.y})`);
+			logger.log_marker(`Маркер уже есть в (${robotPos.x},${robotPos.y})`);
 		} else {
-			// Use functional update for safety if needed, though direct is often fine here
-			setMarkers(prev => ({...prev, [posKey]: 1}));
+			setMarkers(p => ({...p, [k]: 1}));
 			setStatusMessage(getHint('putMarker', editMode));
-			logger.log_marker(`Маркер установлен в позиции: (${robotPos.x}, ${robotPos.y})`);
+			logger.log_marker(`Маркер (${robotPos.x},${robotPos.y})`);
 		}
-	}, [robotPos, markers, setMarkers, setStatusMessage, editMode, logger]);
-
+	}, [robotPos, markers, setMarkers, setStatusMessage, editMode]);
 	const pickMarker = useCallback(() => {
-		const posKey = `${robotPos.x},${robotPos.y}`;
-		if (!markers[posKey]) {
+		const k = `${robotPos.x},${robotPos.y}`;
+		if (!markers[k]) {
 			setStatusMessage(getHint('noMarkerHere', editMode));
-			logger.log_marker(`Попытка поднять маркер, но его нет в (${robotPos.x}, ${robotPos.y})`);
+			logger.log_marker(`Нет маркера в (${robotPos.x},${robotPos.y})`);
 		} else {
-			setMarkers(prev => {
-				const newMarkers = {...prev};
-				delete newMarkers[posKey];
-				return newMarkers;
+			setMarkers(p => {
+				const n = {...p};
+				delete n[k];
+				return n;
 			});
 			setStatusMessage(getHint('pickMarker', editMode));
-			logger.log_marker(`Маркер снят из позиции: (${robotPos.x}, ${robotPos.y})`);
+			logger.log_marker(`Маркер снят (${robotPos.x},${robotPos.y})`);
 		}
-	}, [robotPos, markers, setMarkers, setStatusMessage, editMode, logger]);
-
+	}, [robotPos, markers, setMarkers, setStatusMessage, editMode]);
 	const paintCell = useCallback(() => {
-		const posKey = `${robotPos.x},${robotPos.y}`;
-		if (coloredCells.has(posKey)) {
+		const k = `${robotPos.x},${robotPos.y}`;
+		if (coloredCells.has(k)) {
 			setStatusMessage(getHint('cellAlreadyPainted', editMode));
-			logger.log_cell(`Попытка закрасить клетку (${robotPos.x}, ${robotPos.y}), но она уже закрашена.`);
+			logger.log_cell(`Клетка (${robotPos.x},${robotPos.y}) уже окрашена.`);
 		} else {
-			setColoredCells(prev => new Set(prev).add(posKey));
+			setColoredCells(p => new Set(p).add(k));
 			setStatusMessage(getHint('paintCell', editMode));
-			logger.log_cell(`Клетка (${robotPos.x}, ${robotPos.y}) закрашена.`);
+			logger.log_cell(`Клетка (${robotPos.x},${robotPos.y}) окрашена.`);
 		}
-	}, [robotPos, coloredCells, setColoredCells, setStatusMessage, editMode, logger]);
-
+	}, [robotPos, coloredCells, setColoredCells, setStatusMessage, editMode]);
 	const clearCell = useCallback(() => {
-		const posKey = `${robotPos.x},${robotPos.y}`;
-		if (!coloredCells.has(posKey)) {
+		const k = `${robotPos.x},${robotPos.y}`;
+		if (!coloredCells.has(k)) {
 			setStatusMessage(getHint('cellAlreadyClear', editMode));
-			logger.log_cell(`Попытка очистить клетку (${robotPos.x}, ${robotPos.y}), но она уже чистая.`);
+			logger.log_cell(`Клетка (${robotPos.x},${robotPos.y}) уже чистая.`);
 		} else {
-			setColoredCells(prev => {
-				const newColored = new Set(prev);
-				newColored.delete(posKey);
-				return newColored;
+			setColoredCells(p => {
+				const n = new Set(p);
+				n.delete(k);
+				return n;
 			});
 			setStatusMessage(getHint('clearCell', editMode));
-			logger.log_cell(`Клетка (${robotPos.x}, ${robotPos.y}) очищена.`);
+			logger.log_cell(`Клетка (${robotPos.x},${robotPos.y}) очищена.`);
 		}
-	}, [robotPos, coloredCells, setColoredCells, setStatusMessage, editMode, logger]);
+	}, [robotPos, coloredCells, setColoredCells, setStatusMessage, editMode]);
 
 	// --- Edit Mode and Dimensions ---
-
 	const toggleEditMode = useCallback(() => {
-		const newMode = !editMode;
-		setEditMode(newMode);
-		const hintKey = newMode ? 'enterEditMode' : 'exitEditMode';
-		setStatusMessage(getHint(hintKey, newMode));
-		logger.log_edit_mode_change(newMode);
-	}, [editMode, setEditMode, setStatusMessage, logger]);
-
+		const n = !editMode;
+		setEditMode(n);
+		setStatusMessage(getHint(n ? 'enterEditMode' : 'exitEditMode', n));
+		logger.log_edit_mode_change(n);
+	}, [editMode, setEditMode, setStatusMessage]);
 	const changeDimension = useCallback((dim, delta) => {
 		if (!editMode) {
-			setStatusMessage(getHint('editModeRequired', false)); // Pass false as editMode is off
-			logger.log_event(`Попытка изменить размер поля (${dim}) вне режима редактирования.`);
+			setStatusMessage(getHint('editModeRequired', false));
+			logger.log_event(`Размер (${dim}) вне режима ред.`);
 			return;
 		}
-
-		let currentValue = dim === 'width' ? width : height;
-		let newValue = currentValue + delta;
-		let setter = dim === 'width' ? setWidth : setHeight;
-		let limitMsgKey = dim === 'width' ? 'widthCannotBeLessThan1' : 'heightCannotBeLessThan1';
-		let increaseHintKey = dim === 'width' ? 'increaseWidth' : 'increaseHeight';
-		let decreaseHintKey = dim === 'width' ? 'decreaseWidth' : 'decreaseHeight';
-
-		if (newValue < 1) {
-			setStatusMessage(getHint(limitMsgKey, true)); // Pass true as we are in edit mode
-			logger.log_dimension(`Попытка уменьшить ${dim} ниже 1.`);
+		let c = dim === 'width' ? width : height;
+		let n = c + delta;
+		let s = dim === 'width' ? setWidth : setHeight;
+		if (n < 1) {
+			setStatusMessage(getHint(dim === 'width' ? 'widthCannotBeLessThan1' : 'heightCannotBeLessThan1', true));
+			logger.log_dimension(`Уменьшение ${dim} < 1`);
 		} else {
-			setter(newValue);
-			const hintKey = delta > 0 ? increaseHintKey : decreaseHintKey;
-			setStatusMessage(getHint(hintKey, true));
-			logger.log_dimension_change(dim, currentValue, newValue);
+			s(n);
+			setStatusMessage(getHint(delta > 0 ? (dim === 'width' ? 'increaseWidth' : 'increaseHeight') : (dim === 'width' ? 'decreaseWidth' : 'decreaseHeight'), true));
+			logger.log_dimension_change(dim, c, n);
 		}
-	}, [editMode, width, height, setWidth, setHeight, setStatusMessage, logger]);
-
+	}, [editMode, width, height, setWidth, setHeight, setStatusMessage]);
 	const increaseWidth = useCallback(() => changeDimension('width', 1), [changeDimension]);
 	const decreaseWidth = useCallback(() => changeDimension('width', -1), [changeDimension]);
 	const increaseHeight = useCallback(() => changeDimension('height', 1), [changeDimension]);
 	const decreaseHeight = useCallback(() => changeDimension('height', -1), [changeDimension]);
 
 	// --- File Import ---
+	const handleImportClick = useCallback(() => fileInputRef.current?.click(), []);
 
-	const handleImportClick = useCallback(() => {
-		if (fileInputRef.current) {
-			fileInputRef.current.click(); // Trigger hidden file input
+	const parseAndApplyFieldFile = useCallback((content, filename = "unknown") => {
+		if (!content || typeof content !== 'string') {
+			throw new Error('Содержимое файла пустое.');
 		}
-	}, [fileInputRef]);
+		try {
+			const lines = content.split('\n').map(line => line.trim()).filter(line => line.length > 0 && !line.startsWith(';'));
+			if (lines.length < 2) throw new Error('Недостаточно строк данных (размеры/позиция).');
+
+			const dimensions = lines[0].split(/\s+/).map(Number);
+			if (dimensions.length < 2 || dimensions.some(isNaN) || dimensions[0] < 1 || dimensions[1] < 1) {
+				throw new Error(`Неверный формат размеров ('${lines[0]}').`);
+			}
+			const [fileWidth, fileHeight] = dimensions;
+
+			const robotCoords = lines[1].split(/\s+/).map(Number);
+			if (robotCoords.length < 2 || robotCoords.some(isNaN)) {
+				throw new Error(`Неверный формат координат ('${lines[1]}').`);
+			}
+			const [robotX, robotY] = robotCoords;
+			const clampedRobotPos = {
+				x: Math.min(Math.max(0, robotX), fileWidth - 1),
+				y: Math.min(Math.max(0, robotY), fileHeight - 1)
+			};
+
+			const importedWalls = new Set();
+			const importedColored = new Set();
+			const importedMarkers = {};
+			const importedSymbols = {}; // <-- Object for imported symbols
+			const startIndexForData = 2;
+
+			for (let i = startIndexForData; i < lines.length; i++) {
+				const parts = lines[i].split(/\s+/);
+				// x y wallcode colorflag Rad Temp Sym Sym1 Point
+				// Min 4 required (up to colorflag)
+				if (parts.length < 4) {
+					logger.log_error(`Файл '${filename}', стр ${i + 1}: < 4 полей, пропуск.`);
+					continue;
+				}
+
+				const cellX = parseInt(parts[0], 10);
+				const cellY = parseInt(parts[1], 10);
+				const wallCode = parseInt(parts[2], 10);
+				const colorFlag = parts[3];
+				// Safely access potentially missing fields
+				const upperSymbolRaw = parts.length >= 7 ? parts[6] : '$'; // Sym is index 6
+				const lowerSymbolRaw = parts.length >= 8 ? parts[7] : '$'; // Sym1 is index 7
+				const markerFlag = parts.length >= 9 ? parts[8] : '0';    // Point is index 8
+
+				if (cellX < 0 || cellY < 0 || cellX >= fileWidth || cellY >= fileHeight) {
+					logger.log_event(`Файл '${filename}', стр ${i + 1}: коорд (${cellX},${cellY}) вне поля ${fileWidth}x${fileHeight}, пропуск.`);
+					continue;
+				}
+				if (isNaN(cellX) || isNaN(cellY) || isNaN(wallCode)) {
+					logger.log_error(`Файл '${filename}', стр ${i + 1}: неверные коорд/стены, пропуск.`);
+					continue;
+				}
+
+				const cellKey = `${cellX},${cellY}`;
+				if (colorFlag === '1') importedColored.add(cellKey);
+				if (markerFlag === '1') importedMarkers[cellKey] = 1;
+
+				// --- Process Symbols ---
+				const upperSymbol = upperSymbolRaw !== '$' ? upperSymbolRaw : null;
+				const lowerSymbol = lowerSymbolRaw !== '$' ? lowerSymbolRaw : null;
+				if (upperSymbol || lowerSymbol) {
+					importedSymbols[cellKey] = {};
+					if (upperSymbol) importedSymbols[cellKey].upper = upperSymbol;
+					if (lowerSymbol) importedSymbols[cellKey].lower = lowerSymbol;
+				}
+				// ---------------------
+
+				const wallsToAdd = parseWallCode(wallCode, cellX, cellY);
+				wallsToAdd.forEach(w => importedWalls.add(w));
+			}
+
+			logger.log_event(`Применение '${filename}': ${fileWidth}x${fileHeight}, Робот=(${clampedRobotPos.x},${clampedRobotPos.y})`);
+			setWidth(fileWidth);
+			setHeight(fileHeight);
+			setRobotPos(clampedRobotPos);
+			setWalls(importedWalls);
+			setColoredCells(importedColored);
+			setMarkers(importedMarkers);
+			setSymbols(importedSymbols); // <-- Set the imported symbols
+			setStatusMessage(`Поле (${fileWidth}x${fileHeight}) загружено.`);
+
+		} catch (error) {
+			const errMsg = error instanceof Error ? error.message : String(error);
+			logger.log_error(`Ошибка парсинга '${filename}': ${errMsg}`);
+			throw new Error(`Ошибка разбора '${filename}': ${errMsg}`);
+		}
+	}, [setWidth, setHeight, setRobotPos, setWalls, setColoredCells, setMarkers, setSymbols, setStatusMessage, logger]); // Added setSymbols dependency
 
 	const handleFileChange = useCallback(async (e) => {
 		const file = e.target.files?.[0];
 		if (!file) return;
-
 		try {
 			const content = await file.text();
-			logger.log_fileimport(`Чтение файла '${file.name}' начато.`);
+			logger.log_event(`Чтение '${file.name}'...`);
 			parseAndApplyFieldFile(content, file.name);
 			setStatusMessage(getHint('importSuccess', editMode));
 			logger.log_file_import_success(file.name);
@@ -266,112 +299,9 @@ const ControlPanel = memo(({
 			setStatusMessage(getHint('importError', editMode) + errMsg);
 			logger.log_file_import_error(file.name, errMsg);
 		} finally {
-			// Reset input value to allow importing the same file again
-			if (e.target) {
-				e.target.value = "";
-			}
+			if (e.target) e.target.value = "";
 		}
-	}, [editMode, setWidth, setHeight, setRobotPos, setWalls, setColoredCells, setMarkers, setStatusMessage, logger]); // Dependencies for file handling
-
-	const parseAndApplyFieldFile = useCallback((content, filename = "unknown") => {
-		// Basic validation first
-		if (!content || typeof content !== 'string') {
-			throw new Error('Содержимое файла пустое или недействительное.');
-		}
-
-		try {
-			const lines = content.split('\n')
-				.map(line => line.replace(/#.*$/, '').trim()) // Remove comments and trim
-				.filter(line => line !== ''); // Remove empty lines
-
-			if (lines.length < 2) throw new Error('Недостаточно строк данных (требуется как минимум 2).');
-
-			// Line 1: Dimensions
-			const dimensions = lines[0].split(/\s+/).map(Number);
-			if (dimensions.length < 2 || isNaN(dimensions[0]) || isNaN(dimensions[1]) || dimensions[0] < 1 || dimensions[1] < 1) {
-				throw new Error('Неверный формат размеров поля в первой строке.');
-			}
-			const [fileWidth, fileHeight] = dimensions;
-
-			// Line 2: Robot Position
-			const robotCoords = lines[1].split(/\s+/).map(Number);
-			if (robotCoords.length < 2 || isNaN(robotCoords[0]) || isNaN(robotCoords[1])) {
-				throw new Error('Неверный формат координат робота во второй строке.');
-			}
-			const [robotX, robotY] = robotCoords;
-
-			// Clamp robot position to new dimensions BEFORE setting state
-			const clampedRobotPos = {
-				x: Math.min(Math.max(0, robotX), fileWidth - 1),
-				y: Math.min(Math.max(0, robotY), fileHeight - 1)
-			};
-
-
-			const importedWalls = new Set();
-			const importedColored = new Set();
-			const importedMarkers = {};
-
-			// Process remaining lines for cell data
-			if (lines.length !== 2 + fileWidth * fileHeight) {
-				logger.log_warning(`Количество строк данных (${lines.length - 2}) не соответствует размеру поля ${fileWidth}x${fileHeight}. Некоторые данные могут отсутствовать.`);
-			}
-
-			for (let i = 2; i < lines.length; i++) {
-				const parts = lines[i].split(/\s+/);
-				if (parts.length < 9) {
-					logger.log_warning(`Строка ${i + 1} имеет неверное количество полей (${parts.length}), пропускается.`);
-					continue; // Skip malformed lines
-				}
-
-				const cellX = parseInt(parts[0], 10);
-				const cellY = parseInt(parts[1], 10);
-				const wallCode = parseInt(parts[2], 10);
-				const colorFlag = parts[3]; // '0' or '1'
-				// parts[4] to parts[7] seem unused in the original example
-				const markerFlag = parts[8]; // '0' or '1'
-
-				// Basic sanity checks
-				if (isNaN(cellX) || isNaN(cellY) || isNaN(wallCode) || cellX < 0 || cellY < 0 || cellX >= fileWidth || cellY >= fileHeight) {
-					logger.log_warning(`Строка ${i + 1} содержит неверные координаты или код стены, пропускается.`);
-					continue;
-				}
-
-				const cellKey = `${cellX},${cellY}`;
-
-				// Add colored cell if flag is '1'
-				if (colorFlag === '1') {
-					importedColored.add(cellKey);
-				}
-
-				// Add marker if flag is '1'
-				if (markerFlag === '1') {
-					importedMarkers[cellKey] = 1; // Store marker
-				}
-
-				// Parse and add wall segments
-				const wallsToAdd = parseWallCode(wallCode, cellX, cellY);
-				wallsToAdd.forEach(w => importedWalls.add(w));
-			}
-
-			// Update state: Set dimensions first, then robot position, then field elements
-			setWidth(fileWidth);
-			setHeight(fileHeight);
-			setRobotPos(clampedRobotPos); // Use clamped position
-			setWalls(importedWalls);
-			setColoredCells(importedColored);
-			setMarkers(importedMarkers);
-			// No need to set permanent walls, they will be updated by useEffect in RobotSimulator based on new width/height
-
-			setStatusMessage(`Поле (${fileWidth}x${fileHeight}) успешно загружено из файла ${filename}.`);
-			logger.log_event(`Импорт поля ${filename} (${fileWidth}x${fileHeight}) завершен.`);
-
-		} catch (error) {
-			const errMsg = error instanceof Error ? error.message : String(error);
-			logger.log_error(`Ошибка парсинга файла '${filename}': ${errMsg}`);
-			// Re-throw a more specific error for the caller to catch
-			throw new Error(`Ошибка разбора файла ${filename}: ${errMsg}`);
-		}
-	}, [setWidth, setHeight, setRobotPos, setWalls, setColoredCells, setMarkers, setStatusMessage, logger]); // Dependencies for parsing logic
+	}, [editMode, setStatusMessage, parseAndApplyFieldFile]);
 
 	// --- Help Dialog ---
 	const openHelpDialog = useCallback(() => setHelpOpen(true), []);
@@ -383,140 +313,90 @@ const ControlPanel = memo(({
 			<Card className="control-panel" elevation={3}>
 				<CardHeader title="Панель управления"/>
 				<CardContent>
-					{/* Robot Movement Controls */}
+					{/* ... (rest of the buttons remain the same) ... */}
+					{/* Movement Buttons */}
 					<Grid container spacing={1} justifyContent="center" alignItems="center" className="control-section">
-						<Grid item xs={12} container justifyContent="center">
-							<Tooltip title="Переместить робота вверх">
-								<Button onClick={() => moveRobot('up')} color="primary" variant="contained"
-								        className="control-button small-button" aria-label="Вверх"> <ArrowUpwardIcon/>
-								</Button>
-							</Tooltip>
-						</Grid>
-						<Grid item xs={4} container justifyContent="flex-end">
-							<Tooltip title="Переместить робота влево">
-								<Button onClick={() => moveRobot('left')} color="primary" variant="contained"
-								        className="control-button small-button" aria-label="Влево"> <ArrowBackIcon/>
-								</Button>
-							</Tooltip>
-						</Grid>
-						<Grid item xs={4} container justifyContent="center">
-							{/* Placeholder or Icon in the middle */}
-						</Grid>
-						<Grid item xs={4} container justifyContent="flex-start">
-							<Tooltip title="Переместить робота вправо">
-								<Button onClick={() => moveRobot('right')} color="primary" variant="contained"
-								        className="control-button small-button" aria-label="Вправо"> <ArrowForwardIcon/>
-								</Button>
-							</Tooltip>
-						</Grid>
-						<Grid item xs={12} container justifyContent="center">
-							<Tooltip title="Переместить робота вниз">
-								<Button onClick={() => moveRobot('down')} color="primary" variant="contained"
-								        className="control-button small-button" aria-label="Вниз"> <ArrowDownwardIcon/>
-								</Button>
-							</Tooltip>
-						</Grid>
+						<Grid item xs={12} container justifyContent="center"><Tooltip title="Вверх"><Button
+							onClick={() => moveRobot('up')} variant="contained" className="control-button small-button"><ArrowUpwardIcon/></Button></Tooltip></Grid>
+						<Grid item xs={4} container justifyContent="flex-end"><Tooltip title="Влево"><Button
+							onClick={() => moveRobot('left')} variant="contained"
+							className="control-button small-button"><ArrowBackIcon/></Button></Tooltip></Grid>
+						<Grid item xs={4}/>
+						<Grid item xs={4} container justifyContent="flex-start"><Tooltip title="Вправо"><Button
+							onClick={() => moveRobot('right')} variant="contained"
+							className="control-button small-button"><ArrowForwardIcon/></Button></Tooltip></Grid>
+						<Grid item xs={12} container justifyContent="center"><Tooltip title="Вниз"><Button
+							onClick={() => moveRobot('down')} variant="contained"
+							className="control-button small-button"><ArrowDownwardIcon/></Button></Tooltip></Grid>
 					</Grid>
-
-					{/* Marker and Paint Controls */}
+					{/* Marker/Paint Buttons */}
 					<Grid container spacing={1} className="control-section">
-						<Grid item xs={6}>
-							<Tooltip title="Положить маркер в текущей клетке">
-								<Button onClick={putMarker} startIcon={<AddLocationIcon/>} color="success"
-								        variant="contained" fullWidth className="control-button"
-								        aria-label="Положить маркер"> Маркер </Button>
-							</Tooltip>
-						</Grid>
-						<Grid item xs={6}>
-							<Tooltip title="Поднять маркер из текущей клетки">
-								<Button onClick={pickMarker} startIcon={<DeleteOutlineIcon/>} color="error"
-								        variant="contained" fullWidth className="control-button"
-								        aria-label="Поднять маркер"> Маркер </Button>
-							</Tooltip>
-						</Grid>
-						<Grid item xs={6}>
-							<Tooltip title="Закрасить текущую клетку">
-								<Button onClick={paintCell} startIcon={<BrushIcon/>} color="warning" variant="contained"
-								        fullWidth className="control-button" aria-label="Покрасить"> Клетка </Button>
-							</Tooltip>
-						</Grid>
-						<Grid item xs={6}>
-							<Tooltip title="Очистить текущую клетку">
-								<Button onClick={clearCell} startIcon={<ClearIcon/>} color="info" variant="contained"
-								        fullWidth className="control-button" aria-label="Очистить"> Клетка </Button>
-							</Tooltip>
-						</Grid>
+						<Grid item xs={6}><Tooltip title="Положить маркер"><Button onClick={putMarker}
+						                                                           startIcon={<AddLocationIcon/>}
+						                                                           color="success" variant="contained"
+						                                                           fullWidth
+						                                                           className="control-button">Маркер</Button></Tooltip></Grid>
+						<Grid item xs={6}><Tooltip title="Поднять маркер"><Button onClick={pickMarker}
+						                                                          startIcon={<DeleteOutlineIcon/>}
+						                                                          color="error" variant="contained"
+						                                                          fullWidth
+						                                                          className="control-button">Маркер</Button></Tooltip></Grid>
+						<Grid item xs={6}><Tooltip title="Покрасить клетку"><Button onClick={paintCell}
+						                                                            startIcon={<BrushIcon/>}
+						                                                            color="warning" variant="contained"
+						                                                            fullWidth
+						                                                            className="control-button">Клетка</Button></Tooltip></Grid>
+						<Grid item xs={6}><Tooltip title="Очистить клетку"><Button onClick={clearCell}
+						                                                           startIcon={<ClearIcon/>} color="info"
+						                                                           variant="contained" fullWidth
+						                                                           className="control-button">Клетка</Button></Tooltip></Grid>
 					</Grid>
-
-					{/* Edit Mode and Dimensions Controls */}
+					{/* Edit Mode/Dimension Buttons */}
 					<Grid container spacing={1} className="control-section">
-						<Grid item xs={12}>
-							<Tooltip
-								title={editMode ? 'Выключить режим редактирования поля мышью' : 'Включить режим редактирования поля мышью'}>
-								<Button onClick={toggleEditMode} startIcon={<EditIcon/>}
-								        color={editMode ? "secondary" : "primary"} variant="contained" fullWidth
-								        className="control-button" aria-label="Режим рисования">
-									{editMode ? 'Выкл. Ред.' : 'Вкл. Ред.'}
-								</Button>
-							</Tooltip>
-						</Grid>
-						<Grid item xs={6}>
-							<Tooltip title="Увеличить ширину поля (только в режиме ред.)">
-								<Button onClick={increaseWidth} startIcon={<AddIcon/>} color="primary"
-								        variant="outlined" fullWidth className="control-button" disabled={!editMode}
-								        aria-label="Поле шире"> Шире </Button>
-							</Tooltip>
-						</Grid>
-						<Grid item xs={6}>
-							<Tooltip title="Уменьшить ширину поля (только в режиме ред.)">
-								<Button onClick={decreaseWidth} startIcon={<RemoveIcon/>} color="primary"
-								        variant="outlined" fullWidth className="control-button"
-								        disabled={!editMode || width <= 1} aria-label="Поле уже"> Уже </Button>
-							</Tooltip>
-						</Grid>
-						<Grid item xs={6}>
-							<Tooltip title="Увеличить высоту поля (только в режиме ред.)">
-								<Button onClick={increaseHeight} startIcon={<AddIcon/>} color="primary"
-								        variant="outlined" fullWidth className="control-button" disabled={!editMode}
-								        aria-label="Поле выше"> Выше </Button>
-							</Tooltip>
-						</Grid>
-						<Grid item xs={6}>
-							<Tooltip title="Уменьшить высоту поля (только в режиме ред.)">
-								<Button onClick={decreaseHeight} startIcon={<RemoveIcon/>} color="primary"
-								        variant="outlined" fullWidth className="control-button"
-								        disabled={!editMode || height <= 1} aria-label="Поле ниже"> Ниже </Button>
-							</Tooltip>
-						</Grid>
+						<Grid item xs={12}><Tooltip title={editMode ? 'Выкл. режим ред.' : 'Вкл. режим ред.'}><Button
+							onClick={toggleEditMode} startIcon={<EditIcon/>} color={editMode ? "secondary" : "primary"}
+							variant="contained" fullWidth
+							className="control-button">{editMode ? 'Выкл. Ред.' : 'Вкл. Ред.'}</Button></Tooltip></Grid>
+						<Grid item xs={6}><Tooltip title="Поле шире (в режиме ред.)"><Button onClick={increaseWidth}
+						                                                                     startIcon={<AddIcon/>}
+						                                                                     variant="outlined"
+						                                                                     fullWidth
+						                                                                     className="control-button"
+						                                                                     disabled={!editMode}>Шире</Button></Tooltip></Grid>
+						<Grid item xs={6}><Tooltip title="Поле уже (в режиме ред.)"><Button onClick={decreaseWidth}
+						                                                                    startIcon={<RemoveIcon/>}
+						                                                                    variant="outlined" fullWidth
+						                                                                    className="control-button"
+						                                                                    disabled={!editMode || width <= 1}>Уже</Button></Tooltip></Grid>
+						<Grid item xs={6}><Tooltip title="Поле выше (в режиме ред.)"><Button onClick={increaseHeight}
+						                                                                     startIcon={<AddIcon/>}
+						                                                                     variant="outlined"
+						                                                                     fullWidth
+						                                                                     className="control-button"
+						                                                                     disabled={!editMode}>Выше</Button></Tooltip></Grid>
+						<Grid item xs={6}><Tooltip title="Поле ниже (в режиме ред.)"><Button onClick={decreaseHeight}
+						                                                                     startIcon={<RemoveIcon/>}
+						                                                                     variant="outlined"
+						                                                                     fullWidth
+						                                                                     className="control-button"
+						                                                                     disabled={!editMode || height <= 1}>Ниже</Button></Tooltip></Grid>
 					</Grid>
-
-					{/* Help and Import */}
+					{/* Help/Import Buttons */}
 					<Grid container spacing={1} className="control-section">
-						<Grid item xs={6}>
-							<Tooltip title="Открыть справку">
-								<Button onClick={openHelpDialog} startIcon={<HelpOutlineIcon/>} color="info"
-								        variant="text" fullWidth className="control-button"
-								        aria-label="Помощь"> Помощь </Button>
-							</Tooltip>
-						</Grid>
-						<Grid item xs={6}>
-							<Tooltip title="Импортировать поле из файла .fil">
-								<Button onClick={handleImportClick} startIcon={<FileUploadIcon/>} color="secondary"
-								        variant="text" fullWidth className="control-button"
-								        aria-label="Импорт .fil"> Импорт .fil </Button>
-							</Tooltip>
-							<input
-								type="file"
-								accept=".fil" // Specify acceptable file type
-								ref={fileInputRef}
-								style={{display: 'none'}} // Hidden input
-								onChange={handleFileChange}
-							/>
-						</Grid>
+						<Grid item xs={6}><Tooltip title="Помощь"><Button onClick={openHelpDialog}
+						                                                  startIcon={<HelpOutlineIcon/>} color="info"
+						                                                  variant="text" fullWidth
+						                                                  className="control-button">Помощь</Button></Tooltip></Grid>
+						<Grid item xs={6}><Tooltip title="Импорт .fil"><Button onClick={handleImportClick}
+						                                                       startIcon={<FileUploadIcon/>}
+						                                                       color="secondary" variant="text"
+						                                                       fullWidth className="control-button">Импорт
+							.fil</Button></Tooltip></Grid>
 					</Grid>
+					<input type="file" accept=".fil" ref={fileInputRef} style={{display: 'none'}}
+					       onChange={handleFileChange}/>
 				</CardContent>
 			</Card>
-			{/* Help Dialog Component */}
 			<HelpDialog open={helpOpen} onClose={closeHelpDialog}/>
 		</>
 	);

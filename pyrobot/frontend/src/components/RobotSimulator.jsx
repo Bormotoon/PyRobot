@@ -1,5 +1,5 @@
 import React, {memo, useCallback, useEffect, useReducer, useRef, useState} from 'react';
-import {ThemeProvider} from '@mui/material';
+import {ThemeProvider, Typography} from '@mui/material';
 import CodeEditor from './CodeEditor/CodeEditor';
 import ControlPanel from './ControlPanel/ControlPanel';
 import Field from './Field/Field';
@@ -18,12 +18,13 @@ const initialState = {
 	robotPos: {x: 0, y: 0},
 	walls: new Set(),
 	permanentWalls: new Set(),
-	markers: {},
-	coloredCells: new Set(),
+	markers: {}, // { "x,y": 1 }
+	coloredCells: new Set(), // { "x,y" }
+	symbols: {}, // { "x,y": { upper: 'A', lower: 'Б' } } <-- Initial empty symbols
 	editMode: false,
 };
 
-// Helper Functions (clampRobotPos, setupPermanentWalls) should be placed here
+// Helper Functions (clampRobotPos, setupPermanentWalls)
 function setupPermanentWalls(width, height) {
 	const newWalls = new Set();
 	for (let x = 0; x < width; x++) {
@@ -46,76 +47,104 @@ function clampRobotPos(robotPos, width, height) {
 	return robotPos;
 }
 
-
+// Reducer function
 function reducer(state, action) {
+	// <<< Add Logging inside Reducer >>>
+	// Use a structured log for better readability in console
+	console.groupCollapsed(`%cReducer Action: ${action.type}`, 'color: red;');
+	console.log('Payload:', action.payload);
+	console.log('State Before:', JSON.parse(JSON.stringify(state, (key, value) => value instanceof Set ? Array.from(value) : value)));
+	// <<< --------------------------- >>>
+
+	let nextState; // Calculate next state before logging it
+
 	switch (action.type) {
 		case 'SET_CODE':
-			return {...state, code: action.payload};
+			nextState = {...state, code: action.payload};
+			break;
 		case 'SET_IS_RUNNING':
-			return {...state, isRunning: action.payload};
+			nextState = {...state, isRunning: action.payload};
+			break;
 		case 'SET_STATUS_MESSAGE':
-			return {...state, statusMessage: action.payload};
+			nextState = {...state, statusMessage: action.payload};
+			break;
 		case 'SET_ROBOT_POS':
-			// Clamp position whenever it's set via reducer to be safe
 			const clampedPos = clampRobotPos(action.payload, state.width, state.height);
-			return {...state, robotPos: clampedPos};
-		case 'SET_WIDTH':
-			const newWidth = Math.max(1, action.payload); // Ensure width is at least 1
-			// Ensure robot stays within bounds after width change
+			nextState = {...state, robotPos: clampedPos};
+			break;
+		case 'SET_WIDTH': {
+			const newWidth = Math.max(1, action.payload);
 			const robotAfterWidthChange = clampRobotPos(state.robotPos, newWidth, state.height);
-			return {
-				...state,
-				width: newWidth,
-				robotPos: robotAfterWidthChange, // Update robot pos immediately
-				permanentWalls: setupPermanentWalls(newWidth, state.height) // Update walls immediately
+			nextState = {
+				...state, width: newWidth, robotPos: robotAfterWidthChange,
+				permanentWalls: setupPermanentWalls(newWidth, state.height)
 			};
-		case 'SET_HEIGHT':
-			const newHeight = Math.max(1, action.payload); // Ensure height is at least 1
-			// Ensure robot stays within bounds after height change
+			break;
+		}
+		case 'SET_HEIGHT': {
+			const newHeight = Math.max(1, action.payload);
 			const robotAfterHeightChange = clampRobotPos(state.robotPos, state.width, newHeight);
-			return {
-				...state,
-				height: newHeight,
-				robotPos: robotAfterHeightChange, // Update robot pos immediately
-				permanentWalls: setupPermanentWalls(state.width, newHeight) // Update walls immediately
+			nextState = {
+				...state, height: newHeight, robotPos: robotAfterHeightChange,
+				permanentWalls: setupPermanentWalls(state.width, newHeight)
 			};
+			break;
+		}
 		case 'SET_CELL_SIZE':
-			return {...state, cellSize: Math.max(10, action.payload)}; // Ensure minimum cell size
+			nextState = {...state, cellSize: Math.max(10, action.payload)};
+			break;
 		case 'SET_WALLS':
-			return {
+			nextState = {
 				...state,
-				walls: typeof action.payload === 'function' ? action.payload(state.walls) : new Set(action.payload),
+				walls: typeof action.payload === 'function' ? action.payload(state.walls) : new Set(action.payload)
 			};
+			break;
 		case 'SET_PERMANENT_WALLS':
-			// Should generally not be set directly, derived from width/height
-			return {...state, permanentWalls: new Set(action.payload)};
+			nextState = {...state, permanentWalls: new Set(action.payload)};
+			break;
 		case 'SET_MARKERS':
-			return {
+			nextState = {
 				...state,
-				markers: typeof action.payload === 'function' ? action.payload(state.markers) : action.payload,
+				markers: typeof action.payload === 'function' ? action.payload(state.markers) : action.payload
 			};
+			break;
 		case 'SET_COLORED_CELLS':
-			return {
+			nextState = {
 				...state,
-				coloredCells: typeof action.payload === 'function' ? action.payload(state.coloredCells) : new Set(action.payload),
+				coloredCells: typeof action.payload === 'function' ? action.payload(state.coloredCells) : new Set(action.payload)
 			};
+			break;
+		case 'SET_SYMBOLS':
+			// Log specifically when symbols are set
+			console.log('%cSetting Symbols:', 'color: magenta; font-weight: bold;', action.payload);
+			nextState = {
+				...state,
+				symbols: typeof action.payload === 'function' ? action.payload(state.symbols) : action.payload
+			};
+			break;
 		case 'SET_EDIT_MODE':
-			return {...state, editMode: action.payload};
-		case 'RESET_STATE':
-			// Reset to initial state values, recompute permanent walls
+			nextState = {...state, editMode: action.payload};
+			break;
+		case 'RESET_STATE': {
 			const resetWidth = initialState.width;
 			const resetHeight = initialState.height;
-			return {
+			nextState = {
 				...initialState,
-				width: resetWidth,
-				height: resetHeight,
+				width: resetWidth, height: resetHeight,
 				permanentWalls: setupPermanentWalls(resetWidth, resetHeight),
-				robotPos: clampRobotPos(initialState.robotPos, resetWidth, resetHeight), // Ensure clamped initial pos
-				statusMessage: 'Симулятор сброшен в начальное состояние.',
+				robotPos: clampRobotPos(initialState.robotPos, resetWidth, resetHeight),
+				statusMessage: 'Симулятор сброшен.',
 			};
+			break;
+		}
 		default:
 			throw new Error(`Unknown action type: ${action.type}`);
 	}
+	// <<< Log State After and End Group >>>
+	console.log('State After:', JSON.parse(JSON.stringify(nextState, (key, value) => value instanceof Set ? Array.from(value) : value)));
+	console.groupEnd();
+	// <<< ----------------------------- >>>
+	return nextState; // Return the calculated next state
 }
 
 // Component Definition
@@ -125,352 +154,308 @@ const RobotSimulator = memo(() => {
 		permanentWalls: setupPermanentWalls(init.width, init.height)
 	}));
 
-	// Separate state for animation speed, not part of main reducer state
 	const [animationSpeedLevel, setAnimationSpeedLevel] = useState(2);
 	const canvasRef = useRef(null);
 	const socketRef = useRef(null);
 	const isMountedRef = useRef(true);
-	// Use a ref to track if an animation is currently supposed to be running
 	const animationControllerRef = useRef({
 		stop: () => {
-		}
-	});
+		}, isRunning: false
+	}); // Added isRunning flag
+
+	// <<< Add Component Render Logging >>>
+	// Use JSON.stringify with a replacer for Sets to avoid issues with logging complex state
+	const stateToLog = JSON.stringify(state, (key, value) => {
+		if (value instanceof Set) {
+			return Array.from(value);
+		} // Convert Sets to Arrays for logging
+		return value;
+	}, 2); // Indent for readability
+	console.log('%cRobotSimulator Render - State:', 'color: blue; font-weight: bold;', JSON.parse(stateToLog)); // Log full state on render
+	// <<< ---------------------------- >>>
 
 
-	useEffect(() => {
+	useEffect(() => { // WebSocket setup
 		isMountedRef.current = true;
 		socketRef.current = io('http://localhost:5000');
 
-		// Connection acknowledgment handler (useful for debugging)
 		socketRef.current.on('connection_ack', (data) => {
 			if (isMountedRef.current) {
-				logger.log_event(`WebSocket подключен успешно. SID: ${data.sid}`);
-				// You could potentially store the SID from here if session method fails,
-				// but it requires backend changes to use it.
+				logger.log_event(`WS OK SID: ${data.sid}`);
 			}
 		});
 
 		socketRef.current.on('execution_progress', (data) => {
-			// IMPORTANT: This progress update is primarily for displaying live info,
-			// *not* for driving the animation itself, as message delivery is not guaranteed timely or ordered.
-			// The main animation relies on the trace received via HTTP.
-			if (isMountedRef.current && state.isRunning) {
-				// Update status message with progress *if* animation isn't providing it
-				if (animationControllerRef.current.isRunning) {
-					return;
-				} // Let animation update status
+			// Log all progress messages for debugging
+			console.debug("WS execution_progress received:", data);
+			if (isMountedRef.current && state.isRunning && !animationControllerRef.current.isRunning) {
 				const progressMsg = data.error
-					? `Прогресс: Ошибка на шаге ${data.commandIndex} (${data.phase}) - ${data.error}`
-					: `Прогресс: Фаза ${data.phase}, Команда ${data.commandIndex}`;
+					? `WS Прогр: Ошибка ${data.commandIndex} (${data.phase}) - ${data.error}`
+					: `WS Прогр: ${data.phase} ш.${data.commandIndex}`;
+				// Update status message only if needed, animation might override
 				dispatch({type: 'SET_STATUS_MESSAGE', payload: progressMsg});
-				logger.log_event(`Прогресс WebSocket: ${progressMsg}`);
 			}
 		});
 
-		return () => {
+		return () => { // Cleanup
 			isMountedRef.current = false;
-			animationControllerRef.current.stop(); // Signal any ongoing animation to stop
+			animationControllerRef.current.stop();
 			if (socketRef.current) {
 				socketRef.current.disconnect();
-				logger.log_event('WebSocket отключен при размонтировании.');
+				logger.log_event('WS откл.');
 			}
 		};
-	}, [state.isRunning]); // Re-run if isRunning changes? Maybe not needed, connect once.
+	}, []); // Run once
 
-	// Clear code handler
+	// Handlers
 	const handleClearCode = useCallback(() => {
 		dispatch({type: 'SET_CODE', payload: `использовать Робот\nалг\nнач\n  \nкон`});
-		dispatch({type: 'SET_STATUS_MESSAGE', payload: 'Код программы очищен.'});
-		logger.log_event('Код программы очищен.');
+		dispatch({type: 'SET_STATUS_MESSAGE', payload: 'Код очищен.'});
+		logger.log_event('Код очищен.');
 	}, []);
-
-	// Stop handler
 	const handleStop = useCallback(() => {
-		animationControllerRef.current.stop(); // Tell animation to stop
+		animationControllerRef.current.stop();
 		dispatch({type: 'SET_IS_RUNNING', payload: false});
-		dispatch({type: 'SET_STATUS_MESSAGE', payload: 'Выполнение остановлено пользователем.'});
-		logger.log_event('Выполнение остановлено пользователем.');
-		// Consider backend interruption if needed
+		dispatch({type: 'SET_STATUS_MESSAGE', payload: 'Остановлено.'});
+		logger.log_event('Остановлено.');
+	}, []);
+	const handleReset = useCallback(() => {
+		animationControllerRef.current.stop();
+		dispatch({type: 'RESET_STATE'});
+		dispatch({type: 'SET_IS_RUNNING', payload: false});
+		logger.log_event('Симулятор сброшен.');
+		fetch('http://localhost:5000/reset', {
+			method: 'POST',
+			credentials: 'include'
+		}).catch(e => logger.log_error(`Ошибка /reset: ${e.message}`));
 	}, []);
 
 	// Animation function
 	const animateTrace = useCallback(async (trace) => {
-		// Return early if trace is empty
 		if (!trace || trace.length === 0) {
-			return {completed: true}; // Nothing to animate
+			console.warn("animateTrace called with empty trace.");
+			return {completed: true};
 		}
-
 		let shouldContinue = true;
-		const stopAnimation = () => {
+		const stop = () => {
 			shouldContinue = false;
 		};
-		animationControllerRef.current = {stop: stopAnimation, isRunning: true}; // Expose stop function
-
-		const delayForLevel = (level) => Math.max(50, 2000 - level * 480); // Min 50ms delay
-		const stepDelay = delayForLevel(animationSpeedLevel);
-
-		dispatch({type: 'SET_STATUS_MESSAGE', payload: 'Анимация выполнения...'});
+		animationControllerRef.current = {stop, isRunning: true};
+		const delay = Math.max(50, 2000 - animationSpeedLevel * 480);
+		dispatch({type: 'SET_STATUS_MESSAGE', payload: 'Анимация...'});
+		console.groupCollapsed(`%cStarting Animation (Speed Level: ${animationSpeedLevel}, Delay: ${delay}ms)`, 'color: green');
+		console.log("Trace data:", trace);
+		console.groupEnd();
 
 		for (let i = 0; i < trace.length; i++) {
 			const event = trace[i];
+			console.debug(`%cAnimation Step ${i + 1}/${trace.length}`, 'color: darkcyan', event);
 
 			if (!isMountedRef.current || !shouldContinue) {
-				logger.log_event('Анимация прервана (компонент/остановка).');
+				logger.log_event('Анимация прервана.');
 				animationControllerRef.current.isRunning = false;
-				return {completed: false}; // Indicate interruption
+				return {completed: false};
 			}
 
-			// Apply state changes from the 'stateAfter' of the event
 			if (event.stateAfter) {
-				if (event.stateAfter.robot) {
-					dispatch({type: 'SET_ROBOT_POS', payload: event.stateAfter.robot});
+				console.debug("Applying state:", event.stateAfter);
+				if (event.stateAfter.robot) dispatch({type: 'SET_ROBOT_POS', payload: event.stateAfter.robot});
+				if (event.stateAfter.coloredCells) dispatch({
+					type: 'SET_COLORED_CELLS',
+					payload: new Set(event.stateAfter.coloredCells)
+				});
+				if (event.stateAfter.symbols !== undefined) { // Check specifically for symbols presence
+					dispatch({type: 'SET_SYMBOLS', payload: event.stateAfter.symbols}); // Update symbols state
+				} else {
+					console.warn("Event stateAfter missing 'symbols' field:", event);
 				}
-				if (event.stateAfter.coloredCells) {
-					dispatch({type: 'SET_COLORED_CELLS', payload: new Set(event.stateAfter.coloredCells)});
-				}
-				// Update status based on command or error
-				const message = event.error
-					? `Ошибка: ${event.error} (Команда: ${event.command || 'N/A'})`
-					: `Выполняется: ${event.command || 'шаг'} (${i + 1}/${trace.length})`;
+				const message = event.error ? `Ошибка: ${event.error} (Шаг ${i + 1})` : `Шаг ${i + 1}/${trace.length}: ${event.command || ''}`;
 				dispatch({type: 'SET_STATUS_MESSAGE', payload: message});
 			} else {
-				// Should not happen if trace generation is correct, but handle defensively
-				dispatch({type: 'SET_STATUS_MESSAGE', payload: `Обработка шага ${i + 1}/${trace.length}...`});
+				console.warn("Trace event missing stateAfter:", event);
+				dispatch({type: 'SET_STATUS_MESSAGE', payload: `Обработка шага ${i + 1}... (нет stateAfter)`});
 			}
 
+			if (animationSpeedLevel < 4 && delay > 0) await new Promise(r => setTimeout(r, delay));
 
-			// Introduce delay if not max speed and delay > 0
-			if (animationSpeedLevel < 4 && stepDelay > 0) {
-				await new Promise(resolve => setTimeout(resolve, stepDelay));
-			}
-
-			// If an error occurred in this step, stop the animation AFTER showing the error state
 			if (event.error) {
-				logger.log_error(`Анимация остановлена из-за ошибки: ${event.error}`);
-				// Status message already set above
+				logger.log_error(`Анимация стоп (ошибка на шаге ${i + 1}): ${event.error}`);
 				animationControllerRef.current.isRunning = false;
-				return {completed: false, error: true}; // Indicate error stop
+				return {completed: false, error: true};
 			}
 		}
-
-		// Animation completed normally
 		animationControllerRef.current.isRunning = false;
 		dispatch({type: 'SET_STATUS_MESSAGE', payload: 'Анимация завершена.'});
-		return {completed: true}; // Indicate normal completion
-	}, [animationSpeedLevel]); // Dependency: speed level
+		console.log("%cAnimation Completed Normally", 'color: green; font-weight: bold');
+		return {completed: true};
+	}, [animationSpeedLevel]);
 
 	// Start execution handler
 	const handleStart = useCallback(() => {
-		if (state.isRunning) { // Prevent double clicks
-			logger.log_warning("Попытка запуска во время выполнения.");
+		if (state.isRunning) {
+			logger.log_warning("Уже выполняется.");
 			return;
 		}
 		if (!state.code.trim()) {
-			dispatch({type: 'SET_STATUS_MESSAGE', payload: 'Ошибка: программа пустая.'});
-			logger.log_error('Попытка запуска пустой программы.');
+			dispatch({type: 'SET_STATUS_MESSAGE', payload: 'Код пуст.'});
+			logger.log_error('Запуск пустого кода.');
 			return;
 		}
-
 		dispatch({type: 'SET_IS_RUNNING', payload: true});
-		dispatch({type: 'SET_STATUS_MESSAGE', payload: 'Запрос выполнения...'});
-
-		// Send current field state from React state
+		dispatch({type: 'SET_STATUS_MESSAGE', payload: 'Выполнение...'});
 		const currentFieldState = {
-			width: state.width, height: state.height,
+			width: state.width,
+			height: state.height,
 			robotPos: state.robotPos,
 			walls: Array.from(state.walls),
 			markers: state.markers,
 			coloredCells: Array.from(state.coloredCells),
+			symbols: state.symbols
 		};
-
+		console.log("%cSending /execute with state:", 'color: orange;', currentFieldState); // Log state sent
 		fetch('http://localhost:5000/execute', {
 			method: 'POST',
 			credentials: 'include',
 			headers: {'Content-Type': 'application/json'},
 			body: JSON.stringify({code: state.code, fieldState: currentFieldState}),
 		})
-			.then(async (response) => { // Mark as async to use await inside
+			.then(async (response) => {
 				if (!response.ok) {
-					let errorMsg = `HTTP ошибка ${response.status}`;
+					let eM = `HTTP ${response.status}`;
 					try {
-						const errorData = await response.json();
-						errorMsg = errorData.message || errorMsg;
-					} catch (e) { /* ignore */
+						const d = await response.json();
+						eM = d.message || eM;
+					} catch (e) {
 					}
-					throw new Error(errorMsg);
+					throw new Error(eM);
 				}
 				return response.json();
 			})
-			.then(async (data) => { // Mark as async
-				if (!isMountedRef.current) return; // Check if still mounted
-
-				// --- Central Change Here ---
-				let animationResult = {completed: true}; // Assume completion if no trace
+			.then(async (data) => {
+				console.log("%cReceived /execute response:", 'color: purple;', data); // Log response data
+				if (!isMountedRef.current) return;
+				let animRes = {completed: true};
 				try {
-					if (data.trace && data.trace.length > 0) {
-						animationResult = await animateTrace(data.trace); // Wait for animation attempt
-					} else {
-						logger.log_event("Нет данных трассировки для анимации.");
-					}
-				} catch (animError) {
-					console.error("Ошибка во время анимации:", animError);
-					logger.log_error(`Ошибка JS во время анимации: ${animError}`);
-					// Decide how to proceed, maybe just log and continue to final state update
+					if (data.trace?.length) {
+						console.log("Attempting animation...");
+						animRes = await animateTrace(data.trace);
+					} else logger.log_event("Нет трассировки.");
+				} catch (animE) {
+					console.error("Анимация err:", animE);
+					logger.log_error(`JS ошибка анимации: ${animE}`);
 				}
-
-				// --- Update FINAL state AFTER animation attempt ---
-				// Check mount status again after await
 				if (!isMountedRef.current) return;
 
-				// If animation was stopped manually, don't apply backend's final state?
-				// Let's apply it for now, assuming backend result is canonical.
-				// if (!animationResult.completed && !animationResult.error) {
-				//     // Manual stop, keep UI state as is?
-				//     dispatch({ type: 'SET_IS_RUNNING', payload: false });
-				//     return;
-				// }
-
 				if (data.success) {
-					// Success: Set final state from backend data
+					console.log("Applying final success state from backend.");
 					dispatch({type: 'SET_ROBOT_POS', payload: data.robot});
 					dispatch({type: 'SET_COLORED_CELLS', payload: new Set(data.coloredCells)});
-					// Set status only if animation didn't end with error message
-					if (animationResult.completed) {
-						dispatch({type: 'SET_STATUS_MESSAGE', payload: 'Код выполнен успешно.'});
-					}
-					logger.log_event('Код выполнен успешно (согласно бэкенду).');
+					dispatch({type: 'SET_SYMBOLS', payload: data.symbols || {}}); // Apply final symbols
+					if (animRes.completed) dispatch({type: 'SET_STATUS_MESSAGE', payload: 'Выполнено успешно.'});
+					logger.log_event('Успешно (бэк).');
 				} else {
-					// Error during execution on backend: Set state to where error occurred
-					const errorMsg = `Ошибка бэкенда: ${data.message || 'Неизвестная ошибка'}` + (data.output ? `\nВывод: ${data.output}` : "");
-					// Apply the state reported by the backend (which should be state *at the point of error*)
+					const eMsg = `Ошибка бэка: ${data.message || '?'} ${data.output ? '\n' + data.output : ''}`;
+					console.log("Applying final error state from backend.");
 					if (data.robot) dispatch({type: 'SET_ROBOT_POS', payload: data.robot});
 					if (data.coloredCells) dispatch({type: 'SET_COLORED_CELLS', payload: new Set(data.coloredCells)});
-					// Set error status (animation might have already set a similar message)
-					dispatch({type: 'SET_STATUS_MESSAGE', payload: errorMsg});
-					logger.log_error(`Ошибка бэкенда: ${errorMsg}`);
+					if (data.symbols) dispatch({type: 'SET_SYMBOLS', payload: data.symbols}); // Apply symbols state at error
+					dispatch({type: 'SET_STATUS_MESSAGE', payload: eMsg});
+					logger.log_error(`Ошибка бэка: ${eMsg}`);
 				}
-
-				// Ensure running state is set to false after everything
 				dispatch({type: 'SET_IS_RUNNING', payload: false});
-				// --- End Central Change ---
 			})
 			.catch((error) => {
 				if (!isMountedRef.current) return;
-				console.error('Ошибка fetch запроса /execute:', error);
-				const errorPayload = `Ошибка сети или сервера: ${error.message}`;
-				dispatch({type: 'SET_STATUS_MESSAGE', payload: errorPayload});
-				logger.log_error(`Ошибка fetch /execute: ${error.message}`);
+				console.error('Fetch /execute:', error);
+				dispatch({type: 'SET_STATUS_MESSAGE', payload: `Ошибка сети: ${error.message}`});
+				logger.log_error(`Fetch /execute: ${error.message}`);
 				dispatch({type: 'SET_IS_RUNNING', payload: false});
 			});
-	}, [state.isRunning, state.code, state.width, state.height, state.robotPos, state.walls, state.markers, state.coloredCells, animateTrace]); // Dependencies for start handler
-
-	// Reset handler
-	const handleReset = useCallback(() => {
-		animationControllerRef.current.stop(); // Stop any animation
-		dispatch({type: 'RESET_STATE'}); // Use simple reset action
-		dispatch({type: 'SET_IS_RUNNING', payload: false});
-		logger.log_event('Симулятор сброшен в начальное состояние.');
-		fetch('http://localhost:5000/reset', {method: 'POST', credentials: 'include'})
-			.catch(e => logger.log_error(`Ошибка сброса на сервере: ${e.message}`));
-	}, []);
+	}, [state.isRunning, state.code, state.width, state.height, state.robotPos, state.walls, state.markers, state.coloredCells, state.symbols, animateTrace]);
 
 	// Effect to update field state on backend (debounced)
 	useEffect(() => {
 		const handler = setTimeout(() => {
 			if (!isMountedRef.current) return;
-
+			// <<< Log state being sent for /updateField >>>
 			const fieldState = {
-				width: state.width, height: state.height, cellSize: state.cellSize,
-				robotPos: state.robotPos, walls: Array.from(state.walls),
-				markers: state.markers, coloredCells: Array.from(state.coloredCells),
+				width: state.width,
+				height: state.height,
+				cellSize: state.cellSize,
+				robotPos: state.robotPos,
+				walls: Array.from(state.walls),
+				markers: state.markers,
+				coloredCells: Array.from(state.coloredCells),
+				symbols: state.symbols
 			};
+			const stateToLogForUpdate = JSON.stringify(fieldState, (key, value) => value instanceof Set ? Array.from(value) : value, 2);
+			console.log('%cSending /updateField state (debounced):', 'color: #f5a623;', JSON.parse(stateToLogForUpdate));
+			// <<< --------------------------------------- >>>
 			fetch('http://localhost:5000/updateField', {
-				method: 'POST', credentials: 'include',
+				method: 'POST',
+				credentials: 'include',
 				headers: {'Content-Type': 'application/json'},
 				body: JSON.stringify(fieldState),
-			})
-				.then(response => {
-					if (isMountedRef.current && !response.ok) {
-						logger.log_warning(`Ошибка обновления поля на сервере: ${response.status}`);
-					}
-				})
-				.catch((e) => {
-					if (isMountedRef.current) {
-						logger.log_error(`Ошибка сети при обновлении поля: ${e.message}`);
-					}
-				});
-		}, 300); // Debounce
-
+			}).then(r => {
+				if (isMountedRef.current && !r.ok) logger.log_warning(`Update field ${r.status}`);
+			}).catch((e) => {
+				if (isMountedRef.current) logger.log_error(`Update field fetch: ${e.message}`);
+			});
+		}, 500); // Increased debounce time slightly
 		return () => clearTimeout(handler);
-	}, [
+	}, [ // Dependencies include symbols now
 		state.width, state.height, state.cellSize, state.robotPos,
-		state.walls, state.markers, state.coloredCells, // Exclude permanentWalls
+		state.walls, state.markers, state.coloredCells, state.symbols
 	]);
 
-	// Effect to ensure permanent walls match dimensions (simpler than in reducer)
+	// Effect to ensure permanent walls match dimensions
 	useEffect(() => {
 		const expectedWalls = setupPermanentWalls(state.width, state.height);
-		// Quick check if they are different (Set comparison is tricky, stringify is simple)
-		if (JSON.stringify(Array.from(state.permanentWalls).sort()) !== JSON.stringify(Array.from(expectedWalls).sort())) {
+		if (JSON.stringify([...state.permanentWalls].sort()) !== JSON.stringify([...expectedWalls].sort())) {
 			dispatch({type: 'SET_PERMANENT_WALLS', payload: expectedWalls});
 		}
-	}, [state.width, state.height]); // Only depends on dimensions
+	}, [state.width, state.height, state.permanentWalls]);
 
-
-	// Status text displayed in CodeEditor
-	const statusText = `Позиция: (${state.robotPos.x}, ${state.robotPos.y}) | Размер: ${state.width}x${state.height} | Режим: ${state.editMode ? 'Редакт.' : 'Управл.'}`;
+	const statusText = `Поз: (${state.robotPos.x},${state.robotPos.y}) | ${state.width}x${state.height} | ${state.editMode ? 'Ред.' : 'Упр.'}`;
 
 	return (
 		<ThemeProvider theme={theme}>
 			<div className="app-container">
 				<CodeEditor
-					code={state.code}
-					setCode={(newCode) => dispatch({type: 'SET_CODE', payload: newCode})}
-					isRunning={state.isRunning}
-					onClearCode={handleClearCode}
-					onStop={handleStop}
-					onStart={handleStart}
-					onReset={handleReset}
-					statusText={statusText}
-					speedLevel={animationSpeedLevel}
-					onSpeedChange={setAnimationSpeedLevel}
+					code={state.code} setCode={code => dispatch({type: 'SET_CODE', payload: code})}
+					isRunning={state.isRunning} onClearCode={handleClearCode} onStop={handleStop}
+					onStart={handleStart} onReset={handleReset} statusText={statusText}
+					speedLevel={animationSpeedLevel} onSpeedChange={setAnimationSpeedLevel}
 				/>
 				<ControlPanel
-					robotPos={state.robotPos}
-					setRobotPos={(pos) => dispatch({type: 'SET_ROBOT_POS', payload: pos})}
-					walls={state.walls}
-					setWalls={(payload) => dispatch({type: 'SET_WALLS', payload: payload})}
+					/* Props */
+					robotPos={state.robotPos} setRobotPos={pos => dispatch({type: 'SET_ROBOT_POS', payload: pos})}
+					walls={state.walls} setWalls={payload => dispatch({type: 'SET_WALLS', payload})}
 					permanentWalls={state.permanentWalls}
-					markers={state.markers}
-					setMarkers={(payload) => dispatch({type: 'SET_MARKERS', payload: payload})}
+					markers={state.markers} setMarkers={payload => dispatch({type: 'SET_MARKERS', payload})}
 					coloredCells={state.coloredCells}
-					setColoredCells={(payload) => dispatch({type: 'SET_COLORED_CELLS', payload: payload})}
-					width={state.width}
-					setWidth={(val) => dispatch({type: 'SET_WIDTH', payload: val})}
-					height={state.height}
-					setHeight={(val) => dispatch({type: 'SET_HEIGHT', payload: val})}
-					editMode={state.editMode}
-					setEditMode={(val) => dispatch({type: 'SET_EDIT_MODE', payload: val})}
-					setStatusMessage={(msg) => dispatch({type: 'SET_STATUS_MESSAGE', payload: msg})}
+					setColoredCells={payload => dispatch({type: 'SET_COLORED_CELLS', payload})}
+					symbols={state.symbols}
+					setSymbols={payload => dispatch({type: 'SET_SYMBOLS', payload})} // ControlPanel needs setSymbols
+					width={state.width} setWidth={val => dispatch({type: 'SET_WIDTH', payload: val})}
+					height={state.height} setHeight={val => dispatch({type: 'SET_HEIGHT', payload: val})}
+					editMode={state.editMode} setEditMode={val => dispatch({type: 'SET_EDIT_MODE', payload: val})}
+					setStatusMessage={msg => dispatch({type: 'SET_STATUS_MESSAGE', payload: msg})}
 				/>
 				<Field
-					canvasRef={canvasRef}
-					robotPos={state.robotPos}
-					setRobotPos={(pos) => dispatch({type: 'SET_ROBOT_POS', payload: pos})}
-					walls={state.walls}
-					setWalls={(payload) => dispatch({type: 'SET_WALLS', payload: payload})}
-					permanentWalls={state.permanentWalls}
-					markers={state.markers}
-					setMarkers={(payload) => dispatch({type: 'SET_MARKERS', payload: payload})}
-					coloredCells={state.coloredCells}
-					setColoredCells={(payload) => dispatch({type: 'SET_COLORED_CELLS', payload: payload})}
-					width={state.width}
-					height={state.height}
-					cellSize={state.cellSize}
-					setCellSize={(val) => dispatch({type: 'SET_CELL_SIZE', payload: val})}
-					editMode={state.editMode}
-					statusMessage={state.statusMessage}
-					setStatusMessage={(msg) => dispatch({type: 'SET_STATUS_MESSAGE', payload: msg})}
+					/* Props */
+					canvasRef={canvasRef} robotPos={state.robotPos}
+					walls={state.walls} permanentWalls={state.permanentWalls} markers={state.markers}
+					coloredCells={state.coloredCells} symbols={state.symbols} // Pass symbols for drawing
+					width={state.width} height={state.height} cellSize={state.cellSize}
+					setRobotPos={pos => dispatch({type: 'SET_ROBOT_POS', payload: pos})}
+					setWalls={payload => dispatch({type: 'SET_WALLS', payload})}
+					setMarkers={payload => dispatch({type: 'SET_MARKERS', payload})}
+					setColoredCells={payload => dispatch({type: 'SET_COLORED_CELLS', payload})}
+					// No setSymbols needed for Field
+					setCellSize={val => dispatch({type: 'SET_CELL_SIZE', payload: val})}
+					editMode={state.editMode} statusMessage={state.statusMessage}
+					setStatusMessage={msg => dispatch({type: 'SET_STATUS_MESSAGE', payload: msg})}
 				/>
 			</div>
 		</ThemeProvider>
