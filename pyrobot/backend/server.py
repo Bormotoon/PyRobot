@@ -42,6 +42,7 @@ def get_field_state_from_session():
     """Retrieves and validates field state from session."""
     state = session.get('field_state')
     if state and isinstance(state, dict):
+        # Check for essential keys + basic type validation
         if all(k in state for k in ('width', 'height', 'robotPos')) and \
                 isinstance(state['width'], int) and state['width'] > 0 and \
                 isinstance(state['height'], int) and state['height'] > 0 and \
@@ -51,7 +52,7 @@ def get_field_state_from_session():
         else:
             logger.warning("Invalid field state in session, clearing.")
             session.pop('field_state', None);
-            session.modified = True
+            session.modified = True;
             return None
     return None
 
@@ -74,17 +75,16 @@ def update_field():
 @app.route('/execute', methods=['POST'])
 def execute_code():
     """Executes Kumir code."""
-    logger.debug(f"Session at /execute start: {dict(session.items())}")
+    logger.debug(f"Session at /execute start: {dict(session.items())}")  # Log session at start
     sid = session.get('sid')
     logger.info(f"Execute request (SID in session: {sid})")
 
     if not request.is_json: logger.error("Request must be JSON"); return jsonify(
         {'success': False, 'message': 'Invalid request.'}), 415
-    data = request.get_json()
-    code = data.get('code', '').strip()
+    data = request.get_json();
+    code = data.get('code', '').strip();
     client_field_state = data.get('fieldState')
-
-    if not code: logger.warning("Empty code execution request."); return jsonify(
+    if not code: logger.warning("Empty code execution."); return jsonify(
         {'success': False, 'message': 'Код пуст.'}), 200
 
     initial_state = client_field_state or get_field_state_from_session()
@@ -97,10 +97,18 @@ def execute_code():
         interpreter = KumirLanguageInterpreter(code, initial_field_state=initial_state)
         logger.debug("Interpreter initialized.")
 
+        # --- FIX: Ensure robot obj is passed to progress_callback context ---
         def progress_callback(progress_data):
+            # Add robot position from the interpreter's robot to the progress data
+            # Check if interpreter exists and has robot attribute first
+            if interpreter and hasattr(interpreter, 'robot'):
+                current_robot_pos = interpreter.robot.robot_pos.copy()  # Get current position
+                progress_data['robotPos'] = current_robot_pos
+            # ----------------------------------------------------------------
+
             if sid:
-                socketio.sleep(0)  # Allow emit to proceed
-                logger.debug(f"Emit progress to {sid}")
+                socketio.sleep(0)
+                logger.debug(f"Emit progress to {sid}: {progress_data}")
                 socketio.emit('execution_progress', progress_data, room=sid)
             else:
                 if not hasattr(progress_callback, 'warned'): logger.warning(
@@ -109,7 +117,7 @@ def execute_code():
         result = interpreter.interpret(progress_callback=progress_callback)
         trace_data = result.get('trace', [])
 
-        # Prepare base response data common to success/failure
+        # Prepare response data (including final symbols state)
         response_data = {
             'success': result['success'],
             'message': result.get('message', 'OK' if result['success'] else 'Error'),
@@ -117,9 +125,7 @@ def execute_code():
             'robot': result['finalState'].get('robot'),
             'coloredCells': result['finalState'].get('coloredCells', []),
             'env': result['finalState'].get('env', {}),
-            # --- Include symbols in response ---
-            'symbols': interpreter.robot.symbols.copy() if interpreter else {},  # Get final symbols
-            # ------------------------------------
+            'symbols': result['finalState'].get('symbols', {}),  # Use state from get_state()
             'trace': trace_data
         }
 
@@ -131,39 +137,38 @@ def execute_code():
             # Store final state back to session ONLY on success
             final_field_state = {
                 'width': interpreter.width, 'height': interpreter.height,
-                'robotPos': response_data['robot'],  # Use data already prepared for response
+                'robotPos': response_data['robot'],
                 'walls': list(interpreter.robot.walls),  # Get current walls
                 'markers': interpreter.robot.markers.copy(),
                 'coloredCells': response_data['coloredCells'],
-                'symbols': response_data['symbols']  # <-- Save final symbols to session
+                'symbols': response_data['symbols']  # Save final symbols
             }
-            session['field_state'] = final_field_state
+            session['field_state'] = final_field_state;
             session.modified = True
             logger.debug("Stored final field state in session.")
 
         return jsonify(response_data), 200
 
     except (KumirExecutionError, KumirEvalError, RobotError) as e:
-        error_msg = f"Ошибка: {str(e)}"
+        error_msg = f"Ошибка: {str(e)}";
         logger.error(error_msg, exc_info=False)
         output = interpreter.output if interpreter and hasattr(interpreter, 'output') else ""
-        symbols_state = interpreter.robot.symbols.copy() if interpreter and hasattr(interpreter,
-                                                                                    'robot') else {}  # Try to get symbols state on error
-        return jsonify({'success': False, 'message': error_msg, 'output': output, 'trace': trace_data,
-                        'symbols': symbols_state}), 200
-
+        final_state_on_error = interpreter.get_state() if interpreter else {}  # Try get state on error
+        final_state_on_error["output"] = output
+        return jsonify({'success': False, 'message': error_msg, **final_state_on_error, 'trace': trace_data}), 200
     except Exception as e:
-        logger.exception("Неожиданная ошибка сервера.")
+        logger.exception("Неожиданная ошибка сервера.");
         output = interpreter.output if interpreter and hasattr(interpreter, 'output') else ""
-        symbols_state = interpreter.robot.symbols.copy() if interpreter and hasattr(interpreter, 'robot') else {}
-        return jsonify({'success': False, 'message': f'Ошибка сервера: {str(e)}', 'output': output, 'trace': trace_data,
-                        'symbols': symbols_state}), 500
+        final_state_on_error = interpreter.get_state() if interpreter else {}
+        final_state_on_error["output"] = output
+        return jsonify({'success': False, 'message': f'Ошибка сервера: {str(e)}', **final_state_on_error,
+                        'trace': trace_data}), 500
 
 
 @app.route('/reset', methods=['POST'])
 def reset_simulator_session():
     """Clears simulator state from session."""
-    sid = session.get('sid')
+    sid = session.get('sid');
     logger.info(f"Reset request (SID: {sid}). Clearing session state.")
     session.pop('field_state', None);
     session.modified = True
@@ -175,16 +180,14 @@ def reset_simulator_session():
 def handle_connect():
     logger.info(f"Client connected: SID={request.sid}")
     session['sid'] = request.sid;
-    session.modified = True
+    session.modified = True;
     join_room(request.sid)
     emit('connection_ack', {'message': f'Connected, SID: {request.sid}', 'sid': request.sid})
     logger.debug(f"SID {request.sid} saved, joined room. Session: {dict(session.items())}")
 
 
 @socketio.on('disconnect')
-def handle_disconnect(*args):
-    sid = session.get('sid', request.sid)
-    logger.info(f"Client disconnected: SID={sid}")
+def handle_disconnect(*args): sid = session.get('sid', request.sid); logger.info(f"Client disconnected: SID={sid}")
 
 
 @socketio.on_error_default
