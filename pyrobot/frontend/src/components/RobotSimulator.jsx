@@ -1,5 +1,5 @@
 import React, {memo, useCallback, useEffect, useReducer, useRef, useState} from 'react';
-import {ThemeProvider, Typography} from '@mui/material';
+import {ThemeProvider} from '@mui/material';
 import CodeEditor from './CodeEditor/CodeEditor';
 import ControlPanel from './ControlPanel/ControlPanel';
 import Field from './Field/Field';
@@ -7,6 +7,8 @@ import theme from '../styles/theme';
 import {getHint} from './hints';
 import logger from '../Logger';
 import io from 'socket.io-client';
+
+const backendUrl = process.env.REACT_APP_BACKEND_URL || `http://${window.location.hostname}:5000`;
 
 const initialState = {
 	code: `использовать Робот\nалг\nнач\n  вправо\n  вниз\n  вправо\nкон`,
@@ -374,7 +376,7 @@ const RobotSimulator = memo(() => {
 			}; // <-- Send new fields
 			const stateToLog = JSON.stringify(fieldState, (k, v) => v instanceof Set ? [...v] : v, 2);
 			console.log('%cPOST /updateField (debounced):', 'color:#f5a623;', JSON.parse(stateToLog));
-			fetch('http://localhost:5000/updateField', {
+			fetch(`${backendUrl}/updateField`, {
 				method: 'POST',
 				credentials: 'include',
 				headers: {'Content-Type': 'application/json'},
