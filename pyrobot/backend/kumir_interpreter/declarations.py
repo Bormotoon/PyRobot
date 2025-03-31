@@ -304,7 +304,8 @@ def process_output(line, env, interpreter=None):
 	# Append to interpreter's output buffer if available
 	if interpreter:
 		interpreter.output += output_str
-		logger.info(f"Output buffer appended: '{output_str.replace('\n', '\\n')}'")
+		output_str_escaped = output_str.replace('\n', '\\n')
+		logger.info(f"Output buffer appended: '{output_str_escaped}'")
 	else:
 		# Fallback to printing directly if no interpreter context
 		print(output_str, end="")
