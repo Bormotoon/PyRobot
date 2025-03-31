@@ -3,9 +3,11 @@
 @description Обработка объявлений переменных, присваиваний, ввода/вывода.
 """
 import logging
+import math
+import re
 
 from .identifiers import is_valid_identifier  # Import necessary helpers
-from .safe_eval import safe_eval, get_eval_env  # Import evaluation helpers
+from .safe_eval import safe_eval, get_eval_env, KumirEvalError  # Import evaluation helpers
 
 logger = logging.getLogger('KumirDeclarations')
 
