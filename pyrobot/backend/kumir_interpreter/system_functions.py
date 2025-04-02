@@ -1,54 +1,60 @@
+# FILE START: system_functions.py
+import logging
 import time
+
+logger = logging.getLogger('KumirSystemFunctions')
 
 
 def sleep_ms(x):
-    """
-    Приостанавливает выполнение программы на указанное количество миллисекунд.
-
-    Одна миллисекунда равна 1/1000 секунды.
+	"""
+    Имитирует паузу. На сервере НЕ выполняет реальную задержку time.sleep(),
+    чтобы не блокировать процесс. Просто логирует и возвращает None.
+    Реальная пауза должна быть реализована на фронтенде при анимации трассировки.
 
     Параметры:
-      x (int или число): Количество миллисекунд, на которое необходимо приостановить выполнение.
+      x (int или число): Количество миллисекунд (игнорируется на бэкенде).
 
     Возвращаемое значение:
       None
-
-    Пример:
-      sleep_ms(500)  # Приостанавливает выполнение на 0.5 секунд.
-
-    Исключения:
-      ValueError: Если аргумент x не может быть приведён к целому числу.
     """
-    try:
-        ms = int(x)
-    except Exception as e:
-        raise ValueError(f"sleep_ms: argument x must be an integer, error: {e}")
-    # Переводим миллисекунды в секунды и вызываем функцию time.sleep
-    time.sleep(ms / 1000.0)
+	try:
+		ms = int(x)
+		if ms < 0: ms = 0  # Отрицательная пауза не имеет смысла
+	except Exception as e:
+		# Если аргумент некорректен, логируем и считаем паузу нулевой
+		logger.warning(f"sleep_ms: invalid argument '{x}', treating as 0ms. Error: {e}")
+		ms = 0
+
+	# НЕ ДЕЛАЕМ time.sleep() НА СЕРВЕРЕ
+	logger.info(
+		f"Kumir command 'ждать'/'sleep_ms'({ms}ms) encountered. Backend does nothing (handled by frontend animation).")
+
+	# В Кумире это процедура, она ничего не возвращает
+	return None
 
 
 def current_time():
-    """
+	"""
     Возвращает текущее время в миллисекундах, прошедших с полуночи (локальное время).
 
-    Пример:
-      t = current_time()  # t - количество миллисекунд с начала текущего дня.
-
     Возвращаемое значение:
-      int: Количество миллисекунд, прошедших с полуночи.
+      int: Количество миллисекунд с начала текущего дня.
     """
-    # Получаем текущее время в секундах (с плавающей точкой)
-    now = time.time()
-    # Преобразуем текущее время в локальное время (структура time.struct_time)
-    local = time.localtime(now)
-    # Вычисляем количество секунд с полуночи:
-    # часы * 3600 + минуты * 60 + секунды + дробная часть текущей секунды.
-    seconds_since_midnight = local.tm_hour * 3600 + local.tm_min * 60 + local.tm_sec + (now - int(now))
-    # Переводим секунды в миллисекунды и возвращаем результат в виде целого числа.
-    ms = int(seconds_since_midnight * 1000)
-    return ms
+	try:
+		now = time.time()
+		local = time.localtime(now)
+		# Вычисляем секунды с полуночи
+		seconds_since_midnight = local.tm_hour * 3600 + local.tm_min * 60 + local.tm_sec + (now - int(now))
+		# Переводим в миллисекунды
+		ms = int(seconds_since_midnight * 1000)
+		return ms
+	except Exception as e:
+		logger.error(f"Error getting current time: {e}")
+		return 0  # Возвращаем 0 в случае ошибки
 
 
-# Алиасы для обратной совместимости (русские имена, как указано в документации):
+# Алиасы для обратной совместимости (русские имена):
 ждать = sleep_ms
 время = current_time
+
+# FILE END: system_functions.py
