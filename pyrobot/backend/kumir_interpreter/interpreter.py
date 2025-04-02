@@ -1,55 +1,76 @@
 # FILE START: interpreter.py
 import logging
 
-# --->>> ДОБАВЛЯЕМ ИМПОРТ НЕДОСТАЮЩИХ ИСКЛЮЧЕНИЙ <<<---
 from .declarations import DeclarationError, AssignmentError, InputOutputError
-from .execution import execute_lines, KumirExecutionError  # Import execution logic
-from .preprocessing import preprocess_code, separate_sections, parse_algorithm_header  # Import preprocessing
-from .robot_state import RobotError, SimulatedRobot  # Ensure Robot imports are here
-# Убираем импорт get_eval_env из .safe_eval - УЖЕ СДЕЛАНО
-from .safe_eval import KumirEvalError  # Import safe evaluation
+from .execution import execute_lines, KumirExecutionError  # execute_lines теперь будет использовать стек
+from .preprocessing import preprocess_code, separate_sections, parse_algorithm_header
+from .robot_state import RobotError, SimulatedRobot
+from .safe_eval import KumirEvalError
 
-# Constants - можно вынести в constants.py, если не используется больше нигде
+# Импорты для работы со стеком и окружениями
+
 MAX_INT = 2147483647
 МАКСЦЕЛ = MAX_INT
 
 logger = logging.getLogger('KumirInterpreter')
 
+# Максимальная глубина рекурсии/стека вызовов для предотвращения переполнения
+MAX_CALL_STACK_DEPTH = 100
+
+
+class CallStackFrame:
+	"""Представляет один фрейм в стеке вызовов."""
+
+	def __init__(self, algo_name, local_env, return_address=None):
+		self.algo_name = algo_name  # Имя вызванного алгоритма (для отладки)
+		self.local_env = local_env  # Локальное окружение (переменные и параметры)
+
+	# self.return_address = return_address # Можно добавить указатель на место возврата
+
+	def __repr__(self):
+		return f"<Frame: {self.algo_name}, Env: {list(self.local_env.keys())}>"
+
 
 class KumirLanguageInterpreter:
 	"""
-	Интерпретатор языка КУМИР с поддержкой пошагового исполнения.
+	Интерпретатор языка КУМИР с поддержкой стека вызовов и пошагового исполнения.
 	"""
 
-	# Метод __init__ остается без изменений
 	def __init__(self, code, initial_field_state=None):
-		""" Инициализирует интерпретатор. """
 		self.code = code
-		self.env = {}
+		# self.env больше не используется напрямую, используем стек
+		# self.env = {}
 		self.algorithms = {}
 		self.main_algorithm = None
 		self.introduction = []
 		self.output = ""
 		self.logger = logger
-		# --- Инициализация состояния поля ---
+		self.robot = None  # Инициализируем робота позже
+
+		# --->>> ИНИЦИАЛИЗАЦИЯ СТЕКА ВЫЗОВОВ <<<---
+		self.call_stack = []
+		# Глобальное окружение будет в самом нижнем фрейме стека
+		self.global_env = {}
+
+		# Инициализация робота и поля (как раньше)
+		self._initialize_robot_and_field(initial_field_state)
+		self.logger.info(
+			f"Interpreter initialized. Field: {self.width}x{self.height}. Robot at: {self.robot.robot_pos}")
+
+	def _initialize_robot_and_field(self, initial_field_state):
+		"""Инициализирует робота и размеры поля."""
 		default_state = {
 			'width': 7, 'height': 7, 'robotPos': {'x': 0, 'y': 0},
 			'walls': set(), 'markers': {}, 'coloredCells': set(),
-			'symbols': {}, 'radiation': {}, 'temperature': {}  # Добавлены умолчания
+			'symbols': {}, 'radiation': {}, 'temperature': {}
 		}
 		current_state = initial_field_state if initial_field_state else default_state
-
-		# Валидация размеров
 		self.width = current_state.get('width', default_state['width'])
 		self.height = current_state.get('height', default_state['height'])
-		if not isinstance(self.width, int) or self.width < 1:
-			self.logger.warning(f"Invalid width received: {self.width}. Using default: {default_state['width']}")
-			self.width = default_state['width']
-		if not isinstance(self.height, int) or self.height < 1:
-			self.logger.warning(f"Invalid height received: {self.height}. Using default: {default_state['height']}")
-			self.height = default_state['height']
+		# Валидация размеров...
+		if not isinstance(self.width, int) or self.width < 1: self.width = default_state['width']
+		if not isinstance(self.height, int) or self.height < 1: self.height = default_state['height']
 
-		# Инициализация робота с начальным состоянием
 		self.robot = SimulatedRobot(
 			width=self.width, height=self.height,
 			initial_pos=current_state.get('robotPos', default_state['robotPos']),
@@ -60,17 +81,42 @@ class KumirLanguageInterpreter:
 			initial_radiation=current_state.get('radiation', default_state['radiation']),
 			initial_temperature=current_state.get('temperature', default_state['temperature'])
 		)
-		self.logger.info(
-			f"Interpreter initialized. Field: {self.width}x{self.height}. Robot at: {self.robot.robot_pos}")
-		if self.robot.symbols: logger.debug(f"Initial symbols: {self.robot.symbols}")
-		if self.robot.radiation: logger.debug(f"Initial radiation: {self.robot.radiation}")
-		if self.robot.temperature: logger.debug(f"Initial temperature: {self.robot.temperature}")
 
-	# Метод get_state остается без изменений
+	def get_current_environment(self):
+		"""Возвращает окружение текущего фрейма стека."""
+		if not self.call_stack:
+			# Это может произойти до начала выполнения или после ошибки
+			# Вернем глобальное окружение как запасной вариант
+			logger.warning("Call stack is empty, returning global environment.")
+			return self.global_env
+		# Возвращаем локальное окружение из верхнего фрейма
+		return self.call_stack[-1].local_env
+
+	def push_call_frame(self, algo_name, local_env):
+		"""Помещает новый фрейм на стек вызовов."""
+		if len(self.call_stack) >= MAX_CALL_STACK_DEPTH:
+			logger.error(f"Maximum call stack depth ({MAX_CALL_STACK_DEPTH}) exceeded during call to '{algo_name}'.")
+			raise KumirExecutionError("Превышена максимальная глубина рекурсии.")
+		frame = CallStackFrame(algo_name, local_env)
+		self.call_stack.append(frame)
+		logger.debug(f"Pushed frame for '{algo_name}'. Stack depth: {len(self.call_stack)}")
+
+	def pop_call_frame(self):
+		"""Снимает верхний фрейм со стека вызовов."""
+		if not self.call_stack:
+			logger.error("Attempted to pop from an empty call stack.")
+			raise KumirExecutionError("Внутренняя ошибка: Попытка возврата из пустого стека вызовов.")
+		frame = self.call_stack.pop()
+		logger.debug(f"Popped frame for '{frame.algo_name}'. Stack depth: {len(self.call_stack)}")
+		return frame  # Возвращаем снятый фрейм (может быть полезно для возврата значений)
+
 	def get_state(self):
-		""" Возвращает текущее состояние интерпретатора (копия). """
+		"""Возвращает текущее состояние интерпретатора (копия)."""
+		# Используем текущее окружение для env
+		current_env = self.get_current_environment()
 		state = {
-			"env": self.env.copy(),
+			# Используем текущее окружение из стека
+			"env": current_env.copy() if current_env else {},  # Копия окружения переменных
 			"width": self.width,
 			"height": self.height,
 			"robot": self.robot.robot_pos.copy(),
@@ -81,13 +127,17 @@ class KumirLanguageInterpreter:
 			"symbols": self.robot.symbols.copy(),
 			"radiation": self.robot.radiation.copy(),
 			"temperature": self.robot.temperature.copy(),
-			"output": self.output
+			"output": self.output,
+			# Добавим информацию о стеке для отладки (опционально)
+			# "callStackDepth": len(self.call_stack),
+			# "currentAlgorithm": self.call_stack[-1].algo_name if self.call_stack else "(global)"
 		}
 		return state
 
-	# Метод parse остается без изменений
+	# Метод parse остается без изменений (использует новую parse_algorithm_header)
 	def parse(self):
 		""" Парсит исходный код на вступление и алгоритмы. """
+		# ... (код без изменений, использует новую parse_algorithm_header) ...
 		self.logger.info("Starting code parsing...")
 		try:
 			lines = preprocess_code(self.code)
@@ -107,7 +157,8 @@ class KumirLanguageInterpreter:
 				self.main_algorithm = {
 					"header": "алг (без имени)",
 					"body": self.introduction,
-					"header_info": {"raw": "(без имени)", "name": None, "params": []}
+					# Используем результат нового парсера
+					"header_info": parse_algorithm_header("алг (без имени)")
 				}
 				self.introduction = []
 				self.algorithms = {}
@@ -146,129 +197,53 @@ class KumirLanguageInterpreter:
 			self.logger.error(f"Unexpected parsing failed: {e}", exc_info=True)
 			raise KumirExecutionError(f"Ошибка разбора программы: {e}")
 
-	# Метод _execute_block остается без изменений (или с предыдущими правками)
-	def _execute_block(self, lines, phase_name, trace, progress_callback=None):
-		# ... (код без изменений) ...
-		self.logger.debug(f"Executing block: {phase_name}, Lines: {len(lines)}")
-		current_line_index_in_block = 0
-		executed_something = False
+	# _execute_block больше не нужен в таком виде, т.к. execute_lines будет основной точкой входа
+	# def _execute_block(...)
 
-		try:
-			# Передаем управление execute_lines
-			execute_lines(lines, self.env, self.robot, self)
-			executed_something = True
-
-		# --->>> ЭТОТ БЛОК EXCEPT ТЕПЕРЬ ДОЛЖЕН РАБОТАТЬ КОРРЕКТНО <<<---
-		except (
-				KumirExecutionError, KumirEvalError, RobotError, DeclarationError, AssignmentError,
-				InputOutputError) as e:
-			error_msg = f"Ошибка: {str(e)}"
-			self.logger.error(f"Error during execution of '{phase_name}': {error_msg}", exc_info=False)
-			self.output += f"{error_msg}\n"
-			state_after_error = self.get_state()
-			trace.append({
-				"phase": phase_name, "commandIndex": -1,
-				"command": "Ошибка выполнения блока", "error": str(e),
-				"stateAfter": state_after_error, "outputAfter": self.output
-			})
-			if progress_callback:
-				progress_callback({
-					"phase": phase_name, "commandIndex": -1,
-					"output": self.output, "robotPos": state_after_error.get("robot"),
-					"error": str(e)
-				})
-			return {"success": False, "error": str(e), "errorIndex": -1}
-		except Exception as e:
-			error_msg = f"Неожиданная ошибка: {str(e)}"
-			self.logger.exception(f"Unexpected error during execution of '{phase_name}': {e}")
-			self.output += f"{error_msg}\n"
-			state_after_error = self.get_state()
-			trace.append({
-				"phase": phase_name, "commandIndex": -1,
-				"command": "Неожиданная ошибка блока", "error": str(e),
-				"stateAfter": state_after_error, "outputAfter": self.output
-			})
-			if progress_callback:
-				progress_callback({
-					"phase": phase_name, "commandIndex": -1,
-					"output": self.output, "robotPos": state_after_error.get("robot"),
-					"error": str(e)
-				})
-			return {"success": False, "error": error_msg, "errorIndex": -1}
-
-		self.logger.debug(f"Block '{phase_name}' executed successfully.")
-		return {"success": True}
-
-	# Метод interpret остается без изменений (или с предыдущими правками)
 	def interpret(self, progress_callback=None):
-		# ... (код без изменений) ...
+		""" Полный цикл: парсинг и выполнение кода Кумира с использованием стека вызовов. """
 		trace = []
 		self.output = ""
-		self.env = {}
+		self.global_env = {}  # Сбрасываем глобальное окружение
+		self.call_stack = []  # Очищаем стек вызовов
+		# TODO: Сбросить состояние робота? Или использовать initial_state?
+		# Пока сбрасываем робота при инициализации интерпретатора.
 
 		try:
+			# 1. Парсинг кода
 			self.parse()
 
-			if self.introduction:
-				self.logger.info("Executing introduction...")
-				for idx, line in enumerate(self.introduction):
-					line = line.strip();
-					if not line: continue
-					state_before = self.get_state();
-					output_before = self.output
-					try:
-						execute_line(line, self.env, self.robot, self)
-					except (KumirExecutionError, KumirEvalError, RobotError, DeclarationError, AssignmentError,
-							InputOutputError) as e:  # Теперь этот except корректен
-						error_msg = f"Ошибка во вступлении: {str(e)}"
-						self.logger.error(f"{error_msg} на строке {idx + 1}: '{line}'", exc_info=False)
-						self.output += f"{error_msg} (вступление, строка {idx + 1})\n"
-						state_after_error = self.get_state();
-						output_after_error = self.output
-						trace.append({"phase": "introduction", "commandIndex": idx, "command": line, "error": str(e),
-									  "stateAfter": state_after_error, "outputAfter": output_after_error})
-						if progress_callback: progress_callback(
-							{"phase": "introduction", "commandIndex": idx, "output": self.output,
-							 "robotPos": state_after_error.get("robot"), "error": str(e)})
-						final_state = self.get_state();
-						final_state["output"] = self.output
-						return {"trace": trace, "finalState": final_state, "success": False, "message": error_msg,
-								"errorIndex": idx}
+			# 2. Помещаем глобальное окружение в стек как базовый фрейм
+			self.push_call_frame("(global)", self.global_env)
 
-					state_after = self.get_state();
-					output_after = self.output
-					trace.append(
-						{"phase": "introduction", "commandIndex": idx, "command": line, "stateAfter": state_after,
-						 "outputAfter": output_after})
-					if progress_callback: progress_callback(
-						{"phase": "introduction", "commandIndex": idx, "output": self.output,
-						 "robotPos": state_after.get("robot")})
+			# 3. Выполнение вступительной части (в глобальном окружении)
+			if self.introduction:
+				self.logger.info("Executing introduction in global scope...")
+				# Передаем self (интерпретатор) в execute_lines, чтобы он мог работать со стеком
+				execute_lines(self.introduction, self)  # Убрали env и robot
 				self.logger.info("Introduction executed successfully.")
 			else:
 				self.logger.info("No introduction part to execute.")
 
+			# 4. Выполнение основного алгоритма (если есть)
 			if self.main_algorithm and self.main_algorithm.get("body"):
 				self.logger.info("Executing main algorithm...")
+				main_algo_name = self.main_algorithm["header_info"].get("name", "(main)")
+				# Создаем окружение для основного алгоритма (может быть таким же, как глобальное,
+				# или отдельным в зависимости от правил Кумира - пока делаем отдельным, но пустым)
+				main_env = {}  # Или self.global_env.copy()? Пока пустое.
+				# TODO: Если у основного алгоритма есть параметры, их нужно обработать (откуда брать значения?)
+				# Обычно у главного `алг` нет параметров.
+				self.push_call_frame(main_algo_name, main_env)  # Помещаем фрейм основного алг на стек
+
 				try:
-					execute_lines(self.main_algorithm["body"], self.env, self.robot, self)
+					# Выполняем тело основного алгоритма
+					execute_lines(self.main_algorithm["body"], self)
 					self.logger.info("Main algorithm executed successfully.")
-				except (KumirExecutionError, KumirEvalError, RobotError, DeclarationError, AssignmentError,
-						InputOutputError) as e:  # Теперь этот except корректен
-					error_msg = f"Ошибка в основном алгоритме: {str(e)}"
-					self.logger.error(error_msg, exc_info=False)
-					self.output += f"{error_msg} (основной алгоритм)\n"
-					state_after_error = self.get_state();
-					output_after_error = self.output
-					trace.append(
-						{"phase": "main", "commandIndex": -1, "command": "Ошибка выполнения алгоритма", "error": str(e),
-						 "stateAfter": state_after_error, "outputAfter": output_after_error})
-					if progress_callback: progress_callback({"phase": "main", "commandIndex": -1, "output": self.output,
-															 "robotPos": state_after_error.get("robot"),
-															 "error": str(e)})
-					final_state = self.get_state();
-					final_state["output"] = self.output
-					return {"trace": trace, "finalState": final_state, "success": False, "message": error_msg,
-							"errorIndex": -1}
+				finally:
+					# Снимаем фрейм основного алгоритма со стека по завершении (или ошибке)
+					self.pop_call_frame()
+
 			elif not self.main_algorithm:
 				logger.warning("No main algorithm found or generated after parsing.")
 				if not self.introduction:
@@ -276,35 +251,47 @@ class KumirLanguageInterpreter:
 			else:
 				logger.info("Main algorithm body is empty.")
 
+			# 5. Проверка стека после выполнения
+			if len(self.call_stack) != 1:  # Должен остаться только глобальный фрейм
+				logger.warning(
+					f"Call stack has unexpected depth ({len(self.call_stack)}) after execution. Should be 1.")
+			# Возможно, где-то не сработал pop_call_frame при ошибке?
+
+			# 6. Успешное завершение
 			self.logger.info("Interpretation completed successfully.")
-			final_state = self.get_state()
+			final_state = self.get_state()  # Получаем финальное состояние (с глобальным env)
 			final_state["output"] = self.output
+			# Добавляем результат трассировки (если она собиралась)
+			# TODO: Реализовать сбор трассировки внутри execute_lines/handle_algorithm_call
 			return {"trace": trace, "finalState": final_state, "success": True}
 
-		# --->>> ЭТОТ БЛОК EXCEPT ТЕПЕРЬ ДОЛЖЕН РАБОТАТЬ КОРРЕКТНО <<<---
+		# Блок except остается как в предыдущей версии, он ловит ошибки из execute_lines
 		except (
 				KumirExecutionError, KumirEvalError, RobotError, DeclarationError, AssignmentError,
 				InputOutputError) as e:
 			error_msg = f"Ошибка выполнения: {str(e)}"
-			self.logger.error(error_msg, exc_info=True)  # Логируем с traceback для диагностики
+			# Логируем ошибку и стек вызовов на момент ошибки
+			self.logger.error(error_msg, exc_info=True)
+			self.logger.error(f"Call stack at error: {self.call_stack}")
 			self.output += f"{error_msg}\n"
 			try:
 				state_on_error = self.get_state()
 			except Exception as state_err:
 				logger.error(f"Failed to get state after error: {state_err}")
-				state_on_error = {"env": self.env, "robot": None, "coloredCells": [], "symbols": {},
-								  "output": self.output}
+				state_on_error = {"env": self.global_env, "robot": None, "coloredCells": [], "symbols": {},
+								  "output": self.output}  # Fallback
 			state_on_error["output"] = self.output
 			return {"trace": trace, "finalState": state_on_error, "success": False, "message": error_msg}
 		except Exception as e:
 			error_msg = f"Критическая внутренняя ошибка: {str(e)}"
 			self.logger.exception(error_msg)
+			self.logger.error(f"Call stack at critical error: {self.call_stack}")
 			self.output += f"{error_msg}\n"
 			try:
 				state_on_error = self.get_state()
 			except Exception as state_err:
 				logger.error(f"Failed to get state after critical error: {state_err}")
-				state_on_error = {"env": self.env, "robot": None, "coloredCells": [], "symbols": {},
+				state_on_error = {"env": self.global_env, "robot": None, "coloredCells": [], "symbols": {},
 								  "output": self.output}
 			state_on_error["output"] = self.output
 			return {"trace": trace, "finalState": state_on_error, "success": False, "message": error_msg}
