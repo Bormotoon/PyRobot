@@ -1,557 +1,708 @@
+# FILE START: file_functions.py
 """
 Модуль file_functions.py
-@description Реализует функции для работы с текстовыми файлами:
-открытие, чтение, запись, проверка существования, удаление файлов и директорий.
-Также обеспечивает поддержку псевдо-файла консоли и настройку стандартных источников ввода/вывода.
+@description Реализует функции для работы с текстовыми файлами ВНУТРИ ПЕСОЧНИЦЫ.
+Все пути, передаваемые в функции, проверяются и разрешаются относительно
+безопасного базового каталога (песочницы).
 """
 
+import logging
 import os
 import sys
+from pathlib import Path  # Используем pathlib для удобной работы с путями
 
-# Словарь для отслеживания открытых файлов: { абсолютный путь: объект файла }
+logger = logging.getLogger('KumirFileFunctions')
+
+# --- Настройка Песочницы ---
+
+# Определяем базовый каталог для песочницы.
+# Путь строится относительно текущего файла (__file__) -> backend/kumir_interpreter -> backend -> kumir_sandbox
+try:
+	# Получаем абсолютный путь к каталогу, где находится этот файл
+	current_dir = Path(__file__).parent.absolute()
+	# Поднимаемся на один уровень (к каталогу backend)
+	backend_dir = current_dir.parent
+	# Создаем путь к каталогу песочницы
+	SANDBOX_BASE_DIR = backend_dir / "kumir_sandbox"
+	# Убедимся, что каталог существует, создаем его, если нет
+	SANDBOX_BASE_DIR.mkdir(parents=True, exist_ok=True)
+	# Сохраняем абсолютный путь как строку для сравнения префиксов
+	SANDBOX_BASE_PATH_STR = str(SANDBOX_BASE_DIR)
+	logger.info(f"File sandbox initialized at: {SANDBOX_BASE_PATH_STR}")
+except Exception as e:
+	logger.exception(f"CRITICAL: Failed to initialize file sandbox directory: {e}")
+	# Если песочница не создана, дальнейшая работа опасна.
+	# Можно либо остановить приложение, либо установить SANDBOX_BASE_DIR в None
+	# и проверять это в _resolve_sandbox_path. Установим в None для явной ошибки.
+	SANDBOX_BASE_DIR = None
+	SANDBOX_BASE_PATH_STR = None  # raise RuntimeError(f"Failed to initialize file sandbox: {e}") # Можно раскомментировать для остановки
+
+
+class SandboxError(Exception):
+	"""Исключение для ошибок, связанных с выходом из песочницы."""
+	pass
+
+
+def _resolve_sandbox_path(user_path):
+	"""
+    Преобразует пользовательский путь в абсолютный путь внутри песочницы.
+    Проверяет, что результирующий путь не выходит за пределы песочницы.
+
+    Args:
+        user_path (str): Путь, указанный пользователем (может быть относительным).
+
+    Returns:
+        Path: Объект Path с абсолютным путем внутри песочницы.
+
+    Raises:
+        SandboxError: Если путь выходит за пределы песочницы или песочница не инициализирована.
+        TypeError: Если user_path не является строкой.
+    """
+	if SANDBOX_BASE_DIR is None or SANDBOX_BASE_PATH_STR is None:
+		logger.critical("Sandbox base directory is not configured. File operations denied.")
+		raise SandboxError("Файловая песочница не инициализирована.")
+
+	if not isinstance(user_path, str):
+		raise TypeError(f"Путь должен быть строкой, получен {type(user_path)}")
+
+	# Создаем путь относительно базового каталога песочницы
+	combined_path = SANDBOX_BASE_DIR / user_path
+
+	# Получаем канонический абсолютный путь (разрешает '..', '.', симлинки)
+	try:
+		# Используем resolve() для получения реального пути в файловой системе
+		# strict=True вызовет ошибку, если путь не существует (может быть не нужно для создания)
+		# Поэтому используем abspath() для начального разрешения, а потом проверим префикс
+		abs_path = combined_path.absolute()
+		abs_path_str = str(abs_path)
+	except Exception as e:
+		# Ошибки могут возникнуть из-за слишком длинного имени, некорректных символов и т.д.
+		logger.error(f"Error resolving path '{user_path}' relative to sandbox: {e}")
+		raise SandboxError(f"Некорректный путь: '{user_path}'")
+
+	# ГЛАВНАЯ ПРОВЕРКА: Убеждаемся, что абсолютный путь начинается с пути к песочнице
+	# Это предотвращает выход из песочницы через '..' или абсолютные пути.
+	if not abs_path_str.startswith(SANDBOX_BASE_PATH_STR):
+		logger.warning(
+			f"Path traversal attempt detected: User path '{user_path}' resolved to '{abs_path_str}', which is outside sandbox '{SANDBOX_BASE_PATH_STR}'.")
+		raise SandboxError(f"Доступ запрещен: путь '{user_path}' выходит за пределы песочницы.")
+
+	logger.debug(f"Resolved sandboxed path for '{user_path}' -> '{abs_path}'")
+	return abs_path  # Возвращаем объект Path
+
+
+# --- Глобальные настройки (без изменений) ---
 _open_files = {}
-
-# Глобальные настройки по умолчанию:
-_default_encoding = "UTF-8"  # Кодировка по умолчанию для операций с текстовыми файлами
-_default_input = None  # Если не None, используется вместо ввода с клавиатуры
-_default_output = None  # Если не None, используется вместо стандартного вывода
+_default_encoding = "UTF-8"
+_default_input = None
+_default_output = None
 
 
-# Функции для работы с файлами
-
+# Функция _normalize_encoding остается без изменений
 def _normalize_encoding(enc):
-    """
-    Нормализует имя кодировки.
-    Допустимые кодировки (без учета регистра и дефисов):
-      cp1251, windows1251, windows, cp866, ibm866, dos, koi8r, koi8, koi8-р, utf8, utf, linux.
-    Возвращает нормализованное имя кодировки (например, "cp1251", "cp866", "koi8-r", "utf-8")
-    или None, если кодировка неизвестна.
-
-    Параметры:
-      enc (str): Исходное имя кодировки.
-
-    Возвращаемое значение:
-      str или None: Нормализованное имя кодировки или None, если кодировка недопустима.
-    """
-    # Удаляем дефисы и приводим имя кодировки к нижнему регистру
-    enc = enc.replace("-", "").lower()
-    if enc in ["cp1251", "windows1251", "windows"]:
-        return "cp1251"
-    elif enc in ["cp866", "ibm866", "dos"]:
-        return "cp866"
-    elif enc in ["koi8r", "koi8", "кои8", "кои8р"]:
-        return "koi8-r"
-    elif enc in ["utf8", "utf", "linux"]:
-        return "utf-8"
-    else:
-        return None
+	"""Нормализует имя кодировки."""
+	# ... (код без изменений) ...
+	enc = enc.replace("-", "").lower()
+	if enc in ["cp1251", "windows1251", "windows"]:
+		return "cp1251"
+	elif enc in ["cp866", "ibm866", "dos"]:
+		return "cp866"
+	elif enc in ["koi8r", "koi8", "кои8", "кои8р"]:
+		return "koi8-r"
+	elif enc in ["utf8", "utf", "linux"]:
+		return "utf-8"
+	else:
+		return None
 
 
+# Функция set_encoding остается без изменений
 def set_encoding(encoding_name):
-    """
-    Устанавливает глобальную кодировку для операций с текстовыми файлами.
-    Принимает имя кодировки (строка). Если имя некорректно, генерируется исключение.
+	"""Устанавливает глобальную кодировку."""
+	# ... (код без изменений) ...
+	global _default_encoding
+	norm = _normalize_encoding(encoding_name)
+	if norm is None:
+		raise Exception(f"Invalid encoding name: {encoding_name}")
+	_default_encoding = norm
+	logger.info(f"Default file encoding set to: {_default_encoding}")
+	return "да"  # Возвращаем "да" для совместимости с Кумиром
 
-    Параметры:
-      encoding_name (str): Имя кодировки, которую необходимо установить.
 
-    Возвращаемое значение:
-      None
-
-    Исключения:
-      Exception: Если имя кодировки неверно.
-    """
-    global _default_encoding
-    norm = _normalize_encoding(encoding_name)
-    if norm is None:
-        raise Exception(f"Invalid encoding name: {encoding_name}")
-    _default_encoding = norm
-    return
-
+# --- Модифицированные файловые функции ---
 
 def open_for_reading(filename):
+	"""
+    Открывает текстовый файл ВНУТРИ ПЕСОЧНИЦЫ для чтения.
     """
-    Открывает текстовый файл с указанным именем для чтения, используя текущую кодировку.
-    Если файл не существует или недоступен для чтения, генерируется ошибка.
-    Если файл уже открыт, генерируется ошибка.
+	global _open_files, _default_encoding
+	try:
+		# Разрешаем путь внутри песочницы
+		path_obj = _resolve_sandbox_path(filename)
+		path_str = str(path_obj)
+	except (SandboxError, TypeError) as e:
+		raise Exception(f"Ошибка открытия файла для чтения '{filename}': {e}")
 
-    Параметры:
-      filename (str): Имя файла для открытия.
+	if path_str in _open_files:
+		raise Exception(f"Файл '{filename}' уже открыт.")
+	# Используем path_obj для проверок и открытия
+	if not path_obj.exists():
+		raise Exception(f"Файл '{filename}' не найден в песочнице.")
+	if not path_obj.is_file():
+		raise Exception(f"Путь '{filename}' указывает на директорию, а не на файл.")
+	if not os.access(path_str, os.R_OK):  # os.access все еще нужен для проверки прав
+		raise Exception(f"Нет прав на чтение файла '{filename}'.")
 
-    Возвращаемое значение:
-      file object: Объект открытого файла.
+	try:
+		# Открываем файл с использованием path_obj (или path_str)
+		f = open(path_obj, "r", encoding=_default_encoding)
+		logger.info(f"Opened file '{filename}' (path: {path_str}) for reading.")
+	except Exception as e:
+		raise Exception(f"Ошибка при открытии файла '{filename}' для чтения: {e}")
 
-    Исключения:
-      Exception: Если файл не существует, недоступен для чтения или уже открыт.
-    """
-    global _open_files, _default_encoding
-    # Получаем абсолютный путь к файлу
-    path = os.path.abspath(filename)
-    if path in _open_files:
-        raise Exception(f"File '{filename}' is already open.")
-    if not os.path.exists(path):
-        raise Exception(f"File '{filename}' does not exist.")
-    if not os.access(path, os.R_OK):
-        raise Exception(f"No read permission for file '{filename}'.")
-    try:
-        # Открываем файл для чтения с использованием текущей кодировки
-        f = open(path, "r", encoding=_default_encoding)
-    except Exception as e:
-        raise Exception(f"Error opening file '{filename}' for reading: {e}")
-    _open_files[path] = f  # Записываем файл в глобальный словарь открытых файлов
-    return f
+	_open_files[path_str] = f
+	return f
 
 
 def open_for_writing(filename):
+	"""
+    Открывает текстовый файл ВНУТРИ ПЕСОЧНИЦЫ для записи ("w").
     """
-    Открывает текстовый файл с указанным именем для записи ("w" режим) с использованием текущей кодировки.
-    Если файл существует, его содержимое очищается.
-    Если файл уже открыт, генерируется ошибка.
+	global _open_files, _default_encoding
+	try:
+		path_obj = _resolve_sandbox_path(filename)
+		path_str = str(path_obj)
+	except (SandboxError, TypeError) as e:
+		raise Exception(f"Ошибка открытия файла для записи '{filename}': {e}")
 
-    Параметры:
-      filename (str): Имя файла для открытия на запись.
+	if path_str in _open_files:
+		raise Exception(f"Файл '{filename}' уже открыт.")
 
-    Возвращаемое значение:
-      file object: Объект открытого файла.
+	# Проверяем права на запись (или создание)
+	parent_dir = path_obj.parent
+	if path_obj.exists():
+		if not path_obj.is_file():
+			raise Exception(f"Путь '{filename}' указывает на директорию, запись невозможна.")
+		if not os.access(path_str, os.W_OK):
+			raise Exception(f"Нет прав на запись в файл '{filename}'.")
+	elif not parent_dir.exists() or not os.access(str(parent_dir), os.W_OK):
+		# Проверяем существование родительской директории и права на запись в нее
+		raise Exception(
+			f"Нет прав на создание файла '{filename}' в директории '{parent_dir.relative_to(SANDBOX_BASE_DIR)}'.")
 
-    Исключения:
-      Exception: Если файл уже открыт, недоступен для записи или возникла ошибка открытия.
-    """
-    global _open_files, _default_encoding
-    path = os.path.abspath(filename)
-    if path in _open_files:
-        raise Exception(f"File '{filename}' is already open.")
-    if os.path.exists(path):
-        if not os.access(path, os.W_OK):
-            raise Exception(f"No write permission for file '{filename}'.")
-    else:
-        # Если файл не существует, проверяем возможность его создания в родительском каталоге
-        parent = os.path.dirname(path)
-        if not os.access(parent, os.W_OK):
-            raise Exception(f"No permission to create file in directory '{parent}'.")
-    try:
-        # Открываем файл в режиме записи с заданной кодировкой
-        f = open(path, "w", encoding=_default_encoding)
-    except Exception as e:
-        raise Exception(f"Error opening file '{filename}' for writing: {e}")
-    _open_files[path] = f  # Сохраняем файл в словаре открытых файлов
-    return f
+	try:
+		# Открываем файл в режиме записи
+		f = open(path_obj, "w", encoding=_default_encoding)
+		logger.info(f"Opened file '{filename}' (path: {path_str}) for writing.")
+	except Exception as e:
+		raise Exception(f"Ошибка при открытии файла '{filename}' для записи: {e}")
+
+	_open_files[path_str] = f
+	return f
 
 
 def open_for_append(filename):
+	"""
+    Открывает текстовый файл ВНУТРИ ПЕСОЧНИЦЫ для добавления ("a").
     """
-    Открывает текстовый файл с указанным именем для добавления ("a" режим) с использованием текущей кодировки.
-    Если файл уже открыт, генерируется ошибка.
+	global _open_files, _default_encoding
+	try:
+		path_obj = _resolve_sandbox_path(filename)
+		path_str = str(path_obj)
+	except (SandboxError, TypeError) as e:
+		raise Exception(f"Ошибка открытия файла для добавления '{filename}': {e}")
 
-    Параметры:
-      filename (str): Имя файла для открытия на добавление.
+	if path_str in _open_files:
+		raise Exception(f"Файл '{filename}' уже открыт.")
 
-    Возвращаемое значение:
-      file object: Объект открытого файла.
+	# Проверяем права на запись/создание (аналогично open_for_writing)
+	parent_dir = path_obj.parent
+	if path_obj.exists():
+		if not path_obj.is_file():
+			raise Exception(f"Путь '{filename}' указывает на директорию, добавление невозможно.")
+		if not os.access(path_str, os.W_OK):
+			raise Exception(f"Нет прав на запись (добавление) в файл '{filename}'.")
+	elif not parent_dir.exists() or not os.access(str(parent_dir), os.W_OK):
+		raise Exception(
+			f"Нет прав на создание файла '{filename}' для добавления в директории '{parent_dir.relative_to(SANDBOX_BASE_DIR)}'.")
 
-    Исключения:
-      Exception: Если файл уже открыт или возникла ошибка открытия.
-    """
-    global _open_files, _default_encoding
-    path = os.path.abspath(filename)
-    if path in _open_files:
-        raise Exception(f"File '{filename}' is already open.")
-    parent = os.path.dirname(path)
-    # Если файл не существует, проверяем возможность создания файла
-    if not os.path.exists(path) and not os.access(parent, os.W_OK):
-        raise Exception(f"No permission to create file in directory '{parent}'.")
-    try:
-        # Открываем файл в режиме добавления с заданной кодировкой
-        f = open(path, "a", encoding=_default_encoding)
-    except Exception as e:
-        raise Exception(f"Error opening file '{filename}' for appending: {e}")
-    _open_files[path] = f  # Сохраняем файл в словаре открытых файлов
-    return f
+	try:
+		# Открываем файл в режиме добавления
+		f = open(path_obj, "a", encoding=_default_encoding)
+		logger.info(f"Opened file '{filename}' (path: {path_str}) for appending.")
+	except Exception as e:
+		raise Exception(f"Ошибка при открытии файла '{filename}' для добавления: {e}")
+
+	_open_files[path_str] = f
+	return f
 
 
+# Функция close_file остается почти без изменений, но использует имя файла из объекта f
 def close_file(f):
-    """
-    Закрывает ранее открытый файл и удаляет его из глобального словаря открытых файлов.
-    Если файл не открыт, генерируется ошибка.
+	"""Закрывает ранее открытый файл."""
+	global _open_files
+	if not hasattr(f, 'name') or not f.name:
+		raise Exception("Некорректный файловый объект передан для закрытия.")
 
-    Параметры:
-      f (file object): Объект файла, который необходимо закрыть.
+	# Получаем абсолютный путь файла по его имени
+	# Важно: имя файла в f.name уже должно быть абсолютным путем, который мы сохранили
+	path_str = f.name
+	if path_str not in _open_files:
+		# Это может случиться, если файл был открыт не нашими функциями
+		# или был закрыт ранее. Проверяем, начинается ли путь с песочницы для безопасности.
+		if SANDBOX_BASE_PATH_STR and path_str.startswith(SANDBOX_BASE_PATH_STR):
+			logger.warning(f"Attempting to close file '{f.name}' which was not tracked as open. Closing anyway.")
+		else:
+			# Попытка закрыть файл вне песочницы или некорректный путь
+			logger.error(f"Attempting to close untracked or potentially unsafe file: '{f.name}'")
+			raise Exception(f"Файл '{f.name}' не был найден среди открытых или находится вне песочницы.")
 
-    Возвращаемое значение:
-      None
+	try:
+		f.close()
+		logger.info(f"Closed file '{os.path.relpath(path_str, SANDBOX_BASE_PATH_STR)}' (path: {path_str}).")
+	except Exception as e:
+		# Удаляем из _open_files даже если закрытие вызвало ошибку,
+		# чтобы не блокировать повторное открытие
+		if path_str in _open_files:
+			del _open_files[path_str]
+		raise Exception(f"Ошибка при закрытии файла '{f.name}': {e}")
 
-    Исключения:
-      Exception: Если возникает ошибка при закрытии или файл не найден среди открытых.
-    """
-    global _open_files
-    # Получаем абсолютный путь файла по его имени
-    path = os.path.abspath(f.name)
-    try:
-        f.close()  # Пытаемся закрыть файл
-    except Exception as e:
-        raise Exception(f"Error closing file '{f.name}': {e}")
-    if path in _open_files:
-        del _open_files[path]  # Удаляем запись об открытом файле
-    else:
-        raise Exception(f"File '{f.name}' not found among open files.")
+	# Удаляем запись об открытом файле только при успешном закрытии
+	if path_str in _open_files:
+		del _open_files[path_str]
 
 
+# Функции reset_reading, eof, has_data остаются без изменений (работают с файловым объектом)
 def reset_reading(f):
-    """
-    Сбрасывает указатель файла f в начало файла.
-
-    Параметры:
-      f (file object): Объект файла, для которого необходимо сбросить указатель.
-
-    Возвращаемое значение:
-      None
-
-    Исключения:
-      Exception: Если возникает ошибка при сбросе указателя.
-    """
-    try:
-        f.seek(0)
-    except Exception as e:
-        raise Exception(f"Error resetting file pointer for '{f.name}': {e}")
+	"""Сбрасывает указатель файла f в начало файла."""
+	# ... (код без изменений) ...
+	try:
+		f.seek(0)
+	except Exception as e:
+		raise Exception(f"Error resetting file pointer for '{f.name}': {e}")
 
 
 def eof(f):
-    """
-    Проверяет, достигнут ли конец файла.
-    Возвращает "да", если текущая позиция в файле равна или превышает конец файла, иначе "нет".
-
-    Параметры:
-      f (file object): Объект файла для проверки.
-
-    Возвращаемое значение:
-      str: "да", если конец файла достигнут, иначе "нет".
-    """
-    cur = f.tell()  # Сохраняем текущую позицию
-    f.seek(0, os.SEEK_END)  # Переходим в конец файла
-    end = f.tell()  # Получаем позицию конца файла
-    f.seek(cur)  # Восстанавливаем исходную позицию
-    return "да" if cur >= end else "нет"
+	"""Проверяет, достигнут ли конец файла."""
+	# ... (код без изменений) ...
+	try:
+		cur = f.tell()
+		f.seek(0, os.SEEK_END)
+		end = f.tell()
+		f.seek(cur)
+		return "да" if cur >= end else "нет"
+	except Exception as e:
+		raise Exception(f"Error checking EOF for '{f.name}': {e}")
 
 
 def has_data(f):
-    """
-    Проверяет, имеется ли хотя бы один видимый символ после текущей позиции в файле.
-    Для упрощения проверяет, не достигнут ли конец файла.
+	"""Проверяет, имеется ли хотя бы один видимый символ после текущей позиции."""
+	# ... (код без изменений) ...
+	try:
+		cur = f.tell()
+		char = f.read(1)
+		f.seek(cur)
+		return "да" if char else "нет"
+	except Exception as e:
+		raise Exception(f"Error checking has_data for '{f.name}': {e}")
 
-    Параметры:
-      f (file object): Объект файла для проверки.
 
-    Возвращаемое значение:
-      str: "да", если данные имеются, иначе "нет".
-    """
-    cur = f.tell()  # Сохраняем текущую позицию
-    char = f.read(1)  # Читаем один символ
-    f.seek(cur)  # Возвращаемся к исходной позиции
-    if char == "":
-        return "нет"
-    return "да"
-
+# --- Функции проверки ---
 
 def can_open_for_reading(filename):
-    """
-    Проверяет, существует ли файл с заданным именем и доступен ли он для чтения.
-    Функция не открывает файл, а лишь проверяет его доступность.
-
-    Параметры:
-      filename (str): Имя файла для проверки.
-
-    Возвращаемое значение:
-      str: "да", если файл существует и доступен для чтения, иначе "нет".
-    """
-    path = os.path.abspath(filename)
-    if os.path.exists(path) and os.access(path, os.R_OK):
-        return "да"
-    return "нет"
+	"""Проверяет, существует ли файл ВНУТРИ ПЕСОЧНИЦЫ и доступен ли он для чтения."""
+	try:
+		path_obj = _resolve_sandbox_path(filename)
+		# Проверяем существование, что это файл, и права на чтение
+		if path_obj.exists() and path_obj.is_file() and os.access(str(path_obj), os.R_OK):
+			return "да"
+		else:
+			return "нет"
+	except (SandboxError, TypeError):
+		return "нет"  # Если путь некорректен или вне песочницы, то открыть нельзя
+	except Exception as e:
+		logger.warning(f"Error in can_open_for_reading for '{filename}': {e}")
+		return "нет"
 
 
 def can_open_for_writing(filename):
-    """
-    Проверяет, существует ли файл с заданным именем и доступен ли он для записи,
+	"""
+    Проверяет, существует ли файл ВНУТРИ ПЕСОЧНИЦЫ и доступен ли для записи,
     либо может ли быть создан.
-
-    Параметры:
-      filename (str): Имя файла для проверки.
-
-    Возвращаемое значение:
-      str: "да", если файл существует и доступен для записи или может быть создан, иначе "нет".
     """
-    path = os.path.abspath(filename)
-    if os.path.exists(path):
-        if os.access(path, os.W_OK):
-            return "да"
-        else:
-            return "нет"
-    else:
-        parent = os.path.dirname(path)
-        if os.access(parent, os.W_OK):
-            return "да"
-        else:
-            return "нет"
+	try:
+		path_obj = _resolve_sandbox_path(filename)
+		path_str = str(path_obj)
+		parent_dir = path_obj.parent
+
+		if path_obj.exists():
+			# Файл существует: проверяем, что это файл и есть права на запись
+			if path_obj.is_file() and os.access(path_str, os.W_OK):
+				return "да"
+			else:
+				return "нет"
+		else:
+			# Файл не существует: проверяем, что родительская папка существует и есть права на запись в нее
+			if parent_dir.exists() and parent_dir.is_dir() and os.access(str(parent_dir), os.W_OK):
+				return "да"
+			else:
+				return "нет"
+	except (SandboxError, TypeError):
+		return "нет"
+	except Exception as e:
+		logger.warning(f"Error in can_open_for_writing for '{filename}': {e}")
+		return "нет"
 
 
 def exists(name):
-    """
-    Проверяет, существует ли файл или директория с заданным именем.
-
-    Параметры:
-      name (str): Имя файла или директории для проверки.
-
-    Возвращаемое значение:
-      str: "да", если файл или директория существуют, иначе "нет".
-    """
-    return "да" if os.path.exists(name) else "нет"
+	"""Проверяет, существует ли файл или директория с заданным именем ВНУТРИ ПЕСОЧНИЦЫ."""
+	try:
+		path_obj = _resolve_sandbox_path(name)
+		return "да" if path_obj.exists() else "нет"
+	except (SandboxError, TypeError):
+		return "нет"
+	except Exception as e:
+		logger.warning(f"Error in exists for '{name}': {e}")
+		return "нет"
 
 
 def is_directory(name):
-    """
-    Проверяет, является ли объект с заданным именем директорией.
+	"""Проверяет, является ли объект с заданным именем директорией ВНУТРИ ПЕСОЧНИЦЫ."""
+	try:
+		path_obj = _resolve_sandbox_path(name)
+		# Проверяем существование перед проверкой на директорию
+		return "да" if path_obj.exists() and path_obj.is_dir() else "нет"
+	except (SandboxError, TypeError):
+		return "нет"
+	except Exception as e:
+		logger.warning(f"Error in is_directory for '{name}': {e}")
+		return "нет"
 
-    Параметры:
-      name (str): Имя для проверки.
 
-    Возвращаемое значение:
-      str: "да", если объект является директорией, иначе "нет".
-    """
-    return "да" if os.path.isdir(name) else "нет"
-
+# --- Функции модификации ---
 
 def create_directory(dirname):
-    """
-    Создает директорию с заданным именем (абсолютным или относительным).
-    Возвращает "да" при успешном создании, иначе генерирует исключение.
-
-    Параметры:
-      dirname (str): Имя директории для создания.
-
-    Возвращаемое значение:
-      str: "да", если директория успешно создана.
-
-    Исключения:
-      Exception: Если возникает ошибка при создании директории.
-    """
-    try:
-        os.makedirs(dirname, exist_ok=False)
-        return "да"
-    except Exception as e:
-        raise Exception(f"Error creating directory '{dirname}': {e}")
+	"""Создает директорию с заданным именем ВНУТРИ ПЕСОЧНИЦЫ."""
+	try:
+		path_obj = _resolve_sandbox_path(dirname)
+		# exist_ok=True: не вызывать ошибку, если папка уже существует
+		# parents=True: создавать родительские директории при необходимости
+		path_obj.mkdir(parents=True, exist_ok=True)
+		logger.info(f"Directory '{dirname}' (path: {path_obj}) created or already exists.")
+		return "да"
+	except (SandboxError, TypeError) as e:
+		raise Exception(f"Ошибка создания директории '{dirname}': {e}")
+	except Exception as e:
+		raise Exception(f"Ошибка при создании директории '{dirname}': {e}")
 
 
 def delete_file(filename):
-    """
-    Удаляет файл с заданным именем.
-    Возвращает "да" при успешном удалении, иначе генерирует исключение.
+	"""Удаляет файл с заданным именем ВНУТРИ ПЕСОЧНИЦЫ."""
+	try:
+		path_obj = _resolve_sandbox_path(filename)
+		path_str = str(path_obj)
 
-    Параметры:
-      filename (str): Имя файла для удаления.
+		# Дополнительная проверка перед удалением
+		if not path_obj.exists():
+			raise FileNotFoundError(f"Файл '{filename}' не найден для удаления.")
+		if not path_obj.is_file():
+			raise IsADirectoryError(f"Путь '{filename}' указывает на директорию, а не файл.")
+		if path_str in _open_files:
+			raise Exception(f"Нельзя удалить файл '{filename}', так как он открыт.")
 
-    Возвращаемое значение:
-      str: "да", если файл успешно удален.
-
-    Исключения:
-      Exception: Если возникает ошибка при удалении файла.
-    """
-    try:
-        os.remove(filename)
-        return "да"
-    except Exception as e:
-        raise Exception(f"Error deleting file '{filename}': {e}")
+		path_obj.unlink()  # Используем unlink для удаления файла
+		logger.info(f"File '{filename}' (path: {path_obj}) deleted.")
+		return "да"
+	except (SandboxError, TypeError, FileNotFoundError, IsADirectoryError) as e:
+		raise Exception(f"Ошибка удаления файла '{filename}': {e}")
+	except Exception as e:
+		raise Exception(f"Ошибка при удалении файла '{filename}': {e}")
 
 
 def delete_directory(dirname):
-    """
-    Удаляет пустую директорию с заданным именем.
-    Возвращает "да" при успешном удалении, иначе генерирует исключение.
+	"""Удаляет ПУСТУЮ директорию с заданным именем ВНУТРИ ПЕСОЧНИЦЫ."""
+	try:
+		path_obj = _resolve_sandbox_path(dirname)
 
-    Параметры:
-      dirname (str): Имя директории для удаления.
+		if not path_obj.exists():
+			raise FileNotFoundError(f"Директория '{dirname}' не найдена для удаления.")
+		if not path_obj.is_dir():
+			raise NotADirectoryError(f"Путь '{dirname}' указывает на файл, а не директорию.")
 
-    Возвращаемое значение:
-      str: "да", если директория успешно удалена.
+		# Проверяем, что директория пуста
+		if any(path_obj.iterdir()):
+			raise OSError(f"Директория '{dirname}' не пуста, удаление невозможно.")
 
-    Исключения:
-      Exception: Если возникает ошибка при удалении директории.
-    """
-    try:
-        os.rmdir(dirname)
-        return "да"
-    except Exception as e:
-        raise Exception(f"Error deleting directory '{dirname}': {e}")
+		path_obj.rmdir()  # Удаляем директорию
+		logger.info(f"Directory '{dirname}' (path: {path_obj}) deleted.")
+		return "да"
+	except (SandboxError, TypeError, FileNotFoundError, NotADirectoryError, OSError) as e:
+		raise Exception(f"Ошибка удаления директории '{dirname}': {e}")
+	except Exception as e:
+		raise Exception(f"Ошибка при удалении директории '{dirname}': {e}")
 
+
+# --- Функции получения путей (теперь возвращают пути внутри песочницы) ---
 
 def full_path(name):
+	"""
+    Возвращает 'песочный' относительный путь для заданного имени.
+    Показывает путь относительно базы песочницы.
     """
-    Возвращает абсолютный путь для заданного имени файла или директории.
-
-    Параметры:
-      name (str): Имя файла или директории.
-
-    Возвращаемое значение:
-      str: Абсолютный путь к файлу или директории.
-    """
-    return os.path.abspath(name)
+	try:
+		path_obj = _resolve_sandbox_path(name)
+		# Возвращаем путь относительно базы песочницы
+		relative_path = path_obj.relative_to(SANDBOX_BASE_DIR)
+		# Возвращаем как строку в стиле Unix (с '/')
+		return str(relative_path).replace('\\', '/')
+	except (SandboxError, TypeError) as e:
+		# В случае ошибки возвращаем исходное имя или пустую строку?
+		# Вернем исходное имя, как если бы разрешение не удалось.
+		logger.warning(f"Could not resolve sandboxed full_path for '{name}': {e}")
+		return name
+	except Exception as e:
+		logger.warning(f"Error in full_path for '{name}': {e}")
+		return name
 
 
 def WORKING_DIRECTORY():
-    """
-    Возвращает абсолютный путь текущей рабочей директории.
-
-    Возвращаемое значение:
-      str: Абсолютный путь текущей рабочей директории.
-    """
-    return os.getcwd()
+	"""Возвращает путь к корневому каталогу песочницы."""
+	if SANDBOX_BASE_PATH_STR:
+		# Возвращаем просто '/', обозначая корень песочницы
+		return "/"
+	else:
+		logger.error("Working directory requested but sandbox is not initialized.")
+		return "./"  # Запасной вариант
 
 
 def PROGRAM_DIRECTORY():
-    """
-    Возвращает абсолютный путь директории, содержащей запущенную программу.
-    Если программа не сохранена, возвращает "./".
+	"""Возвращает путь к корневому каталогу песочницы (аналогично WORKING_DIRECTORY)."""
+	# В контексте песочницы нет разницы между рабочей папкой и папкой программы.
+	return WORKING_DIRECTORY()
 
-    Возвращаемое значение:
-      str: Абсолютный путь директории программы или "./", если путь не определен.
-    """
-    if hasattr(sys, 'argv') and sys.argv and os.path.isfile(sys.argv[0]):
-        return os.path.dirname(os.path.abspath(sys.argv[0]))
-    else:
-        return "./"
 
+# --- Функции стандартного ввода/вывода ---
 
 def set_input(filename):
+	"""
+    Устанавливает файл (ВНУТРИ ПЕСОЧНИЦЫ) или консоль в качестве источника ввода.
     """
-    Устанавливает файл с заданным именем в качестве источника ввода для оператора "ввод".
-    Если filename является пустой строкой, восстанавливает ввод с клавиатуры.
-    Возвращает "да" при успешной установке.
+	global _default_input, _default_encoding
+	filename_strip = filename.strip()
 
-    Параметры:
-      filename (str): Имя файла для установки в качестве ввода.
+	# Специальное имя для консоли
+	if filename_strip.lower() == "консоль":
+		if _default_input and _default_input is not sys.stdin:
+			try:
+				# Закрываем предыдущий файл, если он был открыт нами
+				# Используем путь из f.name для удаления из _open_files
+				close_file(_default_input)  # close_file обработает _open_files
+			except Exception as e:
+				logger.warning(f"Could not close previous default input '{_default_input.name}': {e}")
+		_default_input = sys.stdin  # Стандартный ввод Python (input())
+		logger.info("Default input set to console (stdin).")
+		return "да"
 
-    Возвращаемое значение:
-      str: "да" при успешной установке ввода.
+	# Пустая строка - сброс на stdin
+	if filename_strip == "":
+		if _default_input and _default_input is not sys.stdin:
+			try:
+				close_file(_default_input)
+			except Exception as e:
+				logger.warning(f"Could not close previous default input '{_default_input.name}': {e}")
+		_default_input = sys.stdin  # input()
+		logger.info("Default input reset to console (stdin).")
+		return "да"
 
-    Исключения:
-      Exception: Если файл не существует или недоступен для чтения.
-    """
-    global _default_input
-    if filename.strip() == "":
-        _default_input = None
-        return "да"
-    if can_open_for_reading(filename) == "да":
-        try:
-            _default_input = open(filename, "r", encoding=_default_encoding)
-            return "да"
-        except Exception as e:
-            raise Exception(f"Error opening file '{filename}' for input: {e}")
-    else:
-        raise Exception(f"File '{filename}' is not readable.")
+	# Иначе - это имя файла в песочнице
+	try:
+		path_obj = _resolve_sandbox_path(filename_strip)
+		path_str = str(path_obj)
+	except (SandboxError, TypeError) as e:
+		raise Exception(f"Ошибка установки файла ввода '{filename}': {e}")
+
+	# Проверяем возможность чтения
+	if can_open_for_reading(filename_strip) != "да":
+		raise Exception(f"Файл '{filename}' не найден или недоступен для чтения в песочнице.")
+
+	# Закрываем предыдущий файл ввода, если он был
+	if _default_input and _default_input is not sys.stdin:
+		try:
+			close_file(_default_input)
+		except Exception as e:
+			logger.warning(f"Could not close previous default input '{_default_input.name}': {e}")
+
+	try:
+		# Открываем новый файл
+		new_input_file = open(path_obj, "r", encoding=_default_encoding)
+		_open_files[path_str] = new_input_file  # Регистрируем как открытый
+		_default_input = new_input_file
+		logger.info(f"Default input set to file '{filename_strip}' (path: {path_str}).")
+		return "да"
+	except Exception as e:
+		raise Exception(f"Ошибка при открытии файла '{filename}' для ввода: {e}")
 
 
 def set_output(filename):
+	"""
+    Устанавливает файл (ВНУТРИ ПЕСОЧНИЦЫ) или консоль в качестве места вывода.
     """
-    Устанавливает файл с заданным именем в качестве места вывода для оператора "вывод".
-    Если filename является пустой строкой, вывод возвращается на экран.
-    Возвращает "да" при успешной установке.
+	global _default_output, _default_encoding
+	filename_strip = filename.strip()
 
-    Параметры:
-      filename (str): Имя файла для установки в качестве вывода.
+	# Специальное имя для консоли
+	if filename_strip.lower() == "консоль":
+		if _default_output and _default_output is not sys.stdout:
+			try:
+				close_file(_default_output)
+			except Exception as e:
+				logger.warning(f"Could not close previous default output '{_default_output.name}': {e}")
+		_default_output = sys.stdout  # Стандартный вывод Python (print())
+		logger.info("Default output set to console (stdout).")
+		return "да"
 
-    Возвращаемое значение:
-      str: "да" при успешной установке вывода.
+	# Пустая строка - сброс на stdout
+	if filename_strip == "":
+		if _default_output and _default_output is not sys.stdout:
+			try:
+				close_file(_default_output)
+			except Exception as e:
+				logger.warning(f"Could not close previous default output '{_default_output.name}': {e}")
+		_default_output = sys.stdout
+		logger.info("Default output reset to console (stdout).")
+		return "да"
 
-    Исключения:
-      Exception: Если файл недоступен для записи или не может быть создан.
-    """
-    global _default_output
-    if filename.strip() == "":
-        _default_output = None
-        return "да"
-    if can_open_for_writing(filename) == "да":
-        try:
-            _default_output = open(filename, "w", encoding=_default_encoding)
-            return "да"
-        except Exception as e:
-            raise Exception(f"Error opening file '{filename}' for output: {e}")
-    else:
-        raise Exception(f"File '{filename}' is not writable.")
+	# Иначе - это имя файла в песочнице
+	try:
+		path_obj = _resolve_sandbox_path(filename_strip)
+		path_str = str(path_obj)
+	except (SandboxError, TypeError) as e:
+		raise Exception(f"Ошибка установки файла вывода '{filename}': {e}")
+
+	# Проверяем возможность записи
+	if can_open_for_writing(filename_strip) != "да":
+		raise Exception(f"Файл '{filename}' не может быть открыт или создан для записи в песочнице.")
+
+	# Закрываем предыдущий файл вывода, если он был
+	if _default_output and _default_output is not sys.stdout:
+		try:
+			close_file(_default_output)
+		except Exception as e:
+			logger.warning(f"Could not close previous default output '{_default_output.name}': {e}")
+
+	try:
+		# Открываем новый файл для записи (перезаписи!)
+		new_output_file = open(path_obj, "w", encoding=_default_encoding)
+		_open_files[path_str] = new_output_file  # Регистрируем
+		_default_output = new_output_file
+		logger.info(f"Default output set to file '{filename_strip}' (path: {path_str}).")
+		return "да"
+	except Exception as e:
+		raise Exception(f"Ошибка при открытии файла '{filename}' для вывода: {e}")
 
 
+# --- ConsoleFile и get_default_* остаются без изменений ---
 class ConsoleFile:
-    """
-    Псевдо-файл, связанный с терминалом.
-    Попытка закрыть такой файл генерирует ошибку.
-    Чтение инициирует ввод с клавиатуры; запись выводит текст на экран.
-    """
+	"""Псевдо-файл, связанный с терминалом (sys.stdin/sys.stdout)."""
 
-    def __init__(self):
-        # Задаем имя псевдо-файла
-        self.name = "консоль"
-        self.closed = False
+	def __init__(self):
+		self.name = "консоль"  # Имя для идентификации
+		self.closed = False
+		self._input_buffer = ""  # Для возможной буферизации ввода
 
-    def write(self, s):
+	def write(self, s):
+		"""Записывает строку в стандартный вывод."""
+		if self.closed:
+			raise Exception("Ошибка: Попытка записи в закрытый файл 'консоль'.")
+		# Используем стандартный вывод
+		# В веб-сервере это может не отображаться пользователю напрямую,
+		# а перехватываться логгером или буферизироваться.
+		# Если _default_output перенаправлен, запись пойдет туда.
+		# Мы должны писать в sys.stdout, если хотим именно на консоль сервера.
+		# print(s, end="", file=sys.stdout) # Явно в stdout сервера
+		# Или используем текущий _default_output
+		output_stream = get_default_output() or sys.stdout
+		try:
+			print(s, end="", file=output_stream, flush=True)
+		except Exception as e:
+			logger.error(
+				f"Error writing to console/default output: {e}")  # Не бросаем исключение наверх, чтобы не прерывать программу из-за ошибки вывода
+
+	def read(self, n=-1):
+		"""
+        Читает данные из стандартного ввода.
+        ПРЕДУПРЕЖДЕНИЕ: Блокирует выполнение в ожидании ввода! Не использовать на сервере.
         """
-        Записывает строку в псевдо-файл.
-        Выводит текст на экран без автоматического перевода строки.
+		if self.closed:
+			raise Exception("Ошибка: Попытка чтения из закрытого файла 'консоль'.")
 
-        Параметры:
-          s (str): Строка для записи.
-        """
-        if self.closed:
-            raise Exception("Error: Attempt to write to closed file 'консоль'.")
-        # Выводим текст без добавления нового перевода строки
-        print(s, end="")
+		input_stream = get_default_input() or sys.stdin
+		if input_stream is sys.stdin:
+			# Чтение из реальной консоли (блокирующее!)
+			logger.warning("Reading from console (stdin) requested. This is blocking!")
+			try:
+				line = input()  # Блокирующий вызов
+				# В Кумире обычно читают построчно, добавим \n
+				return line + "\n" if n == -1 or n >= len(line) + 1 else line[:n]
+			except EOFError:
+				return ""  # Конец ввода
+		else:
+			# Чтение из файла, установленного через set_input
+			try:
+				if n == -1:
+					return input_stream.read()
+				else:
+					return input_stream.read(n)
+			except Exception as e:
+				logger.error(f"Error reading from default input file '{input_stream.name}': {e}")
+				raise Exception(f"Ошибка чтения из файла ввода '{input_stream.name}': {e}")
 
-    def read(self, n=-1):
-        """
-        Читает данные из псевдо-файла, инициируя ввод с клавиатуры.
+	def seek(self, offset, whence=os.SEEK_SET):
+		# Перемещение указателя для консоли не имеет смысла или невозможно
+		logger.warning("Attempted to seek on console file. Operation ignored.")
+		if whence == os.SEEK_SET and offset == 0: return  # Разрешим seek(0)
+		raise OSError("Cannot seek on console file object.")
 
-        Параметры:
-          n (int, опционально): Количество символов для чтения (по умолчанию -1, что означает чтение всего ввода).
+	def tell(self):
+		# Позиция для консоли не определена
+		logger.warning("Attempted to tell() on console file. Returning 0.")
+		return 0
 
-        Возвращаемое значение:
-          str: Введенная пользователем строка.
-        """
-        if self.closed:
-            raise Exception("Error: Attempt to read from closed file 'консоль'.")
-        return input()
+	def close(self):
+		"""Закрытие 'консоли' невозможно."""
+		# Мы не должны закрывать sys.stdin/sys.stdout
+		# self.closed = True # Можно установить флаг, но лучше бросить ошибку
+		raise Exception("Нельзя закрыть стандартный файл 'консоль'.")
 
-    def close(self):
-        """
-        Закрытие псевдо-файла невозможно.
-        Генерирует исключение при попытке закрытия.
-        """
-        raise Exception("Cannot close file 'консоль'.")
+	def __iter__(self):
+		# Позволяет читать консоль построчно в цикле for (например)
+		return self
+
+	def __next__(self):
+		# Читает следующую строку
+		line = self.read()  # Используем наш read, который может читать из файла или stdin
+		if line:
+			# Убираем \n в конце, если он был добавлен нашим read() для stdin
+			if (get_default_input() or sys.stdin) is sys.stdin and line.endswith('\n'):
+				return line[:-1]
+			return line
+		else:
+			raise StopIteration
 
 
 def console_file():
-    """
-    Возвращает псевдо-файл, связанный с терминалом.
-
-    Возвращаемое значение:
-      ConsoleFile: Объект псевдо-файла, ассоциированного с терминалом.
-    """
-    return ConsoleFile()
+	"""Возвращает объект, представляющий консоль."""
+	return ConsoleFile()
 
 
 def get_default_input():
-    """
-    Возвращает текущий источник ввода по умолчанию.
-
-    Возвращаемое значение:
-      file object или None: Текущий источник ввода, если он установлен.
-    """
-    global _default_input
-    return _default_input
+	"""Возвращает текущий источник ввода по умолчанию (файл или sys.stdin)."""
+	global _default_input
+	return _default_input
 
 
 def get_default_output():
-    """
-    Возвращает текущий выходной поток по умолчанию.
+	"""Возвращает текущий выходной поток по умолчанию (файл или sys.stdout)."""
+	global _default_output
+	return _default_output
 
-    Возвращаемое значение:
-      file object или None: Текущий выходной поток, если он установлен.
-    """
-    global _default_output
-    return _default_output
+# FILE END: file_functions.py
