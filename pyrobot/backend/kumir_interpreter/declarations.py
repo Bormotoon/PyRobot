@@ -1,3 +1,4 @@
+# FILE START: declarations.py
 """
 Модуль declarations.py
 @description Обработка объявлений переменных, присваиваний, ввода/вывода.
@@ -6,12 +7,14 @@ import logging
 import math
 import re
 
-from .identifiers import is_valid_identifier  # Import necessary helpers
-from .safe_eval import safe_eval, get_eval_env, KumirEvalError  # Import evaluation helpers
+from .identifiers import is_valid_identifier
+# Используем новый safe_eval и его исключение
+from .safe_eval import safe_eval, KumirEvalError
+
+# robot нужен для передачи в safe_eval, если выражения зависят от сенсоров
 
 logger = logging.getLogger('KumirDeclarations')
 
-# Define constants (can be moved to a central constants.py)
 ALLOWED_TYPES = {"цел", "вещ", "лог", "сим", "лит"}
 MAX_INT = 2147483647
 
@@ -28,11 +31,9 @@ class InputOutputError(Exception):
 	pass
 
 
+# Функция _validate_and_convert_value остается без изменений
 def _validate_and_convert_value(value, target_type, var_name_for_error):
-	"""
-    Проверяет и конвертирует значение к целевому типу KUMIR.
-    Вспомогательная функция для присваивания.
-    """
+	# ... (код без изменений) ...
 	try:
 		if target_type == "цел":
 			converted_value = int(value)
@@ -84,15 +85,9 @@ def _validate_and_convert_value(value, target_type, var_name_for_error):
 		raise AssignmentError(f"Неожиданная ошибка при преобразовании значения для '{var_name_for_error}': {e}")
 
 
+# Функция process_declaration остается без изменений
 def process_declaration(line, env):
-	"""
-	Обрабатывает строку объявления переменной или таблицы.
-	Args:
-		line (str): Строка объявления (e.g., "цел а, b", "вещ таб Матрица[1:10, 1:5]").
-		env (dict): Окружение переменных для обновления.
-	Raises:
-		DeclarationError: При некорректном синтаксисе или имени переменной.
-	"""
+	# ... (код без изменений) ...
 	logger.debug(f"Processing declaration: '{line}'")
 	tokens = line.split()
 	if not tokens:
@@ -159,19 +154,18 @@ def process_declaration(line, env):
 	return True  # Indicate successful processing
 
 
-def process_assignment(line, env):
+def process_assignment(line, env, robot=None):  # Добавляем robot
 	"""
 	Обрабатывает строку присваивания (:=).
 	Args:
 		line (str): Строка присваивания (e.g., "a := 5", "Матрица[i, j] := x + y").
 		env (dict): Окружение переменных для обновления.
+		robot (SimulatedRobot, optional): Экземпляр робота.
 	Raises:
-		AssignmentError: При синтаксических ошибках, ошибках типов или вычислений.
-		DeclarationError: Если переменная не объявлена.
-		KumirEvalError: Если ошибка при вычислении правой части или индексов.
+		AssignmentError, DeclarationError, KumirEvalError
 	"""
 	logger.debug(f"Processing assignment: '{line}'")
-	parts = line.split(":=", 1)  # Split only on the first ':='
+	parts = line.split(":=", 1)
 	if len(parts) != 2:
 		raise AssignmentError(f"Неверный синтаксис присваивания (отсутствует или несколько ':='): {line}")
 
@@ -181,24 +175,25 @@ def process_assignment(line, env):
 	if not right_expr:
 		raise AssignmentError("Отсутствует выражение справа от ':='.")
 
-	eval_env = get_eval_env(env)  # Get current variable values for evaluation
-
 	# --- Evaluate the right-hand side first ---
 	try:
-		rhs_value = safe_eval(right_expr, eval_env)
+		# Используем новый safe_eval, передаем полное env и robot
+		rhs_value = safe_eval(right_expr, env, robot)
 		logger.debug(f"Evaluated RHS '{right_expr}' -> {rhs_value} (type: {type(rhs_value)})")
-	except Exception as e:
+	except KumirEvalError as e:  # Ловим KumirEvalError
 		raise KumirEvalError(f"Ошибка вычисления выражения '{right_expr}' в правой части присваивания: {e}")
+	except Exception as e:  # Ловим остальные непредвиденные ошибки
+		logger.error(f"Unexpected error evaluating RHS '{right_expr}': {e}", exc_info=True)
+		raise KumirEvalError(f"Неожиданная ошибка вычисления '{right_expr}': {e}")
 
 	# --- Handle assignment target (variable or table element) ---
-	# Check if it's a table assignment like 'Table[index1, index2]'
 	table_match = re.match(r"^([a-zA-Zа-яА-ЯёЁ_][a-zA-Zа-яА-ЯёЁ0-9_\s]*?)\[(.+)\]$", left_raw)
 
 	if table_match:
 		# Assignment to a table element
 		var_name = table_match.group(1).strip()
-		indices_expr = table_match.group(2).strip()
-		logger.debug(f"Assignment target is table '{var_name}' with indices '{indices_expr}'")
+		indices_expr_str = table_match.group(2).strip()  # Строка с индексами "i, j+1"
+		logger.debug(f"Assignment target is table '{var_name}' with indices expr '{indices_expr_str}'")
 
 		if var_name not in env:
 			raise DeclarationError(f"Таблица '{var_name}' не объявлена.")
@@ -207,24 +202,41 @@ def process_assignment(line, env):
 			raise AssignmentError(f"Переменная '{var_name}' не является таблицей, но используется с индексами.")
 
 		# Evaluate indices
-		index_tokens = [token.strip() for token in indices_expr.split(",") if token.strip()]
+		# Индексы могут быть выражениями, их тоже нужно вычислять через safe_eval
+		index_tokens = [token.strip() for token in indices_expr_str.split(",") if token.strip()]
 		if not index_tokens:
 			raise AssignmentError(f"Отсутствуют индексы для таблицы '{var_name}'.")
 		try:
-			# Ensure indices are evaluated to integers for standard arrays
-			indices = tuple(int(safe_eval(token, eval_env)) for token in index_tokens)
+			# Вычисляем каждый индексный токен и собираем в кортеж
+			# ВАЖНО: Результат safe_eval для индексов должен быть пригоден как ключ словаря (int, str, tuple)
+			# В Кумире индексы обычно целые.
+			indices = []
+			for token in index_tokens:
+				index_val = safe_eval(token, env, robot)
+				# Принудительно конвертируем в int, как ожидается для индексов Кумира
+				try:
+					indices.append(int(index_val))
+				except (ValueError, TypeError):
+					raise KumirEvalError(
+						f"Индекс '{token}' вычислен в '{index_val}', но не может быть преобразован в целое число.")
+			indices = tuple(indices)  # Преобразуем в кортеж для использования как ключ словаря
 			logger.debug(f"Evaluated indices -> {indices}")
+
+		except KumirEvalError as e:
+			raise KumirEvalError(f"Ошибка вычисления индексов '{indices_expr_str}' для таблицы '{var_name}': {e}")
 		except Exception as e:
-			raise KumirEvalError(f"Ошибка вычисления индексов '{indices_expr}' для таблицы '{var_name}': {e}")
+			logger.error(f"Unexpected error evaluating indices '{indices_expr_str}': {e}", exc_info=True)
+			raise KumirEvalError(f"Неожиданная ошибка вычисления индексов '{indices_expr_str}': {e}")
 
 		# TODO: Check if indices are within declared bounds if dimensions were specified
 
 		# Convert RHS value to the table's base type
 		target_type = var_info["type"]
-		converted_value = _validate_and_convert_value(rhs_value, target_type, f"{var_name}[{indices_expr}]")
+		converted_value = _validate_and_convert_value(rhs_value, target_type, f"{var_name}[{indices_expr_str}]")
 
 		# Perform assignment
-		if var_info["value"] is None:  # Initialize table dict if first assignment
+		if var_info["value"] is None or not isinstance(var_info["value"],
+													   dict):  # Initialize table dict if first assignment or if corrupted
 			var_info["value"] = {}
 		var_info["value"][indices] = converted_value
 		logger.info(f"Присвоено значение {converted_value} элементу {var_name}{list(indices)}.")
@@ -249,103 +261,86 @@ def process_assignment(line, env):
 		logger.info(f"Присвоено значение {converted_value} переменной '{var_name}'.")
 
 
-def process_output(line, env, interpreter=None):
+def process_output(line, env, robot=None, interpreter=None):  # Добавляем robot
 	"""
 	Обрабатывает команду 'вывод'. Вычисляет выражения и добавляет результат в буфер вывода интерпретатора.
-
-	Args:
-		line (str): Строка команды (e.g., "вывод a, ' плюс ', b").
-		env (dict): Окружение переменных.
-		interpreter (KumirLanguageInterpreter, optional): Контекст интерпретатора для буферизации вывода.
 	"""
 	logger.debug(f"Processing output: '{line}'")
-	# Extract content after 'вывод', handling potential 'нс' at the end
 	content_part = line[len("вывод"):].strip()
 	append_newline = True
 	if content_part.lower().endswith(" нс"):
 		content_part = content_part[:-len(" нс")].strip()
 		append_newline = False
-	elif content_part.lower() == "нс":  # Special case: вывод нс
+	elif content_part.lower() == "нс":
 		content_part = ""
 		append_newline = False
 
-	if not content_part:  # Handle "вывод" or "вывод нс" which just affect newline
-		output_str = "\n" if append_newline and interpreter and interpreter.output else ""
+	if not content_part:
+		output_str = "\n" if append_newline and interpreter and hasattr(interpreter, 'output') else ""
 	else:
-		# Split content by comma, respecting quotes
-		# Basic split by comma, refinement needed for quoted commas
-		# TODO: Use regex or proper parsing to handle commas inside strings
-		parts_to_eval = [part.strip() for part in content_part.split(",")]
+		# TODO: Использовать более надежный парсинг для разделения по запятым вне строк
+		parts_to_eval = [part.strip() for part in content_part.split(",") if part.strip()]
 		output_segments = []
-		eval_env = get_eval_env(env)
 
 		for part in parts_to_eval:
 			if not part: continue
 			try:
-				# Evaluate each part
-				value = safe_eval(part, eval_env)
-				# Format value for output (booleans as да/нет)
+				# Используем новый safe_eval
+				value = safe_eval(part, env, robot)
+				# Форматируем результат
 				if isinstance(value, bool):
 					output_segments.append("да" if value else "нет")
 				else:
-					output_segments.append(str(value))  # Convert result to string
+					output_segments.append(str(value))
 				logger.debug(f"Evaluated output part '{part}' -> '{output_segments[-1]}'")
-			except Exception as e:
+			except KumirEvalError as e:  # Ловим KumirEvalError
 				logger.error(f"Ошибка вычисления части '{part}' в команде 'вывод': {e}")
-			# Option 1: Output the error message
-			# output_segments.append(f"[Ошибка: {e}]")
-			# Option 2: Raise the error to stop execution
-			raise InputOutputError(f"Ошибка вычисления выражения '{part}' в команде 'вывод': {e}")
+				raise InputOutputError(f"Ошибка вычисления выражения '{part}' в команде 'вывод': {e}")
+			except Exception as e:
+				logger.error(f"Unexpected error evaluating output part '{part}': {e}", exc_info=True)
+				raise InputOutputError(f"Неожиданная ошибка в 'вывод' для '{part}': {e}")
 
-		output_str = "".join(output_segments)  # Concatenate parts without spaces
+		output_str = "".join(output_segments)
 		if append_newline:
 			output_str += "\n"
 
-	# Append to interpreter's output buffer if available
 	if interpreter:
+		if not hasattr(interpreter, 'output'): interpreter.output = ""  # Инициализируем, если нет
 		interpreter.output += output_str
-		output_str_escaped = output_str.replace('\n', '\\n')
+		output_str_escaped = output_str.replace('\n', '\\n')  # Для лога
 		logger.info(f"Output buffer appended: '{output_str_escaped}'")
 	else:
-		# Fallback to printing directly if no interpreter context
 		print(output_str, end="")
 		logger.warning("Interpreter context not provided for 'вывод', printing to console.")
 
 
-def process_input(line, env):
+def process_input(line, env):  # robot здесь не нужен
 	"""
 	Обрабатывает команду 'ввод'.
 	ПРЕДУПРЕЖДЕНИЕ: Стандартный input() блокирует сервер. Требует асинхронной реализации.
-
-	Args:
-		line (str): Строка команды (e.g., "ввод x").
-		env (dict): Окружение переменных для обновления.
-	Raises:
-		InputOutputError, DeclarationError
 	"""
 	logger.warning(f"Processing 'ввод': '{line}'. This is blocking and unsuitable for web servers.")
 	var_name = line[len("ввод"):].strip()
 	if not var_name:
 		raise InputOutputError("Отсутствует имя переменной после 'ввод'.")
-	if not is_valid_identifier(var_name, ""):  # Check if valid name generally
+	# Используем is_valid_identifier для общей проверки имени
+	if not is_valid_identifier(var_name, ""):
 		raise InputOutputError(f"Недопустимое имя переменной для ввода: '{var_name}'")
 	if var_name not in env:
 		raise DeclarationError(f"Переменная '{var_name}' не объявлена перед использованием в 'ввод'.")
-	if env[var_name].get("is_table"):
+	var_info = env[var_name]
+	if var_info.get("is_table"):
 		raise InputOutputError(f"Нельзя использовать 'ввод' для всей таблицы '{var_name}'. Укажите элемент.")
 
-	target_type = env[var_name]["type"]
+	target_type = var_info["type"]
 	prompt = f"Введите значение для '{var_name}' (тип {target_type}): "
 
 	try:
 		# --- BLOCKING CALL ---
-		# This needs to be replaced with an async mechanism in a real web server
-		# e.g., sending a request to frontend, waiting for response via WebSocket/callback
-		user_input = input(prompt)
+		user_input = input(prompt)  # Это все еще блокирует!
 		logger.info(f"Получен ввод для '{var_name}': '{user_input}'")
 		# --- END BLOCKING CALL ---
 
-		# Validate and convert input based on variable type
 		converted_value = _validate_and_convert_value(user_input, target_type, var_name)
 		env[var_name]["value"] = converted_value
 		logger.info(f"Переменной '{var_name}' присвоено введенное значение {converted_value}.")
@@ -353,7 +348,11 @@ def process_input(line, env):
 	except EOFError:
 		logger.error("EOF encountered during 'ввод'.")
 		raise InputOutputError("Неожиданный конец файла при ожидании ввода.")
-	except Exception as e:  # Catch conversion errors from _validate_and_convert_value
+	except (AssignmentError, ValueError, TypeError) as e:  # Ловим ошибки валидации/конвертации
 		logger.error(f"Ошибка обработки ввода для '{var_name}': {e}")
-		# Re-raise specific error?
 		raise InputOutputError(f"Ошибка обработки ввода для '{var_name}': {e}")
+	except Exception as e:
+		logger.exception(f"Неожиданная ошибка при выполнении 'ввод' для '{var_name}': {e}")
+		raise InputOutputError(f"Неожиданная ошибка при вводе для '{var_name}': {e}")
+
+# FILE END: declarations.py
