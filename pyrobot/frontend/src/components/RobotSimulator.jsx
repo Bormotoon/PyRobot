@@ -1,31 +1,24 @@
 // FILE START: RobotSimulator.jsx
 import React, {memo, useCallback, useEffect, useReducer, useRef, useState} from 'react';
 import {ThemeProvider} from '@mui/material';
-import CodeEditor from './CodeEditor/CodeEditor';        // Уточните путь
-import ControlPanel from './ControlPanel/ControlPanel';  // Уточните путь
-import Field from './Field/Field';                    // Уточните путь
-import theme from '../styles/theme';                    // Уточните путь
-import {getHint} from './hints';                      // Уточните путь
-import logger from '../Logger';                    // Уточните путь
+import CodeEditor from './CodeEditor/CodeEditor';
+import ControlPanel from './ControlPanel/ControlPanel';
+import Field from './Field/Field';
+import theme from '../styles/theme';
+import {getHint} from './hints';
+import logger from '../../Logger';
 import io from 'socket.io-client';
 
 const backendUrl = process.env.REACT_APP_BACKEND_URL || `http://${window.location.hostname}:5000`;
 
 const initialState = {
-	code: `использовать Робот\nалг\nнач\n  вправо\n  вниз\n  вправо\nкон`,
-	isRunning: false,
-	isAwaitingInput: false,
-	statusMessage: getHint('initial'),
-	width: 7, height: 7, cellSize: 50,
-	robotPos: {x: 0, y: 0},
+	code: `использовать Робот\nалг\nнач\n  вправо\n  вниз\n  вправо\nкон`, isRunning: false, isAwaitingInput: false,
+	statusMessage: getHint('initial'), width: 7, height: 7, cellSize: 50, robotPos: {x: 0, y: 0},
 	walls: new Set(), permanentWalls: new Set(), markers: {}, coloredCells: new Set(),
-	symbols: {}, radiation: {}, temperature: {},
-	editMode: false,
-	inputRequestData: null,
+	symbols: {}, radiation: {}, temperature: {}, editMode: false, inputRequestData: null,
 };
 
-// Вспомогательные функции setupPermanentWalls, clampRobotPos без изменений
-function setupPermanentWalls(width, height) {
+function setupPermanentWalls(width, height) { /* ... */
 	const nw = new Set();
 	for (let x = 0; x < width; x++) {
 		nw.add(`${x},0,${x + 1},0`);
@@ -38,19 +31,16 @@ function setupPermanentWalls(width, height) {
 	return nw;
 }
 
-function clampRobotPos(robotPos, width, height) {
-	const currentX = robotPos?.x ?? 0;
-	const currentY = robotPos?.y ?? 0;
-	const clampedX = Math.min(Math.max(currentX, 0), width - 1);
-	const clampedY = Math.min(Math.max(currentY, 0), height - 1);
-	if (currentX !== clampedX || currentY !== clampedY) {
-		return {x: clampedX, y: clampedY};
+function clampRobotPos(robotPos, width, height) { /* ... */
+	const cX = Math.min(Math.max(robotPos?.x ?? 0, 0), width - 1);
+	const cY = Math.min(Math.max(robotPos?.y ?? 0, 0), height - 1);
+	if (robotPos?.x !== cX || robotPos?.y !== cY) {
+		return {x: cX, y: cY};
 	}
 	return robotPos;
 }
 
-// Редьюсер без изменений в логике, только добавлены новые actions
-function reducer(state, action) {
+function reducer(state, action) { /* ... (без изменений) ... */
 	let nextState;
 	switch (action.type) {
 		case 'SET_CODE':
@@ -154,10 +144,10 @@ function reducer(state, action) {
 	return nextState;
 }
 
-
 const RobotSimulator = memo(() => {
 	const [state, dispatch] = useReducer(reducer, initialState, (init) => ({
-		...init, permanentWalls: setupPermanentWalls(init.width, init.height)
+		...init,
+		permanentWalls: setupPermanentWalls(init.width, init.height)
 	}));
 	const [animationSpeedLevel, setAnimationSpeedLevel] = useState(2);
 	const canvasRef = useRef(null);
@@ -168,8 +158,7 @@ const RobotSimulator = memo(() => {
 		}, isRunning: false
 	});
 
-	// WebSocket useEffect без изменений
-	useEffect(() => {
+	useEffect(() => { /* ... (WebSocket без изменений) ... */
 		isMountedRef.current = true;
 		logger.log_event('Connecting WebSocket...');
 		const socket = io(backendUrl, {reconnectionAttempts: 5, timeout: 10000});
@@ -206,22 +195,21 @@ const RobotSimulator = memo(() => {
 				socketRef.current.disconnect();
 			}
 		};
-	}, [backendUrl]); // Убрали state.isRunning из зависимостей
+	}, [backendUrl]);
 
-	// Обработчики кнопок (handleClearCode, handleStop, handleReset) без изменений
-	const handleClearCode = useCallback(() => {
+	const handleClearCode = useCallback(() => { /* ... (без изменений) ... */
 		dispatch({type: 'SET_CODE', payload: `использовать Робот\nалг\nнач\n  \nкон`});
 		dispatch({type: 'SET_STATUS_MESSAGE', payload: 'Код очищен.'});
 		logger.log_event('Code cleared by user.');
 	}, []);
-	const handleStop = useCallback(() => {
+	const handleStop = useCallback(() => { /* ... (без изменений) ... */
 		animationControllerRef.current.stop();
 		dispatch({type: 'SET_IS_RUNNING', payload: false});
 		dispatch({type: 'SET_IS_AWAITING_INPUT', payload: false});
 		dispatch({type: 'SET_STATUS_MESSAGE', payload: 'Выполнение остановлено.'});
 		logger.log_event('Execution stopped by user.');
 	}, []);
-	const handleReset = useCallback(() => {
+	const handleReset = useCallback(() => { /* ... (без изменений) ... */
 		animationControllerRef.current.stop();
 		dispatch({type: 'RESET_STATE'});
 		logger.log_event('Simulator state reset by user.');
@@ -230,8 +218,7 @@ const RobotSimulator = memo(() => {
 		}).catch(e => logger.log_error(`/reset fetch error: ${e.message}`));
 	}, [backendUrl]);
 
-	// Функция анимации animateTrace без изменений
-	const animateTrace = useCallback(async (trace) => {
+	const animateTrace = useCallback(async (trace) => { /* ... (анимация без изменений) ... */
 		if (!trace || !Array.isArray(trace) || trace.length === 0) {
 			logger.log_event('Animation skipped: No trace data.');
 			return {completed: true};
@@ -300,8 +287,7 @@ const RobotSimulator = memo(() => {
 		return {completed: true};
 	}, [animationSpeedLevel]);
 
-	// Обработчик handleStart без изменений в логике, но использует полные пропсы
-	const handleStart = useCallback(() => {
+	const handleStart = useCallback(() => { /* ... (логика handleStart без изменений) ... */
 		if (state.isRunning || state.isAwaitingInput) {
 			logger.log_warning(`Start prevented: isRunning=${state.isRunning}, isAwaitingInput=${state.isAwaitingInput}`);
 			dispatch({
@@ -336,103 +322,46 @@ const RobotSimulator = memo(() => {
 			credentials: 'include',
 			headers: {'Content-Type': 'application/json'},
 			body: JSON.stringify({code: state.code, fieldState: currentFieldState}),
-		})
-			.then(async (response) => {
-				if (!response.ok) {
-					let errorMsg = `HTTP ${response.status} ${response.statusText}`;
-					try {
-						const errorData = await response.json();
-						errorMsg = errorData.message || errorMsg;
-					} catch (_) {
-					}
-					throw new Error(errorMsg);
+		}).then(async (response) => {
+			if (!response.ok) {
+				let errorMsg = `HTTP ${response.status} ${response.statusText}`;
+				try {
+					const errorData = await response.json();
+					errorMsg = errorData.message || errorMsg;
+				} catch (_) {
 				}
-				return response.json();
-			})
-			.then(async (data) => {
+				throw new Error(errorMsg);
+			}
+			return response.json();
+		}).then(async (data) => {
+			if (!isMountedRef.current) return;
+			if (data.input_required) {
+				logger.log_event(`Input required for variable: ${data.var_name}`);
+				dispatch({type: 'SET_IS_RUNNING', payload: false});
+				dispatch({type: 'SET_IS_AWAITING_INPUT', payload: true});
+				dispatch({
+					type: 'SET_INPUT_REQUEST_DATA',
+					payload: {var_name: data.var_name, prompt: data.prompt, target_type: data.target_type}
+				});
+				dispatch({
+					type: 'SET_STATUS_MESSAGE',
+					payload: data.message || `Требуется ввод для ${data.var_name}...`
+				});
+				const userInput = window.prompt(data.prompt || `Введите значение для ${data.var_name} (тип ${data.target_type || 'неизв.'}):`);
 				if (!isMountedRef.current) return;
-				if (data.input_required) {
-					logger.log_event(`Input required for variable: ${data.var_name}`);
-					dispatch({type: 'SET_IS_RUNNING', payload: false});
-					dispatch({type: 'SET_IS_AWAITING_INPUT', payload: true});
-					dispatch({
-						type: 'SET_INPUT_REQUEST_DATA',
-						payload: {var_name: data.var_name, prompt: data.prompt, target_type: data.target_type}
-					});
+				if (userInput === null) {
+					dispatch({type: 'SET_STATUS_MESSAGE', payload: 'Ввод отменен. Запустите код снова, если нужно.'});
+					dispatch({type: 'SET_IS_AWAITING_INPUT', payload: false});
+					logger.log_warning('User cancelled the input prompt.');
+				} else {
 					dispatch({
 						type: 'SET_STATUS_MESSAGE',
-						payload: data.message || `Требуется ввод для ${data.var_name}...`
+						payload: `Значение '${userInput}' для '${data.var_name}' принято. Для продолжения запустите код снова.`
 					});
-					const userInput = window.prompt(data.prompt || `Введите значение для ${data.var_name} (тип ${data.target_type || 'неизв.'}):`);
-					if (!isMountedRef.current) return;
-					if (userInput === null) {
-						dispatch({
-							type: 'SET_STATUS_MESSAGE',
-							payload: 'Ввод отменен. Запустите код снова, если нужно.'
-						});
-						dispatch({type: 'SET_IS_AWAITING_INPUT', payload: false});
-						logger.log_warning('User cancelled the input prompt.');
-					} else {
-						dispatch({
-							type: 'SET_STATUS_MESSAGE',
-							payload: `Значение '${userInput}' для '${data.var_name}' принято. Для продолжения запустите код снова.`
-						});
-						dispatch({type: 'SET_IS_AWAITING_INPUT', payload: false});
-						logger.log_event(`User provided input '${userInput}' for ${data.var_name}. Manual re-run required.`);
-					}
-					if (data.finalState) {
-						if (data.finalState.robot) dispatch({type: 'SET_ROBOT_POS', payload: data.finalState.robot});
-						if (data.finalState.coloredCells) dispatch({
-							type: 'SET_COLORED_CELLS',
-							payload: new Set(data.finalState.coloredCells)
-						});
-						if (data.finalState.symbols !== undefined) dispatch({
-							type: 'SET_SYMBOLS',
-							payload: data.finalState.symbols || {}
-						});
-						if (data.finalState.radiation !== undefined) dispatch({
-							type: 'SET_RADIATION',
-							payload: data.finalState.radiation || {}
-						});
-						if (data.finalState.temperature !== undefined) dispatch({
-							type: 'SET_TEMPERATURE',
-							payload: data.finalState.temperature || {}
-						});
-						if (data.finalState.walls) dispatch({
-							type: 'SET_WALLS',
-							payload: new Set(data.finalState.walls)
-						});
-						if (data.finalState.markers) dispatch({
-							type: 'SET_MARKERS',
-							payload: data.finalState.markers || {}
-						});
-					}
-					return;
+					dispatch({type: 'SET_IS_AWAITING_INPUT', payload: false});
+					logger.log_event(`User provided input '${userInput}' for ${data.var_name}. Manual re-run required.`);
 				}
-				let animationResult = {completed: true};
-				try {
-					if (data.trace?.length > 0) {
-						dispatch({type: 'SET_IS_RUNNING', payload: true});
-						animationResult = await animateTrace(data.trace);
-						if (animationControllerRef.current.isRunning === false) {
-							dispatch({type: 'SET_IS_RUNNING', payload: false});
-						}
-					} else {
-						dispatch({type: 'SET_IS_RUNNING', payload: false});
-						dispatch({
-							type: 'SET_STATUS_MESSAGE',
-							payload: data.message || (data.success ? 'Выполнено (нет шагов).' : 'Ошибка (нет шагов).')
-						});
-					}
-				} catch (animError) {
-					console.error("Animation error:", animError);
-					logger.log_error(`Animation failed: ${animError.message}`);
-					dispatch({type: 'SET_STATUS_MESSAGE', payload: `Ошибка анимации: ${animError.message}`});
-					dispatch({type: 'SET_IS_RUNNING', payload: false});
-				}
-				if (!isMountedRef.current) return;
 				if (data.finalState) {
-					logger.log_event("Applying final state from server response.");
 					if (data.finalState.robot) dispatch({type: 'SET_ROBOT_POS', payload: data.finalState.robot});
 					if (data.finalState.coloredCells) dispatch({
 						type: 'SET_COLORED_CELLS',
@@ -455,46 +384,91 @@ const RobotSimulator = memo(() => {
 						type: 'SET_MARKERS',
 						payload: data.finalState.markers || {}
 					});
+				}
+				return;
+			}
+			let animationResult = {completed: true};
+			try {
+				if (data.trace?.length > 0) {
+					dispatch({type: 'SET_IS_RUNNING', payload: true});
+					animationResult = await animateTrace(data.trace);
 					if (animationControllerRef.current.isRunning === false) {
-						const finalMessage = data.message || (data.success ? 'Выполнение успешно завершено.' : 'Выполнение завершено с ошибкой.');
-						const finalOutput = data.finalState.output ? `\nВывод:\n${data.finalState.output.trim()}` : "";
-						dispatch({type: 'SET_STATUS_MESSAGE', payload: `${finalMessage}${finalOutput}`});
+						dispatch({type: 'SET_IS_RUNNING', payload: false});
 					}
 				} else {
-					logger.log_warning("No finalState received from server in successful/error response.");
-					if (animationControllerRef.current.isRunning === false) {
-						dispatch({
-							type: 'SET_STATUS_MESSAGE',
-							payload: data.message || 'Нет финального состояния от сервера.'
-						});
-					}
-				}
-				if (data.success) {
-					logger.log_event('Execution successful (server).');
-				} else {
-					logger.log_error(`Execution failed (server): ${data.message || '?'}`);
-				}
-				if (animationControllerRef.current.isRunning === false) {
 					dispatch({type: 'SET_IS_RUNNING', payload: false});
+					dispatch({
+						type: 'SET_STATUS_MESSAGE',
+						payload: data.message || (data.success ? 'Выполнено (нет шагов).' : 'Ошибка (нет шагов).')
+					});
 				}
-			})
-			.catch((error) => {
-				if (!isMountedRef.current) return;
-				console.error('Error during fetch /execute:', error);
-				const errorText = error.message || 'Неизвестная сетевая ошибка';
-				dispatch({type: 'SET_STATUS_MESSAGE', payload: `Ошибка сети: ${errorText}`});
-				logger.log_error(`Fetch /execute failed: ${errorText}`);
+			} catch (animError) {
+				console.error("Animation error:", animError);
+				logger.log_error(`Animation failed: ${animError.message}`);
+				dispatch({type: 'SET_STATUS_MESSAGE', payload: `Ошибка анимации: ${animError.message}`});
 				dispatch({type: 'SET_IS_RUNNING', payload: false});
-				dispatch({type: 'SET_IS_AWAITING_INPUT', payload: false});
-			});
+			}
+			if (!isMountedRef.current) return;
+			if (data.finalState) {
+				logger.log_event("Applying final state from server response.");
+				if (data.finalState.robot) dispatch({type: 'SET_ROBOT_POS', payload: data.finalState.robot});
+				if (data.finalState.coloredCells) dispatch({
+					type: 'SET_COLORED_CELLS',
+					payload: new Set(data.finalState.coloredCells)
+				});
+				if (data.finalState.symbols !== undefined) dispatch({
+					type: 'SET_SYMBOLS',
+					payload: data.finalState.symbols || {}
+				});
+				if (data.finalState.radiation !== undefined) dispatch({
+					type: 'SET_RADIATION',
+					payload: data.finalState.radiation || {}
+				});
+				if (data.finalState.temperature !== undefined) dispatch({
+					type: 'SET_TEMPERATURE',
+					payload: data.finalState.temperature || {}
+				});
+				if (data.finalState.walls) dispatch({type: 'SET_WALLS', payload: new Set(data.finalState.walls)});
+				if (data.finalState.markers) dispatch({type: 'SET_MARKERS', payload: data.finalState.markers || {}});
+				if (animationControllerRef.current.isRunning === false) {
+					const finalMessage = data.message || (data.success ? 'Выполнение успешно завершено.' : 'Выполнение завершено с ошибкой.');
+					const finalOutput = data.finalState.output ? `\nВывод:\n${data.finalState.output.trim()}` : "";
+					dispatch({type: 'SET_STATUS_MESSAGE', payload: `${finalMessage}${finalOutput}`});
+				}
+			} else {
+				logger.log_warning("No finalState received from server in successful/error response.");
+				if (animationControllerRef.current.isRunning === false) {
+					dispatch({
+						type: 'SET_STATUS_MESSAGE',
+						payload: data.message || 'Нет финального состояния от сервера.'
+					});
+				}
+			}
+			if (data.success) {
+				logger.log_event('Execution successful (server).');
+			} else {
+				logger.log_error(`Execution failed (server): ${data.message || '?'}`);
+			}
+			if (animationControllerRef.current.isRunning === false) {
+				dispatch({type: 'SET_IS_RUNNING', payload: false});
+			}
+		}).catch((error) => {
+			if (!isMountedRef.current) return;
+			console.error('Error during fetch /execute:', error);
+			const errorText = error.message || 'Неизвестная сетевая ошибка';
+			dispatch({type: 'SET_STATUS_MESSAGE', payload: `Ошибка сети: ${errorText}`});
+			logger.log_error(`Fetch /execute failed: ${errorText}`);
+			dispatch({type: 'SET_IS_RUNNING', payload: false});
+			dispatch({type: 'SET_IS_AWAITING_INPUT', payload: false});
+		});
 	}, [state.isRunning, state.isAwaitingInput, state.code, state.width, state.height, state.robotPos, state.walls, state.markers, state.coloredCells, state.symbols, state.radiation, state.temperature, animateTrace, backendUrl]);
 
 	// useEffect для обновления состояния поля на бэкенде (debounced) без изменений
-	useEffect(() => {
-		const debounceTimeout = 500;
-		const handler = setTimeout(() => {
+	useEffect(() => { /* ... (без изменений) ... */
+		const dt = 500;
+		const h = setTimeout(() => {
 			if (!isMountedRef.current) return;
-			const fieldState = {
+			const fs = {
 				width: state.width,
 				height: state.height,
 				cellSize: state.cellSize,
@@ -510,25 +484,25 @@ const RobotSimulator = memo(() => {
 				method: 'POST',
 				credentials: 'include',
 				headers: {'Content-Type': 'application/json'},
-				body: JSON.stringify(fieldState),
-			}).then(response => {
-				if (isMountedRef.current && !response.ok) {
-					logger.log_warning(`/updateField responded with status ${response.status}`);
+				body: JSON.stringify(fs),
+			}).then(r => {
+				if (isMountedRef.current && !r.ok) {
+					logger.log_warning(`/updateField responded with status ${r.status}`);
 				}
-			}).catch((error) => {
+			}).catch((e) => {
 				if (isMountedRef.current) {
-					logger.log_error(`/updateField fetch error: ${error.message}`);
+					logger.log_error(`/updateField fetch error: ${e.message}`);
 				}
 			});
-		}, debounceTimeout);
-		return () => clearTimeout(handler);
+		}, dt);
+		return () => clearTimeout(h);
 	}, [state.width, state.height, state.cellSize, state.robotPos, state.walls, state.markers, state.coloredCells, state.symbols, state.radiation, state.temperature, backendUrl]);
 
 	// useEffect для обновления постоянных стен без изменений
-	useEffect(() => {
-		const expectedPermanentWalls = setupPermanentWalls(state.width, state.height);
-		if (JSON.stringify([...state.permanentWalls].sort()) !== JSON.stringify([...expectedPermanentWalls].sort())) {
-			dispatch({type: 'SET_PERMANENT_WALLS', payload: expectedPermanentWalls});
+	useEffect(() => { /* ... (без изменений) ... */
+		const epw = setupPermanentWalls(state.width, state.height);
+		if (JSON.stringify([...state.permanentWalls].sort()) !== JSON.stringify([...epw].sort())) {
+			dispatch({type: 'SET_PERMANENT_WALLS', payload: epw});
 			logger.log_event(`Permanent walls updated for size ${state.width}x${state.height}`);
 		}
 	}, [state.width, state.height, state.permanentWalls]);
@@ -538,54 +512,35 @@ const RobotSimulator = memo(() => {
 	return (
 		<ThemeProvider theme={theme}>
 			<div className="app-container">
-				<CodeEditor
-					code={state.code}
-					setCode={c => dispatch({type: 'SET_CODE', payload: c})}
-					isRunning={state.isRunning || state.isAwaitingInput}
-					onClearCode={handleClearCode}
-					onStop={handleStop}
-					onStart={handleStart}
-					onReset={handleReset}
-					statusText={statusText}
-					speedLevel={animationSpeedLevel}
-					onSpeedChange={setAnimationSpeedLevel}
-				/>
-				<ControlPanel
-					robotPos={state.robotPos} setRobotPos={p => dispatch({type: 'SET_ROBOT_POS', payload: p})}
-					walls={state.walls} setWalls={w => dispatch({type: 'SET_WALLS', payload: w})}
-					permanentWalls={state.permanentWalls}
-					markers={state.markers} setMarkers={m => dispatch({type: 'SET_MARKERS', payload: m})}
-					coloredCells={state.coloredCells}
-					setColoredCells={c => dispatch({type: 'SET_COLORED_CELLS', payload: c})}
-					symbols={state.symbols} setSymbols={s => dispatch({type: 'SET_SYMBOLS', payload: s})}
-					radiation={state.radiation} setRadiation={r => dispatch({type: 'SET_RADIATION', payload: r})}
-					temperature={state.temperature}
-					setTemperature={t => dispatch({type: 'SET_TEMPERATURE', payload: t})}
-					width={state.width} setWidth={v => dispatch({type: 'SET_WIDTH', payload: v})}
-					height={state.height} setHeight={v => dispatch({type: 'SET_HEIGHT', payload: v})}
-					editMode={state.editMode} setEditMode={v => dispatch({type: 'SET_EDIT_MODE', payload: v})}
-					setStatusMessage={m => dispatch({type: 'SET_STATUS_MESSAGE', payload: m})}
-				/>
-				<Field
-					canvasRef={canvasRef}
-					robotPos={state.robotPos}
-					walls={state.walls}
-					permanentWalls={state.permanentWalls}
-					markers={state.markers}
-					coloredCells={state.coloredCells}
-					symbols={state.symbols}
-					width={state.width}
-					height={state.height}
-					cellSize={state.cellSize}
-					editMode={state.editMode}
-					statusMessage={state.statusMessage}
-					setRobotPos={p => dispatch({type: 'SET_ROBOT_POS', payload: p})}
-					setWalls={w => dispatch({type: 'SET_WALLS', payload: w})}
-					setMarkers={m => dispatch({type: 'SET_MARKERS', payload: m})}
-					setColoredCells={c => dispatch({type: 'SET_COLORED_CELLS', payload: c})}
-					setCellSize={v => dispatch({type: 'SET_CELL_SIZE', payload: v})}
-					setStatusMessage={m => dispatch({type: 'SET_STATUS_MESSAGE', payload: m})}
-				/>
+				<CodeEditor code={state.code} setCode={c => dispatch({type: 'SET_CODE', payload: c})}
+				            isRunning={state.isRunning || state.isAwaitingInput} onClearCode={handleClearCode}
+				            onStop={handleStop} onStart={handleStart} onReset={handleReset} statusText={statusText}
+				            speedLevel={animationSpeedLevel} onSpeedChange={setAnimationSpeedLevel}/>
+				<ControlPanel robotPos={state.robotPos} setRobotPos={p => dispatch({type: 'SET_ROBOT_POS', payload: p})}
+				              walls={state.walls} setWalls={w => dispatch({type: 'SET_WALLS', payload: w})}
+				              permanentWalls={state.permanentWalls} markers={state.markers}
+				              setMarkers={m => dispatch({type: 'SET_MARKERS', payload: m})}
+				              coloredCells={state.coloredCells}
+				              setColoredCells={c => dispatch({type: 'SET_COLORED_CELLS', payload: c})}
+				              symbols={state.symbols} setSymbols={s => dispatch({type: 'SET_SYMBOLS', payload: s})}
+				              radiation={state.radiation}
+				              setRadiation={r => dispatch({type: 'SET_RADIATION', payload: r})}
+				              temperature={state.temperature}
+				              setTemperature={t => dispatch({type: 'SET_TEMPERATURE', payload: t})} width={state.width}
+				              setWidth={v => dispatch({type: 'SET_WIDTH', payload: v})} height={state.height}
+				              setHeight={v => dispatch({type: 'SET_HEIGHT', payload: v})} editMode={state.editMode}
+				              setEditMode={v => dispatch({type: 'SET_EDIT_MODE', payload: v})}
+				              setStatusMessage={m => dispatch({type: 'SET_STATUS_MESSAGE', payload: m})}/>
+				<Field canvasRef={canvasRef} robotPos={state.robotPos} walls={state.walls}
+				       permanentWalls={state.permanentWalls} markers={state.markers} coloredCells={state.coloredCells}
+				       symbols={state.symbols} width={state.width} height={state.height} cellSize={state.cellSize}
+				       editMode={state.editMode} statusMessage={state.statusMessage}
+				       setRobotPos={p => dispatch({type: 'SET_ROBOT_POS', payload: p})}
+				       setWalls={w => dispatch({type: 'SET_WALLS', payload: w})}
+				       setMarkers={m => dispatch({type: 'SET_MARKERS', payload: m})}
+				       setColoredCells={c => dispatch({type: 'SET_COLORED_CELLS', payload: c})}
+				       setCellSize={v => dispatch({type: 'SET_CELL_SIZE', payload: v})}
+				       setStatusMessage={m => dispatch({type: 'SET_STATUS_MESSAGE', payload: m})}/>
 			</div>
 		</ThemeProvider>
 	);
