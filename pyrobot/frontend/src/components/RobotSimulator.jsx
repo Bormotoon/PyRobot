@@ -6,7 +6,7 @@ import ControlPanel from './ControlPanel/ControlPanel';
 import Field from './Field/Field';
 import theme from '../styles/theme';
 import {getHint} from './hints';
-import logger from '../../Logger';
+import logger from '../Logger';
 import io from 'socket.io-client';
 
 const backendUrl = process.env.REACT_APP_BACKEND_URL || `http://${window.location.hostname}:5000`;
