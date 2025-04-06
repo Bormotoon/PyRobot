@@ -5,20 +5,34 @@ import CodeEditor from './CodeEditor/CodeEditor';
 import ControlPanel from './ControlPanel/ControlPanel';
 import Field from './Field/Field';
 import theme from '../styles/theme';
-import {getHint} from './hints';
+import {getHint} from './hints'; // Импортируем обновленные подсказки
 import logger from '../Logger';
 import io from 'socket.io-client';
 
 const backendUrl = process.env.REACT_APP_BACKEND_URL || `http://${window.location.hostname}:5000`;
 
+// initialState, setupPermanentWalls, clampRobotPos, reducer без изменений
 const initialState = {
-	code: `использовать Робот\nалг\nнач\n  вправо\n  вниз\n  вправо\nкон`, isRunning: false, isAwaitingInput: false,
-	statusMessage: getHint('initial'), width: 7, height: 7, cellSize: 50, robotPos: {x: 0, y: 0},
-	walls: new Set(), permanentWalls: new Set(), markers: {}, coloredCells: new Set(),
-	symbols: {}, radiation: {}, temperature: {}, editMode: false, inputRequestData: null,
+	code: `использовать Робот\nалг\nнач\n  вправо\n  вниз\n  вправо\nкон`,
+	isRunning: false,
+	isAwaitingInput: false,
+	statusMessage: getHint('initial'),
+	width: 7,
+	height: 7,
+	cellSize: 50,
+	robotPos: {x: 0, y: 0},
+	walls: new Set(),
+	permanentWalls: new Set(),
+	markers: {},
+	coloredCells: new Set(),
+	symbols: {},
+	radiation: {},
+	temperature: {},
+	editMode: false,
+	inputRequestData: null,
 };
 
-function setupPermanentWalls(width, height) { /* ... */
+function setupPermanentWalls(width, height) {
 	const nw = new Set();
 	for (let x = 0; x < width; x++) {
 		nw.add(`${x},0,${x + 1},0`);
@@ -31,16 +45,18 @@ function setupPermanentWalls(width, height) { /* ... */
 	return nw;
 }
 
-function clampRobotPos(robotPos, width, height) { /* ... */
-	const cX = Math.min(Math.max(robotPos?.x ?? 0, 0), width - 1);
-	const cY = Math.min(Math.max(robotPos?.y ?? 0, 0), height - 1);
-	if (robotPos?.x !== cX || robotPos?.y !== cY) {
-		return {x: cX, y: cY};
+function clampRobotPos(robotPos, width, height) {
+	const currentX = robotPos?.x ?? 0;
+	const currentY = robotPos?.y ?? 0;
+	const clampedX = Math.min(Math.max(currentX, 0), width - 1);
+	const clampedY = Math.min(Math.max(currentY, 0), height - 1);
+	if (currentX !== clampedX || currentY !== clampedY) {
+		return {x: clampedX, y: clampedY};
 	}
 	return robotPos;
 }
 
-function reducer(state, action) { /* ... (без изменений) ... */
+function reducer(state, action) {
 	let nextState;
 	switch (action.type) {
 		case 'SET_CODE':
@@ -130,7 +146,7 @@ function reducer(state, action) { /* ... (без изменений) ... */
 				height: ih,
 				permanentWalls: setupPermanentWalls(iw, ih),
 				robotPos: clampRobotPos(initialState.robotPos, iw, ih),
-				statusMessage: 'Симулятор сброшен.',
+				statusMessage: getHint('reset'),
 				isRunning: false,
 				isAwaitingInput: false,
 				inputRequestData: null
@@ -146,8 +162,7 @@ function reducer(state, action) { /* ... (без изменений) ... */
 
 const RobotSimulator = memo(() => {
 	const [state, dispatch] = useReducer(reducer, initialState, (init) => ({
-		...init,
-		permanentWalls: setupPermanentWalls(init.width, init.height)
+		...init, permanentWalls: setupPermanentWalls(init.width, init.height)
 	}));
 	const [animationSpeedLevel, setAnimationSpeedLevel] = useState(2);
 	const canvasRef = useRef(null);
@@ -158,7 +173,8 @@ const RobotSimulator = memo(() => {
 		}, isRunning: false
 	});
 
-	useEffect(() => { /* ... (WebSocket без изменений) ... */
+	// WebSocket useEffect без изменений
+	useEffect(() => {
 		isMountedRef.current = true;
 		logger.log_event('Connecting WebSocket...');
 		const socket = io(backendUrl, {reconnectionAttempts: 5, timeout: 10000});
@@ -197,28 +213,34 @@ const RobotSimulator = memo(() => {
 		};
 	}, [backendUrl]);
 
-	const handleClearCode = useCallback(() => { /* ... (без изменений) ... */
+	// --->>> ОБНОВЛЯЕМ ПОДСКАЗКИ У ОБРАБОТЧИКОВ <<<---
+	const handleClearCode = useCallback(() => {
 		dispatch({type: 'SET_CODE', payload: `использовать Робот\nалг\nнач\n  \nкон`});
-		dispatch({type: 'SET_STATUS_MESSAGE', payload: 'Код очищен.'});
+		dispatch({type: 'SET_STATUS_MESSAGE', payload: getHint('codeCleared')}); // Новая подсказка
 		logger.log_event('Code cleared by user.');
-	}, []);
-	const handleStop = useCallback(() => { /* ... (без изменений) ... */
+	}, [/* зависимости не изменились */]);
+
+	const handleStop = useCallback(() => {
 		animationControllerRef.current.stop();
 		dispatch({type: 'SET_IS_RUNNING', payload: false});
 		dispatch({type: 'SET_IS_AWAITING_INPUT', payload: false});
-		dispatch({type: 'SET_STATUS_MESSAGE', payload: 'Выполнение остановлено.'});
+		dispatch({type: 'SET_STATUS_MESSAGE', payload: getHint('executionStoppedByUser')}); // Новая подсказка
 		logger.log_event('Execution stopped by user.');
-	}, []);
-	const handleReset = useCallback(() => { /* ... (без изменений) ... */
+	}, [/* зависимости не изменились */]);
+
+	const handleReset = useCallback(() => {
 		animationControllerRef.current.stop();
-		dispatch({type: 'RESET_STATE'});
+		dispatch({type: 'RESET_STATE'}); // Редьюсер сам установит getHint('reset')
 		logger.log_event('Simulator state reset by user.');
-		fetch(`${backendUrl}/reset`, {method: 'POST', credentials: 'include'}).then(res => {
-			if (!res.ok) logger.log_warning(`/reset request failed with status ${res.status}`); else logger.log_event('/reset request successful.');
-		}).catch(e => logger.log_error(`/reset fetch error: ${e.message}`));
+		fetch(`${backendUrl}/reset`, {method: 'POST', credentials: 'include'})
+			.then(res => {
+				if (!res.ok) logger.log_warning(`/reset request failed with status ${res.status}`); else logger.log_event('/reset request successful.');
+			})
+			.catch(e => logger.log_error(`/reset fetch error: ${e.message}`));
 	}, [backendUrl]);
 
-	const animateTrace = useCallback(async (trace) => { /* ... (анимация без изменений) ... */
+	// Функция анимации animateTrace без изменений (она уже использует SET_STATUS_MESSAGE внутри)
+	const animateTrace = useCallback(async (trace) => { /* ... без изменений ... */
 		if (!trace || !Array.isArray(trace) || trace.length === 0) {
 			logger.log_event('Animation skipped: No trace data.');
 			return {completed: true};
@@ -287,15 +309,16 @@ const RobotSimulator = memo(() => {
 		return {completed: true};
 	}, [animationSpeedLevel]);
 
-	const handleStart = useCallback(() => { /* ... (логика handleStart без изменений) ... */
+	// --->>> ОБНОВЛЯЕМ ПОДСКАЗКИ В handleStart <<<---
+	const handleStart = useCallback(() => {
 		if (state.isRunning || state.isAwaitingInput) {
 			logger.log_warning(`Start prevented: isRunning=${state.isRunning}, isAwaitingInput=${state.isAwaitingInput}`);
 			dispatch({
 				type: 'SET_STATUS_MESSAGE',
-				payload: state.isAwaitingInput ? 'Ожидание ввода...' : 'Выполнение уже идет...'
+				payload: state.isAwaitingInput ? getHint('inputRequired') + ` ${state.inputRequestData?.var_name ?? ''}` : 'Выполнение уже идет...'
 			});
 			return;
-		}
+		} // Используем подсказку
 		if (!state.code.trim()) {
 			dispatch({type: 'SET_STATUS_MESSAGE', payload: 'Код для выполнения пуст.'});
 			return;
@@ -303,7 +326,7 @@ const RobotSimulator = memo(() => {
 		dispatch({type: 'SET_IS_AWAITING_INPUT', payload: false});
 		dispatch({type: 'SET_INPUT_REQUEST_DATA', payload: null});
 		dispatch({type: 'SET_IS_RUNNING', payload: true});
-		dispatch({type: 'SET_STATUS_MESSAGE', payload: 'Запрос на выполнение...'});
+		dispatch({type: 'SET_STATUS_MESSAGE', payload: getHint('executionStartRequest')}); // Новая подсказка
 		logger.log_event('Requesting code execution...');
 		const currentFieldState = {
 			width: state.width,
@@ -322,46 +345,100 @@ const RobotSimulator = memo(() => {
 			credentials: 'include',
 			headers: {'Content-Type': 'application/json'},
 			body: JSON.stringify({code: state.code, fieldState: currentFieldState}),
-		}).then(async (response) => {
-			if (!response.ok) {
-				let errorMsg = `HTTP ${response.status} ${response.statusText}`;
-				try {
-					const errorData = await response.json();
-					errorMsg = errorData.message || errorMsg;
-				} catch (_) {
+		})
+			.then(async (response) => {
+				if (!response.ok) {
+					let errorMsg = `HTTP ${response.status} ${response.statusText}`;
+					try {
+						const errorData = await response.json();
+						errorMsg = errorData.message || errorMsg;
+					} catch (_) {
+					}
+					throw new Error(errorMsg);
 				}
-				throw new Error(errorMsg);
-			}
-			return response.json();
-		}).then(async (data) => {
-			if (!isMountedRef.current) return;
-			if (data.input_required) {
-				logger.log_event(`Input required for variable: ${data.var_name}`);
-				dispatch({type: 'SET_IS_RUNNING', payload: false});
-				dispatch({type: 'SET_IS_AWAITING_INPUT', payload: true});
-				dispatch({
-					type: 'SET_INPUT_REQUEST_DATA',
-					payload: {var_name: data.var_name, prompt: data.prompt, target_type: data.target_type}
-				});
-				dispatch({
-					type: 'SET_STATUS_MESSAGE',
-					payload: data.message || `Требуется ввод для ${data.var_name}...`
-				});
-				const userInput = window.prompt(data.prompt || `Введите значение для ${data.var_name} (тип ${data.target_type || 'неизв.'}):`);
+				return response.json();
+			})
+			.then(async (data) => {
 				if (!isMountedRef.current) return;
-				if (userInput === null) {
-					dispatch({type: 'SET_STATUS_MESSAGE', payload: 'Ввод отменен. Запустите код снова, если нужно.'});
-					dispatch({type: 'SET_IS_AWAITING_INPUT', payload: false});
-					logger.log_warning('User cancelled the input prompt.');
-				} else {
+				if (data.input_required) {
+					logger.log_event(`Input required for variable: ${data.var_name}`);
+					dispatch({type: 'SET_IS_RUNNING', payload: false});
+					dispatch({type: 'SET_IS_AWAITING_INPUT', payload: true});
 					dispatch({
-						type: 'SET_STATUS_MESSAGE',
-						payload: `Значение '${userInput}' для '${data.var_name}' принято. Для продолжения запустите код снова.`
+						type: 'SET_INPUT_REQUEST_DATA',
+						payload: {var_name: data.var_name, prompt: data.prompt, target_type: data.target_type}
 					});
-					dispatch({type: 'SET_IS_AWAITING_INPUT', payload: false});
-					logger.log_event(`User provided input '${userInput}' for ${data.var_name}. Manual re-run required.`);
+					// Используем новую подсказку
+					dispatch({type: 'SET_STATUS_MESSAGE', payload: `${getHint('inputRequired')} ${data.var_name}`});
+					const userInput = window.prompt(data.prompt || `Введите значение для ${data.var_name} (тип ${data.target_type || 'неизв.'}):`);
+					if (!isMountedRef.current) return;
+					if (userInput === null) {
+						// Используем новую подсказку
+						dispatch({type: 'SET_STATUS_MESSAGE', payload: getHint('inputCancelled')});
+						dispatch({type: 'SET_IS_AWAITING_INPUT', payload: false});
+						logger.log_warning('User cancelled the input prompt.');
+					} else {
+						// Используем новую подсказку
+						dispatch({
+							type: 'SET_STATUS_MESSAGE',
+							payload: `${getHint('inputReceivedNeedsRestart')} Значение: '${userInput}'.`
+						});
+						dispatch({type: 'SET_IS_AWAITING_INPUT', payload: false});
+						logger.log_event(`User provided input '${userInput}' for ${data.var_name}. Manual re-run required.`);
+					}
+					if (data.finalState) {
+						if (data.finalState.robot) dispatch({type: 'SET_ROBOT_POS', payload: data.finalState.robot});
+						if (data.finalState.coloredCells) dispatch({
+							type: 'SET_COLORED_CELLS',
+							payload: new Set(data.finalState.coloredCells)
+						});
+						if (data.finalState.symbols !== undefined) dispatch({
+							type: 'SET_SYMBOLS',
+							payload: data.finalState.symbols || {}
+						});
+						if (data.finalState.radiation !== undefined) dispatch({
+							type: 'SET_RADIATION',
+							payload: data.finalState.radiation || {}
+						});
+						if (data.finalState.temperature !== undefined) dispatch({
+							type: 'SET_TEMPERATURE',
+							payload: data.finalState.temperature || {}
+						});
+						if (data.finalState.walls) dispatch({
+							type: 'SET_WALLS',
+							payload: new Set(data.finalState.walls)
+						});
+						if (data.finalState.markers) dispatch({
+							type: 'SET_MARKERS',
+							payload: data.finalState.markers || {}
+						});
+					}
+					return;
 				}
+				let animationResult = {completed: true};
+				try {
+					if (data.trace?.length > 0) {
+						dispatch({type: 'SET_IS_RUNNING', payload: true});
+						animationResult = await animateTrace(data.trace);
+						if (animationControllerRef.current.isRunning === false) {
+							dispatch({type: 'SET_IS_RUNNING', payload: false});
+						}
+					} else {
+						dispatch({type: 'SET_IS_RUNNING', payload: false});
+						dispatch({
+							type: 'SET_STATUS_MESSAGE',
+							payload: data.message || (data.success ? getHint('executionFinishedSuccess') : getHint('executionFinishedError') + ' (нет шагов)')
+						});
+					} // Подсказки успеха/ошибки
+				} catch (animError) {
+					console.error("Animation error:", animError);
+					logger.log_error(`Animation failed: ${animError.message}`);
+					dispatch({type: 'SET_STATUS_MESSAGE', payload: `Ошибка анимации: ${animError.message}`});
+					dispatch({type: 'SET_IS_RUNNING', payload: false});
+				}
+				if (!isMountedRef.current) return;
 				if (data.finalState) {
+					logger.log_event("Applying final state from server response.");
 					if (data.finalState.robot) dispatch({type: 'SET_ROBOT_POS', payload: data.finalState.robot});
 					if (data.finalState.coloredCells) dispatch({
 						type: 'SET_COLORED_CELLS',
@@ -384,91 +461,48 @@ const RobotSimulator = memo(() => {
 						type: 'SET_MARKERS',
 						payload: data.finalState.markers || {}
 					});
-				}
-				return;
-			}
-			let animationResult = {completed: true};
-			try {
-				if (data.trace?.length > 0) {
-					dispatch({type: 'SET_IS_RUNNING', payload: true});
-					animationResult = await animateTrace(data.trace);
 					if (animationControllerRef.current.isRunning === false) {
-						dispatch({type: 'SET_IS_RUNNING', payload: false});
+						// Используем новые подсказки для успеха/ошибки
+						const finalMessage = data.success ? getHint('executionFinishedSuccess') : `${getHint('executionFinishedError')} ${data.message || '?'}`;
+						const finalOutput = data.finalState.output ? `\nВывод:\n${data.finalState.output.trim()}` : "";
+						dispatch({type: 'SET_STATUS_MESSAGE', payload: `${finalMessage}${finalOutput}`});
 					}
 				} else {
+					logger.log_warning("No finalState received from server in successful/error response.");
+					if (animationControllerRef.current.isRunning === false) {
+						dispatch({
+							type: 'SET_STATUS_MESSAGE',
+							payload: data.message || 'Нет финального состояния от сервера.'
+						});
+					}
+				}
+				if (data.success) {
+					logger.log_event('Execution successful (server).');
+				} else {
+					logger.log_error(`Execution failed (server): ${data.message || '?'}`);
+				}
+				if (animationControllerRef.current.isRunning === false) {
 					dispatch({type: 'SET_IS_RUNNING', payload: false});
-					dispatch({
-						type: 'SET_STATUS_MESSAGE',
-						payload: data.message || (data.success ? 'Выполнено (нет шагов).' : 'Ошибка (нет шагов).')
-					});
 				}
-			} catch (animError) {
-				console.error("Animation error:", animError);
-				logger.log_error(`Animation failed: ${animError.message}`);
-				dispatch({type: 'SET_STATUS_MESSAGE', payload: `Ошибка анимации: ${animError.message}`});
+			})
+			.catch((error) => {
+				if (!isMountedRef.current) return;
+				console.error('Error during fetch /execute:', error);
+				const errorText = error.message || 'Неизвестная сетевая ошибка';
+				// Используем новую подсказку
+				dispatch({type: 'SET_STATUS_MESSAGE', payload: `${getHint('networkError')} ${errorText}`});
+				logger.log_error(`Fetch /execute failed: ${errorText}`);
 				dispatch({type: 'SET_IS_RUNNING', payload: false});
-			}
-			if (!isMountedRef.current) return;
-			if (data.finalState) {
-				logger.log_event("Applying final state from server response.");
-				if (data.finalState.robot) dispatch({type: 'SET_ROBOT_POS', payload: data.finalState.robot});
-				if (data.finalState.coloredCells) dispatch({
-					type: 'SET_COLORED_CELLS',
-					payload: new Set(data.finalState.coloredCells)
-				});
-				if (data.finalState.symbols !== undefined) dispatch({
-					type: 'SET_SYMBOLS',
-					payload: data.finalState.symbols || {}
-				});
-				if (data.finalState.radiation !== undefined) dispatch({
-					type: 'SET_RADIATION',
-					payload: data.finalState.radiation || {}
-				});
-				if (data.finalState.temperature !== undefined) dispatch({
-					type: 'SET_TEMPERATURE',
-					payload: data.finalState.temperature || {}
-				});
-				if (data.finalState.walls) dispatch({type: 'SET_WALLS', payload: new Set(data.finalState.walls)});
-				if (data.finalState.markers) dispatch({type: 'SET_MARKERS', payload: data.finalState.markers || {}});
-				if (animationControllerRef.current.isRunning === false) {
-					const finalMessage = data.message || (data.success ? 'Выполнение успешно завершено.' : 'Выполнение завершено с ошибкой.');
-					const finalOutput = data.finalState.output ? `\nВывод:\n${data.finalState.output.trim()}` : "";
-					dispatch({type: 'SET_STATUS_MESSAGE', payload: `${finalMessage}${finalOutput}`});
-				}
-			} else {
-				logger.log_warning("No finalState received from server in successful/error response.");
-				if (animationControllerRef.current.isRunning === false) {
-					dispatch({
-						type: 'SET_STATUS_MESSAGE',
-						payload: data.message || 'Нет финального состояния от сервера.'
-					});
-				}
-			}
-			if (data.success) {
-				logger.log_event('Execution successful (server).');
-			} else {
-				logger.log_error(`Execution failed (server): ${data.message || '?'}`);
-			}
-			if (animationControllerRef.current.isRunning === false) {
-				dispatch({type: 'SET_IS_RUNNING', payload: false});
-			}
-		}).catch((error) => {
-			if (!isMountedRef.current) return;
-			console.error('Error during fetch /execute:', error);
-			const errorText = error.message || 'Неизвестная сетевая ошибка';
-			dispatch({type: 'SET_STATUS_MESSAGE', payload: `Ошибка сети: ${errorText}`});
-			logger.log_error(`Fetch /execute failed: ${errorText}`);
-			dispatch({type: 'SET_IS_RUNNING', payload: false});
-			dispatch({type: 'SET_IS_AWAITING_INPUT', payload: false});
-		});
-	}, [state.isRunning, state.isAwaitingInput, state.code, state.width, state.height, state.robotPos, state.walls, state.markers, state.coloredCells, state.symbols, state.radiation, state.temperature, animateTrace, backendUrl]);
+				dispatch({type: 'SET_IS_AWAITING_INPUT', payload: false});
+			});
+	}, [state.isRunning, state.isAwaitingInput, state.inputRequestData, state.code, state.width, state.height, state.robotPos, state.walls, state.markers, state.coloredCells, state.symbols, state.radiation, state.temperature, animateTrace, backendUrl]); // Добавил inputRequestData
 
-	// useEffect для обновления состояния поля на бэкенде (debounced) без изменений
-	useEffect(() => { /* ... (без изменений) ... */
-		const dt = 500;
-		const h = setTimeout(() => {
+	// useEffect для /updateField без изменений
+	useEffect(() => {
+		const debounceTimeout = 500;
+		const handler = setTimeout(() => {
 			if (!isMountedRef.current) return;
-			const fs = {
+			const fieldState = {
 				width: state.width,
 				height: state.height,
 				cellSize: state.cellSize,
@@ -484,25 +518,25 @@ const RobotSimulator = memo(() => {
 				method: 'POST',
 				credentials: 'include',
 				headers: {'Content-Type': 'application/json'},
-				body: JSON.stringify(fs),
-			}).then(r => {
-				if (isMountedRef.current && !r.ok) {
-					logger.log_warning(`/updateField responded with status ${r.status}`);
+				body: JSON.stringify(fieldState),
+			}).then(response => {
+				if (isMountedRef.current && !response.ok) {
+					logger.log_warning(`/updateField responded with status ${response.status}`);
 				}
-			}).catch((e) => {
+			}).catch((error) => {
 				if (isMountedRef.current) {
-					logger.log_error(`/updateField fetch error: ${e.message}`);
+					logger.log_error(`/updateField fetch error: ${error.message}`);
 				}
 			});
-		}, dt);
-		return () => clearTimeout(h);
+		}, debounceTimeout);
+		return () => clearTimeout(handler);
 	}, [state.width, state.height, state.cellSize, state.robotPos, state.walls, state.markers, state.coloredCells, state.symbols, state.radiation, state.temperature, backendUrl]);
 
-	// useEffect для обновления постоянных стен без изменений
-	useEffect(() => { /* ... (без изменений) ... */
-		const epw = setupPermanentWalls(state.width, state.height);
-		if (JSON.stringify([...state.permanentWalls].sort()) !== JSON.stringify([...epw].sort())) {
-			dispatch({type: 'SET_PERMANENT_WALLS', payload: epw});
+	// useEffect для permanentWalls без изменений
+	useEffect(() => {
+		const expectedPermanentWalls = setupPermanentWalls(state.width, state.height);
+		if (JSON.stringify([...state.permanentWalls].sort()) !== JSON.stringify([...expectedPermanentWalls].sort())) {
+			dispatch({type: 'SET_PERMANENT_WALLS', payload: expectedPermanentWalls});
 			logger.log_event(`Permanent walls updated for size ${state.width}x${state.height}`);
 		}
 	}, [state.width, state.height, state.permanentWalls]);

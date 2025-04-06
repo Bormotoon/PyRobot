@@ -1,13 +1,14 @@
 // FILE START: Field.jsx
 import React, {memo, useCallback, useEffect, useState, useRef} from 'react';
 import {Card, Typography} from '@mui/material';
-import {drawField, drawStaticLayer} from '../canvasDrawing';
-import {getHint} from '../hints';
+import {drawField, drawStaticLayer} from '../canvasDrawing'; // Уточните путь
+import {getHint} from '../hints'; // Уточните путь
 import './Field.css';
-import logger from '../../Logger';
+import logger from '../../Logger'; // Уточните путь
 
 const Field = memo(({
-	                    canvasRef, robotPos, walls, permanentWalls, markers, coloredCells, symbols,
+	                    canvasRef,
+	                    robotPos, walls, permanentWalls, markers, coloredCells, symbols,
 	                    width, height, cellSize, editMode, statusMessage,
 	                    setRobotPos, setWalls, setMarkers, setColoredCells, setCellSize, setStatusMessage,
                     }) => {
@@ -16,6 +17,7 @@ const Field = memo(({
 	const staticLayerNeedsUpdate = useRef(true);
 	const [isDraggingRobot, setIsDraggingRobot] = useState(false);
 
+	// Эффект для статического слоя (без изменений)
 	useEffect(() => {
 		if (!canvasRef.current) {
 			console.error("Main canvas Ref not available in static layer effect.");
@@ -57,6 +59,7 @@ const Field = memo(({
 		}
 	}, [width, height, cellSize, canvasRef]);
 
+	// Эффект для динамического слоя (без изменений)
 	useEffect(() => {
 		const displayCanvas = canvasRef.current;
 		const offscreenCanvas = offscreenCanvasRef.current;
@@ -80,7 +83,10 @@ const Field = memo(({
 		drawField(displayCanvas, offscreenCanvas, dynamicConfig);
 	}, [canvasRef, robotPos, walls, permanentWalls, markers, coloredCells, symbols, width, height, cellSize]);
 
-	const getCanvasCoords = useCallback((event) => {
+	// --- Обработчики событий мыши ---
+
+	// getCanvasCoords и toGridCoords без изменений
+	const getCanvasCoords = useCallback((event) => { /* ... */
 		const canvas = canvasRef.current;
 		if (!canvas) return {x: null, y: null};
 		const rect = canvas.getBoundingClientRect();
@@ -109,8 +115,7 @@ const Field = memo(({
 		}
 		return {x, y};
 	}, [canvasRef]);
-
-	const toGridCoords = useCallback((px, py) => {
+	const toGridCoords = useCallback((px, py) => { /* ... */
 		if (cellSize <= 0) return {gridX: 0, gridY: 0};
 		let gx = Math.floor(px / cellSize);
 		let gy = Math.floor(py / cellSize);
@@ -119,6 +124,7 @@ const Field = memo(({
 		return {gridX: gx, gridY: gy};
 	}, [cellSize, width, height]);
 
+	// --->>> ОБНОВЛЯЕМ ПОДСКАЗКИ В handleWallsAndCells <<<---
 	const handleWallsAndCells = useCallback((gridX, gridY, pixelX, pixelY) => {
 		if (cellSize <= 0) return;
 		const wallMargin = Math.max(2, Math.min(8, cellSize * 0.12));
@@ -129,82 +135,99 @@ const Field = memo(({
 		else if (yRemainder > cellSize - wallMargin && gridY < height - 1) wallKey = `${gridX},${gridY + 1},${gridX + 1},${gridY + 1}`;
 		else if (xRemainder < wallMargin && gridX > 0) wallKey = `${gridX},${gridY},${gridX},${gridY + 1}`;
 		else if (xRemainder > cellSize - wallMargin && gridX < width - 1) wallKey = `${gridX + 1},${gridY},${gridX + 1},${gridY + 1}`;
-		if (wallKey) {
+
+		if (wallKey) { // Клик на границе
 			if (permanentWalls.has(wallKey)) {
-				setStatusMessage('Нельзя изменить границу поля.');
+				// Используем новый ключ подсказки
+				setStatusMessage(getHint('canvasLeftClickEditModePermanentWall', true));
 				logger.log_warning("[Wall Action] Attempted to modify permanent wall: " + wallKey);
 			} else {
 				setWalls(prevWalls => {
-					const nw = new Set(prevWalls);
-					if (nw.has(wallKey)) {
-						nw.delete(wallKey);
-						setStatusMessage(getHint('canvasLeftClickEditMode', true) + ' Стена удалена.');
+					const newWalls = new Set(prevWalls);
+					if (newWalls.has(wallKey)) {
+						newWalls.delete(wallKey);
+						// Используем новый ключ подсказки
+						setStatusMessage(getHint('canvasLeftClickEditModeWallRemove', true));
 						logger.log_event("[Wall Action] Wall removed via click: " + wallKey);
 					} else {
-						nw.add(wallKey);
-						setStatusMessage(getHint('canvasLeftClickEditMode', true) + ' Стена поставлена.');
+						newWalls.add(wallKey);
+						// Используем новый ключ подсказки
+						setStatusMessage(getHint('canvasLeftClickEditModeWallAdd', true));
 						logger.log_event("[Wall Action] Wall added via click: " + wallKey);
 					}
-					return nw;
+					return newWalls;
 				});
 			}
-		} else {
+		} else { // Клик на клетке
 			const cellKey = `${gridX},${gridY}`;
 			setColoredCells(prevCells => {
-				const nc = new Set(prevCells);
-				if (nc.has(cellKey)) {
-					nc.delete(cellKey);
-					setStatusMessage(getHint('canvasLeftClickEditMode', true) + ' Клетка очищена.');
+				const newCells = new Set(prevCells);
+				if (newCells.has(cellKey)) {
+					newCells.delete(cellKey);
+					// Используем новый ключ подсказки
+					setStatusMessage(getHint('canvasLeftClickEditModeCellClear', true));
 					logger.log_event("[Cell Action] Cell cleared via click: " + cellKey);
 				} else {
-					nc.add(cellKey);
-					setStatusMessage(getHint('canvasLeftClickEditMode', true) + ' Клетка закрашена.');
+					newCells.add(cellKey);
+					// Используем новый ключ подсказки
+					setStatusMessage(getHint('canvasLeftClickEditModeCellPaint', true));
 					logger.log_event("[Cell Action] Cell painted via click: " + cellKey);
 				}
-				return nc;
+				return newCells;
 			});
 		}
 	}, [cellSize, width, height, permanentWalls, setWalls, setColoredCells, setStatusMessage, logger]);
 
+	// --->>> ОБНОВЛЯЕМ ПОДСКАЗКИ В handleMouseDown <<<---
 	const handleMouseDown = useCallback((e) => {
 		if (e.button !== 0) return;
 		e.preventDefault();
 		const {x: pixelX, y: pixelY} = getCanvasCoords(e);
-		if (pixelX === null || pixelY === null) return;
+		if (pixelX === null || pixelY === null) {
+			return;
+		}
 		const {gridX, gridY} = toGridCoords(pixelX, pixelY);
 		if (editMode) {
 			if (robotPos && gridX === robotPos.x && gridY === robotPos.y) {
 				setIsDraggingRobot(true);
-				setStatusMessage('Перетаскивание робота...');
+				// Используем новый ключ подсказки
+				setStatusMessage(getHint('robotDragStart', true));
 				logger.log_robot_drag_start(robotPos);
 			} else {
 				handleWallsAndCells(gridX, gridY, pixelX, pixelY);
 			}
 		} else {
+			// Используем новый ключ подсказки
 			setStatusMessage(getHint('canvasLeftClickNoEdit', false));
 			logger.log_event('Left click ignored (not in edit mode).');
 		}
 	}, [editMode, robotPos, getCanvasCoords, toGridCoords, setStatusMessage, handleWallsAndCells, setIsDraggingRobot, logger]);
 
-	const handleMouseMove = useCallback((e) => {
+	// handleMouseMove без изменений
+	const handleMouseMove = useCallback((e) => { /* ... */
 		if (!isDraggingRobot) return;
 		e.preventDefault();
 		const {x: pixelX, y: pixelY} = getCanvasCoords(e);
-		if (pixelX === null || pixelY === null) return;
+		if (pixelX === null || pixelY === null) {
+			return;
+		}
 		const {gridX, gridY} = toGridCoords(pixelX, pixelY);
 		if (robotPos && (gridX !== robotPos.x || gridY !== robotPos.y)) {
 			setRobotPos({x: gridX, y: gridY});
 		}
 	}, [isDraggingRobot, getCanvasCoords, toGridCoords, setRobotPos, robotPos]);
 
+	// --->>> ОБНОВЛЯЕМ ПОДСКАЗКИ В handleMouseUp <<<---
 	const handleMouseUp = useCallback((e) => {
 		if (!isDraggingRobot || e.button !== 0) return;
 		e.preventDefault();
 		setIsDraggingRobot(false);
-		setStatusMessage(`Робот перемещен в (${robotPos?.x ?? '?'}, ${robotPos?.y ?? '?'}).`);
+		// Используем новый ключ и добавляем позицию
+		setStatusMessage(`${getHint('robotDragEnd', true)} (${robotPos?.x ?? '?'}, ${robotPos?.y ?? '?'}).`);
 		logger.log_robot_drag_end(robotPos);
 	}, [isDraggingRobot, setStatusMessage, robotPos, setIsDraggingRobot, logger]);
 
+	// --->>> ОБНОВЛЯЕМ ПОДСКАЗКИ В handleCanvasRightClick <<<---
 	const handleCanvasRightClick = useCallback((e) => {
 		e.preventDefault();
 		const {x: pixelX, y: pixelY} = getCanvasCoords(e);
@@ -213,24 +236,28 @@ const Field = memo(({
 			const {gridX, gridY} = toGridCoords(pixelX, pixelY);
 			const posKey = `${gridX},${gridY}`;
 			setMarkers(prevMarkers => {
-				const nm = {...prevMarkers};
-				if (nm[posKey]) {
-					delete nm[posKey];
-					setStatusMessage(getHint('canvasRightClickEditMode', true) + ' Маркер убран.');
+				const newMarkers = {...prevMarkers};
+				if (newMarkers[posKey]) {
+					delete newMarkers[posKey];
+					// Используем новый ключ подсказки
+					setStatusMessage(getHint('canvasRightClickEditModeMarkerRemove', true));
 					logger.log_event("[Marker Action] Marker removed via right click: " + posKey);
 				} else {
-					nm[posKey] = 1;
-					setStatusMessage(getHint('canvasRightClickEditMode', true) + ' Маркер добавлен.');
+					newMarkers[posKey] = 1;
+					// Используем новый ключ подсказки
+					setStatusMessage(getHint('canvasRightClickEditModeMarkerAdd', true));
 					logger.log_event("[Marker Action] Marker added via right click: " + posKey);
 				}
-				return nm;
+				return newMarkers;
 			});
 		} else {
+			// Используем новый ключ подсказки
 			setStatusMessage(getHint('canvasRightClickNoEdit', false));
 			logger.log_event('Right click ignored (not in edit mode).');
 		}
 	}, [editMode, getCanvasCoords, toGridCoords, setMarkers, setStatusMessage, logger]);
 
+	// --->>> ОБНОВЛЯЕМ ПОДСКАЗКИ В handleWheel <<<---
 	const handleWheel = useCallback((e) => {
 		e.preventDefault();
 		const delta = Math.sign(e.deltaY);
@@ -239,22 +266,25 @@ const Field = memo(({
 		const maxCellSize = 180;
 		let newSize;
 		const oldSize = cellSize;
-		if (delta < 0) {
+
+		if (delta < 0) { // Приближение
 			newSize = Math.min(maxCellSize, Math.round(oldSize * zoomFactor));
 			if (newSize > oldSize) {
-				setStatusMessage(getHint('wheelZoomIn'));
+				setStatusMessage(getHint('wheelZoomIn')); // Старый ключ подходит
 				logger.log_event(`[Zoom] Changed cell size from ${oldSize} to ${newSize} (+)`);
 			} else {
-				setStatusMessage('Достигнут максимальный масштаб.');
+				// Используем новый ключ подсказки
+				setStatusMessage(getHint('zoomMaxReached'));
 				return;
 			}
-		} else {
+		} else { // Отдаление
 			newSize = Math.max(minCellSize, Math.round(oldSize / zoomFactor));
 			if (newSize < oldSize) {
-				setStatusMessage(getHint('wheelZoomOut'));
+				setStatusMessage(getHint('wheelZoomOut')); // Старый ключ подходит
 				logger.log_event(`[Zoom] Changed cell size from ${oldSize} to ${newSize} (-)`);
 			} else {
-				setStatusMessage('Достигнут минимальный масштаб.');
+				// Используем новый ключ подсказки
+				setStatusMessage(getHint('zoomMinReached'));
 				return;
 			}
 		}
@@ -262,6 +292,7 @@ const Field = memo(({
 		setCellSize(newSize);
 	}, [cellSize, setCellSize, setStatusMessage, logger]);
 
+	// Глобальные слушатели без изменений
 	useEffect(() => {
 		if (isDraggingRobot) {
 			window.addEventListener('mousemove', handleMouseMove);
@@ -279,23 +310,29 @@ const Field = memo(({
 		}
 	}, [isDraggingRobot, handleMouseMove, handleMouseUp]);
 
+	// --- Рендер компонента ---
 	return (
 		<div className="field-area">
+			{/* Карточка с canvas */}
 			<Card className="field-card" elevation={3}>
-				<canvas ref={canvasRef}
-				        className={`robot-canvas ${editMode ? 'edit-mode' : ''} ${isDraggingRobot ? 'dragging' : ''}`}
-				        onMouseDown={handleMouseDown} onContextMenu={handleCanvasRightClick} onWheel={handleWheel}
-				        onTouchStart={handleMouseDown} style={{
-					display: 'block',
-					maxWidth: '100%',
-					maxHeight: '100%',
-					width: 'auto',
-					height: 'auto',
-					aspectRatio: `${width || 1} / ${height || 1}`,
-					cursor: editMode ? (isDraggingRobot ? 'grabbing' : 'crosshair') : 'default',
-					touchAction: 'none'
-				}}/>
+				<canvas
+					ref={canvasRef}
+					className={`robot-canvas ${editMode ? 'edit-mode' : ''} ${isDraggingRobot ? 'dragging' : ''}`}
+					onMouseDown={handleMouseDown} onContextMenu={handleCanvasRightClick} onWheel={handleWheel}
+					onTouchStart={handleMouseDown}
+					style={{
+						display: 'block',
+						maxWidth: '100%',
+						maxHeight: '100%',
+						width: 'auto',
+						height: 'auto',
+						aspectRatio: `${width || 1} / ${height || 1}`,
+						cursor: editMode ? (isDraggingRobot ? 'grabbing' : 'crosshair') : 'default',
+						touchAction: 'none'
+					}}
+				/>
 			</Card>
+			{/* Карточка статуса */}
 			<Card className="status-card" elevation={2} sx={{mt: 1, width: '100%'}}>
 				<Typography variant="body2" component="div" className="status-text" sx={{
 					minHeight: '60px',
@@ -305,7 +342,9 @@ const Field = memo(({
 					padding: '8px',
 					whiteSpace: 'pre-wrap',
 					wordBreak: 'break-word'
-				}}> {statusMessage || ' '} </Typography>
+				}}>
+					{statusMessage || ' '}
+				</Typography>
 			</Card>
 		</div>
 	);
