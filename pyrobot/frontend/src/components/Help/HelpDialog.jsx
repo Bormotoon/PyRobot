@@ -26,10 +26,14 @@ const HelpDialog = ({open, onClose}) => {
 	 */
 	useEffect(() => {
 		if (open) {
+			// process.env.PUBLIC_URL - это правильный способ получить путь к папке public
 			fetch(`${process.env.PUBLIC_URL}/manual.html`)
-				.then(response => response.text())
+				.then(response => response.ok ? response.text() : Promise.reject(`HTTP error ${response.status}`)) // Проверка статуса ответа
 				.then(html => setManualContent(html))
-				.catch(err => setManualContent('<p>Ошибка загрузки инструкции.</p>'));
+				.catch(err => {
+					console.error("Failed to load manual.html:", err);
+					setManualContent('<p style="color: red;"><strong>Ошибка:</strong> Не удалось загрузить файл справки.</p>');
+				});
 		}
 	}, [open]);
 
