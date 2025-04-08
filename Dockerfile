@@ -65,7 +65,7 @@ RUN addgroup --system --gid 1001 appgroup && \
 
 # Копируем зависимости бэкенда
 # Предполагается, что у вас есть requirements.txt в корне папки backend
-COPY pyrobot/backend/requirements.txt ./
+COPY requirements.txt ./
 # Если используете poetry:
 # COPY pyrobot/backend/pyproject.toml pyrobot/backend/poetry.lock* ./
 # RUN pip install --no-cache-dir poetry && poetry config virtualenvs.create false && poetry install --no-dev --no-interaction --no-ansi
