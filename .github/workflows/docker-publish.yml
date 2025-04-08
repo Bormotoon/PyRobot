@@ -35,7 +35,7 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.actor }} # Или github.repository_owner
-          password: ${{ secrets.GITHUB_TOKEN }} # Используем встроенный токен
+          password: ${{ secrets.GHCR_ACTION_TOKEN }} # Используем встроенный токен
 
       - name: Extract Docker metadata
         id: meta
