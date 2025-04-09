@@ -1,11 +1,14 @@
+# FILE START: robot_commands.py
 """
 robot_commands.py
 Описание: Обрабатывает и делегирует команды управления роботом.
 """
 import logging
 
-# Import RobotError if used
-from .robot_state import RobotError, SimulatedRobot
+# Import RobotError from the new exceptions file
+from .kumir_exceptions import RobotError
+# SimulatedRobot нужен для проверки типа и вызова методов
+from .robot_state import SimulatedRobot
 
 logger = logging.getLogger('RobotCommands')
 
@@ -16,9 +19,8 @@ ROBOT_ACTIONS = {
 	"вверх": "go_up",
 	"вниз": "go_down",
 	"закрасить": "do_paint"
-	# Добавить другие команды по мере необходимости (н-р, маркеры)
-	# "положить маркер": "put_marker",
-	# "поднять маркер": "pick_marker",
+	# "положить маркер": "put_marker", # Пример, если будет добавлено
+	# "поднять маркер": "pick_marker", # Пример, если будет добавлено
 }
 
 
@@ -43,30 +45,27 @@ def process_robot_command(line, robot):
 	if cmd in ROBOT_ACTIONS:
 		method_name = ROBOT_ACTIONS[cmd]
 		try:
-			# Получаем метод робота по имени
 			method_to_call = getattr(robot, method_name)
 		except AttributeError:
 			logger.error(f"Internal Error: Robot object lacks method '{method_name}' for command '{cmd}'")
-			# This indicates a mismatch between ROBOT_ACTIONS and SimulatedRobot class
 			raise AttributeError(f"У объекта робота нет метода '{method_name}'")
 
 		logger.info(f"Executing robot command: {cmd} (calling method {method_name})")
 		try:
-			# Вызываем метод робота
-			method_to_call()
-			# Если метод не вызвал исключение, команда считается выполненной
+			method_to_call()  # Вызываем метод робота
 			logger.debug(f"Robot command '{cmd}' executed successfully by robot object.")
-			return True  # Команда распознана и выполнена (или попытка выполнения произведена)
+			return True
 		except RobotError as e:
-			# Перехватываем специфические ошибки робота (стена, уже закрашено и т.д.)
+			# Перехватываем и пробрасываем ошибки робота
 			logger.warning(f"Robot command '{cmd}' failed: {e}")
-			# Пробрасываем ошибку дальше, чтобы интерпретатор мог ее обработать
-			raise e
+			raise e  # Пробрасываем выше для обработки интерпретатором
 		except Exception as e:
-			# Перехватываем другие неожиданные ошибки из методов робота
+			# Перехватываем другие неожиданные ошибки
 			logger.error(f"Unexpected error during robot command '{cmd}': {e}", exc_info=True)
-			raise  # Пробрасываем неожиданные ошибки
+			raise  # Пробрасываем выше
+
 	else:
-		# Строка не является известной командой робота
 		logger.debug(f"'{cmd}' is not a known robot command.")
 		return False
+
+# FILE END: robot_commands.py

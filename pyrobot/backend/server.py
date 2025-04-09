@@ -1,6 +1,5 @@
 # FILE START: server.py
 import logging
-
 import eventlet
 
 eventlet.monkey_patch()
@@ -12,14 +11,15 @@ from flask_socketio import SocketIO, join_room, emit
 import os
 from pathlib import Path
 
-from .kumir_interpreter.interpreter import KumirLanguageInterpreter, KumirExecutionError, KumirEvalError
-from .kumir_interpreter.declarations import KumirInputRequiredError
-from .kumir_interpreter.robot_state import RobotError
+# Импортируем интерпретатор и нужные исключения из нового файла
+from .kumir_interpreter.interpreter import KumirLanguageInterpreter
+from .kumir_interpreter.kumir_exceptions import (KumirExecutionError, KumirEvalError,
+                                                 KumirInputRequiredError, RobotError,
+                                                 DeclarationError, AssignmentError, InputOutputError)
 
 app = Flask(__name__)
 
 # --- Настройки CORS, Сессии, Логирования, Песочницы ---
-# (Код остается таким же, как в предыдущем ответе)
 allowed_origins = os.environ.get('CORS_ALLOWED_ORIGINS', "http://localhost:3000").split(',')
 CORS(app, supports_credentials=True, origins=allowed_origins)
 logger = logging.getLogger('FlaskServer')
@@ -34,14 +34,21 @@ redis_host = os.environ.get('REDIS_HOST', 'localhost');
 redis_port = int(os.environ.get('REDIS_PORT', 6379));
 redis_db = int(os.environ.get('REDIS_DB', 0))
 try:
-	redis_client = redis.Redis(host=redis_host, port=redis_port, db=redis_db);
+	redis_client = redis.Redis(host=redis_host, port=redis_port, db=redis_db, socket_timeout=5,
+	                           socket_connect_timeout=5);
 	redis_client.ping();
 	app.config['SESSION_REDIS'] = redis_client;
 	logger.info(f"Session storage configured for Redis at {redis_host}:{redis_port}, DB: {redis_db}")
 except redis.exceptions.ConnectionError as redis_err:
-	logger.error(f"CRITICAL: Failed to connect to Redis: {redis_err}"); app.config[
-		'SESSION_TYPE'] = 'filesystem'; logger.warning("Falling back to 'filesystem' session type.")
-app.config['SESSION_COOKIE_SAMESITE'] = os.environ.get('SESSION_COOKIE_SAMESITE', 'Lax')
+	logger.error(f"CRITICAL: Failed to connect to Redis: {redis_err}");
+	app.config['SESSION_TYPE'] = 'filesystem';
+	logger.warning("Falling back to 'filesystem' session type.")
+except Exception as redis_other_err:
+	logger.error(f"CRITICAL: Error configuring Redis: {redis_other_err}");
+	app.config['SESSION_TYPE'] = 'filesystem';
+	logger.warning("Falling back to 'filesystem' session type.")
+
+app.config['SESSION_COOKIE_SAMESITE'] = os.environ.get('SESSION_COOKIE_SAMESITE', 'Lax');
 app.config['SESSION_COOKIE_SECURE'] = os.environ.get('SESSION_COOKIE_SECURE', 'False').lower() == 'true'
 logger.info(f"Session cookie Samesite: {app.config['SESSION_COOKIE_SAMESITE']}");
 logger.info(f"Session cookie Secure flag: {app.config['SESSION_COOKIE_SECURE']}")
@@ -74,7 +81,7 @@ def get_field_state_from_session():
 		if s is not None: logger.warning(f"Invalid type for field_state in session: {type(s)}. Clearing."); session.pop(
 			'field_state', None); session.modified = True
 		return None
-	width_ok = isinstance(s.get('width'), int) and s['width'] > 0
+	width_ok = isinstance(s.get('width'), int) and s['width'] > 0;
 	height_ok = isinstance(s.get('height'), int) and s['height'] > 0
 	pos_ok = isinstance(s.get('robotPos'), dict) and isinstance(s['robotPos'].get('x'), int) and isinstance(
 		s['robotPos'].get('y'), int)
@@ -82,68 +89,60 @@ def get_field_state_from_session():
 		logger.debug("Valid field state retrieved from session."); return s
 	else:
 		logger.warning(f"Invalid field state content in session. Clearing."); session.pop('field_state',
-																						  None); session.modified = True; return None
+		                                                                                  None); session.modified = True; return None
 
 
-# --->>> ОБНОВЛЕННАЯ ВАЛИДАЦИЯ в /updateField <<<---
+# --- Эндпоинты Flask ---
 @app.route('/updateField', methods=['POST'])
 def update_field():
-	"""Обновляет состояние поля, сохраненное в сессии, с валидацией."""
-	if not request.is_json:
-		logger.warning("Request to /updateField is not JSON.")
-		return jsonify({'success': False, 'message': 'Invalid content type, expected JSON.'}), 415
-
-	d = request.json
-	if not isinstance(d, dict):
-		return jsonify({'success': False, 'message': 'Invalid data format, expected a JSON object.'}), 400
+	if not request.is_json: logger.warning("Request to /updateField is not JSON."); return jsonify(
+		{'success': False, 'message': 'Invalid content type, expected JSON.'}), 415
+	d = request.json;
+	if not isinstance(d, dict): return jsonify(
+		{'success': False, 'message': 'Invalid data format, expected a JSON object.'}), 400
 
 	errors = {}
-	# Валидация основных полей
 	width = d.get('width');
 	height = d.get('height');
 	robotPos = d.get('robotPos');
 	cellSize = d.get('cellSize')
-	if not (isinstance(width, int) and width > 0): errors['width'] = "Must be a positive integer."
-	if not (isinstance(height, int) and height > 0): errors['height'] = "Must be a positive integer."
-	if not (isinstance(robotPos, dict) and isinstance(robotPos.get('x'), int) and isinstance(robotPos.get('y'), int)):
-		errors['robotPos'] = "Must be an object with integer 'x' and 'y'."
-	if not (isinstance(cellSize, int) and cellSize > 0): errors['cellSize'] = "Must be a positive integer."
 
-	# Валидация коллекций (базовая)
+	if not (isinstance(width, int) and width > 0):
+		errors['width'] = "Must be a positive integer."
+	if not (isinstance(height, int) and height > 0):
+		errors['height'] = "Must be a positive integer."
+	if not (isinstance(robotPos, dict) and isinstance(robotPos.get('x'), int) and isinstance(robotPos.get('y'), int)):
+		# --->>> ИСПРАВЛЕННЫЙ ОТСТУП <<<---
+		errors['robotPos'] = "Must be an object with integer 'x' and 'y'."
+	if not (isinstance(cellSize, int) and cellSize > 0):
+		errors['cellSize'] = "Must be a positive integer."
+
+	# Валидация коллекций (остается без изменений)
 	if not isinstance(d.get('walls'), list):
 		errors['walls'] = "Must be a list."
-	elif not all(isinstance(w, str) for w in d['walls']):
-		errors['walls'] = "All elements must be strings."
-
+	elif not all(isinstance(w, str) for w in d.get('walls', [])):
+		errors['walls'] = "All elements must be strings."  # Добавил .get с default
 	if not isinstance(d.get('markers'), dict): errors['markers'] = "Must be an object/dict."
-	# Можно добавить проверку ключей/значений маркеров, если нужно
-
 	if not isinstance(d.get('coloredCells'), list):
 		errors['coloredCells'] = "Must be a list."
-	elif not all(isinstance(c, str) for c in d['coloredCells']):
-		errors['coloredCells'] = "All elements must be strings."
-
+	elif not all(isinstance(c, str) for c in d.get('coloredCells', [])):
+		errors['coloredCells'] = "All elements must be strings."  # Добавил .get с default
 	if not isinstance(d.get('symbols'), dict): errors['symbols'] = "Must be an object/dict."
-	# Можно добавить проверку структуры символов, если нужно
-
 	if not isinstance(d.get('radiation'), dict): errors['radiation'] = "Must be an object/dict."
 	if not isinstance(d.get('temperature'), dict): errors['temperature'] = "Must be an object/dict."
 
-	if errors:
-		logger.warning(f"Invalid data received in /updateField: {errors}. Data: {d}")
-		return jsonify({'success': False, 'message': 'Invalid field data.', 'errors': errors}), 400
+	if errors: logger.warning(f"Invalid data received in /updateField: {errors}. Data: {d}"); return jsonify(
+		{'success': False, 'message': 'Invalid field data.', 'errors': errors}), 400
 
-	logger.info("Updating field state in session (data validated).")
+	logger.info("Updating field state in session (data validated).");
 	session['field_state'] = d;
 	session.modified = True
 	return jsonify({'success': True, 'message': 'Field state updated in session.'}), 200
 
 
-# --- <<< КОНЕЦ ИЗМЕНЕНИЙ /updateField >>> ---
-
 @app.route('/execute', methods=['POST'])
 def execute_code():
-	# ... (Логика execute_code остается без изменений с предыдущего шага) ...
+	# ... (Остальной код execute_code без изменений) ...
 	session_id_for_log = session.get('sid', 'None');
 	logger.debug(f"Session @ /execute start for SID {session_id_for_log}: {dict(session.items())}");
 	logger.info(f"Execute code request received (Session SID: {session_id_for_log})")
@@ -181,15 +180,14 @@ def execute_code():
 				logger.error(f"Error emitting progress to SID {current_sid}: {emit_err}")
 
 		result = interpreter.interpret(progress_callback=progress_callback)
-		if result.get('input_required'):
-			logger.info(f"Execution requires input for variable '{result.get('var_name')}'. Returning input request.")
-			result['trace'] = result.get('trace', []);
-			return jsonify(result), 200
+		if result.get('input_required'): logger.info(
+			f"Execution requires input for variable '{result.get('var_name')}'. Returning input request."); result[
+			'trace'] = result.get('trace', []); return jsonify(result), 200
 		trace_data = result.get('trace', []);
 		final_state_data = result.get('finalState')
 		response_data = {'success': result.get('success', False),
-						 'message': result.get('message', 'OK' if result.get('success') else 'Unknown Error'),
-						 'finalState': final_state_data, 'trace': trace_data}
+		                 'message': result.get('message', 'OK' if result.get('success') else 'Unknown Error'),
+		                 'finalState': final_state_data, 'trace': trace_data}
 		if not response_data['success']:
 			response_data['errorIndex'] = result.get('errorIndex', -1); logger.warning(
 				f"Execution finished with error: {response_data['message']} (Error Index: {response_data.get('errorIndex')})")
@@ -198,13 +196,13 @@ def execute_code():
 			try:
 				if interpreter and final_state_data and final_state_data.get('robot') is not None:
 					field_state_to_save = {'width': interpreter.width, 'height': interpreter.height,
-										   'robotPos': final_state_data.get('robot'),
-										   'walls': final_state_data.get('walls', []),
-										   'markers': final_state_data.get('markers', {}),
-										   'coloredCells': final_state_data.get('coloredCells', []),
-										   'symbols': final_state_data.get('symbols', {}),
-										   'radiation': final_state_data.get('radiation', {}),
-										   'temperature': final_state_data.get('temperature', {})}
+					                       'robotPos': final_state_data.get('robot'),
+					                       'walls': final_state_data.get('walls', []),
+					                       'markers': final_state_data.get('markers', {}),
+					                       'coloredCells': final_state_data.get('coloredCells', []),
+					                       'symbols': final_state_data.get('symbols', {}),
+					                       'radiation': final_state_data.get('radiation', {}),
+					                       'temperature': final_state_data.get('temperature', {})}
 					field_state_to_save = {k: v for k, v in field_state_to_save.items() if v is not None};
 					session['field_state'] = field_state_to_save;
 					session.modified = True;
@@ -214,21 +212,21 @@ def execute_code():
 			except Exception as save_err:
 				logger.error(f"Error saving final state to session: {save_err}", exc_info=True)
 		return jsonify(response_data), 200
-	except (KumirExecutionError, KumirEvalError, RobotError, KumirInputRequiredError) as e:
-		err_msg = f"Ошибка выполнения Кумир: {str(e)}";
+	except (KumirExecutionError, KumirEvalError, RobotError, KumirInputRequiredError, DeclarationError, AssignmentError,
+	        InputOutputError) as e:
+		err_msg = f"Ошибка выполнения: {str(e)}";
 		logger.error(err_msg, exc_info=False)
-		output_on_error = interpreter.output if interpreter and hasattr(interpreter, 'output') else ""
+		output_on_error = interpreter.output if interpreter and hasattr(interpreter, 'output') else "";
 		state_on_error = {};
+		error_index = -1
 		try:
 			state_on_error = interpreter.get_state() if interpreter and hasattr(interpreter, 'get_state') else {};
-			state_on_error["output"] = output_on_error
+			state_on_error["output"] = output_on_error; error_index = getattr(e, 'line_index', -1)
 		except Exception as getStateErr:
 			logger.error(f"Error getting state after Kumir error: {getStateErr}"); state_on_error = {
 				"output": output_on_error}
-		error_index = getattr(e, 'line_index', -1) if isinstance(e,
-																 (KumirExecutionError, KumirInputRequiredError)) else -1
 		return jsonify({'success': False, 'message': err_msg, 'finalState': state_on_error, 'trace': trace_data,
-						'errorIndex': error_index}), 200
+		                'errorIndex': error_index}), 200
 	except Exception as e:
 		logger.exception("Unexpected server error during code execution.")
 		output_on_error = interpreter.output if interpreter and hasattr(interpreter, 'output') else "";
@@ -239,7 +237,7 @@ def execute_code():
 			pass
 		state_on_error["output"] = output_on_error
 		return jsonify({'success': False, 'message': f'Внутренняя ошибка сервера: {type(e).__name__}',
-						'finalState': state_on_error, 'trace': trace_data}), 500
+		                'finalState': state_on_error, 'trace': trace_data}), 500
 
 
 @app.route('/reset', methods=['POST'])
@@ -252,11 +250,11 @@ def reset_simulator_session():
 	return jsonify({'success': True, 'message': 'Состояние поля сброшено в сессии.'}), 200
 
 
-# Обработчики SocketIO без изменений
+# --- Обработчики SocketIO ---
 @socketio.on('connect')
 def handle_connect(): logger.info(f"WebSocket client connected: SID={request.sid}"); session[
 	'sid'] = request.sid; session.modified = True; join_room(request.sid); emit('connection_ack',
-																				{'sid': request.sid}); logger.debug(
+                                                                                {'sid': request.sid}); logger.debug(
 	f"SID '{request.sid}' saved to Flask session. Session keys: {list(session.keys())}")
 
 
@@ -268,7 +266,7 @@ def handle_disconnect(*args): sid = request.sid; logger.info(f"WebSocket client 
 def default_error_handler(e): logger.error(f"SocketIO error: {e}", exc_info=True)
 
 
-# Запуск сервера без изменений
+# --- Запуск сервера ---
 if __name__ == '__main__':
 	host = os.environ.get('HOST', '0.0.0.0');
 	port = int(os.environ.get('PORT', 5000));

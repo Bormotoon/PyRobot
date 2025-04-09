@@ -1,178 +1,253 @@
+# FILE START: robot_state.py
 import logging
 
+# Импортируем RobotError из нового файла
+from .kumir_exceptions import RobotError
+
 logger = logging.getLogger('SimulatedRobot')
+# ... (остальной код логгера без изменений) ...
 logger.propagate = False
 if not logger.handlers:
-	h = logging.StreamHandler();
-	h.setFormatter(logging.Formatter('%(asctime)s-SR-%(levelname)s-%(message)s'));
+	h = logging.StreamHandler()
+	h.setFormatter(logging.Formatter('%(asctime)s - %(name)s:%(lineno)d - %(levelname)s - %(message)s'))
 	logger.addHandler(h)
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.INFO)  # Уровень можно настроить
 
 
-class RobotError(Exception): pass
-
+# Определение RobotError УДАЛЕНО
 
 class SimulatedRobot:
 	""" Состояние и действия симулированного робота на поле. """
 
 	def __init__(self, width, height, initial_pos=None, initial_walls=None, initial_markers=None,
-				 initial_colored_cells=None, initial_symbols=None, initial_radiation=None,
-				 initial_temperature=None):  # <-- Add new initial states
-		if not isinstance(width, int) or width < 1: raise ValueError("Width>0")
-		if not isinstance(height, int) or height < 1: raise ValueError("Height>0")
-		self.width = width;
-		self.height = height;
+	             initial_colored_cells=None, initial_symbols=None, initial_radiation=None,
+	             initial_temperature=None):
+		if not isinstance(width, int) or width < 1: raise ValueError("Width must be a positive integer")
+		if not isinstance(height, int) or height < 1: raise ValueError("Height must be a positive integer")
+		self.width = width
+		self.height = height
 		self.logger = logger
+		# Используем _clamp_pos для инициализации, чтобы гарантировать корректность
 		self.robot_pos = self._clamp_pos(initial_pos or {'x': 0, 'y': 0})
-		self.walls = initial_walls if initial_walls is not None else set()
-		self.markers = initial_markers if initial_markers is not None else {}
-		self.colored_cells = initial_colored_cells if initial_colored_cells is not None else set()
-		self.symbols = initial_symbols if initial_symbols is not None else {}
-		# --- NEW: Initialize radiation and temperature state ---
-		self.radiation = initial_radiation if initial_radiation is not None else {}  # { "x,y": float_value }
-		self.temperature = initial_temperature if initial_temperature is not None else {}  # { "x,y": int_value }
-		# -------------------------------------------------------
+		# Гарантируем, что это множества
+		self.walls = set(initial_walls) if initial_walls is not None else set()
+		self.colored_cells = set(initial_colored_cells) if initial_colored_cells is not None else set()
+		# Гарантируем, что это словари
+		self.markers = dict(initial_markers) if initial_markers is not None else {}
+		self.symbols = dict(initial_symbols) if initial_symbols is not None else {}
+		self.radiation = dict(initial_radiation) if initial_radiation is not None else {}
+		self.temperature = dict(initial_temperature) if initial_temperature is not None else {}
+
 		self.permanent_walls = self._setup_permanent_walls()
-		self.logger.info(f"Robot init: {width}x{height} @ {self.robot_pos}")
+		self.logger.info(
+			f"Robot initialized: {width}x{height} at {self.robot_pos}. Walls: {len(self.walls)}, Markers: {len(self.markers)}, Colored: {len(self.colored_cells)}")
 
 	def _clamp_pos(self, pos):
-		x = min(max(0, pos.get('x', 0)), self.width - 1);
-		y = min(max(0, pos.get('y', 0)), self.height - 1);
-		return {'x': x, 'y': y}
+		# Гарантирует, что координаты находятся в пределах поля
+		x = 0
+		y = 0
+		if isinstance(pos, dict):
+			# Проверяем тип перед доступом
+			raw_x = pos.get('x', 0)
+			raw_y = pos.get('y', 0)
+			try:
+				x = int(raw_x)
+			except (ValueError, TypeError):
+				self.logger.warning(f"Invalid initial X position '{raw_x}', using 0.")
+				x = 0
+			try:
+				y = int(raw_y)
+			except (ValueError, TypeError):
+				self.logger.warning(f"Invalid initial Y position '{raw_y}', using 0.")
+				y = 0
+		else:
+			self.logger.warning(f"Invalid initial_pos format: {pos}. Using (0,0).")
+
+		clamped_x = min(max(0, x), self.width - 1)
+		clamped_y = min(max(0, y), self.height - 1)
+		return {'x': clamped_x, 'y': clamped_y}
 
 	def _setup_permanent_walls(self):
+		# Создает множество строк, представляющих границы поля
 		w = set()
+		# Горизонтальные
 		for x in range(self.width):
-			w.add(f"{x},0,{x + 1},0")
-			w.add(f"{x},{self.height},{x + 1},{self.height}")
+			w.add(f"{x},0,{x + 1},0")  # Верхняя граница
+			w.add(f"{x},{self.height},{x + 1},{self.height}")  # Нижняя граница
+		# Вертикальные
 		for y in range(self.height):
-			w.add(f"0,{y},0,{y + 1}")
-			w.add(f"{self.width},{y},{self.width},{y + 1}")
+			w.add(f"0,{y},0,{y + 1}")  # Левая граница
+			w.add(f"{self.width},{y},{self.width},{y + 1}")  # Правая граница
 		return w
 
 	def reset(self, new_width=None, new_height=None):
 		""" Resets robot state, optionally resizes. """
+		# ... (код reset без изменений) ...
 		if new_width is not None and isinstance(new_width, int) and new_width >= 1: self.width = new_width
 		if new_height is not None and isinstance(new_height, int) and new_height >= 1: self.height = new_height
-		self.robot_pos = {'x': 0, 'y': 0};
+		self.robot_pos = {'x': 0, 'y': 0}
 		self.walls.clear();
 		self.markers.clear();
-		self.colored_cells.clear();
-		self.symbols.clear()
+		self.colored_cells.clear()
+		self.symbols.clear();
 		self.radiation.clear();
-		self.temperature.clear()  # <-- Clear new states on reset
-		self.permanent_walls = self._setup_permanent_walls();
-		self.logger.info(f"Reset: {self.width}x{self.height}, Pos {self.robot_pos}.")
+		self.temperature.clear()
+		self.permanent_walls = self._setup_permanent_walls()
+		self.logger.info(f"Robot Reset: Field size {self.width}x{self.height}, Position {self.robot_pos}.")
 
-	def is_move_allowed(self, tx, ty):
-		if not (0 <= tx < self.width and 0 <= ty < self.height):
+	def _is_wall_between(self, x1, y1, x2, y2):
+		""" Проверяет наличие стены (пользовательской или границы) между двумя соседними клетками. """
+		wall_key = None
+		# Определяем ключ стены в зависимости от направления
+		if x2 > x1:  # Движение вправо
+			wall_key = f"{x2},{y1},{x2},{y1 + 1}"  # Правая стена клетки (x1, y1)
+		elif x1 > x2:  # Движение влево
+			wall_key = f"{x1},{y1},{x1},{y1 + 1}"  # Левая стена клетки (x1, y1)
+		elif y2 > y1:  # Движение вниз
+			wall_key = f"{x1},{y2},{x1 + 1},{y2}"  # Нижняя стена клетки (x1, y1)
+		elif y1 > y2:  # Движение вверх
+			wall_key = f"{x1},{y1},{x1 + 1},{y1}"  # Верхняя стена клетки (x1, y1)
+
+		if wall_key:
+			# Проверяем наличие стены в пользовательских стенах и границах
+			return wall_key in self.walls or wall_key in self.permanent_walls
+		return False  # Нет движения или не соседние клетки
+
+	def is_move_allowed(self, target_x, target_y):
+		""" Проверяет, разрешено ли движение в целевую клетку. """
+		# 1. Проверка выхода за границы поля
+		if not (0 <= target_x < self.width and 0 <= target_y < self.height):
+			self.logger.debug(
+				f"Move denied: Target ({target_x},{target_y}) is outside field bounds (0..{self.width - 1}, 0..{self.height - 1}).")
 			return False
-		cx, cy = self.robot_pos["x"], self.robot_pos["y"]
-		wk = None
-		if tx > cx:
-			wk = f"{tx},{cy},{tx},{cy + 1}"
-		elif tx < cx:
-			wk = f"{cx},{cy},{cx},{cy + 1}"
-		elif ty > cy:
-			wk = f"{cx},{ty},{cx + 1},{ty}"
-		elif ty < cy:
-			wk = f"{cx},{cy},{cx + 1},{cy}"
-		else:
-			return True
-		if wk and (wk in self.permanent_walls or wk in self.walls):
+
+		# 2. Проверка наличия стены между текущей и целевой клетками
+		current_x, current_y = self.robot_pos["x"], self.robot_pos["y"]
+		if self._is_wall_between(current_x, current_y, target_x, target_y):
+			self.logger.debug(
+				f"Move denied: Wall detected between ({current_x},{current_y}) and ({target_x},{target_y}).")
 			return False
+
+		# Если прошли все проверки - движение разрешено
 		return True
 
-	# Movement methods - unchanged
+	# --- Методы движения (используют is_move_allowed) ---
 	def go_right(self):
-		nx, ty = self.robot_pos["x"] + 1, self.robot_pos["y"];
-		if self.is_move_allowed(nx, ty):
+		nx, ny = self.robot_pos["x"] + 1, self.robot_pos["y"]
+		if self.is_move_allowed(nx, ny):
 			self.robot_pos["x"] = nx
-			self.logger.info(f"Moved R->{self.robot_pos}")
+			self.logger.info(f"Moved Right -> ({nx},{ny})")
 		else:
-			raise RobotError("Стена/граница R")
+			raise RobotError("Стена/граница справа!")
 
 	def go_left(self):
-		nx, ty = self.robot_pos["x"] - 1, self.robot_pos["y"]
-		if self.is_move_allowed(nx, ty):
+		nx, ny = self.robot_pos["x"] - 1, self.robot_pos["y"]
+		if self.is_move_allowed(nx, ny):
 			self.robot_pos["x"] = nx
-			self.logger.info(f"Moved L->{self.robot_pos}")
+			self.logger.info(f"Moved Left -> ({nx},{ny})")
 		else:
-			raise RobotError("Стена/граница L")
+			raise RobotError("Стена/граница слева!")
 
 	def go_up(self):
-		tx, ny = self.robot_pos["x"], self.robot_pos["y"] - 1
-		if self.is_move_allowed(tx, ny):
+		nx, ny = self.robot_pos["x"], self.robot_pos["y"] - 1
+		if self.is_move_allowed(nx, ny):
 			self.robot_pos["y"] = ny
-			self.logger.info(f"Moved U->{self.robot_pos}")
+			self.logger.info(f"Moved Up -> ({nx},{ny})")
 		else:
-			raise RobotError("Стена/граница U")
+			raise RobotError("Стена/граница сверху!")
 
 	def go_down(self):
-		tx, ny = self.robot_pos["x"], self.robot_pos["y"] + 1
-		if self.is_move_allowed(tx, ny):
+		nx, ny = self.robot_pos["x"], self.robot_pos["y"] + 1
+		if self.is_move_allowed(nx, ny):
 			self.robot_pos["y"] = ny
-			self.logger.info(f"Moved D->{self.robot_pos}")
+			self.logger.info(f"Moved Down -> ({nx},{ny})")
 		else:
-			raise RobotError("Стена/граница D")
+			raise RobotError("Стена/граница снизу!")
 
+	# --- Метод закраски (без ошибки при повторе) ---
 	def do_paint(self):
+		""" Закрашивает текущую клетку. Не генерирует ошибку, если уже закрашена. """
 		k = f"{self.robot_pos['x']},{self.robot_pos['y']}"
 		if k in self.colored_cells:
-			self.logger.warning(f"Cell {k} already.")
+			self.logger.debug(f"Cell {k} is already painted. No action taken.")  # Используем debug или info
 		else:
 			self.colored_cells.add(k)
-		self.logger.info(f"Cell {k} painted.")
+			self.logger.info(f"Cell {k} painted.")
 
-	# Sensor methods - unchanged check_direction, check_cell
-	def check_direction(self, d, s):
+	# --- Сенсоры ---
+	def check_direction(self, direction, status_to_check):
+		"""
+		Проверяет состояние в указанном направлении ('wall' или 'free').
+		Использует _is_wall_between для проверки стен.
+		"""
 		cx, cy = self.robot_pos['x'], self.robot_pos['y']
-		wk, tx, ty = None, cx, cy
-		if d == "left":
-			wk = f"{cx},{cy},{cx},{cy + 1}"
+		tx, ty = cx, cy  # Координаты целевой клетки
+
+		if direction == "left":
 			tx -= 1
-		elif d == "right":
-			wk = f"{cx + 1},{cy},{cx + 1},{cy + 1}"
+		elif direction == "right":
 			tx += 1
-		elif d == "up":
-			wk = f"{cx},{cy},{cx + 1},{cy}"
+		elif direction == "up":
 			ty -= 1
-		elif d == "down":
-			wk = f"{cx},{cy + 1},{cx + 1},{cy + 1}"
+		elif direction == "down":
 			ty += 1
 		else:
-			raise ValueError(f"Dir?{d}")
-		iw = wk in self.permanent_walls or wk in self.walls
-		if s == "wall":
-			return iw
-		elif s == "free":
-			return (0 <= tx < self.width and 0 <= ty < self.height) and not iw
-		else:
-			raise ValueError(f"Status?{s}")
+			raise ValueError(f"Unknown direction for check: {direction}")
 
-	def check_cell(self, s):
+		# Проверяем, находится ли целевая клетка вне поля
+		is_outside = not (0 <= tx < self.width and 0 <= ty < self.height)
+
+		# Проверяем стену между текущей и целевой (если целевая в пределах поля)
+		has_wall = False
+		if not is_outside:
+			has_wall = self._is_wall_between(cx, cy, tx, ty)
+
+		# Определяем результат в зависимости от того, что проверяем
+		if status_to_check == "wall":
+			# Стена есть, если она существует ИЛИ если вышли за границу
+			result = has_wall or is_outside
+			self.logger.debug(
+				f"Check '{direction} wall' from ({cx},{cy}): outside={is_outside}, wall_exists={has_wall} -> {result}")
+			return result
+		elif status_to_check == "free":
+			# Свободно, только если НЕ вышли за границу И НЕТ стены
+			result = not is_outside and not has_wall
+			self.logger.debug(
+				f"Check '{direction} free' from ({cx},{cy}): outside={is_outside}, wall_exists={has_wall} -> {result}")
+			return result
+		else:
+			raise ValueError(f"Unknown status for check_direction: {status_to_check}")
+
+	def check_cell(self, status_to_check):
+		""" Проверяет состояние текущей клетки ('painted' или 'clear'). """
 		k = f"{self.robot_pos['x']},{self.robot_pos['y']}"
-		i = k in self.colored_cells
-		if s == "painted":
-			return i
-		elif s == "clear":
-			return not i
-		else:
-			raise ValueError(f"Cell Status?{s}")
+		is_painted = k in self.colored_cells
 
-	# Measurement method - updated
-	def do_measurement(self, measure):
+		if status_to_check == "painted":
+			self.logger.debug(f"Check 'cell painted' at {k}: {is_painted}")
+			return is_painted
+		elif status_to_check == "clear":
+			self.logger.debug(f"Check 'cell clear' at {k}: {not is_painted}")
+			return not is_painted
+		else:
+			raise ValueError(f"Unknown status for check_cell: {status_to_check}")
+
+	def do_measurement(self, measure_type):
 		""" Возвращает значение радиации или температуры в текущей клетке. """
 		pos_key = f"{self.robot_pos['x']},{self.robot_pos['y']}"
-		self.logger.debug(f"Measure '{measure}' at {pos_key}")
-		if measure == "radiation":
-			value = self.radiation.get(pos_key, 0.0)  # Default to 0.0 if not set
+		self.logger.debug(f"Measure '{measure_type}' at {pos_key}")
+		if measure_type == "radiation":
+			value = self.radiation.get(pos_key, 0.0)  # Default to 0.0
 			self.logger.info(f"Radiation at {pos_key}: {value}")
-			return float(value)  # Ensure float
-		elif measure == "temperature":
-			value = self.temperature.get(pos_key, 0)  # Default to 0 if not set
+			return float(value)
+		elif measure_type == "temperature":
+			value = self.temperature.get(pos_key, 0)  # Default to 0
 			self.logger.info(f"Temperature at {pos_key}: {value}")
-			return int(value)  # Ensure int
+			return int(value)
 		else:
-			self.logger.warning(f"Unknown measurement: {measure}. Return 0")
-			return 0  # Return 0 for unknown measurements
+			self.logger.warning(f"Unknown measurement type requested: {measure_type}. Returning 0.")
+			# В оригинальном Кумире может быть ошибка, но возврат 0 безопаснее.
+			# raise RobotError(f"Неизвестный тип измерения: {measure_type}")
+			return 0
+
+# FILE END: robot_state.py
