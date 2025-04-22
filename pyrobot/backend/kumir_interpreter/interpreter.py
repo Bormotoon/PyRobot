@@ -595,24 +595,100 @@ class KumirInterpreterVisitor(KumirVisitor):
             return False
         return None
         
-    # --- Метод visitForLoop (примерно) ---
+    # --- Метод visitForLoop --- 
     def visitForLoop(self, ctx: KumirParser.ForLoopContext):
-        loop_var_name = self.get_full_identifier(ctx.compoundIdentifier()) # Изменено на compoundIdentifier
-        start_val = self.visit(ctx.expression(0))
-        end_val = self.visit(ctx.expression(1))
-        step_val = 1
-        if ctx.expression(2): # Если есть шаг
-            step_val = self.visit(ctx.expression(2))
-        
+        loop_var_id_ctx = ctx.compoundIdentifier()
+        loop_var_name = self.get_full_identifier(loop_var_id_ctx)
+        start_val_ctx = ctx.expression(0)
+        end_val_ctx = ctx.expression(1)
+        step_ctx = ctx.expression(2) # Может быть None
+
+        # Вычисляем границы и шаг
+        try:
+            start_val = self.visit(start_val_ctx)
+            end_val = self.visit(end_val_ctx)
+            step_val = 1
+            if step_ctx:
+                step_val = self.visit(step_ctx)
+        except Exception as e:
+             line = start_val_ctx.start.line
+             column = start_val_ctx.start.column
+             raise KumirEvalError(f"Строка {line}, столбец {column}: Ошибка вычисления границ или шага цикла ДЛЯ: {e}")
+
+        # Проверяем типы границ и шага
+        if not isinstance(start_val, int):
+            line = start_val_ctx.start.line
+            column = start_val_ctx.start.column
+            raise KumirEvalError(f"Строка {line}, столбец {column}: Начальное значение цикла ДЛЯ ('{start_val}') должно быть целым.")
+        if not isinstance(end_val, int):
+            line = end_val_ctx.start.line
+            column = end_val_ctx.start.column
+            raise KumirEvalError(f"Строка {line}, столбец {column}: Конечное значение цикла ДЛЯ ('{end_val}') должно быть целым.")
+        if not isinstance(step_val, int):
+             line = step_ctx.start.line if step_ctx else start_val_ctx.start.line # Приблизительно
+             column = step_ctx.start.column if step_ctx else start_val_ctx.start.column
+             raise KumirEvalError(f"Строка {line}, столбец {column}: Шаг цикла ДЛЯ ('{step_val}') должен быть целым.")
+        if step_val == 0:
+             line = step_ctx.start.line if step_ctx else start_val_ctx.start.line
+             column = step_ctx.start.column if step_ctx else start_val_ctx.start.column
+             raise KumirEvalError(f"Строка {line}, столбец {column}: Шаг цикла ДЛЯ не может быть равен нулю.")
+
         print(f"[DEBUG][Visit] Начало цикла ДЛЯ '{loop_var_name}' от {start_val} до {end_val} шаг {step_val}")
-        
-        # TODO: Правильная проверка типов и реализация цикла
-        # - Найти переменную цикла
-        # - Проверить тип start/end/step (цел)
-        # - Выполнить блок команд нужное количество раз, обновляя переменную цикла
-        
-        raise NotImplementedError(f"Цикл ДЛЯ для переменной '{loop_var_name}' пока не реализован.")
-        
+
+        # Находим информацию о переменной цикла в текущей или внешней области
+        var_info, var_scope = self.find_variable(loop_var_name)
+        if var_info is None:
+            line = loop_var_id_ctx.start.line
+            column = loop_var_id_ctx.start.column
+            raise KumirExecutionError(f"Строка {line}, столбец {column}: Переменная цикла ДЛЯ '{loop_var_name}' не найдена.")
+        if var_info.get('is_table'):
+            line = loop_var_id_ctx.start.line
+            column = loop_var_id_ctx.start.column
+            raise KumirExecutionError(f"Строка {line}, столбец {column}: Переменная цикла ДЛЯ '{loop_var_name}' не может быть таблицей.")
+        if var_info.get('type') != 'цел':
+            line = loop_var_id_ctx.start.line
+            column = loop_var_id_ctx.start.column
+            raise KumirExecutionError(f"Строка {line}, столбец {column}: Переменная цикла ДЛЯ '{loop_var_name}' должна быть целого типа, а не '{var_info.get('type')}'.")
+
+        # Определяем диапазон итераций
+        # range() в Python не включает end_val, поэтому корректируем для шага > 0
+        # Для шага < 0, range() также работает правильно с остановкой
+        current_val = start_val
+        iteration_count = 0
+
+        try:
+            # Итерация цикла
+            if step_val > 0:
+                while current_val <= end_val:
+                    iteration_count += 1
+                    if iteration_count > 100000: # Защита от бесконечных циклов
+                         raise KumirExecutionError(f"Превышено максимальное число итераций цикла ДЛЯ ({iteration_count})")
+                    # Обновляем значение переменной в ее области видимости
+                    var_info['value'] = current_val 
+                    print(f"  -> Итерация {iteration_count}: {loop_var_name} = {current_val}")
+                    # Выполняем тело цикла
+                    self.visit(ctx.block())
+                    current_val += step_val
+            elif step_val < 0:
+                 while current_val >= end_val:
+                    iteration_count += 1
+                    if iteration_count > 100000:
+                         raise KumirExecutionError(f"Превышено максимальное число итераций цикла ДЛЯ ({iteration_count})")
+                    var_info['value'] = current_val
+                    print(f"  -> Итерация {iteration_count}: {loop_var_name} = {current_val}")
+                    self.visit(ctx.block())
+                    current_val += step_val
+            # Если start_val > end_val при step > 0 или start_val < end_val при step < 0, цикл не выполнится
+            
+        except Exception as loop_body_error:
+             # Перехватываем ошибки из тела цикла и добавляем информацию
+             # TODO: По возможности, получить номер строки из loop_body_error
+             line = ctx.block().start.line
+             column = ctx.block().start.column
+             raise KumirExecutionError(f"Строка {line}, столбец {column}: Ошибка внутри цикла ДЛЯ: {loop_body_error}")
+
+        print(f"[DEBUG][Visit] Конец цикла ДЛЯ '{loop_var_name}'. Итераций: {iteration_count}")
+        return None
 
 # --- Функция для запуска интерпретации ---
 
@@ -933,13 +1009,18 @@ class KumirLanguageInterpreter:
 		self.logger.info("Starting code parsing...")
 		try:
 			lines = preprocess_code(self.code)
-            if not lines: self.logger.warning(
-				"Code is empty after preprocessing."); self.introduction = []; self.main_algorithm = None; self.algorithms = {}; return
+			if not lines: 
+				self.logger.warning(
+					"Code is empty after preprocessing.")
+				self.introduction = []
+				self.main_algorithm = None
+				self.algorithms = {}
+				return
 			self.introduction, algo_sections = separate_sections(lines)
-            self.logger.info(
+			self.logger.info(
 				f"Separated into {len(self.introduction)} intro lines and {len(algo_sections)} algorithm sections.")
 			if not algo_sections:
-                self.logger.warning("No 'алг' sections found. Treating entire code as main algorithm body.")
+				self.logger.warning("No 'алг' sections found. Treating entire code as main algorithm body.")
 				main_header = "алг main";
 				self.main_algorithm = {"header": main_header, "body": self.introduction,
 				                       "header_info": parse_algorithm_header(main_header)}
@@ -950,25 +1031,25 @@ class KumirLanguageInterpreter:
 				try:
 					self.main_algorithm["header_info"] = parse_algorithm_header(self.main_algorithm["header"])
 					if not self.main_algorithm["header_info"].get("name"): self.main_algorithm["header_info"][
-                        "name"] = "__main__"; self.logger.debug("Assigning default name '__main__' to main algorithm.")
+						"name"] = "__main__"; self.logger.debug("Assigning default name '__main__' to main algorithm.")
 				except ValueError as header_err:
 					raise KumirExecutionError(f"Ошибка в заголовке основного алгоритма: {header_err}")
-                self.logger.debug(f"Parsed main algorithm header: {self.main_algorithm['header_info']}")
+				self.logger.debug(f"Parsed main algorithm header: {self.main_algorithm['header_info']}")
 				self.algorithms = {}
 				for alg_dict in algo_sections[1:]:
 					try:
 						header_info = parse_algorithm_header(alg_dict["header"]);
 						alg_name = header_info.get("name")
 						if alg_name:
-                            if alg_name in self.algorithms: self.logger.warning(f"Algorithm '{alg_name}' redefined.")
+							if alg_name in self.algorithms: self.logger.warning(f"Algorithm '{alg_name}' redefined.")
 							self.algorithms[alg_name] = {"header_info": header_info, "body": alg_dict.get("body", [])}
-                            self.logger.debug(f"Parsed auxiliary algorithm '{alg_name}'.")
+							self.logger.debug(f"Parsed auxiliary algorithm '{alg_name}'.")
 						else:
-                            self.logger.warning(
+							self.logger.warning(
 								f"Auxiliary algorithm without name found (header: '{header_info.get('raw', '')}'). Cannot be called.")
 					except ValueError as header_err:
-                        self.logger.error(
-                            f"Error parsing aux algorithm header '{alg_dict.get('header', '')}': {header_err}"); self.logger.warning(
+						self.logger.error(
+							f"Error parsing aux algorithm header '{alg_dict.get('header', '')}': {header_err}"); self.logger.warning(
 							f"Skipping aux algorithm due to header error.")
 			self.logger.info("Code parsing completed successfully.")
 		except (SyntaxError, KumirExecutionError) as e:
@@ -1004,11 +1085,11 @@ class KumirLanguageInterpreter:
 				              self.progress_callback, main_algo_name, main_body_indices)
 				self.logger.info("Main algorithm executed successfully.")
 			elif not self.main_algorithm:
-                self.logger.warning("No main algorithm found after parsing.")
+				self.logger.warning("No main algorithm found after parsing.")
 				if not self.introduction: raise KumirExecutionError("Программа не содержит исполняемого кода.")
 			else:
-                self.logger.info("Main algorithm body is empty.")
-            if self.call_stack: self.logger.error(f"Execution finished but call stack is not empty: {self.call_stack}")
+				self.logger.info("Main algorithm body is empty.")
+			if self.call_stack: self.logger.error(f"Execution finished but call stack is not empty: {self.call_stack}")
 			self.logger.info("Interpretation completed successfully.")
 			final_state = self.get_state();
 			final_state["output"] = self.output
@@ -1034,7 +1115,7 @@ class KumirLanguageInterpreter:
 			try:
 				state_on_error = self.get_state()
 			except Exception as state_err:
-                self.logger.error(f"Failed to get state after error: {state_err}");
+				self.logger.error(f"Failed to get state after error: {state_err}");
 				current_env_struct = self.call_stack[-1]['env'] if self.call_stack else self.global_env
 				state_on_error = {"env": self._get_env_for_frontend(current_env_struct.copy()),
 				                  "global_env": self._get_env_for_frontend(self.global_env.copy()), "robot": None,
@@ -1049,7 +1130,7 @@ class KumirLanguageInterpreter:
 			try:
 				state_on_error = self.get_state()
 			except Exception as state_err:
-                self.logger.error(f"Failed to get state after critical error: {state_err}");
+				self.logger.error(f"Failed to get state after critical error: {state_err}");
 				current_env_struct = self.call_stack[-1]['env'] if self.call_stack else self.global_env
 				state_on_error = {"env": self._get_env_for_frontend(current_env_struct.copy()),
 				                  "global_env": self._get_env_for_frontend(self.global_env.copy()), "robot": None,
