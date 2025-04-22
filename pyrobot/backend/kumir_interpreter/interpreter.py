@@ -3,6 +3,8 @@ import logging
 import copy
 import math # Добавлено для pow
 import operator # Добавлено для операций
+# Добавляем импорт TerminalNode
+from antlr4.tree.Tree import TerminalNode 
 
 # Импортируем все исключения из одного места
 from .kumir_exceptions import (KumirExecutionError, DeclarationError, AssignmentError,
@@ -211,12 +213,40 @@ class KumirInterpreterVisitor(KumirVisitor):
     # --- Вспомогательные методы для вычислений ---
 
     def get_full_identifier(self, ctx: KumirParser.CompoundIdentifierContext) -> str:
-        """Возвращает полный текст многословного идентификатора."""
-        # Собираем тексты всех дочерних токенов IDENTIFIER
-        # Контекст compoundIdentifier теперь напрямую содержит список IDENTIFIER
-        identifier_parts = [child.getText() for child in ctx.IDENTIFIER()]
-        full_name = ' '.join(identifier_parts)
-        # print(f"[DEBUG] Собрали идентификатор: '{full_name}' из {len(identifier_parts)} частей") # Убрал дублирующий print
+        """Возвращает полный текст многословного идентификатора, 
+           собирая его из токенов WORD и K_NE."""
+        parts_text = []
+        parts_tokens = [] # Сохраняем токены для проверки
+        if ctx.children: # Убедимся, что есть дети
+            for child in ctx.children:
+                # Проверяем, что это терминальный узел (токен), а не другое правило
+                if isinstance(child, TerminalNode):
+                    token_type = child.symbol.type
+                    # Добавляем только WORD и K_NE
+                    if token_type in (KumirLexer.WORD, KumirLexer.K_NE):
+                        parts_text.append(child.getText())
+                        parts_tokens.append(child.symbol)
+                    # Игнорируем другие возможные токены (если вдруг появятся)
+        
+        full_name = ' '.join(parts_text)
+
+        # Дополнительная проверка валидности имени:
+        if parts_tokens and parts_tokens[-1].type == KumirLexer.K_NE:
+            token = parts_tokens[-1]
+            raise KumirEvalError(f"Строка {token.line}, столбец {token.column}: Идентификатор не может заканчиваться на 'не': '{full_name}'")
+        
+        # Проверка, что K_NE не идет первым (хотя грамматика должна это предотвращать)
+        if parts_tokens and parts_tokens[0].type == KumirLexer.K_NE:
+             token = parts_tokens[0]
+             raise KumirEvalError(f"Строка {token.line}, столбец {token.column}: Идентификатор не может начинаться с 'не': '{full_name}'")
+
+        # Проверка на два K_NE подряд (тоже должно ловиться грамматикой, но на всякий случай)
+        for i in range(len(parts_tokens) - 1):
+            if parts_tokens[i].type == KumirLexer.K_NE and parts_tokens[i+1].type == KumirLexer.K_NE:
+                 token = parts_tokens[i+1]
+                 raise KumirEvalError(f"Строка {token.line}, столбец {token.column}: Два 'не' подряд в идентификаторе недопустимы: '{full_name}'")
+
+        # print(f"[DEBUG] Собрали идентификатор: '{full_name}' из {len(parts_text)} частей")
         return full_name
 
     # --- Вспомогательные методы для вычислений и проверки типов в выражениях ---
@@ -688,6 +718,92 @@ class KumirInterpreterVisitor(KumirVisitor):
              raise KumirExecutionError(f"Строка {line}, столбец {column}: Ошибка внутри цикла ДЛЯ: {loop_body_error}")
 
         print(f"[DEBUG][Visit] Конец цикла ДЛЯ '{loop_var_name}'. Итераций: {iteration_count}")
+        return None
+
+    # --- Метод visitWhileLoop --- 
+    def visitWhileLoop(self, ctx: KumirParser.WhileLoopContext):
+        condition_ctx = ctx.expression()
+        block_ctx = ctx.block()
+        print(f"[DEBUG][Visit] Начало цикла ПОКА")
+        
+        iteration_count = 0
+        max_iterations = 100000 # Защита
+
+        while True:
+            iteration_count += 1
+            if iteration_count > max_iterations:
+                raise KumirExecutionError(f"Превышено максимальное число итераций цикла ПОКА ({iteration_count})")
+
+            # Вычисляем условие
+            try:
+                condition_value = self.visit(condition_ctx)
+            except Exception as e:
+                line = condition_ctx.start.line
+                column = condition_ctx.start.column
+                raise KumirEvalError(f"Строка {line}, столбец {column}: Ошибка вычисления условия цикла ПОКА: {e}")
+            
+            # Проверяем тип условия
+            if not isinstance(condition_value, bool):
+                 line = condition_ctx.start.line
+                 column = condition_ctx.start.column
+                 raise KumirEvalError(f"Строка {line}, столбец {column}: Условие цикла ПОКА ('{condition_value}') должно быть логического типа, а не {type(condition_value).__name__}.")
+
+            print(f"  -> Итерация {iteration_count}: Условие = {condition_value}")
+            if not condition_value: # Если условие == нет (False)
+                break # Выход из цикла
+
+            # Выполняем тело цикла
+            try:
+                self.visit(block_ctx)
+            except Exception as loop_body_error:
+                 line = block_ctx.start.line
+                 column = block_ctx.start.column
+                 raise KumirExecutionError(f"Строка {line}, столбец {column}: Ошибка внутри цикла ПОКА: {loop_body_error}")
+
+        print(f"[DEBUG][Visit] Конец цикла ПОКА. Итераций: {iteration_count - 1}") # -1 т.к. последняя проверка условия была лишней
+        return None
+
+    # --- Метод visitTimesLoop --- 
+    def visitTimesLoop(self, ctx: KumirParser.TimesLoopContext):
+        times_expr_ctx = ctx.expression()
+        block_ctx = ctx.block()
+
+        # Вычисляем количество повторений
+        try:
+            times_value = self.visit(times_expr_ctx)
+        except Exception as e:
+            line = times_expr_ctx.start.line
+            column = times_expr_ctx.start.column
+            raise KumirEvalError(f"Строка {line}, столбец {column}: Ошибка вычисления количества повторений цикла РАЗ: {e}")
+        
+        # Проверяем тип и значение
+        if not isinstance(times_value, int):
+            line = times_expr_ctx.start.line
+            column = times_expr_ctx.start.column
+            raise KumirEvalError(f"Строка {line}, столбец {column}: Количество повторений цикла РАЗ ('{times_value}') должно быть целым числом, а не {type(times_value).__name__}.")
+        if times_value < 0:
+            line = times_expr_ctx.start.line
+            column = times_expr_ctx.start.column
+            raise KumirEvalError(f"Строка {line}, столбец {column}: Количество повторений цикла РАЗ ('{times_value}') не может быть отрицательным.")
+        
+        max_iterations = 100000 # Защита
+        if times_value > max_iterations:
+             raise KumirExecutionError(f"Запрошено слишком большое число итераций цикла РАЗ ({times_value}), максимум {max_iterations}")
+
+        print(f"[DEBUG][Visit] Начало цикла {times_value} РАЗ")
+        
+        for i in range(times_value):
+            iteration_num = i + 1
+            print(f"  -> Итерация {iteration_num} из {times_value}")
+             # Выполняем тело цикла
+            try:
+                self.visit(block_ctx)
+            except Exception as loop_body_error:
+                 line = block_ctx.start.line
+                 column = block_ctx.start.column
+                 raise KumirExecutionError(f"Строка {line}, столбец {column}: Ошибка внутри цикла РАЗ (итерация {iteration_num}): {loop_body_error}")
+
+        print(f"[DEBUG][Visit] Конец цикла РАЗ. Итераций: {times_value}")
         return None
 
 # --- Функция для запуска интерпретации ---
