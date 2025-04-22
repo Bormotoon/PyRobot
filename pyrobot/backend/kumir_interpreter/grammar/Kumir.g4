@@ -8,16 +8,17 @@ grammar Kumir;
 
 // --- Parser Rules ---
 
-// Стартовое правило: опционально 'использовать', опциональный блок (вступление), 0 или больше алгоритмов
-// Семантически, блок вступления должен содержать только неветвящиеся команды (описания, присваивания и т.п.)
-start: NL* usesClause? block? (NL* algorithm)* NL* EOF;
+// Стартовое правило: используем introBlock
+// Было: start: NL* usesClause? block? (NL* algorithm)* NL* EOF;
+start: NL* usesClause? introBlock? (NL* algorithm)* NL* EOF;
 
 // Директивы 'использовать'
 usesClause: (useStatement NL+)+ ;
 useStatement: K_USE compoundIdentifier ;
 
 // Алгоритм
-algorithm: algHeader NL+ declarations K_NACH NL* block K_KON NL* ;
+// Оставляем как есть, т.к. block теперь управляет NL
+algorithm: algHeader (NL+ declarations)? K_NACH NL* block NL* K_KON ;
 
 // Заголовок алгоритма
 // Используем compoundIdentifier для имени алгоритма
@@ -32,8 +33,10 @@ danoClause: NL+ K_DANO expression ;
 nadoClause: NL+ K_NADO expression ;
 
 // Объявления
-declarations: declaration* ;
-declaration: typeDecl NL+ ;
+declarations: (declaration NL+)* ;
+// Убираем NL+ отсюда
+// Было: declaration: typeDecl NL+ ;
+declaration: typeDecl ;
 typeDecl: scalarDecl | tableDecl ;
 // Используем variableNameList (с compoundIdentifier) внутри scalarDecl
 scalarDecl: typeKeyword variableNameList ;
@@ -45,10 +48,17 @@ indexRangeList: indexRange (COMMA indexRange)* ;
 indexRange: expression COLON expression ;
 typeKeyword: K_CEL | K_VESH | K_LOG | K_SIM | K_LIT ;
 
-// Блок команд
-block: statement* ;
+// Блок команд (для тела алгоритма, циклов, if и т.п.)
+// Добавляем NL+ сюда
+// Было: block: statement* ;
+block: (statement NL+)* ;
 
-// Команда (пока базовая + заглушки)
+// Блок вступления (может содержать объявления и команды с NL+)
+introBlock: (declaration NL+ | statement NL+)* ;
+
+// Команда
+// Убираем NL+
+// Было: statement: ( assignment ... ) NL+ ;
 statement: ( assignment
            | ioStatement
            | ifStatement
@@ -61,7 +71,7 @@ statement: ( assignment
            | exitStatement
            | stopStatement
            | pauseStatement
-           ) NL+ ;
+           ) ;
 
 // Присваивание: либо переменной, либо возврат значения функции через знач
 // Используем compoundIdentifier в variable
@@ -107,8 +117,8 @@ mulDivModExpr: powerExpr ((MUL | DIV | K_DIV | K_MOD) powerExpr)* ;
 
 powerExpr: unaryExpr (POW unaryExpr)* ; // POW право-ассоциативен
 
-// Обработка 'не' как унарного оператора через литерал
-unaryExpr: (PLUS | MINUS | 'не')? primaryExpr ;
+// Обработка 'не' как унарного оператора через K_NE
+unaryExpr: (PLUS | MINUS | K_NE)? primaryExpr ;
 
 primaryExpr
     : literal
@@ -125,8 +135,7 @@ literal: NUMBER | STRING | CHAR | K_DA | K_NET ;
 // Новое правило для многословного идентификатора
 // Это последовательность из одного или более IDENTIFIER подряд.
 // Пробелы между ними пропускаются лексером (WS -> skip).
-compoundIdentifier: IDENTIFIER+ ;
-
+compoundIdentifier: WORD ( (K_NE)? WORD )* ;
 
 // --- Lexer Rules ---
 
@@ -177,6 +186,7 @@ K_STOP: 'стоп';
 K_PAUZA: 'пауза';
 K_DIV: 'div'; // Добавлено
 K_MOD: 'mod'; // Добавлено
+K_NE: 'не'; // Возвращаем K_NE
 
 // Operators and Delimiters
 ASSIGN: ':=' ;
@@ -199,7 +209,7 @@ LE : '<=' ;
 GE : '>=' ;
 
 // Identifier (одно слово) - НЕ включает пробелы
-IDENTIFIER: [a-zA-Zа-яА-ЯёЁ_] [a-zA-Zа-яА-ЯёЁ0-9_@]*; // Добавил @
+WORD: [a-zA-Zа-яА-ЯёЁ_] [a-zA-Zа-яА-ЯёЁ0-9_@]*; // Добавил @
 
 // Literals
 NUMBER: '-'? DIGIT+ ('.' DIGIT+)? (([eE]) [+-]? DIGIT+)?

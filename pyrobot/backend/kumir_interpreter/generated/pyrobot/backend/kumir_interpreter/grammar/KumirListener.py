@@ -1,6 +1,6 @@
-# Generated from pyrobot/backend/kumir_interpreter/grammar/Kumir.g4 by ANTLR 4.13.2
+# Generated from pyrobot/backend/kumir_interpreter/grammar/Kumir.g4 by ANTLR 4.6
 from antlr4 import *
-if "." in __name__:
+if __name__ is not None and "." in __name__:
     from .KumirParser import KumirParser
 else:
     from KumirParser import KumirParser
@@ -476,5 +476,3 @@ class KumirListener(ParseTreeListener):
         pass
 
 
-
-del KumirParser
