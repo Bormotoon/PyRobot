@@ -159,6 +159,11 @@ class KumirParserVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
+    # Visit a parse tree produced by KumirParser#algorithmNameTokens.
+    def visitAlgorithmNameTokens(self, ctx:KumirParser.AlgorithmNameTokensContext):
+        return self.visitChildren(ctx)
+
+
     # Visit a parse tree produced by KumirParser#algorithmName.
     def visitAlgorithmName(self, ctx:KumirParser.AlgorithmNameContext):
         return self.visitChildren(ctx)

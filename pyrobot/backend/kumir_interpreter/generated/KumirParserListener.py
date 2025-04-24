@@ -278,6 +278,15 @@ class KumirParserListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by KumirParser#algorithmNameTokens.
+    def enterAlgorithmNameTokens(self, ctx:KumirParser.AlgorithmNameTokensContext):
+        pass
+
+    # Exit a parse tree produced by KumirParser#algorithmNameTokens.
+    def exitAlgorithmNameTokens(self, ctx:KumirParser.AlgorithmNameTokensContext):
+        pass
+
+
     # Enter a parse tree produced by KumirParser#algorithmName.
     def enterAlgorithmName(self, ctx:KumirParser.AlgorithmNameContext):
         pass
