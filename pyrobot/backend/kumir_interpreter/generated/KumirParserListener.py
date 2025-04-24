@@ -17,12 +17,12 @@ class KumirParserListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by KumirParser#preamble.
-    def enterPreamble(self, ctx:KumirParser.PreambleContext):
+    # Enter a parse tree produced by KumirParser#programItem.
+    def enterProgramItem(self, ctx:KumirParser.ProgramItemContext):
         pass
 
-    # Exit a parse tree produced by KumirParser#preamble.
-    def exitPreamble(self, ctx:KumirParser.PreambleContext):
+    # Exit a parse tree produced by KumirParser#programItem.
+    def exitProgramItem(self, ctx:KumirParser.ProgramItemContext):
         pass
 
 
@@ -518,6 +518,24 @@ class KumirParserListener(ParseTreeListener):
 
     # Exit a parse tree produced by KumirParser#primaryExpression.
     def exitPrimaryExpression(self, ctx:KumirParser.PrimaryExpressionContext):
+        pass
+
+
+    # Enter a parse tree produced by KumirParser#arrayLiteral.
+    def enterArrayLiteral(self, ctx:KumirParser.ArrayLiteralContext):
+        pass
+
+    # Exit a parse tree produced by KumirParser#arrayLiteral.
+    def exitArrayLiteral(self, ctx:KumirParser.ArrayLiteralContext):
+        pass
+
+
+    # Enter a parse tree produced by KumirParser#expressionList.
+    def enterExpressionList(self, ctx:KumirParser.ExpressionListContext):
+        pass
+
+    # Exit a parse tree produced by KumirParser#expressionList.
+    def exitExpressionList(self, ctx:KumirParser.ExpressionListContext):
         pass
 
 

@@ -14,8 +14,8 @@ class KumirParserVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by KumirParser#preamble.
-    def visitPreamble(self, ctx:KumirParser.PreambleContext):
+    # Visit a parse tree produced by KumirParser#programItem.
+    def visitProgramItem(self, ctx:KumirParser.ProgramItemContext):
         return self.visitChildren(ctx)
 
 
@@ -291,6 +291,16 @@ class KumirParserVisitor(ParseTreeVisitor):
 
     # Visit a parse tree produced by KumirParser#primaryExpression.
     def visitPrimaryExpression(self, ctx:KumirParser.PrimaryExpressionContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by KumirParser#arrayLiteral.
+    def visitArrayLiteral(self, ctx:KumirParser.ArrayLiteralContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by KumirParser#expressionList.
+    def visitExpressionList(self, ctx:KumirParser.ExpressionListContext):
         return self.visitChildren(ctx)
 
 
