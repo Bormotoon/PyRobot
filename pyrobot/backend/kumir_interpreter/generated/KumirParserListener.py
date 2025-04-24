@@ -8,138 +8,165 @@ else:
 # This class defines a complete listener for a parse tree produced by KumirParser.
 class KumirParserListener(ParseTreeListener):
 
-    # Enter a parse tree produced by KumirParser#program.
-    def enterProgram(self, ctx:KumirParser.ProgramContext):
+    # Enter a parse tree produced by KumirParser#qualifiedIdentifier.
+    def enterQualifiedIdentifier(self, ctx:KumirParser.QualifiedIdentifierContext):
         pass
 
-    # Exit a parse tree produced by KumirParser#program.
-    def exitProgram(self, ctx:KumirParser.ProgramContext):
-        pass
-
-
-    # Enter a parse tree produced by KumirParser#programItem.
-    def enterProgramItem(self, ctx:KumirParser.ProgramItemContext):
-        pass
-
-    # Exit a parse tree produced by KumirParser#programItem.
-    def exitProgramItem(self, ctx:KumirParser.ProgramItemContext):
+    # Exit a parse tree produced by KumirParser#qualifiedIdentifier.
+    def exitQualifiedIdentifier(self, ctx:KumirParser.QualifiedIdentifierContext):
         pass
 
 
-    # Enter a parse tree produced by KumirParser#globalDeclaration.
-    def enterGlobalDeclaration(self, ctx:KumirParser.GlobalDeclarationContext):
+    # Enter a parse tree produced by KumirParser#literal.
+    def enterLiteral(self, ctx:KumirParser.LiteralContext):
         pass
 
-    # Exit a parse tree produced by KumirParser#globalDeclaration.
-    def exitGlobalDeclaration(self, ctx:KumirParser.GlobalDeclarationContext):
-        pass
-
-
-    # Enter a parse tree produced by KumirParser#globalAssignment.
-    def enterGlobalAssignment(self, ctx:KumirParser.GlobalAssignmentContext):
-        pass
-
-    # Exit a parse tree produced by KumirParser#globalAssignment.
-    def exitGlobalAssignment(self, ctx:KumirParser.GlobalAssignmentContext):
+    # Exit a parse tree produced by KumirParser#literal.
+    def exitLiteral(self, ctx:KumirParser.LiteralContext):
         pass
 
 
-    # Enter a parse tree produced by KumirParser#moduleDefinition.
-    def enterModuleDefinition(self, ctx:KumirParser.ModuleDefinitionContext):
+    # Enter a parse tree produced by KumirParser#colorLiteral.
+    def enterColorLiteral(self, ctx:KumirParser.ColorLiteralContext):
         pass
 
-    # Exit a parse tree produced by KumirParser#moduleDefinition.
-    def exitModuleDefinition(self, ctx:KumirParser.ModuleDefinitionContext):
-        pass
-
-
-    # Enter a parse tree produced by KumirParser#moduleHeader.
-    def enterModuleHeader(self, ctx:KumirParser.ModuleHeaderContext):
-        pass
-
-    # Exit a parse tree produced by KumirParser#moduleHeader.
-    def exitModuleHeader(self, ctx:KumirParser.ModuleHeaderContext):
+    # Exit a parse tree produced by KumirParser#colorLiteral.
+    def exitColorLiteral(self, ctx:KumirParser.ColorLiteralContext):
         pass
 
 
-    # Enter a parse tree produced by KumirParser#moduleBody.
-    def enterModuleBody(self, ctx:KumirParser.ModuleBodyContext):
+    # Enter a parse tree produced by KumirParser#expressionList.
+    def enterExpressionList(self, ctx:KumirParser.ExpressionListContext):
         pass
 
-    # Exit a parse tree produced by KumirParser#moduleBody.
-    def exitModuleBody(self, ctx:KumirParser.ModuleBodyContext):
-        pass
-
-
-    # Enter a parse tree produced by KumirParser#implicitModuleBody.
-    def enterImplicitModuleBody(self, ctx:KumirParser.ImplicitModuleBodyContext):
-        pass
-
-    # Exit a parse tree produced by KumirParser#implicitModuleBody.
-    def exitImplicitModuleBody(self, ctx:KumirParser.ImplicitModuleBodyContext):
+    # Exit a parse tree produced by KumirParser#expressionList.
+    def exitExpressionList(self, ctx:KumirParser.ExpressionListContext):
         pass
 
 
-    # Enter a parse tree produced by KumirParser#importStatement.
-    def enterImportStatement(self, ctx:KumirParser.ImportStatementContext):
+    # Enter a parse tree produced by KumirParser#arrayLiteral.
+    def enterArrayLiteral(self, ctx:KumirParser.ArrayLiteralContext):
         pass
 
-    # Exit a parse tree produced by KumirParser#importStatement.
-    def exitImportStatement(self, ctx:KumirParser.ImportStatementContext):
-        pass
-
-
-    # Enter a parse tree produced by KumirParser#moduleName.
-    def enterModuleName(self, ctx:KumirParser.ModuleNameContext):
-        pass
-
-    # Exit a parse tree produced by KumirParser#moduleName.
-    def exitModuleName(self, ctx:KumirParser.ModuleNameContext):
+    # Exit a parse tree produced by KumirParser#arrayLiteral.
+    def exitArrayLiteral(self, ctx:KumirParser.ArrayLiteralContext):
         pass
 
 
-    # Enter a parse tree produced by KumirParser#algorithmDefinition.
-    def enterAlgorithmDefinition(self, ctx:KumirParser.AlgorithmDefinitionContext):
+    # Enter a parse tree produced by KumirParser#primaryExpression.
+    def enterPrimaryExpression(self, ctx:KumirParser.PrimaryExpressionContext):
         pass
 
-    # Exit a parse tree produced by KumirParser#algorithmDefinition.
-    def exitAlgorithmDefinition(self, ctx:KumirParser.AlgorithmDefinitionContext):
-        pass
-
-
-    # Enter a parse tree produced by KumirParser#algorithmHeader.
-    def enterAlgorithmHeader(self, ctx:KumirParser.AlgorithmHeaderContext):
-        pass
-
-    # Exit a parse tree produced by KumirParser#algorithmHeader.
-    def exitAlgorithmHeader(self, ctx:KumirParser.AlgorithmHeaderContext):
+    # Exit a parse tree produced by KumirParser#primaryExpression.
+    def exitPrimaryExpression(self, ctx:KumirParser.PrimaryExpressionContext):
         pass
 
 
-    # Enter a parse tree produced by KumirParser#algorithmName.
-    def enterAlgorithmName(self, ctx:KumirParser.AlgorithmNameContext):
+    # Enter a parse tree produced by KumirParser#argumentList.
+    def enterArgumentList(self, ctx:KumirParser.ArgumentListContext):
         pass
 
-    # Exit a parse tree produced by KumirParser#algorithmName.
-    def exitAlgorithmName(self, ctx:KumirParser.AlgorithmNameContext):
-        pass
-
-
-    # Enter a parse tree produced by KumirParser#parameterList.
-    def enterParameterList(self, ctx:KumirParser.ParameterListContext):
-        pass
-
-    # Exit a parse tree produced by KumirParser#parameterList.
-    def exitParameterList(self, ctx:KumirParser.ParameterListContext):
+    # Exit a parse tree produced by KumirParser#argumentList.
+    def exitArgumentList(self, ctx:KumirParser.ArgumentListContext):
         pass
 
 
-    # Enter a parse tree produced by KumirParser#parameterDeclaration.
-    def enterParameterDeclaration(self, ctx:KumirParser.ParameterDeclarationContext):
+    # Enter a parse tree produced by KumirParser#indexList.
+    def enterIndexList(self, ctx:KumirParser.IndexListContext):
         pass
 
-    # Exit a parse tree produced by KumirParser#parameterDeclaration.
-    def exitParameterDeclaration(self, ctx:KumirParser.ParameterDeclarationContext):
+    # Exit a parse tree produced by KumirParser#indexList.
+    def exitIndexList(self, ctx:KumirParser.IndexListContext):
+        pass
+
+
+    # Enter a parse tree produced by KumirParser#postfixExpression.
+    def enterPostfixExpression(self, ctx:KumirParser.PostfixExpressionContext):
+        pass
+
+    # Exit a parse tree produced by KumirParser#postfixExpression.
+    def exitPostfixExpression(self, ctx:KumirParser.PostfixExpressionContext):
+        pass
+
+
+    # Enter a parse tree produced by KumirParser#unaryExpression.
+    def enterUnaryExpression(self, ctx:KumirParser.UnaryExpressionContext):
+        pass
+
+    # Exit a parse tree produced by KumirParser#unaryExpression.
+    def exitUnaryExpression(self, ctx:KumirParser.UnaryExpressionContext):
+        pass
+
+
+    # Enter a parse tree produced by KumirParser#powerExpression.
+    def enterPowerExpression(self, ctx:KumirParser.PowerExpressionContext):
+        pass
+
+    # Exit a parse tree produced by KumirParser#powerExpression.
+    def exitPowerExpression(self, ctx:KumirParser.PowerExpressionContext):
+        pass
+
+
+    # Enter a parse tree produced by KumirParser#multiplicativeExpression.
+    def enterMultiplicativeExpression(self, ctx:KumirParser.MultiplicativeExpressionContext):
+        pass
+
+    # Exit a parse tree produced by KumirParser#multiplicativeExpression.
+    def exitMultiplicativeExpression(self, ctx:KumirParser.MultiplicativeExpressionContext):
+        pass
+
+
+    # Enter a parse tree produced by KumirParser#additiveExpression.
+    def enterAdditiveExpression(self, ctx:KumirParser.AdditiveExpressionContext):
+        pass
+
+    # Exit a parse tree produced by KumirParser#additiveExpression.
+    def exitAdditiveExpression(self, ctx:KumirParser.AdditiveExpressionContext):
+        pass
+
+
+    # Enter a parse tree produced by KumirParser#relationalExpression.
+    def enterRelationalExpression(self, ctx:KumirParser.RelationalExpressionContext):
+        pass
+
+    # Exit a parse tree produced by KumirParser#relationalExpression.
+    def exitRelationalExpression(self, ctx:KumirParser.RelationalExpressionContext):
+        pass
+
+
+    # Enter a parse tree produced by KumirParser#equalityExpression.
+    def enterEqualityExpression(self, ctx:KumirParser.EqualityExpressionContext):
+        pass
+
+    # Exit a parse tree produced by KumirParser#equalityExpression.
+    def exitEqualityExpression(self, ctx:KumirParser.EqualityExpressionContext):
+        pass
+
+
+    # Enter a parse tree produced by KumirParser#logicalAndExpression.
+    def enterLogicalAndExpression(self, ctx:KumirParser.LogicalAndExpressionContext):
+        pass
+
+    # Exit a parse tree produced by KumirParser#logicalAndExpression.
+    def exitLogicalAndExpression(self, ctx:KumirParser.LogicalAndExpressionContext):
+        pass
+
+
+    # Enter a parse tree produced by KumirParser#logicalOrExpression.
+    def enterLogicalOrExpression(self, ctx:KumirParser.LogicalOrExpressionContext):
+        pass
+
+    # Exit a parse tree produced by KumirParser#logicalOrExpression.
+    def exitLogicalOrExpression(self, ctx:KumirParser.LogicalOrExpressionContext):
+        pass
+
+
+    # Enter a parse tree produced by KumirParser#expression.
+    def enterExpression(self, ctx:KumirParser.ExpressionContext):
+        pass
+
+    # Exit a parse tree produced by KumirParser#expression.
+    def exitExpression(self, ctx:KumirParser.ExpressionContext):
         pass
 
 
@@ -179,12 +206,12 @@ class KumirParserListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by KumirParser#variableList.
-    def enterVariableList(self, ctx:KumirParser.VariableListContext):
+    # Enter a parse tree produced by KumirParser#arrayBounds.
+    def enterArrayBounds(self, ctx:KumirParser.ArrayBoundsContext):
         pass
 
-    # Exit a parse tree produced by KumirParser#variableList.
-    def exitVariableList(self, ctx:KumirParser.VariableListContext):
+    # Exit a parse tree produced by KumirParser#arrayBounds.
+    def exitArrayBounds(self, ctx:KumirParser.ArrayBoundsContext):
         pass
 
 
@@ -197,12 +224,75 @@ class KumirParserListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by KumirParser#arrayBounds.
-    def enterArrayBounds(self, ctx:KumirParser.ArrayBoundsContext):
+    # Enter a parse tree produced by KumirParser#variableList.
+    def enterVariableList(self, ctx:KumirParser.VariableListContext):
         pass
 
-    # Exit a parse tree produced by KumirParser#arrayBounds.
-    def exitArrayBounds(self, ctx:KumirParser.ArrayBoundsContext):
+    # Exit a parse tree produced by KumirParser#variableList.
+    def exitVariableList(self, ctx:KumirParser.VariableListContext):
+        pass
+
+
+    # Enter a parse tree produced by KumirParser#variableDeclaration.
+    def enterVariableDeclaration(self, ctx:KumirParser.VariableDeclarationContext):
+        pass
+
+    # Exit a parse tree produced by KumirParser#variableDeclaration.
+    def exitVariableDeclaration(self, ctx:KumirParser.VariableDeclarationContext):
+        pass
+
+
+    # Enter a parse tree produced by KumirParser#globalDeclaration.
+    def enterGlobalDeclaration(self, ctx:KumirParser.GlobalDeclarationContext):
+        pass
+
+    # Exit a parse tree produced by KumirParser#globalDeclaration.
+    def exitGlobalDeclaration(self, ctx:KumirParser.GlobalDeclarationContext):
+        pass
+
+
+    # Enter a parse tree produced by KumirParser#globalAssignment.
+    def enterGlobalAssignment(self, ctx:KumirParser.GlobalAssignmentContext):
+        pass
+
+    # Exit a parse tree produced by KumirParser#globalAssignment.
+    def exitGlobalAssignment(self, ctx:KumirParser.GlobalAssignmentContext):
+        pass
+
+
+    # Enter a parse tree produced by KumirParser#parameterDeclaration.
+    def enterParameterDeclaration(self, ctx:KumirParser.ParameterDeclarationContext):
+        pass
+
+    # Exit a parse tree produced by KumirParser#parameterDeclaration.
+    def exitParameterDeclaration(self, ctx:KumirParser.ParameterDeclarationContext):
+        pass
+
+
+    # Enter a parse tree produced by KumirParser#parameterList.
+    def enterParameterList(self, ctx:KumirParser.ParameterListContext):
+        pass
+
+    # Exit a parse tree produced by KumirParser#parameterList.
+    def exitParameterList(self, ctx:KumirParser.ParameterListContext):
+        pass
+
+
+    # Enter a parse tree produced by KumirParser#algorithmName.
+    def enterAlgorithmName(self, ctx:KumirParser.AlgorithmNameContext):
+        pass
+
+    # Exit a parse tree produced by KumirParser#algorithmName.
+    def exitAlgorithmName(self, ctx:KumirParser.AlgorithmNameContext):
+        pass
+
+
+    # Enter a parse tree produced by KumirParser#algorithmHeader.
+    def enterAlgorithmHeader(self, ctx:KumirParser.AlgorithmHeaderContext):
+        pass
+
+    # Exit a parse tree produced by KumirParser#algorithmHeader.
+    def exitAlgorithmHeader(self, ctx:KumirParser.AlgorithmHeaderContext):
         pass
 
 
@@ -242,21 +332,12 @@ class KumirParserListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by KumirParser#statement.
-    def enterStatement(self, ctx:KumirParser.StatementContext):
+    # Enter a parse tree produced by KumirParser#lvalue.
+    def enterLvalue(self, ctx:KumirParser.LvalueContext):
         pass
 
-    # Exit a parse tree produced by KumirParser#statement.
-    def exitStatement(self, ctx:KumirParser.StatementContext):
-        pass
-
-
-    # Enter a parse tree produced by KumirParser#variableDeclaration.
-    def enterVariableDeclaration(self, ctx:KumirParser.VariableDeclarationContext):
-        pass
-
-    # Exit a parse tree produced by KumirParser#variableDeclaration.
-    def exitVariableDeclaration(self, ctx:KumirParser.VariableDeclarationContext):
+    # Exit a parse tree produced by KumirParser#lvalue.
+    def exitLvalue(self, ctx:KumirParser.LvalueContext):
         pass
 
 
@@ -269,21 +350,12 @@ class KumirParserListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by KumirParser#lvalue.
-    def enterLvalue(self, ctx:KumirParser.LvalueContext):
+    # Enter a parse tree produced by KumirParser#ioArgument.
+    def enterIoArgument(self, ctx:KumirParser.IoArgumentContext):
         pass
 
-    # Exit a parse tree produced by KumirParser#lvalue.
-    def exitLvalue(self, ctx:KumirParser.LvalueContext):
-        pass
-
-
-    # Enter a parse tree produced by KumirParser#ioStatement.
-    def enterIoStatement(self, ctx:KumirParser.IoStatementContext):
-        pass
-
-    # Exit a parse tree produced by KumirParser#ioStatement.
-    def exitIoStatement(self, ctx:KumirParser.IoStatementContext):
+    # Exit a parse tree produced by KumirParser#ioArgument.
+    def exitIoArgument(self, ctx:KumirParser.IoArgumentContext):
         pass
 
 
@@ -296,12 +368,12 @@ class KumirParserListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by KumirParser#ioArgument.
-    def enterIoArgument(self, ctx:KumirParser.IoArgumentContext):
+    # Enter a parse tree produced by KumirParser#ioStatement.
+    def enterIoStatement(self, ctx:KumirParser.IoStatementContext):
         pass
 
-    # Exit a parse tree produced by KumirParser#ioArgument.
-    def exitIoArgument(self, ctx:KumirParser.IoArgumentContext):
+    # Exit a parse tree produced by KumirParser#ioStatement.
+    def exitIoStatement(self, ctx:KumirParser.IoStatementContext):
         pass
 
 
@@ -314,15 +386,6 @@ class KumirParserListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by KumirParser#switchStatement.
-    def enterSwitchStatement(self, ctx:KumirParser.SwitchStatementContext):
-        pass
-
-    # Exit a parse tree produced by KumirParser#switchStatement.
-    def exitSwitchStatement(self, ctx:KumirParser.SwitchStatementContext):
-        pass
-
-
     # Enter a parse tree produced by KumirParser#caseBlock.
     def enterCaseBlock(self, ctx:KumirParser.CaseBlockContext):
         pass
@@ -332,12 +395,12 @@ class KumirParserListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by KumirParser#loopStatement.
-    def enterLoopStatement(self, ctx:KumirParser.LoopStatementContext):
+    # Enter a parse tree produced by KumirParser#switchStatement.
+    def enterSwitchStatement(self, ctx:KumirParser.SwitchStatementContext):
         pass
 
-    # Exit a parse tree produced by KumirParser#loopStatement.
-    def exitLoopStatement(self, ctx:KumirParser.LoopStatementContext):
+    # Exit a parse tree produced by KumirParser#switchStatement.
+    def exitSwitchStatement(self, ctx:KumirParser.SwitchStatementContext):
         pass
 
 
@@ -356,6 +419,15 @@ class KumirParserListener(ParseTreeListener):
 
     # Exit a parse tree produced by KumirParser#loopSpecifier.
     def exitLoopSpecifier(self, ctx:KumirParser.LoopSpecifierContext):
+        pass
+
+
+    # Enter a parse tree produced by KumirParser#loopStatement.
+    def enterLoopStatement(self, ctx:KumirParser.LoopStatementContext):
+        pass
+
+    # Exit a parse tree produced by KumirParser#loopStatement.
+    def exitLoopStatement(self, ctx:KumirParser.LoopStatementContext):
         pass
 
 
@@ -404,165 +476,93 @@ class KumirParserListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by KumirParser#expression.
-    def enterExpression(self, ctx:KumirParser.ExpressionContext):
+    # Enter a parse tree produced by KumirParser#statement.
+    def enterStatement(self, ctx:KumirParser.StatementContext):
         pass
 
-    # Exit a parse tree produced by KumirParser#expression.
-    def exitExpression(self, ctx:KumirParser.ExpressionContext):
-        pass
-
-
-    # Enter a parse tree produced by KumirParser#logicalOrExpression.
-    def enterLogicalOrExpression(self, ctx:KumirParser.LogicalOrExpressionContext):
-        pass
-
-    # Exit a parse tree produced by KumirParser#logicalOrExpression.
-    def exitLogicalOrExpression(self, ctx:KumirParser.LogicalOrExpressionContext):
+    # Exit a parse tree produced by KumirParser#statement.
+    def exitStatement(self, ctx:KumirParser.StatementContext):
         pass
 
 
-    # Enter a parse tree produced by KumirParser#logicalAndExpression.
-    def enterLogicalAndExpression(self, ctx:KumirParser.LogicalAndExpressionContext):
+    # Enter a parse tree produced by KumirParser#algorithmDefinition.
+    def enterAlgorithmDefinition(self, ctx:KumirParser.AlgorithmDefinitionContext):
         pass
 
-    # Exit a parse tree produced by KumirParser#logicalAndExpression.
-    def exitLogicalAndExpression(self, ctx:KumirParser.LogicalAndExpressionContext):
-        pass
-
-
-    # Enter a parse tree produced by KumirParser#equalityExpression.
-    def enterEqualityExpression(self, ctx:KumirParser.EqualityExpressionContext):
-        pass
-
-    # Exit a parse tree produced by KumirParser#equalityExpression.
-    def exitEqualityExpression(self, ctx:KumirParser.EqualityExpressionContext):
+    # Exit a parse tree produced by KumirParser#algorithmDefinition.
+    def exitAlgorithmDefinition(self, ctx:KumirParser.AlgorithmDefinitionContext):
         pass
 
 
-    # Enter a parse tree produced by KumirParser#relationalExpression.
-    def enterRelationalExpression(self, ctx:KumirParser.RelationalExpressionContext):
+    # Enter a parse tree produced by KumirParser#moduleName.
+    def enterModuleName(self, ctx:KumirParser.ModuleNameContext):
         pass
 
-    # Exit a parse tree produced by KumirParser#relationalExpression.
-    def exitRelationalExpression(self, ctx:KumirParser.RelationalExpressionContext):
-        pass
-
-
-    # Enter a parse tree produced by KumirParser#additiveExpression.
-    def enterAdditiveExpression(self, ctx:KumirParser.AdditiveExpressionContext):
-        pass
-
-    # Exit a parse tree produced by KumirParser#additiveExpression.
-    def exitAdditiveExpression(self, ctx:KumirParser.AdditiveExpressionContext):
+    # Exit a parse tree produced by KumirParser#moduleName.
+    def exitModuleName(self, ctx:KumirParser.ModuleNameContext):
         pass
 
 
-    # Enter a parse tree produced by KumirParser#multiplicativeExpression.
-    def enterMultiplicativeExpression(self, ctx:KumirParser.MultiplicativeExpressionContext):
+    # Enter a parse tree produced by KumirParser#importStatement.
+    def enterImportStatement(self, ctx:KumirParser.ImportStatementContext):
         pass
 
-    # Exit a parse tree produced by KumirParser#multiplicativeExpression.
-    def exitMultiplicativeExpression(self, ctx:KumirParser.MultiplicativeExpressionContext):
-        pass
-
-
-    # Enter a parse tree produced by KumirParser#powerExpression.
-    def enterPowerExpression(self, ctx:KumirParser.PowerExpressionContext):
-        pass
-
-    # Exit a parse tree produced by KumirParser#powerExpression.
-    def exitPowerExpression(self, ctx:KumirParser.PowerExpressionContext):
+    # Exit a parse tree produced by KumirParser#importStatement.
+    def exitImportStatement(self, ctx:KumirParser.ImportStatementContext):
         pass
 
 
-    # Enter a parse tree produced by KumirParser#unaryExpression.
-    def enterUnaryExpression(self, ctx:KumirParser.UnaryExpressionContext):
+    # Enter a parse tree produced by KumirParser#programItem.
+    def enterProgramItem(self, ctx:KumirParser.ProgramItemContext):
         pass
 
-    # Exit a parse tree produced by KumirParser#unaryExpression.
-    def exitUnaryExpression(self, ctx:KumirParser.UnaryExpressionContext):
-        pass
-
-
-    # Enter a parse tree produced by KumirParser#postfixExpression.
-    def enterPostfixExpression(self, ctx:KumirParser.PostfixExpressionContext):
-        pass
-
-    # Exit a parse tree produced by KumirParser#postfixExpression.
-    def exitPostfixExpression(self, ctx:KumirParser.PostfixExpressionContext):
+    # Exit a parse tree produced by KumirParser#programItem.
+    def exitProgramItem(self, ctx:KumirParser.ProgramItemContext):
         pass
 
 
-    # Enter a parse tree produced by KumirParser#indexList.
-    def enterIndexList(self, ctx:KumirParser.IndexListContext):
+    # Enter a parse tree produced by KumirParser#moduleHeader.
+    def enterModuleHeader(self, ctx:KumirParser.ModuleHeaderContext):
         pass
 
-    # Exit a parse tree produced by KumirParser#indexList.
-    def exitIndexList(self, ctx:KumirParser.IndexListContext):
-        pass
-
-
-    # Enter a parse tree produced by KumirParser#argumentList.
-    def enterArgumentList(self, ctx:KumirParser.ArgumentListContext):
-        pass
-
-    # Exit a parse tree produced by KumirParser#argumentList.
-    def exitArgumentList(self, ctx:KumirParser.ArgumentListContext):
+    # Exit a parse tree produced by KumirParser#moduleHeader.
+    def exitModuleHeader(self, ctx:KumirParser.ModuleHeaderContext):
         pass
 
 
-    # Enter a parse tree produced by KumirParser#primaryExpression.
-    def enterPrimaryExpression(self, ctx:KumirParser.PrimaryExpressionContext):
+    # Enter a parse tree produced by KumirParser#moduleBody.
+    def enterModuleBody(self, ctx:KumirParser.ModuleBodyContext):
         pass
 
-    # Exit a parse tree produced by KumirParser#primaryExpression.
-    def exitPrimaryExpression(self, ctx:KumirParser.PrimaryExpressionContext):
-        pass
-
-
-    # Enter a parse tree produced by KumirParser#arrayLiteral.
-    def enterArrayLiteral(self, ctx:KumirParser.ArrayLiteralContext):
-        pass
-
-    # Exit a parse tree produced by KumirParser#arrayLiteral.
-    def exitArrayLiteral(self, ctx:KumirParser.ArrayLiteralContext):
+    # Exit a parse tree produced by KumirParser#moduleBody.
+    def exitModuleBody(self, ctx:KumirParser.ModuleBodyContext):
         pass
 
 
-    # Enter a parse tree produced by KumirParser#expressionList.
-    def enterExpressionList(self, ctx:KumirParser.ExpressionListContext):
+    # Enter a parse tree produced by KumirParser#implicitModuleBody.
+    def enterImplicitModuleBody(self, ctx:KumirParser.ImplicitModuleBodyContext):
         pass
 
-    # Exit a parse tree produced by KumirParser#expressionList.
-    def exitExpressionList(self, ctx:KumirParser.ExpressionListContext):
-        pass
-
-
-    # Enter a parse tree produced by KumirParser#qualifiedIdentifier.
-    def enterQualifiedIdentifier(self, ctx:KumirParser.QualifiedIdentifierContext):
-        pass
-
-    # Exit a parse tree produced by KumirParser#qualifiedIdentifier.
-    def exitQualifiedIdentifier(self, ctx:KumirParser.QualifiedIdentifierContext):
+    # Exit a parse tree produced by KumirParser#implicitModuleBody.
+    def exitImplicitModuleBody(self, ctx:KumirParser.ImplicitModuleBodyContext):
         pass
 
 
-    # Enter a parse tree produced by KumirParser#literal.
-    def enterLiteral(self, ctx:KumirParser.LiteralContext):
+    # Enter a parse tree produced by KumirParser#moduleDefinition.
+    def enterModuleDefinition(self, ctx:KumirParser.ModuleDefinitionContext):
         pass
 
-    # Exit a parse tree produced by KumirParser#literal.
-    def exitLiteral(self, ctx:KumirParser.LiteralContext):
+    # Exit a parse tree produced by KumirParser#moduleDefinition.
+    def exitModuleDefinition(self, ctx:KumirParser.ModuleDefinitionContext):
         pass
 
 
-    # Enter a parse tree produced by KumirParser#colorLiteral.
-    def enterColorLiteral(self, ctx:KumirParser.ColorLiteralContext):
+    # Enter a parse tree produced by KumirParser#program.
+    def enterProgram(self, ctx:KumirParser.ProgramContext):
         pass
 
-    # Exit a parse tree produced by KumirParser#colorLiteral.
-    def exitColorLiteral(self, ctx:KumirParser.ColorLiteralContext):
+    # Exit a parse tree produced by KumirParser#program.
+    def exitProgram(self, ctx:KumirParser.ProgramContext):
         pass
 
 

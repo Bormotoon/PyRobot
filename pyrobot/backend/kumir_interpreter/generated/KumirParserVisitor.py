@@ -9,78 +9,93 @@ else:
 
 class KumirParserVisitor(ParseTreeVisitor):
 
-    # Visit a parse tree produced by KumirParser#program.
-    def visitProgram(self, ctx:KumirParser.ProgramContext):
+    # Visit a parse tree produced by KumirParser#qualifiedIdentifier.
+    def visitQualifiedIdentifier(self, ctx:KumirParser.QualifiedIdentifierContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by KumirParser#programItem.
-    def visitProgramItem(self, ctx:KumirParser.ProgramItemContext):
+    # Visit a parse tree produced by KumirParser#literal.
+    def visitLiteral(self, ctx:KumirParser.LiteralContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by KumirParser#globalDeclaration.
-    def visitGlobalDeclaration(self, ctx:KumirParser.GlobalDeclarationContext):
+    # Visit a parse tree produced by KumirParser#colorLiteral.
+    def visitColorLiteral(self, ctx:KumirParser.ColorLiteralContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by KumirParser#globalAssignment.
-    def visitGlobalAssignment(self, ctx:KumirParser.GlobalAssignmentContext):
+    # Visit a parse tree produced by KumirParser#expressionList.
+    def visitExpressionList(self, ctx:KumirParser.ExpressionListContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by KumirParser#moduleDefinition.
-    def visitModuleDefinition(self, ctx:KumirParser.ModuleDefinitionContext):
+    # Visit a parse tree produced by KumirParser#arrayLiteral.
+    def visitArrayLiteral(self, ctx:KumirParser.ArrayLiteralContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by KumirParser#moduleHeader.
-    def visitModuleHeader(self, ctx:KumirParser.ModuleHeaderContext):
+    # Visit a parse tree produced by KumirParser#primaryExpression.
+    def visitPrimaryExpression(self, ctx:KumirParser.PrimaryExpressionContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by KumirParser#moduleBody.
-    def visitModuleBody(self, ctx:KumirParser.ModuleBodyContext):
+    # Visit a parse tree produced by KumirParser#argumentList.
+    def visitArgumentList(self, ctx:KumirParser.ArgumentListContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by KumirParser#implicitModuleBody.
-    def visitImplicitModuleBody(self, ctx:KumirParser.ImplicitModuleBodyContext):
+    # Visit a parse tree produced by KumirParser#indexList.
+    def visitIndexList(self, ctx:KumirParser.IndexListContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by KumirParser#importStatement.
-    def visitImportStatement(self, ctx:KumirParser.ImportStatementContext):
+    # Visit a parse tree produced by KumirParser#postfixExpression.
+    def visitPostfixExpression(self, ctx:KumirParser.PostfixExpressionContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by KumirParser#moduleName.
-    def visitModuleName(self, ctx:KumirParser.ModuleNameContext):
+    # Visit a parse tree produced by KumirParser#unaryExpression.
+    def visitUnaryExpression(self, ctx:KumirParser.UnaryExpressionContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by KumirParser#algorithmDefinition.
-    def visitAlgorithmDefinition(self, ctx:KumirParser.AlgorithmDefinitionContext):
+    # Visit a parse tree produced by KumirParser#powerExpression.
+    def visitPowerExpression(self, ctx:KumirParser.PowerExpressionContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by KumirParser#algorithmHeader.
-    def visitAlgorithmHeader(self, ctx:KumirParser.AlgorithmHeaderContext):
+    # Visit a parse tree produced by KumirParser#multiplicativeExpression.
+    def visitMultiplicativeExpression(self, ctx:KumirParser.MultiplicativeExpressionContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by KumirParser#algorithmName.
-    def visitAlgorithmName(self, ctx:KumirParser.AlgorithmNameContext):
+    # Visit a parse tree produced by KumirParser#additiveExpression.
+    def visitAdditiveExpression(self, ctx:KumirParser.AdditiveExpressionContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by KumirParser#parameterList.
-    def visitParameterList(self, ctx:KumirParser.ParameterListContext):
+    # Visit a parse tree produced by KumirParser#relationalExpression.
+    def visitRelationalExpression(self, ctx:KumirParser.RelationalExpressionContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by KumirParser#parameterDeclaration.
-    def visitParameterDeclaration(self, ctx:KumirParser.ParameterDeclarationContext):
+    # Visit a parse tree produced by KumirParser#equalityExpression.
+    def visitEqualityExpression(self, ctx:KumirParser.EqualityExpressionContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by KumirParser#logicalAndExpression.
+    def visitLogicalAndExpression(self, ctx:KumirParser.LogicalAndExpressionContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by KumirParser#logicalOrExpression.
+    def visitLogicalOrExpression(self, ctx:KumirParser.LogicalOrExpressionContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by KumirParser#expression.
+    def visitExpression(self, ctx:KumirParser.ExpressionContext):
         return self.visitChildren(ctx)
 
 
@@ -104,8 +119,8 @@ class KumirParserVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by KumirParser#variableList.
-    def visitVariableList(self, ctx:KumirParser.VariableListContext):
+    # Visit a parse tree produced by KumirParser#arrayBounds.
+    def visitArrayBounds(self, ctx:KumirParser.ArrayBoundsContext):
         return self.visitChildren(ctx)
 
 
@@ -114,8 +129,43 @@ class KumirParserVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by KumirParser#arrayBounds.
-    def visitArrayBounds(self, ctx:KumirParser.ArrayBoundsContext):
+    # Visit a parse tree produced by KumirParser#variableList.
+    def visitVariableList(self, ctx:KumirParser.VariableListContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by KumirParser#variableDeclaration.
+    def visitVariableDeclaration(self, ctx:KumirParser.VariableDeclarationContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by KumirParser#globalDeclaration.
+    def visitGlobalDeclaration(self, ctx:KumirParser.GlobalDeclarationContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by KumirParser#globalAssignment.
+    def visitGlobalAssignment(self, ctx:KumirParser.GlobalAssignmentContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by KumirParser#parameterDeclaration.
+    def visitParameterDeclaration(self, ctx:KumirParser.ParameterDeclarationContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by KumirParser#parameterList.
+    def visitParameterList(self, ctx:KumirParser.ParameterListContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by KumirParser#algorithmName.
+    def visitAlgorithmName(self, ctx:KumirParser.AlgorithmNameContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by KumirParser#algorithmHeader.
+    def visitAlgorithmHeader(self, ctx:KumirParser.AlgorithmHeaderContext):
         return self.visitChildren(ctx)
 
 
@@ -139,13 +189,8 @@ class KumirParserVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by KumirParser#statement.
-    def visitStatement(self, ctx:KumirParser.StatementContext):
-        return self.visitChildren(ctx)
-
-
-    # Visit a parse tree produced by KumirParser#variableDeclaration.
-    def visitVariableDeclaration(self, ctx:KumirParser.VariableDeclarationContext):
+    # Visit a parse tree produced by KumirParser#lvalue.
+    def visitLvalue(self, ctx:KumirParser.LvalueContext):
         return self.visitChildren(ctx)
 
 
@@ -154,13 +199,8 @@ class KumirParserVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by KumirParser#lvalue.
-    def visitLvalue(self, ctx:KumirParser.LvalueContext):
-        return self.visitChildren(ctx)
-
-
-    # Visit a parse tree produced by KumirParser#ioStatement.
-    def visitIoStatement(self, ctx:KumirParser.IoStatementContext):
+    # Visit a parse tree produced by KumirParser#ioArgument.
+    def visitIoArgument(self, ctx:KumirParser.IoArgumentContext):
         return self.visitChildren(ctx)
 
 
@@ -169,8 +209,8 @@ class KumirParserVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by KumirParser#ioArgument.
-    def visitIoArgument(self, ctx:KumirParser.IoArgumentContext):
+    # Visit a parse tree produced by KumirParser#ioStatement.
+    def visitIoStatement(self, ctx:KumirParser.IoStatementContext):
         return self.visitChildren(ctx)
 
 
@@ -179,18 +219,13 @@ class KumirParserVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by KumirParser#switchStatement.
-    def visitSwitchStatement(self, ctx:KumirParser.SwitchStatementContext):
-        return self.visitChildren(ctx)
-
-
     # Visit a parse tree produced by KumirParser#caseBlock.
     def visitCaseBlock(self, ctx:KumirParser.CaseBlockContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by KumirParser#loopStatement.
-    def visitLoopStatement(self, ctx:KumirParser.LoopStatementContext):
+    # Visit a parse tree produced by KumirParser#switchStatement.
+    def visitSwitchStatement(self, ctx:KumirParser.SwitchStatementContext):
         return self.visitChildren(ctx)
 
 
@@ -201,6 +236,11 @@ class KumirParserVisitor(ParseTreeVisitor):
 
     # Visit a parse tree produced by KumirParser#loopSpecifier.
     def visitLoopSpecifier(self, ctx:KumirParser.LoopSpecifierContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by KumirParser#loopStatement.
+    def visitLoopStatement(self, ctx:KumirParser.LoopStatementContext):
         return self.visitChildren(ctx)
 
 
@@ -229,93 +269,53 @@ class KumirParserVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by KumirParser#expression.
-    def visitExpression(self, ctx:KumirParser.ExpressionContext):
+    # Visit a parse tree produced by KumirParser#statement.
+    def visitStatement(self, ctx:KumirParser.StatementContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by KumirParser#logicalOrExpression.
-    def visitLogicalOrExpression(self, ctx:KumirParser.LogicalOrExpressionContext):
+    # Visit a parse tree produced by KumirParser#algorithmDefinition.
+    def visitAlgorithmDefinition(self, ctx:KumirParser.AlgorithmDefinitionContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by KumirParser#logicalAndExpression.
-    def visitLogicalAndExpression(self, ctx:KumirParser.LogicalAndExpressionContext):
+    # Visit a parse tree produced by KumirParser#moduleName.
+    def visitModuleName(self, ctx:KumirParser.ModuleNameContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by KumirParser#equalityExpression.
-    def visitEqualityExpression(self, ctx:KumirParser.EqualityExpressionContext):
+    # Visit a parse tree produced by KumirParser#importStatement.
+    def visitImportStatement(self, ctx:KumirParser.ImportStatementContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by KumirParser#relationalExpression.
-    def visitRelationalExpression(self, ctx:KumirParser.RelationalExpressionContext):
+    # Visit a parse tree produced by KumirParser#programItem.
+    def visitProgramItem(self, ctx:KumirParser.ProgramItemContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by KumirParser#additiveExpression.
-    def visitAdditiveExpression(self, ctx:KumirParser.AdditiveExpressionContext):
+    # Visit a parse tree produced by KumirParser#moduleHeader.
+    def visitModuleHeader(self, ctx:KumirParser.ModuleHeaderContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by KumirParser#multiplicativeExpression.
-    def visitMultiplicativeExpression(self, ctx:KumirParser.MultiplicativeExpressionContext):
+    # Visit a parse tree produced by KumirParser#moduleBody.
+    def visitModuleBody(self, ctx:KumirParser.ModuleBodyContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by KumirParser#powerExpression.
-    def visitPowerExpression(self, ctx:KumirParser.PowerExpressionContext):
+    # Visit a parse tree produced by KumirParser#implicitModuleBody.
+    def visitImplicitModuleBody(self, ctx:KumirParser.ImplicitModuleBodyContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by KumirParser#unaryExpression.
-    def visitUnaryExpression(self, ctx:KumirParser.UnaryExpressionContext):
+    # Visit a parse tree produced by KumirParser#moduleDefinition.
+    def visitModuleDefinition(self, ctx:KumirParser.ModuleDefinitionContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by KumirParser#postfixExpression.
-    def visitPostfixExpression(self, ctx:KumirParser.PostfixExpressionContext):
-        return self.visitChildren(ctx)
-
-
-    # Visit a parse tree produced by KumirParser#indexList.
-    def visitIndexList(self, ctx:KumirParser.IndexListContext):
-        return self.visitChildren(ctx)
-
-
-    # Visit a parse tree produced by KumirParser#argumentList.
-    def visitArgumentList(self, ctx:KumirParser.ArgumentListContext):
-        return self.visitChildren(ctx)
-
-
-    # Visit a parse tree produced by KumirParser#primaryExpression.
-    def visitPrimaryExpression(self, ctx:KumirParser.PrimaryExpressionContext):
-        return self.visitChildren(ctx)
-
-
-    # Visit a parse tree produced by KumirParser#arrayLiteral.
-    def visitArrayLiteral(self, ctx:KumirParser.ArrayLiteralContext):
-        return self.visitChildren(ctx)
-
-
-    # Visit a parse tree produced by KumirParser#expressionList.
-    def visitExpressionList(self, ctx:KumirParser.ExpressionListContext):
-        return self.visitChildren(ctx)
-
-
-    # Visit a parse tree produced by KumirParser#qualifiedIdentifier.
-    def visitQualifiedIdentifier(self, ctx:KumirParser.QualifiedIdentifierContext):
-        return self.visitChildren(ctx)
-
-
-    # Visit a parse tree produced by KumirParser#literal.
-    def visitLiteral(self, ctx:KumirParser.LiteralContext):
-        return self.visitChildren(ctx)
-
-
-    # Visit a parse tree produced by KumirParser#colorLiteral.
-    def visitColorLiteral(self, ctx:KumirParser.ColorLiteralContext):
+    # Visit a parse tree produced by KumirParser#program.
+    def visitProgram(self, ctx:KumirParser.ProgramContext):
         return self.visitChildren(ctx)
 
 
