@@ -1,7 +1,7 @@
 // KumirParser.g4
 // Грамматика парсера ANTLR v4 для языка КуМир.
-// Финальная версия, имитирующая поведение оригинального IDE
-// при разборе имен алгоритмов (захватывает всё до '(' или 'нач').
+// Финальная версия, реализующая захват "всего" имени алгоритма
+// после 'алг [тип]?' до '(' или начала следующего блока.
 parser grammar KumirParser;
 
 options { tokenVocab=KumirLexer; }
@@ -118,40 +118,42 @@ parameterList
 
 /*
  * =============================================================================
- * Имена Алгоритмов (Новый подход - Захват всего)
+ * Имена Алгоритмов (Исправленный предикат)
  * =============================================================================
  */
 /**
  * algorithmNameTokens: Захватывает все токены, которые могут быть частью имени,
- * до тех пор, пока не встретится открывающая скобка '(', точка с запятой ';'
- * или начало следующего блока ('нач', 'дано', 'надо', конец файла).
- * Используется для обоих типов заголовков.
+ * до тех пор, пока не встретится один из "стоп-токенов".
+ * ИСПОЛЬЗУЕТ КОРРЕКТНЫЙ СИНТАКСИС ПРЕДИКАТА ДЛЯ PYTHON ('self._input', 'self.TOKEN_NAME').
  */
 algorithmNameTokens
-    : (~(LPAREN | SEMICOLON | ALG_BEGIN | PRE_CONDITION | POST_CONDITION | EOF))+
+    : ( {self._input.LA(1) != self.LPAREN and \
+         self._input.LA(1) != self.ALG_BEGIN and \
+         self._input.LA(1) != self.PRE_CONDITION and \
+         self._input.LA(1) != self.POST_CONDITION and \
+         self._input.LA(1) != self.SEMICOLON and \
+         self._input.LA(1) != self.EOF}? . // Захватываем ЛЮБОЙ токен, если он не стоп-токен
+      )+ // Требуем хотя бы один токен для имени
     ;
 
 /**
  * algorithmName: Используется только для проверки имени в конце блока 'кон'.
- * Оставляем ID+ для большей строгости здесь.
  */
 algorithmName: ID+ ;
 
 
 /*
  * =============================================================================
- * Структура Алгоритма (Измененный algorithmHeader)
+ * Структура Алгоритма (ЕДИНОЕ ПРАВИЛО algorithmHeader)
  * =============================================================================
  */
 /**
  * algorithmHeader: Заголовок алгоритма.
- * ИЗМЕНЕНО: Две явные альтернативы. ANTLR выберет первую, если сможет
- * сопоставить typeSpecifier после ALG_HEADER. Иначе попробует вторую.
- * Обе альтернативы используют algorithmNameTokens для захвата имени.
+ * Единое правило: алг [тип]? ИМЯ [(параметры)]? [;]?
+ * Использует algorithmNameTokens для захвата имени.
  */
 algorithmHeader
-    : ALG_HEADER typeSpecifier        algorithmNameTokens (LPAREN parameterList? RPAREN)? SEMICOLON? // Вариант для ФУНКЦИИ
-    | ALG_HEADER /*тип отсутствует*/ algorithmNameTokens (LPAREN parameterList? RPAREN)? SEMICOLON? // Вариант для ПРОЦЕДУРЫ
+    : ALG_HEADER (typeSpecifier)? algorithmNameTokens (LPAREN parameterList? RPAREN)? SEMICOLON?
     ;
 
 preCondition // дано
@@ -169,7 +171,6 @@ statementSequence
 
 /**
  * lvalue: Левая часть присваивания (то, чему присваивают).
- * Разрешен RETURN_VALUE ('знач').
  */
 lvalue
     : qualifiedIdentifier (LBRACK indexList RBRACK)? // Обычная переменная или элемент массива A[i]
