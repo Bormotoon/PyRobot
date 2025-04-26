@@ -1,0 +1,1 @@
+recursive-include pyrobot/backend/kumir_interpreter/generated *.py *.tokens *.interp 

@@ -45,7 +45,7 @@ powerExpression
     : unaryExpression (POWER powerExpression)?
     ;
 multiplicativeExpression
-    : powerExpression ((MUL | DIV) powerExpression)*
+    : powerExpression ((MUL | DIV | DIV_OP | MOD_OP) powerExpression)*
     ;
 additiveExpression
     : multiplicativeExpression ((PLUS | MINUS) multiplicativeExpression)*

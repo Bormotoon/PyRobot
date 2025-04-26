@@ -83,6 +83,8 @@ PLUS                : '+';
 MINUS               : '-';
 MUL                 : '*';
 DIV                 : '/';
+DIV_OP              : ('div' | 'DIV');
+MOD_OP              : ('mod' | 'MOD');
 EQ                  : '=';
 LT                  : '<';
 GT                  : '>';
