@@ -57,6 +57,22 @@ class KumirEvalError(KumirExecutionError):
 	pass
 
 
+# Синтаксическая ошибка в коде Кумира
+class KumirSyntaxError(SyntaxError, KumirExecutionError): # Наследуем от SyntaxError и нашего базового
+	def __init__(self, message, line_index=None, line_content=None, offset=None):
+		# Инициализируем SyntaxError с дополнительными параметрами
+		SyntaxError.__init__(self, message)
+		# Устанавливаем атрибуты для KumirExecutionError
+		self.line_index = line_index
+		self.line_content = line_content
+		# Дополнительно сохраняем смещение, если оно есть
+		self.offset = offset
+
+	def __str__(self):
+		# Используем __str__ от KumirExecutionError для форматирования
+		return KumirExecutionError.__str__(self)
+
+
 # Ошибка, связанная с командами или состоянием робота
 class RobotError(KumirExecutionError):
 	pass

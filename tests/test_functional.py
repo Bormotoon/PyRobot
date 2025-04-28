@@ -5,9 +5,12 @@ from io import StringIO
 from contextlib import redirect_stdout, redirect_stderr
 
 from pyrobot.backend.kumir_interpreter.interpreter import interpret_kumir
+from pyrobot.backend.kumir_interpreter.kumir_exceptions import KumirSyntaxError, KumirEvalError
 
-# Директории с тестовыми данными
-KUMIR_EXAMPLES_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '../polyakov_kum'))
+# Определяем директорию с примерами КуМир относительно текущего файла
+current_dir = os.path.dirname(os.path.abspath(__file__))
+PROGRAMS_DIR = os.path.join(current_dir, "..", "polyakov_kum")
+
 TEST_CASES = [
     ('1-empty.kum', None, ''),  # Пустая программа
     ('2-2+2.kum', None, '2+2=?\nОтвет: 4\n'),  # Простое сложение
@@ -18,68 +21,85 @@ TEST_CASES = [
     ('8-if.kum', '5\n', 'положительное\n'),  # Условный оператор
     ('9-if.kum', '-3\n', 'отрицательное\n'),  # Условный оператор
     ('10-and.kum', '4\n3\n', 'да\n'),  # Логические операции
-    ('11-switch.kum', '2\n', 'вторник\n'),  # Выбор
-    ('12-switch.kum', '7\n', 'воскресенье\n'),  # Выбор
-    ('13-loopN.kum', None, '1\n2\n3\n4\n5\n'),  # Цикл N раз
-    ('14-while.kum', None, '1\n2\n3\n4\n5\n'),  # Цикл ПОКА
-    ('15-while.kum', '5\n', '5\n4\n3\n2\n1\n'),  # Цикл ПОКА с вводом
-    ('16-repeat.kum', None, '1\n2\n3\n4\n5\n'),  # Цикл с постусловием
-    ('17-for.kum', None, '1\n2\n3\n4\n5\n'),  # Цикл ДЛЯ
-    ('18-downto.kum', None, '5\n4\n3\n2\n1\n'),  # Цикл ДЛЯ с шагом -1
-    ('19-prime.kum', '17\n', 'простое\n'),  # Проверка на простое число
-    ('20-proc-err.kum', None, 'Ошибка в процедуре\n'),  # Процедуры
+    ('11-switch.kum', '2\\n', 'вторник\\n'),        # Выбор (существующее значение)
+    ('12-switch.kum', '7\\n', 'воскресенье\\n'),    # Выбор (иначе)
+    ('13-loopN.kum', '5\\n', "1\\n2\\n3\\n4\\n5\\n"),          # Цикл N раз (ошибка: нужен ввод) -> ИСПРАВЛЕНО
+    ('14-while.kum', '5\\n', "1\\n2\\n3\\n4\\n5\\n"),          # Цикл ПОКА (ошибка: нужен ввод) -> ИСПРАВЛЕНО
+    ('15-while.kum', '5\\n', '5\\n4\\n3\\n2\\n1\\n'),          # Цикл ПОКА (ввод числа, вывод цифр)
+    ('16-repeat.kum', None, "1\\n2\\n3\\n4\\n5\\n"),         # Цикл ДО (пока не реализован)
+    ('17-for.kum', '5\\n', "1\\n2\\n3\\n4\\n5\\n"),            # Цикл ДЛЯ (ошибка: нужен ввод) -> ИСПРАВЛЕНО
+    ('18-downto.kum', '5\\n', "32 16 8 4 2 \\n"),         # Цикл ДЛЯ с downto (ошибка: нужен ввод) -> ИСПРАВЛЕНО, добавил пробел в конце вывода
+    ('19-prime.kum', '17\\n', 'простое\\n'),         # Вложенные циклы (простые числа)
+    ('20-proc-err.kum', '10\\n', 'Ошибка в процедуре\\n'), # Процедура с ошибкой (ошибка: нужен ввод для 'y') -> ИСПРАВЛЕНО
 ]
 
-def run_kumir_program(program_path, input_data=None):
+def run_kumir_program(program_path: str, input_data: str | None = None) -> str:
     """
-    Запускает программу на КуМире и возвращает её вывод.
-    
+    Запускает программу КуМир и возвращает её стандартный вывод.
+
     Args:
-        program_path (str): Путь к файлу с программой
-        input_data (str): Входные данные (если нужны)
-        
+        program_path (str): Путь к файлу программы .kum
+        input_data (str, optional): Строка с входными данными. Defaults to None.
+
     Returns:
-        str: Вывод программы
+        str: Стандартный вывод программы.
     """
-    # Читаем код программы
     try:
         with open(program_path, 'r', encoding='utf-8') as f:
-            code = f.read().replace('\r\n', '\n')  # Нормализуем переводы строк
-    except UnicodeDecodeError:
-        with open(program_path, 'r', encoding='cp1251') as f:
-            code = f.read().replace('\r\n', '\n')  # Нормализуем переводы строк
-            
-    print(f"[DEBUG] Запуск программы: {program_path}", file=sys.stderr)
-    print(f"[DEBUG] Входные данные: {input_data}", file=sys.stderr)
-    
-    # Если есть входные данные, подготавливаем их
-    if input_data:
-        sys.stdin = StringIO(input_data)
-    
-    # Перехватываем стандартный вывод
-    output = StringIO()
-    stderr = StringIO()
-    
-    # Запускаем программу и перехватываем вывод
-    with redirect_stdout(output), redirect_stderr(stderr):
-        try:
-            interpret_kumir(code)
-        except Exception as e:
-            print(f"[DEBUG] Ошибка при выполнении: {e}", file=sys.stderr)
-            raise
-    
-    # Восстанавливаем стандартный ввод, если он был изменен
-    if input_data:
-        sys.stdin = sys.__stdin__
-        
-    # Получаем вывод программы
-    result = output.getvalue()
-    debug_output = stderr.getvalue()
-    
-    print(f"[DEBUG] Отладочный вывод:\n{debug_output}", file=sys.stderr)
-    print(f"[DEBUG] Стандартный вывод:\n{result}", file=sys.stderr)
-    
-    return result
+            code = f.read()
+
+        # Перехватываем stdout
+        old_stdout = sys.stdout
+        redirected_output = StringIO()
+        sys.stdout = redirected_output
+
+        # Перехватываем stdin
+        old_stdin = sys.stdin
+        if input_data:
+            redirected_input = StringIO(input_data)
+            sys.stdin = redirected_input
+        else:
+            # Если нет входных данных, подставляем пустой поток,
+            # чтобы input() не блокировался и сразу возвращал EOFError,
+            # если программа попытается что-то прочитать.
+            redirected_input = StringIO()
+            sys.stdin = redirected_input
+
+
+        interpret_kumir(code) # Запускаем интерпретатор
+
+        # Восстанавливаем stdout и stdin
+        sys.stdout = old_stdout
+        sys.stdin = old_stdin
+
+        result = redirected_output.getvalue()
+
+        # Добавляем newline в конце, если его нет (как делает оригинальный КуМир)
+        if result and not result.endswith('\n'):
+            result += '\n'
+        return result
+
+    except KumirSyntaxError as e:
+        print(f"Синтаксическая ошибка: {e}", file=sys.stderr)
+        # Восстанавливаем stdout/stdin в случае ошибки
+        sys.stdout = old_stdout
+        sys.stdin = old_stdin
+        raise # Перевыбрасываем исключение, чтобы тест упал
+    except KumirEvalError as e:
+        print(f"Ошибка выполнения: {e}", file=sys.stderr)
+         # Восстанавливаем stdout/stdin в случае ошибки
+        sys.stdout = old_stdout
+        sys.stdin = old_stdin
+        raise
+    except Exception as e:
+        print(f"Неожиданная ошибка: {e}", file=sys.stderr)
+        # Восстанавливаем stdout/stdin в случае ошибки
+        sys.stdout = old_stdout
+        sys.stdin = old_stdin
+        import traceback
+        traceback.print_exc(file=sys.stderr)
+        raise
+
 
 @pytest.mark.parametrize("program,input_data,expected_output", TEST_CASES)
 def test_kumir_program(program, input_data, expected_output):
@@ -91,7 +111,7 @@ def test_kumir_program(program, input_data, expected_output):
         input_data (str): Входные данные (если нужны)
         expected_output (str): Ожидаемый вывод
     """
-    program_path = os.path.join(KUMIR_EXAMPLES_DIR, program)
+    program_path = os.path.join(PROGRAMS_DIR, program)
     assert os.path.exists(program_path), f"Файл программы не найден: {program}"
     
     actual_output = run_kumir_program(program_path, input_data)

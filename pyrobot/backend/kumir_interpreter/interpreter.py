@@ -879,136 +879,67 @@ class KumirInterpreterVisitor(KumirParserVisitor):
             )
 
     def visitIoStatement(self, ctx: KumirParser.IoStatementContext):
-        """Обработка оператора ввода-вывода."""
-        print("[DEBUG][Visit] Обработка ioStatement", file=sys.stderr)
+        # Этот метод больше не обрабатывает вывод! 
+        # Логика перенесена в visitStatement.
+        # Обработка ввода остается здесь.
+        print("[DEBUG][Visit] Обработка ioStatement (Только ВВОД)", file=sys.stderr)
         
-        # Определяем тип операции (ввод/вывод)
         is_input = ctx.INPUT() is not None
-        
-        # Получаем список аргументов
+        if not is_input:
+             # Ничего не делаем для вывода здесь
+             return None 
+
+        # --- Обработка ВВОДА --- 
         args = ctx.ioArgumentList().ioArgument() if ctx.ioArgumentList() else []
-        
-        if is_input:
-            # Обработка оператора ввода
-            for arg_ctx in args:
+        for arg_ctx in args:
+            # ... (код обработки ввода остается как был, с исправлением lvalue_ctx) ...
+            try:
+                lvalue_list = arg_ctx.expression() # Возвращает список!
+                if not lvalue_list:
+                    # ... (обработка ошибки отсутствия переменной) ... 
+                    line = arg_ctx.start.line
+                    column = arg_ctx.start.column
+                    if arg_ctx.NEWLINE_CONST(): raise KumirEvalError(f"Строка {line}, столбец {column}: Нельзя использовать 'нс' в операторе ввода")
+                    else: raise KumirEvalError(f"Строка {line}, столбец {column}: Отсутствует переменная для ввода")
+                
+                lvalue_ctx = lvalue_list[0] if isinstance(lvalue_list, list) else lvalue_list 
+                if lvalue_ctx is None: raise KumirEvalError(f"Строка {arg_ctx.start.line}: Получено некорректное выражение для ввода (None)")
+                
+                var_name = self.get_variable_name(lvalue_ctx)
+                if not var_name: raise KumirEvalError(f"Строка {lvalue_ctx.start.line}: Не удалось получить имя переменной для ввода")
+                
+                var_info, var_scope = self.find_variable(var_name)
+                if var_info is None: raise KumirEvalError(f"Строка {lvalue_ctx.start.line}: Переменная '{var_name}' не найдена")
+                
+                prompt = f"Введите значение для '{var_name}' ({var_info['type']}): " # Упрощенный промпт
+                value_str = input(prompt)
+                
                 try:
-                    # Получаем контекст выражения для переменной
-                    lvalue_ctx = arg_ctx.expression()
-                    if not lvalue_ctx:
-                        line = arg_ctx.start.line
-                        column = arg_ctx.start.column
-                        raise KumirEvalError(f"Строка {line}, столбец {column}: Отсутствует выражение для ввода")
-                    
-                    # Получаем имя переменной
-                    var_name = self.get_variable_name(lvalue_ctx)
-                    if not var_name:
-                        line = lvalue_ctx.start.line
-                        column = lvalue_ctx.start.column
-                        raise KumirEvalError(f"Строка {line}, столбец {column}: Не удалось получить имя переменной для ввода")
-                    
-                    # Находим информацию о переменной
-                    var_info, var_scope = self.find_variable(var_name)
-                    if var_info is None:
-                        line = lvalue_ctx.start.line
-                        column = lvalue_ctx.start.column
-                        raise KumirEvalError(f"Строка {line}, столбец {column}: Переменная '{var_name}' не найдена")
-                    
-                    # Запрашиваем ввод у пользователя
-                    prompt = f"Введите значение для переменной '{var_name}' ({var_info['type']}): "
-                    value = input(prompt)
-                    
-                    # Преобразуем введенное значение в нужный тип
-                    try:
-                        if var_info['type'] == INTEGER_TYPE:
-                            value = int(value)
-                        elif var_info['type'] == FLOAT_TYPE:
-                            value = float(value)
-                        elif var_info['type'] == BOOLEAN_TYPE:
-                            value = value.lower() == 'да'
-                        elif var_info['type'] == CHAR_TYPE:
-                            if len(value) != 1:
-                                raise ValueError("Для символьного типа требуется ровно один символ")
-                            value = value[0]
-                        # Для строкового типа преобразование не требуется
-                    except ValueError as e:
-                        line = lvalue_ctx.start.line
-                        column = lvalue_ctx.start.column
-                        raise KumirEvalError(f"Строка {line}, столбец {column}: Ошибка преобразования типа для '{var_name}': {e}")
-                    
-                    # Обновляем значение переменной
-                    var_scope[var_name]['value'] = value
-                    
-                except Exception as e:
-                    if not isinstance(e, KumirEvalError):
-                        line = arg_ctx.start.line if arg_ctx else ctx.start.line
-                        column = arg_ctx.start.column if arg_ctx else ctx.start.column
-                        raise KumirEvalError(f"Строка {line}, столбец {column}: Ошибка при обработке ввода: {e}")
-                    raise
-        else:
-            # Обработка оператора вывода
-            output = []
-            has_newline = True  # По умолчанию добавляем перевод строки
-            
-            for arg_ctx in args:
-                try:
-                    # Проверяем наличие спецификатора "нс"
-                    if arg_ctx.NEWLINE_CONST():
-                        has_newline = False
-                        continue
-                    
-                    # Получаем значение выражения
-                    expr_ctx = arg_ctx.expression()
-                    if expr_ctx:
-                        value = self.visit(expr_ctx)
-                        if value is None:
-                            line = expr_ctx.start.line
-                            column = expr_ctx.start.column
-                            raise KumirEvalError(f"Строка {line}, столбец {column}: Попытка вывести неинициализированное значение")
-                        
-                        # Форматируем значение для вывода
-                        if isinstance(value, bool):
-                            value = "да" if value else "нет"
-                        elif isinstance(value, (int, float)):
-                            # Проверяем наличие спецификаторов ширины и точности
-                            width = None
-                            precision = None
-                            if arg_ctx.INTEGER():
-                                width = int(arg_ctx.INTEGER().getText())
-                            if arg_ctx.FLOAT():
-                                precision = int(arg_ctx.FLOAT().getText())
-                            
-                            # Применяем форматирование
-                            if precision is not None:
-                                value = f"{value:.{precision}f}"
-                            else:
-                                value = str(value)
-                            
-                            if width is not None:
-                                value = value.rjust(width)
-                        else:
-                            value = str(value)
-                        
-                        output.append(value)
-                    
-                    # Проверяем наличие строкового литерала
-                    elif arg_ctx.STRING():
-                        text = arg_ctx.STRING().getText()
-                        # Удаляем кавычки и экранирование
-                        text = text[1:-1].replace('\\"', '"')
-                        # Добавляем пробел после двоеточия
-                        text = text.replace(":", ": ")
-                        output.append(text)
-                    
-                except Exception as e:
-                    if not isinstance(e, KumirEvalError):
-                        line = arg_ctx.start.line if arg_ctx else ctx.start.line
-                        column = arg_ctx.start.column if arg_ctx else ctx.start.column
-                        raise KumirEvalError(f"Строка {line}, столбец {column}: Ошибка при обработке вывода: {e}")
-                    raise
-            
-            # Выводим результат
-            if output:
-                print("".join(output), end='\n' if has_newline else '', file=sys.stdout)
+                    # ... (преобразование value_str в value нужного типа) ...
+                    target_type = var_info['type']
+                    if target_type == INTEGER_TYPE: value = int(value_str)
+                    elif target_type == FLOAT_TYPE: value = float(value_str)
+                    elif target_type == BOOLEAN_TYPE: 
+                        if value_str.lower() == 'да': value = True
+                        elif value_str.lower() == 'нет': value = False
+                        else: raise ValueError("Ожидается 'да' или 'нет'")
+                    elif target_type == CHAR_TYPE: 
+                        if len(value_str) != 1: raise ValueError("Ожидается один символ")
+                        value = value_str
+                    elif target_type == STRING_TYPE: value = value_str
+                    else: raise KumirEvalError(f"Неподдерживаемый тип для ввода: {target_type}")
+                except ValueError as e:
+                    raise KumirEvalError(f"Строка {lvalue_ctx.start.line}: Ошибка преобразования типа для '{var_name}': {e}")
+                
+                if var_scope is None: raise KumirEvalError("Не найдена область видимости для переменной ввода") # Доп. проверка
+                var_scope[var_name]['value'] = value
+                
+            except Exception as e:
+                if not isinstance(e, KumirEvalError):
+                    line = arg_ctx.start.line if arg_ctx else ctx.start.line
+                    column = arg_ctx.start.column if arg_ctx else ctx.start.column
+                    raise KumirEvalError(f"Строка {line}, столбец {column}: Ошибка при обработке ввода: {e}")
+                raise
         
         return None
 
@@ -1017,8 +948,11 @@ class KumirInterpreterVisitor(KumirParserVisitor):
         print("[DEBUG][Visit] Обработка switchStatement", file=sys.stderr)
         
         # Получаем значение для выбора
-        switch_value = self.visit(ctx.expression())
-        print(f"  -> Значение для выбора = {switch_value}", file=sys.stderr)
+        # !!! ГРАММАТИКА НЕ СОДЕРЖИТ expression В switchStatement!
+        # !!! ЭТО НУЖНО ИСПРАВИТЬ В KumirParser.g4 И ПЕРЕГЕНЕРИРОВАТЬ ПАРСЕР.
+        # switch_value = self.visit(ctx.expression()) # <-- ЭТА СТРОКА ВЫЗЫВАЕТ ОШИБКУ ЛИНТЕРА
+        switch_value = None # Временное решение, чтобы не падало. Тесты на switch не пройдут.
+        print(f"  -> Значение для выбора = {switch_value} (ВРЕМЕННОЕ ЗНАЧЕНИЕ!)", file=sys.stderr)
         
         # Проходим по всем вариантам
         for case_ctx in ctx.caseBlock():
@@ -1102,6 +1036,125 @@ class KumirInterpreterVisitor(KumirParserVisitor):
             return self.get_variable_name(expr_ctx.logicalOrExpression())
         else:
             raise KumirEvalError(f"Не удалось получить имя переменной из выражения: {expr_ctx.getText()}")
+
+    # Вспомогательная функция для форматирования
+    def _format_output_value(self, value, arg_ctx):
+        """Форматирует значение для вывода, включая ширину/точность."""
+        formatted_value = ""
+        if isinstance(value, bool):
+            formatted_value = "да" if value else "нет"
+        elif isinstance(value, (int, float)):
+            width = None
+            precision = None
+            # Получаем выражения для ширины/точности (если есть)
+            expr_list = arg_ctx.expression()
+            colon_expressions = []
+            if isinstance(expr_list, list) and len(expr_list) > 1:
+                 colon_expressions = expr_list[1:] 
+            # elif ... (остается как есть)
+
+            if len(colon_expressions) >= 1: 
+                try:
+                    width_ctx = colon_expressions[0]
+                    # Добавляем проверку на None перед visit
+                    if width_ctx is None:
+                        raise KumirEvalError(f"Строка {arg_ctx.start.line}: Некорректное выражение для ширины поля (None).")
+                    width = int(self.visit(width_ctx))
+                except Exception as e:
+                     # Уточняем сообщение об ошибке
+                     raise KumirEvalError(f"Строка {arg_ctx.start.line}: Ошибка вычисления ширины поля ({e}).")
+            if len(colon_expressions) >= 2:
+                try:
+                    precision_ctx = colon_expressions[1]
+                    # Добавляем проверку на None перед visit
+                    if precision_ctx is None:
+                        raise KumirEvalError(f"Строка {arg_ctx.start.line}: Некорректное выражение для точности (None).")
+                    precision = int(self.visit(precision_ctx))
+                except Exception as e:
+                     # Уточняем сообщение об ошибке
+                     raise KumirEvalError(f"Строка {arg_ctx.start.line}: Ошибка вычисления точности ({e}).")
+            
+            if precision is not None:
+                try:
+                    formatted_value = f"{float(value):.{precision}f}"
+                except ValueError:
+                    raise KumirEvalError(f"Строка {arg_ctx.start.line}: Неверный формат точности ({precision}).")
+            else:
+                formatted_value = str(value)
+            
+            if width is not None:
+                formatted_value = formatted_value.rjust(width)
+        else:
+            formatted_value = str(value)
+        return formatted_value
+
+    # ... visitStatement теперь обрабатывает ВЫВОД ...
+    def visitStatement(self, ctx:KumirParser.StatementContext):
+        # ... (другие типы стейтментов) ... 
+        if ctx.ioStatement():
+            io_ctx = ctx.ioStatement()
+            if io_ctx.INPUT():
+                # Ввод обрабатывается в visitIoStatement
+                return self.visit(io_ctx)
+            else: 
+                # --- Обработка ВЫВОДА здесь --- 
+                print("[DEBUG][Visit] Обработка ВЫВОДА в visitStatement", file=sys.stderr)
+                args = io_ctx.ioArgumentList().ioArgument() if io_ctx.ioArgumentList() else []
+                
+                for arg_ctx in args:
+                    try:
+                        # ВОЗВРАЩАЕМ обработку нс как добавление \n
+                        if arg_ctx.NEWLINE_CONST():
+                            sys.stdout.write('\n')
+                            continue 
+
+                        formatted_value = ""
+                        expr_list = arg_ctx.expression()
+                        if expr_list:
+                            expr_ctx = expr_list[0] if isinstance(expr_list, list) else expr_list
+                            if expr_ctx is None:
+                                line = arg_ctx.start.line
+                                column = arg_ctx.start.column
+                                raise KumirEvalError(f"Строка {line}, столбец {column}: Получено некорректное выражение для вывода (None)") # Исправлено
+                            
+                            value = self.visit(expr_ctx)
+                            if value is None:
+                                line = expr_ctx.start.line
+                                column = expr_ctx.start.column
+                                raise KumirEvalError(f"Строка {line}, столбец {column}: Попытка вывести неинициализированное значение") # Исправлено
+                            
+                            formatted_value = self._format_output_value(value, arg_ctx)
+                        
+                        elif arg_ctx.STRING():
+                            text_node = arg_ctx.STRING()
+                            if not text_node:
+                                line = arg_ctx.start.line
+                                column = arg_ctx.start.column
+                                raise KumirEvalError(f"Строка {line}, столбец {column}: Отсутствует строковый литерал для вывода") # Исправлено
+                            text = text_node.getText()
+                            formatted_value = text[1:-1].replace('\\"', '"').replace("\\'", "'").replace('\\\\', '\\')
+                        else:
+                            # Добавляем обработку случая, когда нет ни expression, ни STRING (хотя грамматика не должна этого допускать)
+                            line = arg_ctx.start.line
+                            column = arg_ctx.start.column
+                            raise KumirEvalError(f"Строка {line}, столбец {column}: Некорректный аргумент для вывода (ни выражение, ни строка)")
+                        
+                        sys.stdout.write(formatted_value)
+                        
+                    except Exception as e:
+                        # ... (обработка ошибок) ...
+                        if not isinstance(e, KumirEvalError):
+                            line = arg_ctx.start.line if arg_ctx else io_ctx.start.line
+                            column = arg_ctx.start.column if arg_ctx else io_ctx.start.column
+                            raise KumirEvalError(f"Строка {line}, столбец {column}: Ошибка при обработке вывода: {e}")
+                        raise
+                
+                return None # Завершаем обработку стейтмента
+        # ... (обработка других стейтментов) ... 
+        else:
+             # Если это не известный нам тип statement, просто обходим детей
+             # Это может быть точка с запятой или пустой стейтмент
+             return self.visitChildren(ctx)
 
 def interpret_kumir(code: str):
     """
