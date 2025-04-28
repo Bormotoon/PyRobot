@@ -20,13 +20,13 @@ TEST_CASES = [
     ('7-rand.kum', None, None),  # Случайные числа - проверяем только запуск
     ('8-if.kum', '5\n7\n', 'Введите два целых числа: Максимальное число:\n7\n7\n7\n7\n'), # Corrected input and expected output based on kum file comments and interpreter behavior
     ('9-if.kum', '-3\n5\n', 'Введите возраст Андрея и Бориса: Борис старше\n'), # Условный оператор, ветвление
-    ('10-and.kum', '4\n3\n', 'да\n'),  # Логические операции
+    ('10-and.kum', '27\n', "Введите возраст: подходит\n"),  # Corrected input and expected output based on kum file
     ('11-switch.kum', '2\\n', 'вторник\\n'),        # Выбор (существующее значение)
     ('12-switch.kum', '7\\n', 'воскресенье\\n'),    # Выбор (иначе)
-    ('13-loopN.kum', '5\\n', "1\\n2\\n3\\n4\\n5\\n"),          # Цикл N раз (ошибка: нужен ввод) -> ИСПРАВЛЕНО
-    ('14-while.kum', '5\\n', "1\\n2\\n3\\n4\\n5\\n"),          # Цикл ПОКА (ошибка: нужен ввод) -> ИСПРАВЛЕНО
-    ('15-while.kum', '5\\n', '5\\n4\\n3\\n2\\n1\\n'),          # Цикл ПОКА (ввод числа, вывод цифр)
-    ('16-repeat.kum', None, "1\\n2\\n3\\n4\\n5\\n"),         # Цикл ДО (пока не реализован)
+    ('13-loopN.kum', '5\n', '1\n2\n3\n4\n5\n'),        # Цикл НЦ раз
+    ('14-while.kum', '5\n', '1\n2\n3\n4\n5\n'),       # Цикл ПОКА
+    ('15-while.kum', '12345\n', "Введите целое число: Цифр в числе: 5\n"), # Corrected input and expected output based on kum file
+    ('16-repeat.kum', None, '1\n2\n3\n4\n5\n'),     # Цикл ДО
     ('17-for.kum', '5\\n', "1\\n2\\n3\\n4\\n5\\n"),            # Цикл ДЛЯ (ошибка: нужен ввод) -> ИСПРАВЛЕНО
     ('18-downto.kum', '5\\n', "32 16 8 4 2 \\n"),         # Цикл ДЛЯ с downto (ошибка: нужен ввод) -> ИСПРАВЛЕНО, добавил пробел в конце вывода
     ('19-prime.kum', '17\n', 'Введите N: простое\n'),  # Проверка простоты числа
@@ -48,6 +48,8 @@ def run_kumir_program(program_path: str, input_data: str | None = None) -> str:
     try:
         with open(program_path, 'r', encoding='utf-8') as f:
             code = f.read()
+            # --- Добавляем нормализацию переносов строк ---
+            code = code.replace('\r\n', '\n').replace('\r', '\n')
 
         # Перехватываем stdout
         old_stdout = sys.stdout
