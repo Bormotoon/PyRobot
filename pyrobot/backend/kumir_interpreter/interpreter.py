@@ -845,7 +845,7 @@ class KumirInterpreterVisitor(KumirParserVisitor):
         # Запрашиваем ввод с учетом типа
         type_name = var_info['type']
         try:
-            value = input()
+            value = input().rstrip()
             if type_name == 'цел':
                 value = int(value)
             elif type_name == 'вещ':
@@ -911,9 +911,9 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                 var_info, var_scope = self.find_variable(var_name)
                 if var_info is None: raise KumirEvalError(f"Строка {lvalue_ctx.start.line}: Переменная '{var_name}' не найдена")
                 
-                prompt = f"Введите значение для '{var_name}' ({var_info['type']}): " # Упрощенный промпт
-                value_str = input(prompt)
-                
+                # Убираем prompt из вызова input() и удаляем пробельные символы справа
+                value_str = input().rstrip()
+
                 try:
                     # ... (преобразование value_str в value нужного типа) ...
                     target_type = var_info['type']
