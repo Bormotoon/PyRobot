@@ -23,7 +23,7 @@
     * Файл теста: `tests/polyakov_kum/7-rand.kum`
     * Место в коде: Вероятно, `visitPostfixExpression` или `visitPrimaryExpression` в `pyrobot/backend/kumir_interpreter/interpreter.py`.
 
-2. **Цикл `нц N раз`:** (**РЕШЕНО**)
+2. **Цикл `нц N раз`:**
     * Проблема: Интерпретатор вызывает `NotImplementedError`, так как этот тип цикла еще не реализован.
     * Файл теста: `tests/polyakov_kum/8-if.kum`
     * Место в коде: Ветка `elif loop_spec.expression():` в методе `visitLoopStatement` в `pyrobot/backend/kumir_interpreter/interpreter.py`.
@@ -38,8 +38,7 @@
     * Файлы тестов: `13-loopN.kum`, `14-while.kum`, `17-for.kum`.
     * Место в коде: `visitLoopStatement` в `interpreter.py`.
 
-5. **Цикл `до` (repeat...until):**
-    * Проблема: `NotImplementedError: Цикл без условия (до) пока не реализован`.
+5. **Цикл `до` (repeat...until):** (**РЕШЕНО**)
     * Файл теста: `16-repeat.kum`.
     * Место в коде: `visitLoopStatement` в `interpreter.py`.
 

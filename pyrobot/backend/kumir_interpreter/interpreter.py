@@ -10,6 +10,10 @@ from antlr4.tree.Tree import TerminalNode
 from .kumir_exceptions import (KumirExecutionError, DeclarationError, AssignmentError,
                                InputOutputError, KumirInputRequiredError, KumirEvalError,
                                RobotError)
+# Исключение для команды ВЫХОД из цикла
+class LoopExitException(Exception):
+    pass
+
 # Импортируем остальные зависимости
 from .declarations import (get_default_value, _validate_and_convert_value,
                            process_declaration, process_assignment, process_output,
@@ -639,11 +643,74 @@ class KumirInterpreterVisitor(KumirParserVisitor):
     def visitLoopStatement(self, ctx: KumirParser.LoopStatementContext):
         # Получаем спецификатор цикла
         loop_spec = ctx.loopSpecifier()
+        statement_sequence_ctx = ctx.statementSequence()
+        max_iterations = 100000 # Защита от бесконечных циклов
+        iteration_count = 0
+
         if not loop_spec:
-            # TODO: Цикл без условия (до)
-            raise NotImplementedError("Цикл без условия (до) пока не реализован")
+            # Обработка циклов без явного спецификатора (нц...кц и нц...кц при)
+            end_condition_ctx = ctx.endLoopCondition()
+
+            if end_condition_ctx: # Цикл "до тех пор" (нц ... кц при условие)
+                print(f"[DEBUG][Visit] Начало цикла ДО ТЕХ ПОР (КЦ ПРИ)", file=sys.stderr)
+                condition_expr_ctx = end_condition_ctx.expression()
+                while True:
+                    iteration_count += 1
+                    if iteration_count > max_iterations:
+                         raise KumirExecutionError(f"Превышено максимальное число итераций цикла ДО ТЕХ ПОР ({iteration_count})")
+                    
+                    # Выполняем тело цикла
+                    try:
+                        self.visit(statement_sequence_ctx)
+                    except LoopExitException:
+                        print("[DEBUG][Visit] Выход из цикла ДО ТЕХ ПОР по команде ВЫХОД", file=sys.stderr)
+                        break # Прерываем цикл по команде ВЫХОД
+                    except Exception as loop_body_error:
+                         line = statement_sequence_ctx.start.line
+                         column = statement_sequence_ctx.start.column
+                         raise KumirExecutionError(f"Строка {line}, столбец {column}: Ошибка внутри цикла ДО ТЕХ ПОР: {loop_body_error}")
+
+                    # Вычисляем условие выхода
+                    try:
+                        condition_value = self.visit(condition_expr_ctx)
+                    except Exception as e:
+                        line = condition_expr_ctx.start.line
+                        column = condition_expr_ctx.start.column
+                        raise KumirEvalError(f"Строка {line}, столбец {column}: Ошибка вычисления условия выхода цикла ДО ТЕХ ПОР: {e}")
+                    
+                    if not isinstance(condition_value, bool):
+                        line = condition_expr_ctx.start.line
+                        column = condition_expr_ctx.start.column
+                        raise KumirEvalError(f"Строка {line}, столбец {column}: Условие выхода цикла ДО ТЕХ ПОР ('{condition_value}') должно быть логического типа, а не {type(condition_value).__name__}.")
+
+                    print(f"  -> Итерация {iteration_count}: Условие выхода = {condition_value}", file=sys.stderr)
+                    if condition_value: # Если условие ВЫХОДА == да (True)
+                        break # Выход из цикла
+
+                print(f"[DEBUG][Visit] Конец цикла ДО ТЕХ ПОР. Итераций: {iteration_count}", file=sys.stderr)
+
+            else: # Безусловный цикл (нц ... кц)
+                print(f"[DEBUG][Visit] Начало безусловного цикла (НЦ-КЦ)", file=sys.stderr)
+                while True:
+                    iteration_count += 1
+                    if iteration_count > max_iterations:
+                         raise KumirExecutionError(f"Превышено максимальное число итераций безусловного цикла ({iteration_count})")
+                    
+                    print(f"  -> Итерация {iteration_count}", file=sys.stderr)
+                    # Выполняем тело цикла
+                    try:
+                        self.visit(statement_sequence_ctx)
+                    except LoopExitException:
+                        print("[DEBUG][Visit] Выход из безусловного цикла по команде ВЫХОД", file=sys.stderr)
+                        break # Прерываем цикл по команде ВЫХОД
+                    except Exception as loop_body_error:
+                         line = statement_sequence_ctx.start.line
+                         column = statement_sequence_ctx.start.column
+                         raise KumirExecutionError(f"Строка {line}, столбец {column}: Ошибка внутри безусловного цикла: {loop_body_error}")
+                
+                print(f"[DEBUG][Visit] Конец безусловного цикла. Итераций: {iteration_count}", file=sys.stderr)
             
-        if loop_spec.FOR():  # Цикл ДЛЯ
+        elif loop_spec.FOR():  # Цикл ДЛЯ
             loop_var_name = loop_spec.ID().getText()
             start_val_ctx = loop_spec.expression(0)
             end_val_ctx = loop_spec.expression(1)
@@ -711,7 +778,11 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                         var_info['value'] = current_val 
                         print(f"  -> Итерация {iteration_count}: {loop_var_name} = {current_val}", file=sys.stderr)
                         # Выполняем тело цикла
-                        self.visit(ctx.statementSequence())
+                        try:
+                            self.visit(statement_sequence_ctx)
+                        except LoopExitException:
+                            print("[DEBUG][Visit] Выход из цикла ДЛЯ по команде ВЫХОД", file=sys.stderr)
+                            break # Прерываем цикл
                         current_val += step_val
                 elif step_val < 0:
                      while current_val >= end_val:
@@ -720,7 +791,11 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                              raise KumirExecutionError(f"Превышено максимальное число итераций цикла ДЛЯ ({iteration_count})")
                         var_info['value'] = current_val
                         print(f"  -> Итерация {iteration_count}: {loop_var_name} = {current_val}", file=sys.stderr)
-                        self.visit(ctx.statementSequence())
+                        try:
+                            self.visit(statement_sequence_ctx)
+                        except LoopExitException:
+                             print("[DEBUG][Visit] Выход из цикла ДЛЯ по команде ВЫХОД", file=sys.stderr)
+                             break # Прерываем цикл
                         current_val += step_val
                 # Если start_val > end_val при step > 0 или start_val < end_val при step < 0, цикл не выполнится
                 
@@ -764,10 +839,13 @@ class KumirInterpreterVisitor(KumirParserVisitor):
 
                 # Выполняем тело цикла
                 try:
-                    self.visit(ctx.statementSequence())
+                    self.visit(statement_sequence_ctx)
+                except LoopExitException:
+                    print("[DEBUG][Visit] Выход из цикла ПОКА по команде ВЫХОД", file=sys.stderr)
+                    break # Прерываем цикл
                 except Exception as loop_body_error:
-                     line = ctx.statementSequence().start.line
-                     column = ctx.statementSequence().start.column
+                     line = statement_sequence_ctx.start.line
+                     column = statement_sequence_ctx.start.column
                      raise KumirExecutionError(f"Строка {line}, столбец {column}: Ошибка внутри цикла ПОКА: {loop_body_error}")
 
             print(f"[DEBUG][Visit] Конец цикла ПОКА. Итераций: {iteration_count - 1}", file=sys.stderr) # -1 т.к. последняя проверка условия была лишней
@@ -807,6 +885,9 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                 # Выполняем тело цикла
                 try:
                     self.visit(statement_sequence_ctx)
+                except LoopExitException:
+                    print("[DEBUG][Visit] Выход из цикла РАЗ по команде ВЫХОД", file=sys.stderr)
+                    break # Прерываем цикл for
                 except Exception as loop_body_error:
                      # TODO: По возможности, получить номер строки из loop_body_error
                      line = statement_sequence_ctx.start.line
@@ -1189,11 +1270,19 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                         raise
                 
                 return None # Завершаем обработку стейтмента
+        elif ctx.exitStatement(): # Обработка команды ВЫХОД
+            return self.visit(ctx.exitStatement())
+        
         # ... (обработка других стейтментов) ... 
         else:
              # Если это не известный нам тип statement, просто обходим детей
              # Это может быть точка с запятой или пустой стейтмент
              return self.visitChildren(ctx)
+
+    def visitExitStatement(self, ctx: KumirParser.ExitStatementContext):
+        """Обработка команды ВЫХОД."""
+        print("[DEBUG][Visit] Команда ВЫХОД", file=sys.stderr)
+        raise LoopExitException() # Бросаем исключение для прерывания цикла
 
 def interpret_kumir(code: str):
     """
