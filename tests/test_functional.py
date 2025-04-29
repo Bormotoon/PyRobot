@@ -9,7 +9,10 @@ from pyrobot.backend.kumir_interpreter.kumir_exceptions import KumirSyntaxError,
 
 # Определяем директорию с примерами КуМир относительно текущего файла
 current_dir = os.path.dirname(os.path.abspath(__file__))
-PROGRAMS_DIR = os.path.join(current_dir, "..", "polyakov_kum")
+# Нормализуем путь, чтобы избежать проблем с '..' - УДАЛЕНО, ТАК КАК ПУТЬ НЕПРАВИЛЬНЫЙ
+# PROGRAMS_DIR = os.path.abspath(os.path.join(current_dir, "..", "polyakov_kum"))
+# Исправляем путь на tests/polyakov_kum
+PROGRAMS_DIR = os.path.join(current_dir, "polyakov_kum")
 
 TEST_CASES = [
     ('1-empty.kum', None, ''),  # Пустая программа
