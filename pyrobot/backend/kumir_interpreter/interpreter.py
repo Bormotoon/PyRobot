@@ -773,9 +773,48 @@ class KumirInterpreterVisitor(KumirParserVisitor):
             print(f"[DEBUG][Visit] Конец цикла ПОКА. Итераций: {iteration_count - 1}", file=sys.stderr) # -1 т.к. последняя проверка условия была лишней
             
         elif loop_spec.expression():  # Цикл РАЗ
-            # TODO: Реализовать цикл РАЗ
-            raise NotImplementedError("Цикл РАЗ пока не реализован")
-            
+            times_expr_ctx = loop_spec.expression(0) # Получаем контекст выражения N
+            statement_sequence_ctx = ctx.statementSequence() # Получаем контекст тела цикла
+
+            # Вычисляем количество повторений
+            try:
+                times_value = self.visit(times_expr_ctx)
+            except Exception as e:
+                line = times_expr_ctx.start.line
+                column = times_expr_ctx.start.column
+                raise KumirEvalError(f"Строка {line}, столбец {column}: Ошибка вычисления количества повторений цикла РАЗ: {e}")
+
+            # Проверяем тип и значение
+            if not isinstance(times_value, int):
+                line = times_expr_ctx.start.line
+                column = times_expr_ctx.start.column
+                raise KumirEvalError(f"Строка {line}, столбец {column}: Количество повторений цикла РАЗ ('{times_value}') должно быть целым числом, а не {type(times_value).__name__}.")
+            if times_value < 0:
+                line = times_expr_ctx.start.line
+                column = times_expr_ctx.start.column
+                raise KumirEvalError(f"Строка {line}, столбец {column}: Количество повторений цикла РАЗ ('{times_value}') не может быть отрицательным.")
+
+            max_iterations = 100000 # Защита от слишком больших чисел
+            if times_value > max_iterations:
+                 raise KumirExecutionError(f"Запрошено слишком большое число итераций цикла РАЗ ({times_value}), максимум {max_iterations}")
+
+            print(f"[DEBUG][Visit] Начало цикла {times_value} РАЗ", file=sys.stderr)
+
+            # Итерация цикла
+            for i in range(times_value):
+                iteration_num = i + 1
+                print(f"  -> Итерация {iteration_num} из {times_value}", file=sys.stderr)
+                # Выполняем тело цикла
+                try:
+                    self.visit(statement_sequence_ctx)
+                except Exception as loop_body_error:
+                     # TODO: По возможности, получить номер строки из loop_body_error
+                     line = statement_sequence_ctx.start.line
+                     column = statement_sequence_ctx.start.column
+                     raise KumirExecutionError(f"Строка {line}, столбец {column}: Ошибка внутри цикла РАЗ (итерация {iteration_num}): {loop_body_error}")
+
+            print(f"[DEBUG][Visit] Конец цикла РАЗ. Итераций: {times_value}", file=sys.stderr)
+
         return None
 
     def visitIfStatement(self, ctx:KumirParser.IfStatementContext):
