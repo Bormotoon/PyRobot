@@ -17,7 +17,7 @@ from pyrobot.backend.kumir_interpreter.generated.KumirLexer import KumirLexer
 from pyrobot.backend.kumir_interpreter.generated.KumirParser import KumirParser
 
 # Директория с примерами кода КуМир
-KUMIR_EXAMPLES_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '../polyakov_kum'))
+KUMIR_EXAMPLES_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), 'polyakov_kum'))
 
 # Собираем список .kum файлов для параметризации теста
 kumir_files = [

@@ -66,7 +66,7 @@ def serializedATN():
         1,62,1,62,1,62,0,0,63,0,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,
         32,34,36,38,40,42,44,46,48,50,52,54,56,58,60,62,64,66,68,70,72,74,
         76,78,80,82,84,86,88,90,92,94,96,98,100,102,104,106,108,110,112,
-        114,116,118,120,122,124,0,10,1,0,56,66,2,0,32,32,71,72,1,0,73,74,
+        114,116,118,120,122,124,0,10,1,0,56,66,2,0,32,32,71,72,1,0,73,76,
         1,0,71,72,2,0,68,69,78,79,2,0,70,70,77,77,1,0,39,43,1,0,45,48,1,
         0,49,53,1,0,35,37,663,0,126,1,0,0,0,2,136,1,0,0,0,4,138,1,0,0,0,
         6,140,1,0,0,0,8,148,1,0,0,0,10,162,1,0,0,0,12,164,1,0,0,0,14,181,
@@ -1418,6 +1418,18 @@ class KumirParser ( Parser ):
             else:
                 return self.getToken(KumirParser.DIV, i)
 
+        def DIV_OP(self, i:int=None):
+            if i is None:
+                return self.getTokens(KumirParser.DIV_OP)
+            else:
+                return self.getToken(KumirParser.DIV_OP, i)
+
+        def MOD_OP(self, i:int=None):
+            if i is None:
+                return self.getTokens(KumirParser.MOD_OP)
+            else:
+                return self.getToken(KumirParser.MOD_OP, i)
+
         def getRuleIndex(self):
             return KumirParser.RULE_multiplicativeExpression
 
@@ -1450,10 +1462,10 @@ class KumirParser ( Parser ):
             self.state = 213
             self._errHandler.sync(self)
             _la = self._input.LA(1)
-            while _la==73 or _la==74:
+            while ((((_la - 73)) & ~0x3f) == 0 and ((1 << (_la - 73)) & 15) != 0):
                 self.state = 209
                 _la = self._input.LA(1)
-                if not(_la==73 or _la==74):
+                if not(((((_la - 73)) & ~0x3f) == 0 and ((1 << (_la - 73)) & 15) != 0)):
                     self._errHandler.recoverInline(self)
                 else:
                     self._errHandler.reportMatch(self)
@@ -2840,7 +2852,7 @@ class KumirParser ( Parser ):
                              self._input.LA(1) != self.SEMICOLON and \
                              self._input.LA(1) != self.EOF:
                         from antlr4.error.Errors import FailedPredicateException
-                        raise FailedPredicateException(self, "self._input.LA(1) != self.LPAREN and \\\r\n         self._input.LA(1) != self.ALG_BEGIN and \\\r\n         self._input.LA(1) != self.PRE_CONDITION and \\\r\n         self._input.LA(1) != self.POST_CONDITION and \\\r\n         self._input.LA(1) != self.SEMICOLON and \\\r\n         self._input.LA(1) != self.EOF")
+                        raise FailedPredicateException(self, "self._input.LA(1) != self.LPAREN and \\\n         self._input.LA(1) != self.ALG_BEGIN and \\\n         self._input.LA(1) != self.PRE_CONDITION and \\\n         self._input.LA(1) != self.POST_CONDITION and \\\n         self._input.LA(1) != self.SEMICOLON and \\\n         self._input.LA(1) != self.EOF")
                     self.state = 335
                     self.matchWildcard()
 

@@ -26,7 +26,7 @@ TEST_CASES = [
     ('10-and.kum', '27\n', "Введите возраст: подходит\n"),  # Corrected input and expected output based on kum file
     ('11-switch.kum', '2\\n', 'вторник\\n'),        # Выбор (существующее значение)
     ('12-switch.kum', '7\\n', 'воскресенье\\n'),    # Выбор (иначе)
-    ('13-loopN.kum', '5\n', '1\n2\n3\n4\n5\n'),        # Цикл НЦ раз
+    ('13-loopN.kum', '5\n', 'Сколько раз сделать? привет\nпривет\nпривет\nпривет\nпривет\n'), # Цикл НЦ раз - ИСПРАВЛЕНО ОЖИДАНИЕ
     ('14-while.kum', '5\n', '1\n2\n3\n4\n5\n'),       # Цикл ПОКА
     ('15-while.kum', '12345\n', "Введите целое число: Цифр в числе: 5\n"), # Corrected input and expected output based on kum file
     ('16-repeat.kum', None, '1\n2\n3\n4\n5\n'),     # Цикл ДО

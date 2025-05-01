@@ -748,35 +748,33 @@ class KumirInterpreterVisitor(KumirParserVisitor):
 
             print(f"[DEBUG][Visit] Начало цикла ДЛЯ '{loop_var_name}' от {start_val} до {end_val} шаг {step_val}", file=sys.stderr)
 
-            # Находим информацию о переменной цикла в текущей или внешней области
-            var_info, var_scope = self.find_variable(loop_var_name)
-            if var_info is None:
-                line = loop_spec.ID().getSymbol().line
-                column = loop_spec.ID().getSymbol().column
-                raise KumirExecutionError(f"Строка {line}, столбец {column}: Переменная цикла ДЛЯ '{loop_var_name}' не найдена.")
-            if var_info.get('is_table'):
-                line = loop_spec.ID().getSymbol().line
-                column = loop_spec.ID().getSymbol().column
-                raise KumirExecutionError(f"Строка {line}, столбец {column}: Переменная цикла ДЛЯ '{loop_var_name}' не может быть таблицей.")
-            if var_info.get('type') != 'цел':
-                line = loop_spec.ID().getSymbol().line
-                column = loop_spec.ID().getSymbol().column
-                raise KumirExecutionError(f"Строка {line}, столбец {column}: Переменная цикла ДЛЯ '{loop_var_name}' должна быть целого типа, а не '{var_info.get('type')}'.")
-
-            # Определяем диапазон итераций
-            current_val = start_val
-            iteration_count = 0
-
+            # --- Начало изменений для области видимости ---
+            self.enter_scope() # Входим в новую область видимости для цикла
             try:
-                # Итерация цикла
+                # Объявляем переменную цикла в локальной области видимости
+                # Определяем тип переменной по типу начального значения
+                var_type = 'цел' if isinstance(start_val, int) else 'вещ'
+                self.declare_variable(loop_var_name, var_type)
+                # Обновляем ее начальным значением (declare_variable устанавливает значение по умолчанию)
+                self.update_variable(loop_var_name, start_val)
+                # Находим var_info уже в новой области видимости
+                var_info, _ = self.find_variable(loop_var_name)
+                if var_info is None: # На всякий случай проверка, хотя declare должен был создать
+                     raise KumirExecutionError(f"Не удалось создать локальную переменную цикла '{loop_var_name}'")
+            
+                current_val = start_val
+                iteration_count = 0
+                max_iterations = 100000 # Защита
+                
+                # Основной цикл (логика остается прежней, но работает с локальной переменной)
                 if step_val > 0:
                     while current_val <= end_val:
                         iteration_count += 1
-                        if iteration_count > 100000: # Защита от бесконечных циклов
+                        if iteration_count > max_iterations:
                              raise KumirExecutionError(f"Превышено максимальное число итераций цикла ДЛЯ ({iteration_count})")
-                        # Обновляем значение переменной в ее области видимости
-                        var_info['value'] = current_val 
+                        var_info['value'] = current_val # Обновляем локальную переменную
                         print(f"  -> Итерация {iteration_count}: {loop_var_name} = {current_val}", file=sys.stderr)
+                        
                         # Выполняем тело цикла
                         try:
                             self.visit(statement_sequence_ctx)
@@ -787,9 +785,9 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                 elif step_val < 0:
                      while current_val >= end_val:
                         iteration_count += 1
-                        if iteration_count > 100000:
+                        if iteration_count > max_iterations:
                              raise KumirExecutionError(f"Превышено максимальное число итераций цикла ДЛЯ ({iteration_count})")
-                        var_info['value'] = current_val
+                        var_info['value'] = current_val # Обновляем локальную переменную
                         print(f"  -> Итерация {iteration_count}: {loop_var_name} = {current_val}", file=sys.stderr)
                         try:
                             self.visit(statement_sequence_ctx)
@@ -804,9 +802,10 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                  line = ctx.statementSequence().start.line
                  column = ctx.statementSequence().start.column
                  raise KumirExecutionError(f"Строка {line}, столбец {column}: Ошибка внутри цикла ДЛЯ: {loop_body_error}")
+            finally:
+                 self.exit_scope() # Выходим из локальной области видимости цикла
+                 print(f"[DEBUG][Visit] Конец цикла ДЛЯ '{loop_var_name}'. Итераций: {iteration_count}", file=sys.stderr)
 
-            print(f"[DEBUG][Visit] Конец цикла ДЛЯ '{loop_var_name}'. Итераций: {iteration_count}", file=sys.stderr)
-            
         elif loop_spec.WHILE():  # Цикл ПОКА
             condition_ctx = loop_spec.expression(0)
             print(f"[DEBUG][Visit] Начало цикла ПОКА", file=sys.stderr)
@@ -895,6 +894,50 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                      raise KumirExecutionError(f"Строка {line}, столбец {column}: Ошибка внутри цикла РАЗ (итерация {iteration_num}): {loop_body_error}")
 
             print(f"[DEBUG][Visit] Конец цикла РАЗ. Итераций: {times_value}", file=sys.stderr)
+
+        elif loop_spec.REPEAT(): # Цикл ДО (REPEAT ... UNTIL)
+            condition_ctx = loop_spec.expression(0)
+            print(f"[DEBUG][Visit] Начало цикла ДО", file=sys.stderr)
+            
+            iteration_count = 0
+            max_iterations = 100000 # Защита
+
+            while True:
+                iteration_count += 1
+                if iteration_count > max_iterations:
+                    raise KumirExecutionError(f"Превышено максимальное число итераций цикла ДО ({iteration_count})")
+
+                print(f"  -> Итерация {iteration_count}", file=sys.stderr)
+                # Выполняем тело цикла ПЕРЕД проверкой условия
+                try:
+                    self.visit(statement_sequence_ctx)
+                except LoopExitException:
+                    print("[DEBUG][Visit] Выход из цикла ДО по команде ВЫХОД", file=sys.stderr)
+                    break # Прерываем цикл
+                except Exception as loop_body_error:
+                     line = statement_sequence_ctx.start.line
+                     column = statement_sequence_ctx.start.column
+                     raise KumirExecutionError(f"Строка {line}, столбец {column}: Ошибка внутри цикла ДО: {loop_body_error}")
+
+                # Вычисляем условие выхода
+                try:
+                    condition_value = self.visit(condition_ctx)
+                except Exception as e:
+                    line = condition_ctx.start.line
+                    column = condition_ctx.start.column
+                    raise KumirEvalError(f"Строка {line}, столбец {column}: Ошибка вычисления условия цикла ДО: {e}")
+                
+                # Проверяем тип условия
+                if not isinstance(condition_value, bool):
+                     line = condition_ctx.start.line
+                     column = condition_ctx.start.column
+                     raise KumirEvalError(f"Строка {line}, столбец {column}: Условие цикла ДО ('{condition_value}') должно быть логического типа, а не {type(condition_value).__name__}.")
+
+                print(f"  -> Проверка условия выхода: {condition_value}", file=sys.stderr)
+                if condition_value: # Если условие == да (True)
+                    break # Выход из цикла
+
+            print(f"[DEBUG][Visit] Конец цикла ДО. Итераций: {iteration_count}", file=sys.stderr)
 
         return None
 

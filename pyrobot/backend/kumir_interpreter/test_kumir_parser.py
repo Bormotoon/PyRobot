@@ -1,7 +1,7 @@
 import sys
 from antlr4 import *
-from generated.KumirLexer import KumirLexer
-from generated.KumirParser import KumirParser
+from .generated.KumirLexer import KumirLexer
+from .generated.KumirParser import KumirParser
 from antlr4.error.ErrorListener import ErrorListener
 
 class MyErrorListener(ErrorListener):
