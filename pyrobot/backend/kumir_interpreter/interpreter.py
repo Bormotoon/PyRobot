@@ -295,7 +295,10 @@ class KumirInterpreterVisitor(KumirParserVisitor):
             # Операции сравнения - только для чисел и строк одного типа
             left_val = self._check_comparable(left_val, op_token.text)
             right_val = self._check_comparable(right_val, op_token.text)
-            if type(left_val) != type(right_val):
+            # --- ИСПРАВЛЕНИЕ: Разрешаем сравнение int и float --- 
+            is_left_num = isinstance(left_val, (int, float))
+            is_right_num = isinstance(right_val, (int, float))
+            if not ((is_left_num and is_right_num) or (type(left_val) == type(right_val))):
                 raise KumirEvalError(f"Несовместимые типы в операции '{op_token.text}': {type(left_val).__name__} и {type(right_val).__name__}")
             if not isinstance(left_val, (int, float, str)):
                 raise KumirEvalError(f"Операция '{op_token.text}' не применима к типу {type(left_val).__name__}")
@@ -1076,6 +1079,9 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                 
                 # Убираем prompt из вызова input() и удаляем пробельные символы справа
                 value_str = input().rstrip()
+                # --- ИСПРАВЛЕНИЕ: Убираем возможный литерал \n в конце --- 
+                if value_str.endswith('\\n'):
+                    value_str = value_str[:-2]
 
                 try:
                     # ... (преобразование value_str в value нужного типа) ...
