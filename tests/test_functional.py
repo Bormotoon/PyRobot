@@ -87,42 +87,43 @@ def run_kumir_program(program_path: str, input_data: str | None = None) -> str:
     try:
         with open(program_path, 'r', encoding='utf-8') as f:
             code = f.read()
-            # --- Добавляем нормализацию переносов строк ---
+            # --- ВОЗВРАЩАЕМ НОРМАЛИЗАЦИЮ ПЕРЕНОСОВ СТРОК ---
             code = code.replace('\r\n', '\n').replace('\r', '\n')
 
-        # Создаем буферы для перехвата вывода и ввода
+        # --- ВОЗВРАЩАЕМ ПЕРЕХВАТ IO И ЗАМЕНУ STDIN --- 
         output_buffer = StringIO()
         input_buffer = StringIO(input_data if input_data else '')
-
-        # Используем контекстные менеджеры для безопасного перехвата stdout и stdin
-        with redirect_stdout(output_buffer), redirect_stderr(StringIO()):
-            # Временно заменяем stdin
-            old_stdin = sys.stdin
-            sys.stdin = input_buffer
-            try:
+        stderr_buffer = StringIO()
+        old_stdin = sys.stdin
+        try:
+            with redirect_stdout(output_buffer), redirect_stderr(stderr_buffer):
+                sys.stdin = input_buffer
                 interpret_kumir(code)  # Запускаем интерпретатор
-            finally:
-                # Восстанавливаем stdin в любом случае
-                sys.stdin = old_stdin
+        except Exception as e:
+            print(f"--- ОШИБКА ПРИ ВЫПОЛНЕНИИ {os.path.basename(program_path)} ---", file=sys.__stderr__)
+            captured_stderr = stderr_buffer.getvalue()
+            if captured_stderr:
+                print("--- Перехваченный STDERR: ---", file=sys.__stderr__)
+                print(captured_stderr, file=sys.__stderr__)
+                print("----------------------------- ", file=sys.__stderr__)
+            print("--- Исключение Python: ---", file=sys.__stderr__)
+            import traceback
+            traceback.print_exc(file=sys.__stderr__)
+            print("------------------------- ", file=sys.__stderr__)
+            raise e 
+        finally:
+            sys.stdin = old_stdin
+        # -------------------------------------------------------------
 
-        # Получаем результат
         result = output_buffer.getvalue()
-        # --- ИСПРАВЛЕНИЕ: Убираем пробельные символы в конце результата --- 
-        result = result.rstrip()
-
-        # Добавляем newline в конце, если его нет (как делает оригинальный КуМир)
-        if result:
+        # --- ВОЗВРАЩАЕМ ДОБАВЛЕНИЕ ПЕРЕНОСА СТРОКИ (если его нет) ---
+        if result and not result.endswith('\n'):
             result += '\n'
+        # -----------------------------------------------------------
         return result
 
-    except KumirSyntaxError as e:
-        print(f"Синтаксическая ошибка: {e}", file=sys.stderr)
-        raise  # Перевыбрасываем исключение, чтобы тест упал
-    except KumirEvalError as e:
-        print(f"Ошибка выполнения: {e}", file=sys.stderr)
-        raise
-    except Exception as e:
-        print(f"Неожиданная ошибка: {e}", file=sys.stderr)
+    except Exception as e: 
+        print(f"Неожиданная ошибка при запуске теста {program_path}: {e}", file=sys.stderr)
         import traceback
         traceback.print_exc(file=sys.stderr)
         raise

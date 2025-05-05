@@ -9,7 +9,7 @@ from antlr4.tree.Tree import TerminalNode
 # Импортируем все исключения из одного места
 from .kumir_exceptions import (KumirExecutionError, DeclarationError, AssignmentError,
                                InputOutputError, KumirInputRequiredError, KumirEvalError,
-                               RobotError)
+                               RobotError, KumirSyntaxError)
 # Исключение для команды ВЫХОД из цикла
 class LoopExitException(Exception):
     pass
@@ -85,7 +85,10 @@ STRING_TYPE = 'лит'
 # Класс для вывода подробных ошибок парсинга
 class DiagnosticErrorListener(ErrorListener):
     def syntaxError(self, recognizer, offendingSymbol, line, column, msg, e):
-        print(f"[DEBUG][Parser Error] Строка {line}:{column} около '{offendingSymbol.text if offendingSymbol else 'EOF'}' - {msg}", file=sys.stderr)
+        error_message = f"Строка {line}:{column} около '{offendingSymbol.text if offendingSymbol else 'EOF'}': {msg}"
+        # --- ВЫБРАСЫВАЕМ ИСКЛЮЧЕНИЕ --- 
+        print(f"[DEBUG][Parser Error] {error_message}", file=sys.stderr)
+        raise KumirSyntaxError(error_message)
 
 def get_default_value(kumir_type):
     """Возвращает значение по умолчанию для данного типа Кумира."""
@@ -121,7 +124,7 @@ class KumirInterpreterVisitor(KumirParserVisitor):
         super().__init__()
         self.variables = {}  # Глобальные переменные
         self.scopes = [{}]  # Стек областей видимости, начинаем с глобальной
-        self.debug = False  # Флаг для отладочного вывода (ОТКЛЮЧЕН)
+        self.debug = True  # Флаг для отладочного вывода (ВКЛЮЧЕН ДЛЯ 15-while)
         self.procedures = {}  # Словарь для хранения определений процедур/функций
 
     # --- Управление областями видимости и символами ---
@@ -1054,16 +1057,25 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                     raise KumirExecutionError(f"Строка {line}, столбец {column}: Ошибка внутри цикла РАЗ (итерация {i+1}): {str(e)}")
 
         elif loop_spec.WHILE():  # Цикл ПОКА
+            loop_count = 0 # Счетчик итераций для отладки
+            if self.debug: print(f"[DEBUG][While 15] Вход в цикл ПОКА", file=sys.stderr)
             while True:
                 condition_expr = loop_spec.expression()
                 if not condition_expr:
                      raise KumirEvalError(f"Строка {loop_spec.start.line}: Отсутствует выражение условия для цикла ПОКА")
                 condition = self.visit(condition_expr)
                 condition_value = self._get_value(condition)
+                if self.debug: print(f"[DEBUG][While 15] Итерация {loop_count}, проверка условия ({condition_expr.getText()}): {condition_value}", file=sys.stderr)
                 if not isinstance(condition_value, bool):
                     raise KumirEvalError(f"Строка {loop_spec.start.line}: Условие цикла ПОКА должно быть логическим, получено {type(condition_value).__name__}")
                 if not condition_value:
+                    if self.debug: print(f"[DEBUG][While 15] Условие ложно, выход из цикла.", file=sys.stderr)
                     break
+                # --- DEBUG 15-while --- 
+                n_val_before = self.find_variable('n')[0]['value'] if self.find_variable('n')[0] else 'N/A'
+                count_val_before = self.find_variable('count')[0]['value'] if self.find_variable('count')[0] else 'N/A'
+                if self.debug: print(f"[DEBUG][While 15] Перед телом итерации {loop_count}: n={n_val_before}, count={count_val_before}", file=sys.stderr)
+                # ---------------------
                 try:
                     self.visit(ctx.statementSequence())
                 except LoopExitException:
@@ -1072,6 +1084,12 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                     line = ctx.start.line
                     column = ctx.start.column
                     raise KumirExecutionError(f"Строка {line}, столбец {column}: Ошибка внутри цикла ПОКА: {str(e)}")
+                # --- DEBUG 15-while --- 
+                n_val_after = self.find_variable('n')[0]['value'] if self.find_variable('n')[0] else 'N/A'
+                count_val_after = self.find_variable('count')[0]['value'] if self.find_variable('count')[0] else 'N/A'
+                if self.debug: print(f"[DEBUG][While 15] После тела итерации {loop_count}: n={n_val_after}, count={count_val_after}", file=sys.stderr)
+                # ---------------------
+                loop_count += 1 # Увеличиваем счетчик итераций
 
         elif loop_spec.FOR():  # Цикл ДЛЯ
             var_name = loop_spec.ID().getText()
@@ -1320,31 +1338,35 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                 return None # Завершили обработку ввода
             else: 
                 # --- Обработка ВЫВОДА здесь --- 
-                print("[DEBUG][Visit] Обработка ВЫВОДА в visitStatement", file=sys.stderr)
+                if self.debug: print("[DEBUG][OUTPUT] Начало обработки вывода", file=sys.stderr)
                 args = io_ctx.ioArgumentList().ioArgument() if io_ctx.ioArgumentList() else []
                 
+                printed_non_literal = False 
+
                 for i, arg_ctx in enumerate(args):
+                    arg_text_debug = arg_ctx.getText()
+                    if self.debug: print(f"[DEBUG][OUTPUT] Обработка аргумента {i}: {arg_text_debug}", file=sys.stderr)
                     try:
                         if arg_ctx.NEWLINE_CONST():
+                            if self.debug: print(f"[DEBUG][OUTPUT] Печать НС", file=sys.stderr)
                             sys.stdout.write('\n')
+                            printed_non_literal = True
                             continue 
 
                         formatted_value = ""
-                        expr_list = arg_ctx.expression() # Получаем узел(ы) expression из аргумента
+                        expr_list = arg_ctx.expression()
+                        is_simple_string_literal = False
+                        literal_value = None
 
-                        if expr_list: # ЕСЛИ аргумент - это expression
-                            # Получаем первый (и обычно единственный) узел expression
+                        if expr_list: 
                             expr_ctx = expr_list[0] if isinstance(expr_list, list) else expr_list 
                             if expr_ctx is None:
                                 line = arg_ctx.start.line
                                 column = arg_ctx.start.column
                                 raise KumirEvalError(f"Строка {line}, столбец {column}: Получено некорректное выражение для вывода (None)")
-
-                            # --- НОВАЯ ПРОВЕРКА: Является ли expression простым строковым литералом? ---
-                            is_simple_string_literal = False
-                            literal_value = None
+                            
+                            # --- Определяем, простой ли это строковый литерал --- 
                             try:
-                                # Пробуем добраться до STRING через стандартную цепочку primaryExpression
                                 primary = (expr_ctx.logicalOrExpression()
                                            .logicalAndExpression(0).equalityExpression(0)
                                            .relationalExpression(0).additiveExpression(0)
@@ -1354,62 +1376,52 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                                 if primary and primary.literal() and primary.literal().STRING():
                                     is_simple_string_literal = True
                                     raw_text = primary.literal().STRING().getText()
-                                    # Убираем кавычки и экранирование
                                     if len(raw_text) >= 2 and raw_text.startswith(('"', "'")) and raw_text.endswith(('"', "'")):
-                                        # Сначала убираем кавычки, потом обрабатываем экранирование
                                         inner_text = raw_text[1:-1]
-                                        # Простая замена для основных случаев, может потребовать доработки для сложных
                                         literal_value = inner_text.replace('\\"', '"').replace("\\'", "'").replace('\\\\', '\\')
                                     else:
-                                        literal_value = raw_text # На всякий случай
+                                        literal_value = raw_text
                             except AttributeError:
-                                # Цепочка нарушена, значит это не простой литерал
                                 is_simple_string_literal = False
+                            # ---------------------------------------------------------
+                            
+                            if self.debug: print(f"[DEBUG][OUTPUT] Аргумент {i}: is_simple_string_literal={is_simple_string_literal}, literal_value='{literal_value}'", file=sys.stderr)
 
                             if is_simple_string_literal:
-                                # Если это простой строковый литерал, используем его значение напрямую
-                                print(f"[DEBUG][ВЫВОД] Expression распознан как строковый литерал: '{literal_value}'", file=sys.stderr)
                                 formatted_value = literal_value
+                                if self.debug: print(f"[DEBUG][OUTPUT] Аргумент {i}: Значение - строка '{formatted_value}'", file=sys.stderr)
                             else:
-                                # Иначе, вычисляем выражение как обычно
-                                print(f"[DEBUG][ВЫВОД] Вычисление выражения: {expr_ctx.getText()}", file=sys.stderr)
-                                # !!! ВЫЧИСЛЯЕМ ЗНАЧЕНИЕ ВЫРАЖЕНИЯ !!!
+                                if self.debug: print(f"[DEBUG][OUTPUT] Аргумент {i}: Вычисление выражения {expr_ctx.getText()}", file=sys.stderr)
                                 value = self.visit(expr_ctx)
-                                # Извлекаем значение, если это переменная (т.е. visit вернул словарь)
                                 value = self._get_value(value)
-
-                                # !!! ПРОВЕРЯЕМ НА NONE ПОСЛЕ ВЫЧИСЛЕНИЯ !!!
+                                if self.debug: print(f"[DEBUG][OUTPUT] Аргумент {i}: Вычислено value={repr(value)} ({type(value).__name__})", file=sys.stderr)
+                                
                                 if value is None:
-                                    # Вот здесь возникает ошибка для неиниц. переменных
                                     expr_text = expr_ctx.getText() if hasattr(expr_ctx, 'getText') else '[Unknown Expression]'
                                     line = expr_ctx.start.line
                                     column = expr_ctx.start.column
                                     raise KumirEvalError(f"Строка {line}, столбец {column}: Попытка вывести неинициализированное значение (выражение: {expr_text})")
 
-                                # Форматируем значение (кажется, _format_output_value не реализован?)
-                                # TODO: Реализовать или проверить _format_output_value
                                 formatted_value = self._format_output_value(value, arg_ctx)
-
-                        elif arg_ctx.STRING(): # ИНАЧЕ ЕСЛИ аргумент - это строковый литерал НАПРЯМУЮ
-                            print(f"[DEBUG][ВЫВОД] Аргумент распознан как прямой строковый литерал", file=sys.stderr)
+                                printed_non_literal = True 
+                        elif arg_ctx.STRING(): 
                             text_node = arg_ctx.STRING()
                             if not text_node:
                                 line = arg_ctx.start.line
                                 column = arg_ctx.start.column
                                 raise KumirEvalError(f"Строка {line}, столбец {column}: Отсутствует строковый литерал для вывода")
                             text = text_node.getText()
-                            # Извлекаем и очищаем строку
                             value = text[1:-1].replace('\\"', '"').replace("\\'", "'").replace('\\\\', '\\')
-                            # Строки не требуют форматирования :Ш:Т, используем как есть
                             formatted_value = value
                         else:
                             line = arg_ctx.start.line
                             column = arg_ctx.start.column
                             raise KumirEvalError(f"Строка {line}, столбец {column}: Некорректный аргумент для вывода (ни выражение, ни строка)")
                         
-                        # Печатаем отформатированный аргумент немедленно
+                        if self.debug: print(f"[DEBUG][OUTPUT] Аргумент {i}: Печать formatted_value='{formatted_value}'", file=sys.stderr)
                         sys.stdout.write(formatted_value)
                         
+                    # --- ИСПРАВЛЕНО: except блок с правильным отступом --- 
                     except Exception as e:
                         if not isinstance(e, KumirEvalError):
                             line = arg_ctx.start.line if arg_ctx else io_ctx.start.line
@@ -1417,17 +1429,13 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                             raise KumirEvalError(f"Строка {line}, столбец {column}: Ошибка при обработке вывода: {e}")
                         raise
                 
-                # Добавляем перенос строки в конце вывода, 
-                # ТОЛЬКО если это был не единственный строковый литерал-приглашение
-                # ИЛИ если последний элемент вывода не был 'нс'.
-                is_prompt_only = len(args) == 1 and is_simple_string_literal
+                # --- Обработка финального переноса строки --- 
                 ends_with_newline_const = args and args[-1].NEWLINE_CONST()
-                
-                if not ends_with_newline_const and not is_prompt_only:
-                    sys.stdout.write('\n')
-                # -----------------------------------------------------
-                
-                return None # Завершаем обработку стейтмента
+                if printed_non_literal and not ends_with_newline_const:
+                     sys.stdout.write('\n')
+                # -------------------------------------------
+                if self.debug: print("[DEBUG][OUTPUT] Конец обработки вывода", file=sys.stderr)
+                return None
         elif ctx.exitStatement(): # Обработка команды ВЫХОД
             return self.visit(ctx.exitStatement())
         # ... (другие стейтменты) ...
@@ -1457,20 +1465,13 @@ class KumirInterpreterVisitor(KumirParserVisitor):
 
     # --- ИСПРАВЛЕНИЕ: Добавляем явный visitArgumentList ---
     def visitArgumentList(self, ctx: KumirParser.ArgumentListContext):
-        # argumentList: expression (COMMA expression)*
-        if self.debug: print("[DEBUG][Visit] ArgumentList", file=sys.stderr)
+        # print(f"[DEBUG][Visit] Обработка argumentList", file=sys.stderr)
         args = []
-        if ctx:
-            # Итерируем по дочерним узлам, чтобы выбрать только expression верхнего уровня
-            for child in ctx.getChildren():
-                # Проверяем, является ли дочерний узел expression
-                if hasattr(child, 'getRuleIndex') and child.getRuleIndex() == KumirParser.RULE_expression:
-                    value = self.visit(child)
-                    if self.debug: print(f"[DEBUG][ArgList] Аргумент: {value} (тип {type(value).__name__})")
-                    args.append(value)
-
-        if self.debug: print(f"[DEBUG][Visit] ArgumentList: результат = {args}", file=sys.stderr)
-        return args # Возвращаем список вычисленных значений аргументов
+        for i, expr_ctx in enumerate(ctx.expression()):
+            arg_value = self.visit(expr_ctx)
+            # print(f"[DEBUG][ArgList] Аргумент: {arg_value} (тип {type(arg_value).__name__})", file=sys.stderr)
+            args.append(arg_value)
+        return args
 
     def visitPrimaryExpression(self, ctx:KumirParser.PrimaryExpressionContext):
         """Обрабатывает первичные выражения."""
@@ -1590,8 +1591,18 @@ def interpret_kumir(code: str):
     visitor = KumirInterpreterVisitor()
     
     print("[DEBUG][Interpreter] Начало выполнения", file=sys.stderr)
-    # Выполняем программу
-    visitor.visit(tree)
+    # --- ДОБАВЛЯЕМ TRY...EXCEPT ВОКРУГ visit --- 
+    try:
+        # Выполняем программу
+        visitor.visit(tree)
+        print("[DEBUG][Interpreter] Выполнение завершено успешно", file=sys.stderr)
+    except Exception as e:
+        print("[ERROR][Interpreter] ИСКЛЮЧЕНИЕ ВО ВРЕМЯ ВЫПОЛНЕНИЯ:", file=sys.stderr)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
+        # Перевыбрасываем исключение, чтобы оно было поймано в run_kumir_program
+        raise e
+    # ---------------------------------------------
     
-    print("[DEBUG][Interpreter] Конец выполнения", file=sys.stderr)
+    # Возвращаем пустую строку, так как вывод собирается через redirect_stdout
     return ""
