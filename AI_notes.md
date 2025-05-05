@@ -188,3 +188,37 @@ TODO:
     *   Текст: "Ключевое слово `нс` ... является признаком **перехода на новую строку**."
     *   Пример `вывод а, " ", б, "Привет!", нс` внутри цикла печатает каждую итерацию на новой строке.
     *   **Эта интерпретация противоречит выводу `
+
+## 2024-07-29
+
+*   Добавлены/обновлены тесты в `tests/test_functional.py` на основе файлов `.out` или комментариев в `.kum`:
+    *   `'26-rec-hanoi.kum'` (Вход: `None`, Вывод: из `26-rec-hanoi-out.txt`).
+    *   `'27-rec-bin.kum'` (Вход: `'99\n'`, Вывод: из `27-rec-bin-out.txt`).
+    *   `'28-rec-sumdig.kum'` (Вход: `'12345\n'`, Вывод: из `28-rec-sumdig-out.txt`).
+    *   `'29-rec-nod.kum'` (Вход: `'14\n21\n'`, Вывод: из `29-rec-nod-out.txt`).
+    *   `'30-rec-fact.kum'` (Вход: `'4\n'` (из `.out`), Вывод: из `30-rec-fact-out.txt`).
+    *   `'31-arr-empty.kum'` (Вход: `None`, Вывод: `''` (из `31-arr-empty-out.txt`)).
+    *   `'32-arr-kvad.kum'` (Вход: `'9\n'` (из `.out`), Вывод: из `32-arr-kvad-out.txt`).
+    *   `'33-arr-input.kum'` (Вход: `'4\n9\n-2\n0\n1\n'` (из `.out`), Вывод: из `33-arr-input-out.txt`).
+    *   `'34-arr-rand.kum'` (Вход: `'8\n'` (из `.out`), Вывод: `None` (из-за `irand`)).
+    *   `'35-arr-sum.kum'` (Вход: `'7\n180\n185\n100\n200\n170\n188\n190\n'` (из `.out`), Вывод: из `35-arr-sum-out.txt`).
+    *   `'36-arr-search.kum'` (Вход: `'6\n-3\n3\n0\n2\n12\n-45\n0\n'` (из `.out`), Вывод: из `36-arr-search-out.txt`).
+    *   `'37-arr-search.kum'` (Вход: `'7\n-3\n-2\n-1\n0\n1\n2\n3\n1\n'` (из `.out`), Вывод: из `37-arr-search-out.txt`).
+    *   `'39-arr-rev.kum'` (Вход: `'7\n-2\n-1\n0\n1\n2\n3\n4\n'` (из `.out`), Вывод: из `39-arr-rev-out.txt`).
+    *   `'40-arr-shift.kum'` (Вход: `'5\n-3\n-2\n0\n2\n3\n'` (из `.out`), Вывод: из `40-arr-shift-out.txt`).
+    *   `'42-arr-bsort.kum'` (Вход: `'4\n-12\n0\n3\n1\n'` (из `.out`), Вывод: из `42-arr-bsort-out.txt`).
+    *   `'42a-arr-bsort.kum'` (Вход: `'6\n-12\n43\n11\n0\n-3\n-5412\n'` (из `.out`), Вывод: из `42a-arr-bsort-out.txt`).
+    *   `'43-arr-msort.kum'` (Вход: `'5\n-1\n8\n4\n5\n-21\n'` (из `.out`), Вывод: из `43-arr-msort-out.txt`).
+    *   `'44-arr-qsort.kum'` (Вход: `None` (массив в коде), Вывод: из `44-arr-qsort-out.txt`).
+    *   `'46-str-ab.kum'` (Вход: `'ааабббвввгггдддееежжж\n'` (из `.out`), Вывод: из `46-str-ab-out.txt`).
+    *   `'47-str-ops.kum'` (Вход: `None`, Вывод: из `47-str-ops-out.txt`).
+    *   `'48-str-search.kum'` (Вход: `None`, Вывод: из `48-str-search-out.txt`).
+    *   `'49-str-complex.kum'` (Вход: `'Николай Ильич Щитфаков\n'` (из `.out`), Вывод: из `49-str-complex-out.txt`).
+    *   `'50-str-num.kum'` (Вход: `None`, Вывод: из `50-str-num-out.txt`).
+    *   `'51-str-proc.kum'` (Вход: `None`, Вывод: из `51-str-proc-out.txt`).
+    *   `'52-str-func.kum'` (Вход: `None`, Вывод: из `52-str-func-out.txt`).
+    *   `'53-str-rec.kum'` (Вход: `None`, Вывод: из `53-str-rec-out.txt`).
+    *   `'54-str-sort.kum'` (Вход: `'5\nпароход\nпаровоз\nпар\nПар\nпАр\n'`, Вывод: из `54-str-sort-out.txt`).
+    *   `'55-matr-declare.kum'` (Вход: `None`, Вывод: `''` (из `55-matr-declare-out.txt`)).
+    *   `'56-matr-rand.kum'` (Вход: `None`, Вывод: `None` (из-за `irand`)).
+    *   `'57-matr-sum.kum'` (Вход: `None`, Вывод: из `57-matr-sum-out.txt`).
