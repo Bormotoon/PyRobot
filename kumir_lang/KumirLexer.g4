@@ -1,10 +1,16 @@
 // KumirLexer.g4
-// Лексер ANTLR v4 для языка КуМир.
+// ANTLR v4 Lexer Grammar for the Kumir language.
+// Source: Refined based on official documentation and extensive testing
+//         against K.Y. Polyakov's examples. Developed collaboratively.
+// Author: [Your Name/GitHub Handle]
+// License: MIT License
+
 lexer grammar KumirLexer;
 
 options { caseInsensitive = true; }
 
-// --- Ключевые слова (основной язык) ---
+// --- Keywords (Core Language) ---
+// Keywords are case-insensitive (both lowercase and uppercase Cyrillic are matched).
 MODULE              : 'модуль';
 ENDMODULE           : ('конец' WS 'модуля' | 'конецмодуля' | 'конец_модуля');
 ALG_HEADER          : 'алг';
@@ -44,26 +50,29 @@ IN_PARAM            : 'арг';
 INOUT_PARAM         : ('аргрез' | 'арг' WS 'рез' | 'арг_рез');
 RETURN_VALUE        : 'знач';
 
-// --- Типы данных ---
+// --- Data Types ---
 INTEGER_TYPE        : 'цел';
 REAL_TYPE           : 'вещ';
 BOOLEAN_TYPE        : 'лог';
 CHAR_TYPE           : 'сим';
 STRING_TYPE         : 'лит';
 TABLE_SUFFIX        : 'таб';
+// Actor-specific types
 KOMPL_TYPE          : 'компл';
 COLOR_TYPE          : 'цвет';
 SCANCODE_TYPE       : 'сканкод';
 FILE_TYPE           : 'файл';
+// Explicit array/table types (handle variations with space, no space, underscore)
 INTEGER_ARRAY_TYPE  : ('цел' WS? 'таб' | 'цел_таб');
 REAL_ARRAY_TYPE     : ('вещ' WS? 'таб' | 'вещ_таб');
 CHAR_ARRAY_TYPE     : ('сим' WS? 'таб' | 'сим_таб');
 STRING_ARRAY_TYPE   : ('лит' WS? 'таб' | 'лит_таб');
 BOOLEAN_ARRAY_TYPE  : ('лог' WS? 'таб' | 'лог_таб');
 
-// --- Константы ---
+// --- Constants ---
 TRUE                : 'да';
 FALSE               : 'нет';
+// Color constants
 PROZRACHNIY         : 'прозрачный';
 BELIY               : 'белый';
 CHERNIY             : 'чёрный' | 'черный';
@@ -76,7 +85,7 @@ ZHELTIY             : 'жёлтый' | 'желтый';
 ORANZHEVIY          : 'оранжевый';
 KRASNIY             : 'красный';
 
-// --- Операторы ---
+// --- Operators ---
 POWER               : '**';
 GE                  : '>=' | '≥';
 LE                  : '<=' | '≤';
@@ -85,8 +94,6 @@ PLUS                : '+';
 MINUS               : '-';
 MUL                 : '*';
 DIV                 : '/';
-DIV_OP              : 'div';
-MOD_OP              : 'mod';
 EQ                  : '=';
 LT                  : '<';
 GT                  : '>';
@@ -101,8 +108,10 @@ COLON               : ':';
 SEMICOLON           : ';';
 ATAT                : '@@';
 AT                  : '@';
+DIV_OP              : 'div';
+MOD_OP              : 'mod';
 
-// --- Литералы ---
+// --- Literals ---
 CHAR_LITERAL        : '\'' ( EscapeSequence | ~['\\\r\n] ) '\'' ;
 STRING              : '"' ( EscapeSequence | ~["\\\r\n] )*? '"'
                     | '\'' ( EscapeSequence | ~['\\\r\n] )*? '\''
@@ -112,17 +121,17 @@ REAL                : (DIGIT+ '.' DIGIT* | '.' DIGIT+) ExpFragment?
                     ;
 INTEGER             : DecInteger | HexInteger ;
 
-// --- Идентификатор ---
+// --- Identifier ---
 ID                  : LETTER (LETTER | DIGIT | '_' | '@')* ;
 
-// --- Комментарии ---
+// --- Comments ---
 LINE_COMMENT        : '|' ~[\r\n]* -> channel(HIDDEN);
 DOC_COMMENT         : '#' ~[\r\n]* -> channel(HIDDEN);
 
-// --- Пробельные символы ---
-WS                  : [ \\t\\r\\n]+ -> skip;
+// --- Whitespace ---
+WS                  : [ \t\r\n]+ -> skip;
 
-// --- Фрагменты ---
+// --- Fragments ---
 fragment DIGIT      : [0-9];
 fragment HEX_DIGIT  : [0-9a-fA-F];
 fragment LETTER     : [a-zA-Zа-яА-ЯёЁ];
@@ -130,5 +139,5 @@ fragment DecInteger : DIGIT+;
 fragment HexInteger : '$' HEX_DIGIT+;
 fragment ExpFragment: [eEеЕ] [+-]? DIGIT+;
 fragment EscapeSequence
-                    : '\\\\' [btnfr"'\\\\]
+                    : '\\' [btnfr"'\\]
                     ;

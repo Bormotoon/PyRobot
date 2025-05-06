@@ -127,13 +127,7 @@ parameterList
  * ИСПОЛЬЗУЕТ КОРРЕКТНЫЙ СИНТАКСИС ПРЕДИКАТА ДЛЯ PYTHON ('self._input', 'self.TOKEN_NAME').
  */
 algorithmNameTokens
-    : ( {self._input.LA(1) != self.LPAREN and \
-         self._input.LA(1) != self.ALG_BEGIN and \
-         self._input.LA(1) != self.PRE_CONDITION and \
-         self._input.LA(1) != self.POST_CONDITION and \
-         self._input.LA(1) != self.SEMICOLON and \
-         self._input.LA(1) != self.EOF}? . // Захватываем ЛЮБОЙ токен, если он не стоп-токен
-      )+ // Требуем хотя бы один токен для имени
+    : ~(LPAREN | ALG_BEGIN | PRE_CONDITION | POST_CONDITION | SEMICOLON | EOF)+
     ;
 
 /**
@@ -249,7 +243,7 @@ algorithmDefinition
     : algorithmHeader (preCondition | postCondition | variableDeclaration)*
       ALG_BEGIN
       algorithmBody
-      ALG_END (algorithmName)? SEMICOLON? // Используем algorithmName (ID+) для проверки
+      ALG_END (algorithmName)? SEMICOLON?
     ;
 
 /*
@@ -292,7 +286,7 @@ moduleDefinition
  * program: Основное правило, точка входа в грамматику.
  */
 program
-    : programItem* (moduleDefinition | algorithmDefinition)* EOF // Меняем + на *
+    : programItem* (moduleDefinition | algorithmDefinition)* SEMICOLON? EOF
     ;
 
 // Конец файла KumirParser.g4
