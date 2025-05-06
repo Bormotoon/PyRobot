@@ -118,7 +118,7 @@ LINE_COMMENT        : '|' ~[\r\n]* -> channel(HIDDEN);
 DOC_COMMENT         : '#' ~[\r\n]* -> channel(HIDDEN);
 
 // --- Пробельные символы ---
-WS                  : [ \t\r\n]+ -> skip;
+WS                  : [ \\t\\r\\n]+ -> skip;
 
 // --- Фрагменты ---
 fragment DIGIT      : [0-9];
@@ -128,5 +128,5 @@ fragment DecInteger : DIGIT+;
 fragment HexInteger : '$' HEX_DIGIT+;
 fragment ExpFragment: [eEеЕ] [+-]? DIGIT+;
 fragment EscapeSequence
-                    : '\\' [btnfr"'\\]
+                    : '\\\\' [btnfr"'\\\\]
                     ;

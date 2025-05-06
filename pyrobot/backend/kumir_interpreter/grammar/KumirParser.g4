@@ -292,7 +292,7 @@ moduleDefinition
  * program: Основное правило, точка входа в грамматику.
  */
 program
-    : programItem* (moduleDefinition | algorithmDefinition)+ EOF
+    : programItem* (moduleDefinition | algorithmDefinition)* EOF // Меняем + на *
     ;
 
 // Конец файла KumirParser.g4
