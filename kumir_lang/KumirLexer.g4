@@ -137,7 +137,7 @@ fragment HEX_DIGIT  : [0-9a-fA-F];
 fragment LETTER     : [a-zA-Zа-яА-ЯёЁ];
 fragment DecInteger : DIGIT+;
 fragment HexInteger : '$' HEX_DIGIT+;
-fragment ExpFragment: [eEеЕ] [+-]? DIGIT+;
+fragment ExpFragment: [eE] [+-]? DIGIT+;
 fragment EscapeSequence
                     : '\\' [btnfr"'\\]
                     ;
