@@ -53,9 +53,7 @@ ARITHMETIC_OPS = {
     KumirLexer.PLUS: operator.add,
     KumirLexer.MINUS: operator.sub,
     KumirLexer.MUL: operator.mul,
-    KumirLexer.DIV: operator.truediv, # Обычное деление -> вещ
-    KumirLexer.DIV_OP: operator.floordiv, # Целочисленное деление -> цел
-    KumirLexer.MOD_OP: operator.mod, # Остаток -> цел
+    KumirLexer.DIV: operator.truediv,    # Обычное деление -> вещ
     KumirLexer.POWER: operator.pow,
 }
 
@@ -70,8 +68,8 @@ COMPARISON_OPS = {
 
 # Добавляем логические операции
 LOGICAL_OPS = {
-    KumirLexer.AND: operator.and_,
-    KumirLexer.OR: operator.or_,
+    KumirLexer.AND: lambda a, b: a and b,
+    KumirLexer.OR: lambda a, b: a or b,
     # NOT handled in unaryExpr
 }
 
@@ -117,6 +115,12 @@ class KumirInterpreterVisitor(KumirParserVisitor):
         },
         'printbin': { # Ключ теперь в нижнем регистре
             1: lambda n: print(format(n, '08b'), end='') # Аргумент n - это само значение
+        },
+        'div': {
+            2: lambda a, b: int(a) // int(b) if b != 0 else (_ for _ in ()).throw(KumirEvalError("Целочисленное деление на ноль"))
+        },
+        'mod': {
+            2: lambda a, b: int(a) % int(b) if b != 0 else (_ for _ in ()).throw(KumirEvalError("Остаток от деления на ноль"))
         }
     }
 
@@ -124,8 +128,9 @@ class KumirInterpreterVisitor(KumirParserVisitor):
         super().__init__()
         self.variables = {}  # Глобальные переменные
         self.scopes = [{}]  # Стек областей видимости, начинаем с глобальной
-        self.debug = True  # Флаг для отладочного вывода (ВКЛЮЧЕН ДЛЯ 15-while)
+        self.debug = True  # Флаг для отладочного вывода (ВКЛЮЧЕН)
         self.procedures = {}  # Словарь для хранения определений процедур/функций
+        self.logger = logging.getLogger(__name__) # <--- ДОБАВЛЕНО
 
     # --- Управление областями видимости и символами ---
 
@@ -192,9 +197,13 @@ class KumirInterpreterVisitor(KumirParserVisitor):
 
     def find_variable(self, var_name: str) -> Tuple[Optional[Dict], Optional[Dict]]:
         """Ищет переменную во всех областях видимости и возвращает её информацию и область видимости."""
-        for scope in reversed(self.scopes):
+        if self.debug: print(f"[DEBUG][FindVar] Поиск переменной '{var_name}'", file=sys.stderr)
+        for i, scope in enumerate(reversed(self.scopes)):
+            scope_level = len(self.scopes) - 1 - i
             if var_name in scope:
+                if self.debug: print(f"[DEBUG][FindVar] Найдена '{var_name}' в области {scope_level}", file=sys.stderr)
                 return scope[var_name], scope
+        if self.debug: print(f"[DEBUG][FindVar] Переменная '{var_name}' НЕ найдена", file=sys.stderr)
         return None, None
 
     def update_variable(self, var_name: str, value: Any) -> None:
@@ -373,14 +382,9 @@ class KumirInterpreterVisitor(KumirParserVisitor):
             if right_val == 0:
                 raise KumirEvalError("Деление на ноль")
             return float(left_val) / float(right_val)
-        elif op_token.type in [KumirLexer.DIV_OP, KumirLexer.MOD_OP]:  # div, mod
-            if not isinstance(left_val, int) or not isinstance(right_val, int):
-                raise KumirEvalError(f"Операция '{op_token.text}' применима только к целым числам")
-            if right_val == 0:
-                raise KumirEvalError(f"Целочисленное деление или остаток от деления на ноль ('{op_token.text}')")
-            return operation(left_val, right_val)
+        # elif op_token.type in [KumirLexer.MOD_OP]: был здесь
             
-        # Выполняем операцию
+        # Выполняем операцию (для остальных: +, -, *, **)
         try:
             result = operation(left_val, right_val)
             return result
@@ -569,7 +573,7 @@ class KumirInterpreterVisitor(KumirParserVisitor):
             raise KumirExecutionError(f"Строка {line}, столбец {column}: Переменная '{var_name}' не найдена.")
 
         if ctx.indexList():
-            print(f"  -> Это обращение к таблице '{var_name}'", file=sys.stderr)
+            # print(f"  -> Это обращение к таблице '{var_name}'", file=sys.stderr)
             if not var_info['is_table']:
                 line = ctx.start.line
                 column = ctx.start.column
@@ -578,30 +582,36 @@ class KumirInterpreterVisitor(KumirParserVisitor):
             raise NotImplementedError(f"Обращение к элементу таблицы '{var_name}' пока не реализовано.")
         else:
             if var_info['is_table']:
-                 print(f"  -> Это обращение ко всей таблице '{var_name}' (возвращаем словарь)", file=sys.stderr)
+                #  print(f"  -> Это обращение ко всей таблице '{var_name}' (возвращаем словарь)", file=sys.stderr)
                  return var_info['value']
             else:
-                print(f"  -> Возвращаем значение переменной '{var_name}': {var_info['value']}", file=sys.stderr)
+                # print(f"  -> Возвращаем значение переменной '{var_name}': {var_info['value']}", file=sys.stderr)
                 return var_info['value']
 
     # Обработка присваивания
     def visitAssignmentStatement(self, ctx: KumirParser.AssignmentStatementContext):
         if ctx.lvalue():
             lvalue_ctx = ctx.lvalue()
-            value = self.visit(ctx.expression()) 
+            value_to_assign = self.visit(ctx.expression())
             
             if lvalue_ctx.RETURN_VALUE():
-                print("  -> Присваивание результату функции (знач)", file=sys.stderr)
-                raise NotImplementedError("Присваивание результату функции (знач) пока не реализовано.")
+                current_scope = self.scopes[-1]
+                # Проверяем, находимся ли мы внутри вызова процедуры/функции
+                # (т.е. есть ли более одной области видимости)
+                if len(self.scopes) > 1: # Глобальная + локальная = минимум 2
+                    current_scope['__знач__'] = value_to_assign
+                    # print(f"[DEBUG][Return Value] Присвоено 'знач' = {repr(value_to_assign)} в области {len(self.scopes) -1}", file=sys.stderr)
+                else:
+                    raise KumirExecutionError("Нельзя использовать 'знач :=' вне тела алгоритма.")
             else:
                 target_name = self.get_full_identifier(lvalue_ctx.qualifiedIdentifier())
                 
                 if lvalue_ctx.indexList():
-                    print(f"  -> Присваивание элементу таблицы: '{target_name}[...]'", file=sys.stderr)
+                    # print(f"  -> Присваивание элементу таблицы: '{target_name}[...]'", file=sys.stderr)
                     raise NotImplementedError(f"Присваивание элементу таблицы '{target_name}' пока не реализовано.")
                 else:
                     try:
-                        self.update_variable(target_name, value) 
+                        self.update_variable(target_name, value_to_assign) 
                     except (AssignmentError, DeclarationError, KumirExecutionError) as e:
                         line = ctx.start.line
                         column = ctx.start.column
@@ -620,31 +630,102 @@ class KumirInterpreterVisitor(KumirParserVisitor):
     # --- Обработка выражений --- 
 
     def visitExpression(self, ctx:KumirParser.ExpressionContext):
-        # Стартовое правило для выражения - просто передаем дальше
-        print(f"[DEBUG][Visit Expression] Контекст: {ctx.getText()}", file=sys.stderr)
-        return self.visitChildren(ctx)
+        if self.debug: print(f"[Enter] visitExpression for {ctx.getText()}", file=sys.stderr)
+        if ctx.logicalOrExpression():
+            result = self.visit(ctx.logicalOrExpression())
+            
+            # --- НОВАЯ ПОПЫТКА ИСПРАВЛЕНИЯ ---
+            if result is None: 
+                lor_ctx = ctx.logicalOrExpression()
+                # Проверяем, что это действительно цепочка до простого идентификатора
+                # Это очень упрощенная и хрупкая проверка, но для теста...
+                is_simple_identifier_path = False
+                try:
+                    if (len(lor_ctx.logicalAndExpression()) == 1 and not lor_ctx.LOGICAL_OR_OP() and
+                        len(lor_ctx.logicalAndExpression(0).equalityExpression()) == 1 and not lor_ctx.logicalAndExpression(0).LOGICAL_AND_OP() and
+                        len(lor_ctx.logicalAndExpression(0).equalityExpression(0).relationalExpression()) == 1 and not lor_ctx.logicalAndExpression(0).equalityExpression(0).EQUALITY_OP() and
+                        len(lor_ctx.logicalAndExpression(0).equalityExpression(0).relationalExpression(0).additiveExpression()) == 1 and not lor_ctx.logicalAndExpression(0).equalityExpression(0).relationalExpression(0).RELATIONAL_OP() and
+                        len(lor_ctx.logicalAndExpression(0).equalityExpression(0).relationalExpression(0).additiveExpression(0).multiplicativeExpression()) == 1 and not lor_ctx.logicalAndExpression(0).equalityExpression(0).relationalExpression(0).additiveExpression(0).ADDITIVE_OP() and
+                        len(lor_ctx.logicalAndExpression(0).equalityExpression(0).relationalExpression(0).additiveExpression(0).multiplicativeExpression(0).powerExpression()) == 1 and not lor_ctx.logicalAndExpression(0).equalityExpression(0).relationalExpression(0).additiveExpression(0).multiplicativeExpression(0).MULTIPLICATIVE_OP() and
+                        lor_ctx.logicalAndExpression(0).equalityExpression(0).relationalExpression(0).additiveExpression(0).multiplicativeExpression(0).powerExpression(0).unaryExpression() is not None and not lor_ctx.logicalAndExpression(0).equalityExpression(0).relationalExpression(0).additiveExpression(0).multiplicativeExpression(0).powerExpression(0).POWER_OP() and
+                        lor_ctx.logicalAndExpression(0).equalityExpression(0).relationalExpression(0).additiveExpression(0).multiplicativeExpression(0).powerExpression(0).unaryExpression().postfixExpression() is not None and not lor_ctx.logicalAndExpression(0).equalityExpression(0).relationalExpression(0).additiveExpression(0).multiplicativeExpression(0).powerExpression(0).unaryExpression().UNARY_OP() and
+                        lor_ctx.logicalAndExpression(0).equalityExpression(0).relationalExpression(0).additiveExpression(0).multiplicativeExpression(0).powerExpression(0).unaryExpression().postfixExpression().primaryExpression() is not None and 
+                        not lor_ctx.logicalAndExpression(0).equalityExpression(0).relationalExpression(0).additiveExpression(0).multiplicativeExpression(0).powerExpression(0).unaryExpression().postfixExpression().indexList() and 
+                        not lor_ctx.logicalAndExpression(0).equalityExpression(0).relationalExpression(0).additiveExpression(0).multiplicativeExpression(0).powerExpression(0).unaryExpression().postfixExpression().argumentList() and
+                        lor_ctx.logicalAndExpression(0).equalityExpression(0).relationalExpression(0).additiveExpression(0).multiplicativeExpression(0).powerExpression(0).unaryExpression().postfixExpression().primaryExpression().qualifiedIdentifier() is not None and
+                        not lor_ctx.logicalAndExpression(0).equalityExpression(0).relationalExpression(0).additiveExpression(0).multiplicativeExpression(0).powerExpression(0).unaryExpression().postfixExpression().primaryExpression().literal() and
+                        not lor_ctx.logicalAndExpression(0).equalityExpression(0).relationalExpression(0).additiveExpression(0).multiplicativeExpression(0).powerExpression(0).unaryExpression().postfixExpression().primaryExpression().expression() # нет '(' expression ')'
+                        ):
+                        is_simple_identifier_path = True
+                except AttributeError:
+                    is_simple_identifier_path = False # Если какой-то части пути нет
+
+                if is_simple_identifier_path:
+                    identifier_text = lor_ctx.getText() # Должно быть имя переменной
+                    print(f"!!! PATCHING PATH: Result for '{identifier_text}' was None. Attempting direct primaryExpression visit.", file=sys.stderr, flush=True)
+                    try:
+                        # Попытка дойти до primaryExpression и вызвать visit для него
+                        primary_expr_ctx = lor_ctx.logicalAndExpression(0).equalityExpression(0).relationalExpression(0).additiveExpression(0).multiplicativeExpression(0).powerExpression(0).unaryExpression().postfixExpression().primaryExpression()
+                        if primary_expr_ctx:
+                            result = self.visit(primary_expr_ctx)
+                            print(f"!!! PATCHING PATH: Direct visit of primaryExpression '{primary_expr_ctx.getText()}' gave: {repr(result)}", file=sys.stderr, flush=True)
+                    except Exception as e_patch:
+                        print(f"!!! PATCHING PATH: Error during direct primaryExpression visit for '{identifier_text}': {e_patch}", file=sys.stderr, flush=True)
+            # --- КОНЕЦ НОВОЙ ПОПЫТКИ ---
+
+            if self.debug: print(f"[Exit] visitExpression for {ctx.getText()} -> returns {repr(result)} via logicalOrExpr", file=sys.stderr)
+            return result
+        
+        result = self.visitChildren(ctx)
+        if self.debug: print(f"[Exit] visitExpression for {ctx.getText()} -> returns {repr(result)} via children", file=sys.stderr)
+        return result
 
     def visitLogicalOrExpression(self, ctx:KumirParser.LogicalOrExpressionContext):
-        if len(ctx.children) > 1:  # Есть операция ИЛИ
-            return self._perform_binary_operation(ctx, LOGICAL_OPS)
-        return self.visit(ctx.logicalAndExpression(0))
+        if self.debug: print(f"[Enter] visitLogicalOrExpression for {ctx.getText()}", file=sys.stderr)
+        if len(ctx.children) > 1:
+            # Это операция ИЛИ
+            result = self._perform_binary_operation(ctx, LOGICAL_OPS)
+            if self.debug: print(f"[Exit] visitLogicalOrExpression for {ctx.getText()} -> returns {repr(result)} via binary_op", file=sys.stderr)
+            return result
+        # Иначе это просто logicalAndExpression
+        result = self.visit(ctx.logicalAndExpression(0))
+        if self.debug: print(f"[Exit] visitLogicalOrExpression for {ctx.getText()} -> returns {repr(result)} via logicalAndExpr", file=sys.stderr)
+        return result
 
     def visitLogicalAndExpression(self, ctx:KumirParser.LogicalAndExpressionContext):
-        if len(ctx.children) > 1:  # Есть операция И
-            return self._perform_binary_operation(ctx, LOGICAL_OPS)
-        return self.visit(ctx.equalityExpression(0))
+        if self.debug: print(f"[Enter] visitLogicalAndExpression for {ctx.getText()}", file=sys.stderr)
+        if len(ctx.children) > 1:
+            # Это операция И
+            result = self._perform_binary_operation(ctx, LOGICAL_OPS)
+            if self.debug: print(f"[Exit] visitLogicalAndExpression for {ctx.getText()} -> returns {repr(result)} via binary_op", file=sys.stderr)
+            return result
+        # Иначе это просто equalityExpression
+        result = self.visit(ctx.equalityExpression(0))
+        if self.debug: print(f"[Exit] visitLogicalAndExpression for {ctx.getText()} -> returns {repr(result)} via equalityExpr", file=sys.stderr)
+        return result
 
     def visitEqualityExpression(self, ctx:KumirParser.EqualityExpressionContext):
-        if len(ctx.children) > 1:  # Есть операция = или <>
-            return self._perform_binary_operation(ctx, COMPARISON_OPS)
-        return self.visit(ctx.relationalExpression(0))
+        if self.debug: print(f"[Enter] visitEqualityExpression for {ctx.getText()}", file=sys.stderr)
+        if len(ctx.children) > 1:
+            result = self._perform_binary_operation(ctx, COMPARISON_OPS)
+            # print(f"[Exit] visitEqualityExpression for {ctx.getText()} -> returns {repr(result)} via binary_op", file=sys.stderr)
+            return result
+        result = self.visit(ctx.relationalExpression(0))
+        # print(f"[Exit] visitEqualityExpression for {ctx.getText()} -> returns {repr(result)} via relationalExpr", file=sys.stderr)
+        return result
 
     def visitRelationalExpression(self, ctx:KumirParser.RelationalExpressionContext):
-        if len(ctx.children) > 1:  # Есть операция <, >, <=, >=
-            return self._perform_binary_operation(ctx, COMPARISON_OPS)
-        return self.visit(ctx.additiveExpression(0))
+        # print(f"[Enter] visitRelationalExpression for {ctx.getText()}", file=sys.stderr)
+        if len(ctx.children) > 1:
+            result = self._perform_binary_operation(ctx, COMPARISON_OPS)
+            # print(f"[Exit] visitRelationalExpression for {ctx.getText()} -> returns {repr(result)} via binary_op", file=sys.stderr)
+            return result
+        result = self.visit(ctx.additiveExpression(0))
+        # print(f"[Exit] visitRelationalExpression for {ctx.getText()} -> returns {repr(result)} via additiveExpr", file=sys.stderr)
+        return result
 
     def visitAdditiveExpression(self, ctx:KumirParser.AdditiveExpressionContext):
+        # print(f"[Enter] visitAdditiveExpression for {ctx.getText()}", file=sys.stderr)
         if len(ctx.children) > 1: 
             result = self.visit(ctx.getChild(0))
             i = 1
@@ -665,9 +746,12 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                 i += 2
             return result
         else:
-            return self.visit(ctx.multiplicativeExpression(0))
+            result = self.visit(ctx.multiplicativeExpression(0))
+            # print(f"[Exit] visitAdditiveExpression for {ctx.getText()} -> returns {repr(result)} via multiplicativeExpr", file=sys.stderr)
+            return result
 
     def visitMultiplicativeExpression(self, ctx:KumirParser.MultiplicativeExpressionContext):
+        # print(f"[Enter] visitMultiplicativeExpression for {ctx.getText()}", file=sys.stderr)
         if len(ctx.children) > 1: 
             result = self.visit(ctx.getChild(0))
             i = 1
@@ -687,12 +771,6 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                 if op_token.type == KumirLexer.DIV:
                     if right_val == 0: raise KumirEvalError("Деление на ноль.")
                     result = float(result) / float(right_val)
-                elif op_token.type in [KumirLexer.DIV_OP, KumirLexer.MOD_OP]:
-                    if not isinstance(result, int) or not isinstance(right_val, int):
-                        raise KumirEvalError(f"Операция '{op_token.text}' применима только к целым числам.")
-                    if right_val == 0:
-                        raise KumirEvalError(f"Целочисленное деление или остаток от деления на ноль ('{op_token.text}').")
-                    result = operation(result, right_val)
                 else: # Умножение
                     try:
                         result = operation(result, right_val)
@@ -701,16 +779,24 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                 i += 2
             return result
         else:
-            return self.visit(ctx.powerExpression(0))
+            result = self.visit(ctx.powerExpression(0))
+            # print(f"[Exit] visitMultiplicativeExpression for {ctx.getText()} -> returns {repr(result)} via powerExpr", file=sys.stderr)
+            return result
         
     def visitPowerExpression(self, ctx:KumirParser.PowerExpressionContext):
+        # print(f"[Enter] visitPowerExpression for {ctx.getText()}", file=sys.stderr)
         if ctx.POWER():
-            return self._perform_binary_operation(ctx, ARITHMETIC_OPS)
+            result = self._perform_binary_operation(ctx, ARITHMETIC_OPS)
+            # print(f"[Exit] visitPowerExpression for {ctx.getText()} -> returns {repr(result)} via binary_op", file=sys.stderr)
+            return result
         else:
-            return self.visit(ctx.unaryExpression())
+            result = self.visit(ctx.unaryExpression())
+            # print(f"[Exit] visitPowerExpression for {ctx.getText()} -> returns {repr(result)} via unaryExpr", file=sys.stderr)
+            return result
 
     def visitUnaryExpression(self, ctx:KumirParser.UnaryExpressionContext):
-        if ctx.getChildCount() == 2: # Есть оператор
+        # print(f"[Enter] visitUnaryExpression for {ctx.getText()}", file=sys.stderr)
+        if ctx.getChildCount() == 2:
             op_symbol = ctx.getChild(0).symbol
             operand_value = self.visit(ctx.getChild(1)) # Посещаем операнд (который тоже unaryExpression)
 
@@ -733,175 +819,160 @@ class KumirInterpreterVisitor(KumirParserVisitor):
         else:
             # Просто postfixExpression
             if self.debug: print(f"[DEBUG][Visit] UnaryExpression -> PostfixExpression", file=sys.stderr)
-            return self.visit(ctx.postfixExpression())
+            result = self.visit(ctx.postfixExpression())
+            # print(f"[Exit] visitUnaryExpression for {ctx.getText()} -> returns {repr(result)} via postfixExpr", file=sys.stderr)
+            return result
 
     def visitPostfixExpression(self, ctx:KumirParser.PostfixExpressionContext):
-        """Обрабатывает постфиксные выражения, включая вызовы процедур."""
-        # Сначала обрабатываем primaryExpression
+        # print(f"[Enter] visitPostfixExpression for {ctx.getText()}", file=sys.stderr)
         primary = ctx.primaryExpression()
         if not primary:
             raise KumirEvalError("Отсутствует primaryExpression в postfixExpression")
 
-        # Получаем значение primaryExpression
-        value = self.visit(primary)
+        current_eval_value = self.visit(primary)
 
-        # Обрабатываем постфиксные операции (индексы и вызовы)
         for i in range(1, ctx.getChildCount()):
             child = ctx.getChild(i)
             if isinstance(child, antlr4.tree.Tree.TerminalNode):
-                continue  # Пропускаем терминальные узлы (скобки и т.д.)
+                continue
 
             if child.getRuleIndex() == KumirParser.RULE_indexList:
-                # Обработка индексации массива
-                if not isinstance(value, list):
+                # ... (обработка индексации, current_eval_value обновляется)
+                if not isinstance(current_eval_value, list): # Проверка типа перед индексацией
                     raise KumirEvalError("Попытка индексации не массива")
-                index = self.visit(child)
-                if not isinstance(index, int):
-                    raise KumirEvalError("Индекс массива должен быть целым числом")
-                if index < 0 or index >= len(value):
-                    raise KumirEvalError(f"Индекс {index} вне границ массива [0..{len(value)-1}]")
-                value = value[index]
+                index_val = self.visit(child) # visitIndexList должен вернуть либо int, либо (int, int) для среза
+                # TODO: Более сложная обработка срезов и многомерных массивов
+                if isinstance(index_val, int):
+                    if index_val < 0 or index_val >= len(current_eval_value):
+                        raise KumirEvalError(f"Индекс {index_val} вне границ массива [0..{len(current_eval_value)-1}]")
+                    current_eval_value = current_eval_value[index_val]
+                else: 
+                    raise KumirEvalError("Сложные индексы (срезы, многомерные) пока не полностью поддерживаются.")
 
             elif child.getRuleIndex() == KumirParser.RULE_argumentList:
-                # Обработка вызова процедуры/функции
-                # 'value' здесь - это имя, полученное из primaryExpression
-                if not isinstance(value, str):
-                    # Если value не строка, значит primaryExpression вернуло не имя,
-                    # а какое-то вычисленное значение (число, bool и т.д.), что некорректно для вызова.
+                if not isinstance(current_eval_value, str):
                     line = ctx.primaryExpression().start.line
                     column = ctx.primaryExpression().start.column
-                    raise KumirEvalError(f"Строка {line}, столбец {column}: Попытка вызова не процедуры/функции (получено значение типа {type(value).__name__})")
+                    raise KumirEvalError(f"Строка {line}, столбец {column}: Попытка вызова не процедуры/функции (получено значение типа {type(current_eval_value).__name__})")
                 
-                proc_name = value
+                proc_name = current_eval_value
                 args = self.visit(child) if child.getChildCount() > 0 else []
-                print(f"[DEBUG][Postfix] Вызов процедуры/функции '{proc_name}' с аргументами: {args}", file=sys.stderr)
+                # print(f"[DEBUG][Postfix] Вызов процедуры/функции '{proc_name}' с аргументами: {args}", file=sys.stderr)
                 
-                # 1. Проверяем встроенные процедуры
-                proc_name_lower = proc_name.lower() # Для встроенных используем нижний регистр
+                proc_name_lower = proc_name.lower()
                 if proc_name_lower in self.BUILTIN_FUNCTIONS:
                     arg_count = len(args)
                     builtin_variants = self.BUILTIN_FUNCTIONS[proc_name_lower]
-                    
                     if arg_count not in builtin_variants:
                         raise KumirEvalError(f"Неверное количество аргументов для встроенной процедуры '{proc_name}': ожидалось одно из {list(builtin_variants.keys())}, получено {arg_count}")
-                    
-                    # Вызываем встроенную процедуру
                     try:
-                        # Передаем аргументы как есть
-                        result = builtin_variants[arg_count](*args)
-                        print(f"[DEBUG][Postfix] Результат встроенной '{proc_name}': {result}", file=sys.stderr)
-                        # Обновляем 'value' результатом вызова для цепочек вызовов
-                        value = result 
+                        # Добавляем print перед вызовом
+                        print(f"!!! [Builtin Call PRE] Calling '{proc_name_lower}' with args: {repr(args)} (types: {[type(arg) for arg in args]})", flush=True)
+                        result_of_call = builtin_variants[arg_count](*args)
+                        # Добавляем print после вызова
+                        print(f"!!! [Builtin Call POST] '{proc_name_lower}' returned: {repr(result_of_call)} (type: {type(result_of_call)})", flush=True)
+                        current_eval_value = result_of_call
                     except Exception as e:
                         line = child.start.line
                         column = child.start.column
                         raise KumirExecutionError(f"Строка {line}, столбец {column}: Ошибка выполнения встроенной процедуры '{proc_name}': {e}")
                 
-                # 2. Если не встроенная, ищем пользовательскую процедуру
                 elif proc_name in self.procedures:
                     proc_def_ctx = self.procedures[proc_name]
                     header = proc_def_ctx.algorithmHeader()
                     params_ctx = header.parameterList()
-                    arg_list_ctx = child # Контекст списка аргументов вызова
-                    
-                    # --- Подготовка к обработке параметров рез/арг рез ---
-                    output_params_mapping = [] # Список для {caller_var_name, proc_param_name}
-                    # ----------------------------------------------------
-                    
-                    # Собираем информацию об ожидаемых параметрах (имя, тип, режим)
+                    arg_list_ctx = child
+                    output_params_mapping = []
                     expected_params = []
+
                     if params_ctx:
-                        param_index = 0 # Индекс для сопоставления с аргументами вызова
+                        param_index = 0
                         for param_decl_ctx in params_ctx.parameterDeclaration():
                             param_type_ctx = param_decl_ctx.typeSpecifier()
                             param_type_name = self._get_type_name_from_specifier(param_type_ctx)
                             mode = self._get_param_mode(param_decl_ctx)
-                            
                             param_vars_list_ctx = param_decl_ctx.variableList()
-                            if not param_vars_list_ctx:
-                                raise KumirEvalError(f"Строка {param_decl_ctx.start.line}: Ошибка парсинга - отсутствует список переменных в объявлении параметра.")
-
+                            if not param_vars_list_ctx: raise KumirEvalError(f"Строка {param_decl_ctx.start.line}: Ошибка парсинга - отсутствует список переменных в объявлении параметра.")
                             for param_var_item_ctx in param_vars_list_ctx.variableDeclarationItem():
-                                param_name = param_var_item_ctx.ID().getText()
-                                expected_params.append({'name': param_name, 'type': param_type_name, 'mode': mode})
-                                
-                                # --- Сохраняем информацию для рез/арг рез ---
+                                param_name_map = param_var_item_ctx.ID().getText()
+                                expected_params.append({'name': param_name_map, 'type': param_type_name, 'mode': mode})
                                 if mode in ['рез', 'арг рез']:
+                                    # ... (логика output_params_mapping как была)
                                     if param_index < len(arg_list_ctx.expression()):
                                         arg_expr_ctx = arg_list_ctx.expression(param_index)
                                         try:
-                                            primary_expr = arg_expr_ctx.logicalOrExpression() \
-                                                           .logicalAndExpression(0).equalityExpression(0) \
-                                                           .relationalExpression(0).additiveExpression(0) \
-                                                           .multiplicativeExpression(0).powerExpression(0) \
-                                                           .unaryExpression().postfixExpression() \
-                                                           .primaryExpression()
-                                            if primary_expr and primary_expr.qualifiedIdentifier():
-                                                caller_var_name = primary_expr.qualifiedIdentifier().getText()
+                                            current_expr_node = arg_expr_ctx
+                                            path_to_id = ['logicalOrExpression', 'logicalAndExpression', 'equalityExpression', 
+                                                          'relationalExpression', 'additiveExpression', 'multiplicativeExpression', 
+                                                          'powerExpression', 'unaryExpression', 'postfixExpression', 
+                                                          'primaryExpression']
+                                            temp_node = current_expr_node
+                                            valid_path = True
+                                            for rule_name_part in path_to_id:
+                                                if hasattr(temp_node, rule_name_part) and callable(getattr(temp_node, rule_name_part)):
+                                                    node_or_list = getattr(temp_node, rule_name_part)()
+                                                    if isinstance(node_or_list, list): temp_node = node_or_list[0] if node_or_list else None
+                                                    else: temp_node = node_or_list
+                                                    if temp_node is None: valid_path = False; break
+                                                else: valid_path = False; break
+                                            if valid_path and hasattr(temp_node, 'qualifiedIdentifier') and temp_node.qualifiedIdentifier():
+                                                caller_var_name = temp_node.qualifiedIdentifier().getText()
                                                 caller_var_info, _ = self.find_variable(caller_var_name)
                                                 if caller_var_info:
-                                                    output_params_mapping.append({
-                                                        'caller_var_name': caller_var_name,
-                                                        'proc_param_name': param_name
-                                                    })
-                                                    print(f"[DEBUG][Param Map] Сопоставлен выходной параметр: '{caller_var_name}' -> '{param_name}'", file=sys.stderr)
-                                                else:
-                                                     raise KumirEvalError(f"Строка {arg_expr_ctx.start.line}: Переменная '{caller_var_name}', переданная как аргумент для параметра '{mode}', не найдена в вызывающей области.")
-                                            else:
-                                                raise KumirEvalError(f"Строка {arg_expr_ctx.start.line}: Аргумент для параметра '{mode}' ('{param_name}') должен быть переменной, а не выражением.")
-                                        except AttributeError:
-                                             raise KumirEvalError(f"Строка {arg_expr_ctx.start.line}: Не удалось распознать аргумент для параметра '{mode}' ('{param_name}') как переменную.")
-                                    else:
-                                        raise KumirEvalError("Несоответствие индекса параметра и аргумента.")
-                                # -----------------------------------------
+                                                    output_params_mapping.append({'caller_var_name': caller_var_name, 'proc_param_name': param_name_map})
+                                                    # print(f"[DEBUG][Param Map] Сопоставлен выходной параметр: '{caller_var_name}' -> '{param_name_map}'", file=sys.stderr)
+                                                else: raise KumirEvalError(f"Строка {arg_expr_ctx.start.line}: Переменная '{caller_var_name}', переданная как аргумент для параметра '{mode}', не найдена в вызывающей области.")
+                                            elif mode in ['рез', 'арг рез']: raise KumirEvalError(f"Строка {arg_expr_ctx.start.line}: Аргумент для параметра '{mode}' ('{param_name_map}') должен быть простой переменной.")
+                                        except AttributeError as e_attr: 
+                                            # print(f"[WARN][Param Map] Не удалось сопоставить '{param_name_map}': {e_attr}", file=sys.stderr)
+                                            if mode == 'арг рез': raise KumirEvalError(f"Строка {arg_expr_ctx.start.line}: Не удалось распознать аргумент для 'арг рез' ('{param_name_map}') как переменную.")
+                                    elif mode == 'арг рез': raise KumirEvalError(f"Отсутствует аргумент для 'арг рез' '{param_name_map}' в '{proc_name}'.")
                                 param_index += 1
                     
-                    print(f"[DEBUG][ProcCall] Ожидаемые параметры для '{proc_name}': {expected_params}", file=sys.stderr)
-                    print(f"[DEBUG][ProcCall] Сопоставление выходных параметров: {output_params_mapping}", file=sys.stderr)
-                    
-                    # Вычисляем аргументы вызова ОДИН РАЗ перед входом в процедуру
+                    # print(f"[DEBUG][ProcCall] Ожидаемые параметры для '{proc_name}': {expected_params}", file=sys.stderr)
+                    # print(f"[DEBUG][ProcCall] Сопоставление выходных параметров: {output_params_mapping}", file=sys.stderr)
                     actual_args = self.visit(arg_list_ctx) if arg_list_ctx.getChildCount() > 0 else []
-                    if len(actual_args) != len(expected_params):
-                        raise KumirEvalError(f"Неверное количество аргументов для процедуры '{proc_name}': ожидалось {len(expected_params)}, получено {len(actual_args)}")
+                    num_expected_input_args = len([p for p in expected_params if p['mode'] in ['арг', 'арг рез']])
+                    if len(actual_args) != num_expected_input_args:
+                        raise KumirEvalError(f"Неверное количество аргументов для '{proc_name}': ожидалось {num_expected_input_args} входных, получено {len(actual_args)}")
                     
-                    # Создаем новую область видимости для процедуры
                     self.enter_scope()
-                    return_value = None
+                    local_scope = self.scopes[-1]
+                    local_scope['__знач__'] = None
+                    
+                    # Переменная для хранения результата вызова этой пользовательской функции/процедуры
+                    # Она будет обновлена либо из __знач__, либо из последнего рез/аргрез параметра
+                    procedure_call_result_value = None 
+
                     try:
-                        # Привязываем аргументы к параметрам в локальной области
-                        for i, param_info in enumerate(expected_params):
-                            arg_value = actual_args[i] 
-                            param_name = param_info['name']
-                            param_type = param_info['type']
-                            param_mode = param_info['mode']
-
-                            # Объявляем параметр в локальной области
-                            self.declare_variable(param_name, param_type)
-                            
-                            # Инициализируем значение параметра в зависимости от режима
-                            if param_mode in ['арг', 'арг рез']:
-                                try:
-                                    # Проверяем тип и присваиваем значение аргумента
-                                    converted_arg_value = self._validate_and_convert_value_for_assignment(arg_value, param_type, param_name)
-                                    self.update_variable(param_name, converted_arg_value) # Обновляем в локальной области
-                                    print(f"[DEBUG][ProcCall Init] Инициализация параметра '{param_mode}' '{param_name}' значением {repr(converted_arg_value)}", file=sys.stderr)
+                        arg_idx_counter = 0
+                        for param_info_loop in expected_params: # Избегаем конфликта имен с i внешнего цикла
+                            param_name_inner = param_info_loop['name']
+                            param_type_inner = param_info_loop['type']
+                            param_mode_inner = param_info_loop['mode']
+                            self.declare_variable(param_name_inner, param_type_inner)
+                            if param_mode_inner in ['арг', 'арг рез']:
+                                if arg_idx_counter < len(actual_args):
+                                    arg_value_inner = actual_args[arg_idx_counter]
+                                    if self.debug: print(f"[DEBUG][ProcCall PRE_VALIDATE] Param '{param_name_inner}' ({param_type_inner}), got arg_value_inner: {repr(arg_value_inner)} from actual_args[{arg_idx_counter}]", file=sys.stderr)
+                                    try:
+                                        converted_arg_value = self._validate_and_convert_value_for_assignment(arg_value_inner, param_type_inner, param_name_inner)
+                                        self.update_variable(param_name_inner, converted_arg_value)
+                                        # print(f"[DEBUG][ProcCall Init] Инициализация параметра '{param_mode_inner}' '{param_name_inner}' значением {repr(converted_arg_value)}", file=sys.stderr)
                                 except (AssignmentError, DeclarationError, KumirExecutionError) as e:
-                                    line = arg_list_ctx.expression(i).start.line # Строка аргумента вызова
-                                    raise KumirEvalError(f"Строка ~{line}: Ошибка типа при передаче аргумента №{i+1} в параметр '{param_name}': {e}")
-                            elif param_mode == 'рез':
-                                # Для 'рез' оставляем значение по умолчанию
-                                print(f"[DEBUG][ProcCall Init] Параметр '{param_mode}' '{param_name}' инициализирован по умолчанию.", file=sys.stderr)
-
-                        # Выполняем тело процедуры
-                        print(f"[DEBUG][ProcCall] Выполнение тела процедуры '{proc_name}'", file=sys.stderr)
+                                        line = arg_list_ctx.expression(arg_idx_counter).start.line
+                                        raise KumirEvalError(f"Строка ~{line}: Ошибка типа при передаче аргумента №{arg_idx_counter+1} в параметр '{param_name_inner}': {e}")
+                                    arg_idx_counter += 1
+                                else: raise KumirEvalError(f"Недостаточно аргументов для '{param_mode_inner}' '{param_name_inner}'.")
+                            elif param_mode_inner == 'рез':
+                                # print(f"[DEBUG][ProcCall Init] Параметр '{param_mode_inner}' '{param_name_inner}' инициализирован по умолчанию.", file=sys.stderr)
+                                pass # Просто регистрируем, значение будет установлено в теле процедуры
+                        
+                        # print(f"[DEBUG][ProcCall] Выполнение тела процедуры '{proc_name}'", file=sys.stderr)
                         self.visit(proc_def_ctx.algorithmBody())
 
-                        # --- Копируем результаты обратно в вызывающую область для рез/арг рез ---
-                        print(f"[DEBUG][ProcCall Exit] Копирование результатов для '{proc_name}'", file=sys.stderr)
-                        if len(self.scopes) < 2:
-                             raise KumirExecutionError("Невозможно скопировать результаты: отсутствует вызывающая область видимости.")
-                        caller_scope = self.scopes[-2] # Вызывающая область
-                        local_scope = self.scopes[-1]  # Текущая (локальная) область
+
+                        caller_scope = self.scopes[-2]
                         
                         for mapping in output_params_mapping:
                             caller_var_name = mapping['caller_var_name']
@@ -910,44 +981,48 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                             if proc_param_name not in local_scope:
                                 raise KumirExecutionError(f"Внутренняя ошибка: параметр '{proc_param_name}' не найден в локальной области при выходе из '{proc_name}'.")
                             if caller_var_name not in caller_scope:
-                                # Эта проверка уже была при создании mapping, но на всякий случай
                                 raise KumirExecutionError(f"Внутренняя ошибка: переменная '{caller_var_name}' не найдена в вызывающей области при выходе из '{proc_name}'.")
                                 
                             final_param_value = local_scope[proc_param_name]['value']
                             caller_var_info = caller_scope[caller_var_name]
                             target_type = caller_var_info['type']
                             
-                            print(f"[DEBUG][ProcCall Exit] Копируем '{proc_param_name}' ({repr(final_param_value)}) -> '{caller_var_name}' ({target_type})", file=sys.stderr)
+                            # print(f"[DEBUG][ProcCall Exit] Копируем '{proc_param_name}' ({repr(final_param_value)}) -> '{caller_var_name}' ({target_type})", file=sys.stderr)
                             
-                            # Обновляем переменную в вызывающей области
                             try:
-                                # Используем _validate_and_convert для проверки типа перед записью в вызывающую область
                                 converted_value = self._validate_and_convert_value_for_assignment(final_param_value, target_type, caller_var_name)
-                                # Обновляем значение напрямую в словаре вызывающей области
                                 caller_var_info['value'] = converted_value
                             except (AssignmentError, DeclarationError, KumirExecutionError) as e:
                                 line = proc_def_ctx.algorithmHeader().start.line
                                 raise KumirExecutionError(f"Строка ~{line}: Ошибка при возврате значения из параметра '{proc_param_name}' в переменную '{caller_var_name}': {e}")
-                        # -----------------------------------------------------------------
+                        
+                        # --- Определение возвращаемого значения ---
+                        if header.typeSpecifier(): # Если это явно объявленная функция (алг ТИП ...)
+                            value = local_scope.get('__знач__')
+                            if value is None: # Если 'знач :=' не было выполнено
+                                func_signature_for_error = f"{header.typeSpecifier().getText()} {proc_name}"
+                                raise KumirEvalError(f"Функция '{func_signature_for_error}' не присвоила значение переменной 'знач'.")
+                            # print(f"[DEBUG][ProcCall Return] Явный возврат 'знач' из функции '{proc_name}': {repr(value)}", file=sys.stderr)
+                        else: # Если это процедура (алг ИМЯ ...)
+                              # или используется как функция с неявным возвратом через последний 'рез'
+                            result_params_in_order = [p['name'] for p in expected_params if p['mode'] == 'рез']
+                            inout_result_params_in_order = [p['name'] for p in expected_params if p['mode'] == 'арг рез']
+                            
+                            potential_return_param_name = None
+                            if result_params_in_order:
+                                potential_return_param_name = result_params_in_order[-1]
+                            elif inout_result_params_in_order:
+                                potential_return_param_name = inout_result_params_in_order[-1]
 
-                        # TODO: Обработка возвращаемых значений (`знач`) для функций
-                        value = None # Для процедур возвращаем None
-
-                    finally:
-                        self.exit_scope() # Выходим из области видимости процедуры
-                
-                # 3. Если не найдена ни встроенная, ни пользовательская
+                            if potential_return_param_name and potential_return_param_name in local_scope:
+                                value = local_scope[potential_return_param_name]['value']
+                                # print(f"[DEBUG][ProcCall Return] Неявный возврат из '{proc_name}' через параметр '{potential_return_param_name}': {repr(value)}", file=sys.stderr)
                 else:
-                    line = ctx.primaryExpression().start.line
-                    column = ctx.primaryExpression().start.column
-                    raise KumirEvalError(f"Строка {line}, столбец {column}: Процедура или функция '{proc_name}' не определена")
-
-            # Добавляем обработку других постфиксных операций, если они появятся
-            # else:
-            #    raise KumirEvalError("Неизвестная постфиксная операция")
-
-        # Возвращаем последнее вычисленное значение (результат последнего вызова или primaryExpression)
-        return value
+                                value = None # Обычная процедура без возвращаемого значения или не удалось найти параметр
+                                # print(f"[DEBUG][ProcCall Return] Процедура '{proc_name}' вернула None (нет явного/неявного возврата через рез/аргрез или 'знач')", file=sys.stderr)
+                                
+                    finally:
+                        self.exit_scope()
 
     def visitExpressionList(self, ctx:KumirParser.ExpressionListContext):
         # expressionList: expression (COMMA expression)*
@@ -1465,49 +1540,43 @@ class KumirInterpreterVisitor(KumirParserVisitor):
 
     # --- ИСПРАВЛЕНИЕ: Добавляем явный visitArgumentList ---
     def visitArgumentList(self, ctx: KumirParser.ArgumentListContext):
-        # print(f"[DEBUG][Visit] Обработка argumentList", file=sys.stderr)
+        parent_ctx = ctx.parentCtx # Получаем родительский контекст (это должен быть PostfixExpression)
+        func_name_debug = "UNKNOWN_FUNC"
+        if isinstance(parent_ctx, KumirParser.PostfixExpressionContext) and parent_ctx.primaryExpression():
+            func_name_debug = parent_ctx.primaryExpression().getText()
+        
+        if self.debug: print(f"[Enter] visitArgumentList for {func_name_debug}({ctx.getText()})", file=sys.stderr)
         args = []
         for i, expr_ctx in enumerate(ctx.expression()):
-            arg_value = self.visit(expr_ctx)
-            # print(f"[DEBUG][ArgList] Аргумент: {arg_value} (тип {type(arg_value).__name__})", file=sys.stderr)
-            args.append(arg_value)
+            raw_arg_value = self.visitExpression(expr_ctx) # <--- ЯВНЫЙ ВЫЗОВ
+            if self.debug: print(f"[DEBUG][ArgList Proc] For {func_name_debug}, Arg {i} ({expr_ctx.getText()}): evaluated to {repr(raw_arg_value)} ({type(raw_arg_value).__name__})", file=sys.stderr)
+            args.append(raw_arg_value)
+        if self.debug: print(f"[Exit] visitArgumentList for {func_name_debug}({ctx.getText()}) -> returns {repr(args)}", file=sys.stderr)
         return args
 
     def visitPrimaryExpression(self, ctx:KumirParser.PrimaryExpressionContext):
-        """Обрабатывает первичные выражения."""
+        # print(f"[Enter] visitPrimaryExpression for {ctx.getText()}", file=sys.stderr)
+        result = None
         if ctx.literal():
-            return self.visit(ctx.literal())
+            result = self.visit(ctx.literal())
         elif ctx.qualifiedIdentifier():
             name = ctx.qualifiedIdentifier().getText()
-            # Проверяем, является ли это переменной
             var_info, _ = self.find_variable(name)
             if var_info:
-                # --- ИСПРАВЛЕНИЕ: Возвращаем значение, а не словарь ---
-                if var_info['is_table']:
-                    # Если это таблица, но обращаемся без индекса, возвращаем весь словарь значений
-                    # (Для присваивания или передачи как аргумент)
-                    # TODO: Уточнить поведение КуМир при передаче таблиц
-                    print(f"[DEBUG][Primary] Возвращаем всю таблицу '{name}'", file=sys.stderr)
-                    return var_info['value'] # Возвращаем словарь {индекс: значение}
+                result = var_info['value']
                 else:
-                    # Для скалярной переменной возвращаем само значение
-                    print(f"[DEBUG][Primary] Возвращаем значение переменной '{name}': {var_info['value']}", file=sys.stderr)
-                    return var_info['value']
-            # Если не переменная, возможно это имя процедуры/функции
-            # В этом случае visitPostfixExpression должен обработать вызов
-            # Возвращаем имя как строку, чтобы PostfixExpression знал, что вызывать
-            print(f"[DEBUG][Primary] Возвращаем имя процедуры/функции '{name}'", file=sys.stderr)
-            return name
+                result = name # имя функции
         elif ctx.RETURN_VALUE():
-            if 'return_value' not in self.current_scope:
-                raise KumirEvalError("Попытка использовать неинициализированное возвращаемое значение")
-            return self.current_scope['return_value']
+            # ...
+            result = self.current_scope['return_value']
         elif ctx.LPAREN():
-            return self.visit(ctx.expression())
+            result = self.visit(ctx.expression())
         elif ctx.arrayLiteral():
-            return self.visit(ctx.arrayLiteral())
+            result = self.visit(ctx.arrayLiteral())
         else:
             raise KumirEvalError("Некорректное первичное выражение")
+        # print(f"[Exit] visitPrimaryExpression for {ctx.getText()} -> returns {repr(result)}", file=sys.stderr)
+        return result
 
     # --- НОВЫЙ МЕТОД: Форматирование вывода ---
     def _format_output_value(self, value, arg_ctx: KumirParser.IoArgumentContext) -> str:
@@ -1549,6 +1618,52 @@ class KumirInterpreterVisitor(KumirParserVisitor):
             # Строки и другие типы выводим как есть
             return str(value)
 
+    # --- Метод для visitLiteral ---
+    def visitLiteral(self, ctx:KumirParser.LiteralContext):
+        text_debug = ctx.getText()
+        # print(f"[DEBUG][VisitLiteral] Processing literal: '{text_debug}'", file=sys.stderr)
+
+        if ctx.INTEGER():
+            text = ctx.INTEGER().getText()
+            val = None
+            if text.startswith('$'): # Hex
+                val = int(text[1:], 16)
+            else: # Decimal
+                val = int(text)
+            # print(f"[DEBUG][VisitLiteral] INTEGER '{text}' parsed as {repr(val)} (type {type(val).__name__})", file=sys.stderr)
+            return val
+        elif ctx.REAL():
+            val = float(ctx.REAL().getText().replace(',', '.')) # Заменяем запятую на точку для совместимости
+            # print(f"[DEBUG][VisitLiteral] REAL '{ctx.REAL().getText()}' parsed as {repr(val)} (type {type(val).__name__})", file=sys.stderr)
+            return val
+        elif ctx.STRING():
+            text = ctx.STRING().getText()
+            val = text[1:-1].replace('\\\\"', '"').replace("\\\\'", "'").replace('\\\\\\\\', '\\\\')
+            # print(f"[DEBUG][VisitLiteral] STRING '{text}' parsed as {repr(val)} (type {type(val).__name__})", file=sys.stderr)
+            return val
+        elif ctx.CHAR_LITERAL():
+            text = ctx.CHAR_LITERAL().getText()
+            val = text[1:-1].replace('\\\\"', '"').replace("\\\\'", "'").replace('\\\\\\\\', '\\\\') # Аналогично STRING
+            # print(f"[DEBUG][VisitLiteral] CHAR_LITERAL '{text}' parsed as {repr(val)} (type {type(val).__name__})", file=sys.stderr)
+            return val
+        elif ctx.TRUE():
+            # print(f"[DEBUG][VisitLiteral] TRUE parsed as True", file=sys.stderr)
+            return True
+        elif ctx.FALSE():
+            # print(f"[DEBUG][VisitLiteral] FALSE parsed as False", file=sys.stderr)
+            return False
+        elif ctx.colorLiteral():
+            val = ctx.colorLiteral().getText()
+            # print(f"[DEBUG][VisitLiteral] colorLiteral '{val}' parsed as string", file=sys.stderr)
+            return val 
+        elif ctx.NEWLINE_CONST():
+            # print(f"[DEBUG][VisitLiteral] NEWLINE_CONST parsed as '\\n'", file=sys.stderr)
+            return '\\n' 
+
+        # print(f"[DEBUG][VisitLiteral] Literal '{text_debug}' did not match any known literal type, returning None (ERROR!)", file=sys.stderr)
+        return None 
+    # --- Конец visitLiteral ---
+
 def interpret_kumir(code: str):
     """
     Интерпретирует код на языке КуМир.
@@ -1563,46 +1678,36 @@ def interpret_kumir(code: str):
     from .generated.KumirLexer import KumirLexer
     from .generated.KumirParser import KumirParser
     
-    print("[DEBUG][Interpreter] Начало интерпретации", file=sys.stderr)
-    print(f"[DEBUG][Interpreter] Код программы:\n{code}", file=sys.stderr)
+    # print("[DEBUG][Interpreter] Начало интерпретации", file=sys.stderr)
+    # print(f"[DEBUG][Interpreter] Код программы:\\n{code}", file=sys.stderr)
     
     # Создаем поток символов из кода
     input_stream = InputStream(code)
     
     # Создаем лексер
     lexer = KumirLexer(input_stream)
-    lexer.removeErrorListeners() # Убираем стандартный обработчик ошибок
-    lexer.addErrorListener(DiagnosticErrorListener()) # Добавляем свой обработчик ошибок
+    lexer.removeErrorListeners() 
+    lexer.addErrorListener(DiagnosticErrorListener()) 
     
-    # Создаем поток токенов
     token_stream = CommonTokenStream(lexer)
     
-    # Создаем парсер
     parser = KumirParser(token_stream)
-    parser.removeErrorListeners() # Убираем стандартный обработчик ошибок
-    parser.addErrorListener(DiagnosticErrorListener()) # Добавляем свой обработчик ошибок
+    parser.removeErrorListeners() 
+    parser.addErrorListener(DiagnosticErrorListener()) 
     
-    print("[DEBUG][Interpreter] Парсинг программы", file=sys.stderr)
-    # Получаем дерево разбора
+    # print("[DEBUG][Interpreter] Парсинг программы", file=sys.stderr)
     tree = parser.program()
     
-    print("[DEBUG][Interpreter] Создание интерпретатора", file=sys.stderr)
-    # Создаем интерпретатор
+    # print("[DEBUG][Interpreter] Создание интерпретатора", file=sys.stderr)
     visitor = KumirInterpreterVisitor()
     
-    print("[DEBUG][Interpreter] Начало выполнения", file=sys.stderr)
-    # --- ДОБАВЛЯЕМ TRY...EXCEPT ВОКРУГ visit --- 
+    # print("[DEBUG][Interpreter] Начало выполнения", file=sys.stderr)
     try:
-        # Выполняем программу
         visitor.visit(tree)
-        print("[DEBUG][Interpreter] Выполнение завершено успешно", file=sys.stderr)
+        # print("[DEBUG][Interpreter] Выполнение завершено успешно", file=sys.stderr)
     except Exception as e:
-        print("[ERROR][Interpreter] ИСКЛЮЧЕНИЕ ВО ВРЕМЯ ВЫПОЛНЕНИЯ:", file=sys.stderr)
-        import traceback
-        traceback.print_exc(file=sys.stderr)
-        # Перевыбрасываем исключение, чтобы оно было поймано в run_kumir_program
+        # print("[ERROR][Interpreter] ИСКЛЮЧЕНИЕ ВО ВРЕМЯ ВЫПОЛНЕНИЯ:", file=sys.stderr)
+        # import traceback
+        # traceback.print_exc(file=sys.stderr)
         raise e
-    # ---------------------------------------------
-    
-    # Возвращаем пустую строку, так как вывод собирается через redirect_stdout
     return ""

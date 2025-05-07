@@ -108,8 +108,8 @@ COLON               : ':';
 SEMICOLON           : ';';
 ATAT                : '@@';
 AT                  : '@';
-DIV_OP              : 'div';
-MOD_OP              : 'mod';
+// DIV_OP              : 'div'; // Treated as ID, function call
+// MOD_OP              : 'mod'; // Treated as ID, function call
 
 // --- Literals ---
 CHAR_LITERAL        : '\'' ( EscapeSequence | ~['\\\r\n] ) '\'' ;

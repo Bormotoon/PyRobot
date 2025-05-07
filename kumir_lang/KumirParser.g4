@@ -67,8 +67,8 @@ powerExpression // Handles exponentiation (**)
     : unaryExpression (POWER powerExpression)?
     ;
 
-multiplicativeExpression // Handles *, /, div, mod
-    : powerExpression ((MUL | DIV | DIV_OP | MOD_OP) powerExpression)*
+multiplicativeExpression // Handles *, /
+    : powerExpression ((MUL | DIV) powerExpression)*
     ;
 
 additiveExpression // Handles +, -
