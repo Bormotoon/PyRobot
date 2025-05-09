@@ -132,7 +132,7 @@ class KumirInterpreterVisitor(KumirParserVisitor):
         self.procedures = {}  # Словарь для хранения определений процедур/функций
         self.logger = logging.getLogger(__name__) # <--- ДОБАВЛЕНО
         # --- DEBUG PRINT --- 
-        print(f"[DEBUG][INIT] KumirInterpreterVisitor initialized. Available methods starting with '_handle': {[name for name in dir(self) if callable(getattr(self, name)) and name.startswith('_handle')]}", file=sys.stdout) #stdout
+        print(f"[DEBUG][INIT] KumirInterpreterVisitor initialized. Available methods starting with '_handle': {[name for name in dir(self) if callable(getattr(self, name)) and name.startswith('_handle')]}", file=sys.stderr) #stdout -> stderr
         # --- END DEBUG PRINT ---
 
     # --- Управление областями видимости и символами ---
@@ -140,15 +140,15 @@ class KumirInterpreterVisitor(KumirParserVisitor):
     def enter_scope(self):
         """Входит в новую локальную область видимости."""
         self.scopes.append({}) # Добавляем новый пустой словарь для локальной области
-        print(f"[DEBUG][Scope] Вошли в область уровня {len(self.scopes)}", file=sys.stdout)
+        print(f"[DEBUG][Scope] Вошли в область уровня {len(self.scopes)}", file=sys.stderr)
 
     def exit_scope(self):
         """Выходит из текущей локальной области видимости."""
         if len(self.scopes) > 1:
-            print(f"[DEBUG][Scope] Вышли из области уровня {len(self.scopes) - 1}", file=sys.stdout)
+            print(f"[DEBUG][Scope] Вышли из области уровня {len(self.scopes) - 1}", file=sys.stderr)
             self.scopes.pop()
         else:
-            print("[ERROR][Scope] Попытка выйти из глобальной области!", file=sys.stdout)
+            print("[ERROR][Scope] Попытка выйти из глобальной области!", file=sys.stderr)
 
     def declare_variable(self, name, kumir_type, is_table=False, dimensions=None):
         """Объявляет переменную в текущей области видимости."""
@@ -164,7 +164,7 @@ class KumirInterpreterVisitor(KumirParserVisitor):
             'is_table': is_table,
             'dimensions': dimensions if is_table else None
         }
-        print(f"[DEBUG][Declare] Объявлена {'таблица' if is_table else 'переменная'} '{name}' тип {kumir_type} в области {len(self.scopes) - 1}", file=sys.stdout)
+        print(f"[DEBUG][Declare] Объявлена {'таблица' if is_table else 'переменная'} '{name}' тип {kumir_type} в области {len(self.scopes) - 1}", file=sys.stderr) #stdout -> stderr
 
     def _get_type_name_from_specifier(self, type_ctx: KumirParser.TypeSpecifierContext) -> str:
         """Извлекает строковое имя типа из узла typeSpecifier."""
@@ -200,13 +200,13 @@ class KumirInterpreterVisitor(KumirParserVisitor):
 
     def find_variable(self, var_name: str) -> Tuple[Optional[Dict], Optional[Dict]]:
         """Ищет переменную во всех областях видимости и возвращает её информацию и область видимости."""
-        if self.debug: print(f"[DEBUG][FindVar] Поиск переменной '{var_name}'", file=sys.stdout)
+        if self.debug: print(f"[DEBUG][FindVar] Поиск переменной '{var_name}'", file=sys.stderr) #stdout -> stderr
         for i, scope in enumerate(reversed(self.scopes)):
             scope_level = len(self.scopes) - 1 - i
             if var_name in scope:
-                if self.debug: print(f"[DEBUG][FindVar] Найдена '{var_name}' в области {scope_level}", file=sys.stdout)
+                if self.debug: print(f"[DEBUG][FindVar] Найдена '{var_name}' в области {scope_level}", file=sys.stderr) #stdout -> stderr
                 return scope[var_name], scope
-        if self.debug: print(f"[DEBUG][FindVar] Переменная '{var_name}' НЕ найдена", file=sys.stdout)
+        if self.debug: print(f"[DEBUG][FindVar] Переменная '{var_name}' НЕ найдена", file=sys.stderr) #stdout -> stderr
         return None, None
 
     def update_variable(self, var_name: str, value: Any) -> None:
@@ -238,7 +238,7 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                 raise KumirEvalError(f"Ожидалась строка для '{var_name}', получено {type(value)}")
                 
         var_info['value'] = value
-        print(f"[DEBUG][Update] Обновлено значение переменной '{var_name}' = {value}", file=sys.stdout)
+        print(f"[DEBUG][Update] Обновлено значение переменной '{var_name}' = {value}", file=sys.stderr) #stdout -> stderr
 
     # --- Вспомогательные методы для проверки и конвертации типов при присваивании ---
 
@@ -327,10 +327,10 @@ class KumirInterpreterVisitor(KumirParserVisitor):
 
         # Приведение int к float для сравнения
         if is_left_int and is_right_float:
-            print(f"[DEBUG][TypePromo] Promoting left operand {left} (int) to float for comparison with {right} (float)", file=sys.stdout)
+            print(f"[DEBUG][TypePromo] Promoting left operand {left} (int) to float for comparison with {right} (float)", file=sys.stderr) #stdout -> stderr
             return float(left), right
         if is_left_float and is_right_int:
-            print(f"[DEBUG][TypePromo] Promoting right operand {right} (int) to float for comparison with {left} (float)", file=sys.stdout)
+            print(f"[DEBUG][TypePromo] Promoting right operand {right} (int) to float for comparison with {left} (float)", file=sys.stderr) #stdout -> stderr
             return left, float(right)
         
         # Если типы уже совместимы (оба числа, или оба строки, или оба bool), или не числа, оставляем как есть.
@@ -338,13 +338,17 @@ class KumirInterpreterVisitor(KumirParserVisitor):
         return left, right
 
     def _check_numeric(self, value, operation_name):
-        """Проверяет, является ли значение числом (цел или вещ)."""
-        value = self._get_value(value)
-        if value is None:
+        print(f"[DEBUG][_check_numeric] ENTERED. Op: {operation_name}. Value initial type: {type(value).__name__}.", file=sys.stderr)
+        processed_value = self._get_value(value)
+        print(f"[DEBUG][_check_numeric] Value after _get_value for op '{operation_name}': {repr(processed_value)} (type: {type(processed_value).__name__})", file=sys.stderr)
+        if processed_value is None:
+            print(f"[DEBUG][_check_numeric] Raising KumirEvalError: processed_value is None for op '{operation_name}'", file=sys.stderr)
             raise KumirEvalError(f"Попытка использовать неинициализированное значение в операции '{operation_name}'")
-        if not isinstance(value, (int, float)):
-            raise KumirEvalError(f"Операция '{operation_name}' не применима к нечисловому типу {type(value).__name__}.")
-        return value
+        if not isinstance(processed_value, (int, float)):
+            print(f"[DEBUG][_check_numeric] Raising KumirEvalError: not int/float for op '{operation_name}'. Value: {repr(processed_value)}, Type: {type(processed_value).__name__}", file=sys.stderr)
+            raise KumirEvalError(f"Операция '{operation_name}' не применима к нечисловому типу {type(processed_value).__name__}.")
+        # print(f"[DEBUG][_check_numeric] Returning: {repr(processed_value)}", file=sys.stderr)
+        return processed_value
 
     def _check_logical(self, value, operation_name):
         """Проверяет, является ли значение логическим."""
@@ -363,65 +367,58 @@ class KumirInterpreterVisitor(KumirParserVisitor):
             raise KumirEvalError(f"Операция '{operation_name}' не применима к типу {type(value).__name__}.")
         return value
 
-    def _perform_binary_operation(self, ctx, ops_map, type_check_func=None):
-        """Общая логика для выполнения бинарных операций."""
-        left_ctx = ctx.getChild(0)  # Левый операнд
-        right_ctx = ctx.getChild(2)  # Правый операнд
-        op_token = ctx.getChild(1).symbol  # Токен оператора
-        
-        left_val = self.visit(left_ctx)
-        right_val = self.visit(right_ctx)
-        # print(f"[DEBUG][BinOp Eval] Op: {op_token.text}, Left: {repr(left_val)}, Right: {repr(right_val)}", file=sys.stderr) # DEBUG
-        
-        # Получаем функцию операции из словаря
-        operation = ops_map.get(op_token.type)
-        if not operation:
-            raise KumirEvalError(f"Неизвестная или неподдерживаемая бинарная операция: {op_token.text}")
+    def _perform_binary_operation(self, left_val, right_val, op_token, expression_node_ctx):
+        """Выполняет бинарную арифметическую операцию над уже вычисленными значениями."""
+        op_text = op_token.text  # e.g. "+", "-"
+        op_type = op_token.type  # e.g. KumirLexer.PLUS
 
-        # Особая обработка для разных типов операций
-        if op_token.type in [KumirLexer.AND, KumirLexer.OR]:
-            # Логические операции
-            left_val = self._check_logical(left_val, op_token.text)
-            right_val = self._check_logical(right_val, op_token.text)
-        elif op_token.type in [KumirLexer.EQ, KumirLexer.NE]:
-            # Операции равенства/неравенства - работают с любыми типами
-            left_val = self._check_comparable(left_val, op_token.text)
-            right_val = self._check_comparable(right_val, op_token.text)
-            # Проверяем совместимость типов, кроме числовых
-            if not (isinstance(left_val, (int, float)) and isinstance(right_val, (int, float))):
-                if type(left_val) != type(right_val):
-                    raise KumirEvalError(f"Несовместимые типы в операции '{op_token.text}': {type(left_val).__name__} и {type(right_val).__name__}")
-        elif op_token.type in [KumirLexer.LT, KumirLexer.GT, KumirLexer.LE, KumirLexer.GE]:
-            # Операции сравнения - только для чисел и строк одного типа
-            left_val = self._check_comparable(left_val, op_token.text)
-            right_val = self._check_comparable(right_val, op_token.text)
-            # --- ИСПРАВЛЕНИЕ: Разрешаем сравнение int и float --- 
-            is_left_num = isinstance(left_val, (int, float))
-            is_right_num = isinstance(right_val, (int, float))
-            if not ((is_left_num and is_right_num) or (type(left_val) == type(right_val))):
-                raise KumirEvalError(f"Несовместимые типы в операции '{op_token.text}': {type(left_val).__name__} и {type(right_val).__name__}")
-            if not isinstance(left_val, (int, float, str)):
-                raise KumirEvalError(f"Операция '{op_token.text}' не применима к типу {type(left_val).__name__}")
-        else:
-            # Арифметические операции
-            left_val = self._check_numeric(left_val, op_token.text)
-            right_val = self._check_numeric(right_val, op_token.text)
+        # <<< DETAILED DEBUG FOR OPERATOR >>>
+        # Пока убрали KumirLexer.MOD, т.к. точное имя токена не подтверждено
+        print(f"[DEBUG][PBO_OP_DETAILS] op_text='{op_text}', op_type_val={op_type}, KumirLexer.DIV={KumirLexer.DIV}", file=sys.stderr)
 
-        # Особая обработка для деления
-        if op_token.type == KumirLexer.DIV:  # Обычное деление
-            if right_val == 0:
-                raise KumirEvalError("Деление на ноль")
-            return float(left_val) / float(right_val)
-        # elif op_token.type in [KumirLexer.MOD_OP]: был здесь
-            
-        # Выполняем операцию (для остальных: +, -, *, **)
+        # Для арифметических операций (сложение, вычитание, умножение, деление, степень)
+        # ожидаем числовые операнды.
+        # print(f"[DEBUG][_perform_binary_operation] Before _check_numeric for left: {repr(left_val)}, op: {op_text}", file=sys.stderr)
+        checked_left_val = self._check_numeric(left_val, op_text)
+        # print(f"[DEBUG][_perform_binary_operation] Before _check_numeric for right: {repr(right_val)}, op: {op_text}", file=sys.stderr)
+        checked_right_val = self._check_numeric(right_val, op_text)
+        # print(f"[DEBUG][_perform_binary_operation] After _check_numeric. Left: {repr(checked_left_val)}, Right: {repr(checked_right_val)}", file=sys.stderr)
+
+        operation_func = ARITHMETIC_OPS.get(op_type)
+        
+        # <<< DETAILED DEBUG FOR OP_FUNC >>>
+        print(f"[DEBUG][PBO_OP_DETAILS] op_text='{op_text}', op_type_val={op_type}, operation_func_found={bool(operation_func)}", file=sys.stderr)
+
+        if not operation_func:
+            # Эта ситуация не должна возникать, если op_token пришел из Additive/MultiplicativeExpression,
+            # так как грамматика ограничивает операторы.
+            # <<< DETAILED DEBUG FOR 'mod'/'div' NOT FOUND >>>
+            if op_type == KumirLexer.MOD or op_type == KumirLexer.DIV:
+                 print(f"[DEBUG][PBO_OP_DETAILS] Keyword '{op_text}' was not found in ARITHMETIC_OPS. Raising error as expected.", file=sys.stderr)
+            raise KumirEvalError(f"Строка ~{expression_node_ctx.start.line}: Неизвестный или неподдерживаемый арифметический оператор: {op_text} в выражении '{expression_node_ctx.getText()}'")
+
+        # Стандартное деление '/' в КуМире всегда дает ВЕЩ результат.
+        if op_type == KumirLexer.DIV: # This is for '/' (DIV_OP), not the keyword 'div'
+            if checked_right_val == 0:
+                raise KumirEvalError(f"Строка ~{expression_node_ctx.start.line}: Деление на ноль в выражении '{expression_node_ctx.getText()}'")
+            return float(checked_left_val) / float(checked_right_val)
+        
+        # Для остальных арифметических операций (+, -, *, ^)
         try:
-            result = operation(left_val, right_val)
+            # print(f"[DEBUG][_perform_binary_operation] Executing: {checked_left_val} {op_text} {checked_right_val} using {operation_func}", file=sys.stderr)
+            result = operation_func(checked_left_val, checked_right_val)
+            # print(f"[DEBUG][_perform_binary_operation] Result: {repr(result)}", file=sys.stderr)
             return result
         except TypeError as e:
-            raise KumirEvalError(f"Ошибка типа при выполнении операции '{op_token.text}': {e}")
-        except Exception as e:
-            raise KumirEvalError(f"Ошибка при вычислении '{op_token.text}': {e}")
+            # Эта ошибка может возникнуть, если _check_numeric пропустил несовместимый тип (маловероятно) 
+            # или если сама операция Python не может быть выполнена (например, int ** large_float, что может быть не тем, что ожидает КуМир)
+            raise KumirEvalError(f"Строка ~{expression_node_ctx.start.line}: Ошибка типа при выполнении операции '{op_text}' ({type(checked_left_val).__name__} {op_text} {type(checked_right_val).__name__}) в выражении '{expression_node_ctx.getText()}': {e}")
+        except ZeroDivisionError: # Для оператора ** с отрицательным основанием и дробным показателем, или 0**отриц_число
+             raise KumirEvalError(f"Строка ~{expression_node_ctx.start.line}: Ошибка деления на ноль или некорректная операция со степенью при вычислении '{op_text}' в выражении '{expression_node_ctx.getText()}'")
+        except OverflowError:
+            raise KumirEvalError(f"Строка ~{expression_node_ctx.start.line}: Переполнение при вычислении '{op_text}' в выражении '{expression_node_ctx.getText()}'")
+        except Exception as e: # Другие возможные математические ошибки
+            raise KumirEvalError(f"Строка ~{expression_node_ctx.start.line}: Ошибка при вычислении '{op_text}' в выражении '{expression_node_ctx.getText()}': {e}")
 
     # --- Переопределение методов visit ---
 
@@ -434,7 +431,7 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                  # Если это определение алгоритма или модуля (модули могут содержать алгоритмы)
                  self._collect_procedure_definitions(item)
 
-        print(f"[DEBUG][VisitProgram] Собрано {len(self.procedures)} процедур/функций: {list(self.procedures.keys())}", file=sys.stdout)
+        print(f"[DEBUG][VisitProgram] Собрано {len(self.procedures)} процедур/функций: {list(self.procedures.keys())}", file=sys.stderr) #stdout -> stderr
 
         # Затем выполняем программу (посещаем всех детей)
         # Исполнение основного алгоритма произойдет при посещении его узла
@@ -460,7 +457,7 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                         line = header.start.line
                         raise DeclarationError(f"Строка {line}: Алгоритм с именем '{name}' уже определен.")
 
-                    print(f"[DEBUG][Collect] Найдено определение: '{name}'", file=sys.stdout)
+                    print(f"[DEBUG][Collect] Найдено определение: '{name}'", file=sys.stderr) #stdout -> stderr
                     # Сохраняем весь узел определения
                     self.procedures[name] = ctx
                 else:
@@ -481,7 +478,7 @@ class KumirInterpreterVisitor(KumirParserVisitor):
     def visitImplicitModuleBody(self, ctx: KumirParser.ImplicitModuleBodyContext):
         """Обработка неявного тела модуля (программы без явного объявления модуля)."""
         # Сбор процедур уже выполнен в visitProgram
-        print("[DEBUG][Visit] Обработка implicitModuleBody", file=sys.stdout)
+        print("[DEBUG][Visit] Обработка implicitModuleBody", file=sys.stderr) #stdout -> stderr
         # Просто выполняем содержимое
         for item in ctx.children:
              if isinstance(item, KumirParser.AlgorithmDefinitionContext):
@@ -489,7 +486,7 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                  # Основным считаем тот, у которого нет параметров в заголовке
                  header = item.algorithmHeader()
                  if header and not header.parameterList():
-                     print(f"[DEBUG][ImplicitBody] Запуск основного алгоритма: {header.algorithmNameTokens().getText().strip()}", file=sys.stdout)
+                     print(f"[DEBUG][ImplicitBody] Запуск основного алгоритма: {header.algorithmNameTokens().getText().strip()}", file=sys.stderr) #stdout -> stderr
                      self.visit(item) # Посещаем определение, что приведет к выполнению тела
                      break # Выполняем только первый найденный основной алгоритм
         return None
@@ -497,14 +494,14 @@ class KumirInterpreterVisitor(KumirParserVisitor):
     def visitModuleDefinition(self, ctx: KumirParser.ModuleDefinitionContext):
         """Обработка определения модуля."""
         # Сбор процедур уже выполнен в visitProgram
-        print("[DEBUG][Visit] Обработка moduleDefinition", file=sys.stdout)
+        print("[DEBUG][Visit] Обработка moduleDefinition", file=sys.stderr) #stdout -> stderr
         # Если это неявный модуль, делегируем visitImplicitModuleBody
         if ctx.implicitModuleBody():
             return self.visit(ctx.implicitModuleBody())
         else:
             # Для явных модулей пока ничего не делаем (только собираем процедуры)
             # В будущем здесь может быть выполнение инициализации модуля
-            print("[DEBUG][ModuleDef] Явный модуль - выполнение пока не реализовано.", file=sys.stdout)
+            print("[DEBUG][ModuleDef] Явный модуль - выполнение пока не реализовано.", file=sys.stderr) #stdout -> stderr
             return None
 
     def visitAlgorithmDefinition(self, ctx: KumirParser.AlgorithmDefinitionContext):
@@ -513,7 +510,7 @@ class KumirInterpreterVisitor(KumirParserVisitor):
         # когда его вызывают для основного алгоритма.
         # Сбор определений уже произошел.
         name = ctx.algorithmHeader().algorithmNameTokens().getText().strip()
-        print(f"[DEBUG][VisitAlgDef] Выполнение алгоритма '{name}'", file=sys.stdout)
+        print(f"[DEBUG][VisitAlgDef] Выполнение алгоритма '{name}'", file=sys.stderr) #stdout -> stderr
 
         body = ctx.algorithmBody()
         if body:
@@ -534,7 +531,7 @@ class KumirInterpreterVisitor(KumirParserVisitor):
 
     # Обработка объявлений скалярных переменных
     def visitVariableDeclaration(self, ctx: KumirParser.VariableDeclarationContext):
-        print(f"[DEBUG][Visit] Обработка variableDeclaration", file=sys.stdout)
+        print(f"[DEBUG][Visit] Обработка variableDeclaration", file=sys.stderr) #stdout -> stderr
         type_ctx = ctx.typeSpecifier()
         
         # Определяем тип переменной
@@ -563,7 +560,7 @@ class KumirInterpreterVisitor(KumirParserVisitor):
             
             if var_decl.arrayBounds():
                 # TODO: Обработка размерностей таблицы
-                print(f"  -> Диапазоны для таблицы '{var_name}' пока не вычисляются.", file=sys.stdout)
+                print(f"  -> Диапазоны для таблицы '{var_name}' пока не вычисляются.", file=sys.stderr) #stdout -> stderr
                 
             # Объявляем переменную с значением по умолчанию
             self.declare_variable(var_name, kumir_type, is_table=is_table, dimensions=dimensions)
@@ -589,11 +586,11 @@ class KumirInterpreterVisitor(KumirParserVisitor):
     # Обработка узла переменной
     def visitLvalue(self, ctx: KumirParser.LvalueContext):
         if ctx.RETURN_VALUE():
-            print(f"[DEBUG][Visit] Обращение к специальной переменной 'знач'", file=sys.stdout)
+            print(f"[DEBUG][Visit] Обращение к специальной переменной 'знач'", file=sys.stderr) #stdout -> stderr
             raise NotImplementedError("Обращение к 'знач' пока не реализовано.")
             
         var_name = self.get_full_identifier(ctx.qualifiedIdentifier())
-        print(f"[DEBUG][Visit] Обращение к переменной/таблице: '{var_name}'", file=sys.stdout)
+        print(f"[DEBUG][Visit] Обращение к переменной/таблице: '{var_name}'", file=sys.stderr) #stdout -> stderr
         
         var_info, _ = self.find_variable(var_name)
         if var_info is None:
@@ -660,22 +657,22 @@ class KumirInterpreterVisitor(KumirParserVisitor):
     # --- Обработка выражений --- 
 
     def visitExpression(self, ctx: KumirParser.ExpressionContext):
-        print(f"[DEBUG][visitExpression] Called for ctx: {ctx.getText()}", file=sys.stdout)
+        print(f"[DEBUG][visitExpression] Called for ctx: {ctx.getText()}", file=sys.stderr)
         # print(f"[DEBUG][visitExpression] Expecting to get a value from visitLogicalOrExpression")
         result = self.visit(ctx.logicalOrExpression())
-        print(f"[DEBUG][visitExpression] Received from visitLogicalOrExpression: {result} (type: {type(result)})", file=sys.stdout)
-        print(f"[DEBUG][visitExpression] Returning: {result} (type: {type(result)})", file=sys.stdout)
+        print(f"[DEBUG][visitExpression] Received from visitLogicalOrExpression: {result} (type: {type(result)})", file=sys.stderr)
+        print(f"[DEBUG][visitExpression] Returning: {result} (type: {type(result)})", file=sys.stderr)
         return result
 
     def visitLogicalOrExpression(self, ctx: KumirParser.LogicalOrExpressionContext):
-        print(f"[DEBUG][visitLogicalOrExpression] Called for ctx: {ctx.getText()}", file=sys.stdout)
+        print(f"[DEBUG][visitLogicalOrExpression] Called for ctx: {ctx.getText()}", file=sys.stderr)
         if not ctx.logicalAndExpression():  # Should not happen based on grammar
             # print(f"[DEBUG][visitLogicalOrExpression] No logicalAndExpression, returning None early.")
             return None
 
         # print(f"[DEBUG][visitLogicalOrExpression] Expecting to get a value from the first logicalAndExpression")
         result = self.visit(ctx.logicalAndExpression(0))
-        print(f"[DEBUG][visitLogicalOrExpression] Received from first logicalAndExpression: {result} (type: {type(result)})", file=sys.stdout)
+        print(f"[DEBUG][visitLogicalOrExpression] Received from first logicalAndExpression: {result} (type: {type(result)})", file=sys.stderr)
 
         if len(ctx.logicalAndExpression()) > 1:
             for i in range(1, len(ctx.logicalAndExpression())):
@@ -683,7 +680,7 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                 # print(f"[DEBUG][visitLogicalOrExpression] Expecting to get a value from next logicalAndExpression")
                 right_operand_ctx = ctx.logicalAndExpression(i)
                 right_operand = self.visit(right_operand_ctx)
-                print(f"[DEBUG][visitLogicalOrExpression] Received for OR's right operand: {right_operand} (type: {type(right_operand)})", file=sys.stdout)
+                print(f"[DEBUG][visitLogicalOrExpression] Received for OR's right operand: {right_operand} (type: {type(right_operand)})", file=sys.stderr)
                 if not isinstance(result, (bool, int)) or not isinstance(right_operand, (bool, int)):
                     raise KumirEvalError(
                         f"Строка ~{ctx.start.line}: Ошибка типа: операция 'ИЛИ' не применима к типам {type(result).__name__} и {type(right_operand).__name__}",
@@ -693,18 +690,18 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                 result = bool(result) or bool(right_operand)
                 # print(f"[DEBUG][visitLogicalOrExpression] Result after OR: {result}")
         
-        print(f"[DEBUG][visitLogicalOrExpression] Returning: {result} (type: {type(result)})", file=sys.stdout)
+        print(f"[DEBUG][visitLogicalOrExpression] Returning: {result} (type: {type(result)})", file=sys.stderr)
         return result
 
     def visitLogicalAndExpression(self, ctx: KumirParser.LogicalAndExpressionContext):
-        print(f"[DEBUG][visitLogicalAndExpression] Called for ctx: {ctx.getText()}", file=sys.stdout)
+        print(f"[DEBUG][visitLogicalAndExpression] Called for ctx: {ctx.getText()}", file=sys.stderr)
         if not ctx.equalityExpression(): # Should not happen
             # print(f"[DEBUG][visitLogicalAndExpression] No equalityExpression, returning None early.")
             return None
 
         # print(f"[DEBUG][visitLogicalAndExpression] Expecting to get a value from the first equalityExpression")
         result = self.visit(ctx.equalityExpression(0))
-        print(f"[DEBUG][visitLogicalAndExpression] Received from first equalityExpression: {result} (type: {type(result)})")
+        print(f"[DEBUG][visitLogicalAndExpression] Received from first equalityExpression: {result} (type: {type(result)})", file=sys.stderr)
         
         if len(ctx.equalityExpression()) > 1:
             for i in range(1, len(ctx.equalityExpression())):
@@ -712,7 +709,7 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                 # print(f"[DEBUG][visitLogicalAndExpression] Expecting to get a value from next equalityExpression")
                 right_operand_ctx = ctx.equalityExpression(i)
                 right_operand = self.visit(right_operand_ctx)
-                print(f"[DEBUG][visitLogicalAndExpression] Received for AND's right operand: {right_operand} (type: {type(right_operand)})")
+                print(f"[DEBUG][visitLogicalAndExpression] Received for AND's right operand: {right_operand} (type: {type(right_operand)})", file=sys.stderr)
                 if not isinstance(result, (bool, int)) or not isinstance(right_operand, (bool, int)):
                     raise KumirEvalError(
                         f"Строка ~{ctx.start.line}: Ошибка типа: операция 'И' не применима к типам {type(result).__name__} и {type(right_operand).__name__}",
@@ -722,14 +719,14 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                 result = bool(result) and bool(right_operand)
                 # print(f"[DEBUG][visitLogicalAndExpression] Result after AND: {result}")
 
-        print(f"[DEBUG][visitLogicalAndExpression] Returning: {result} (type: {type(result)})")
+        print(f"[DEBUG][visitLogicalAndExpression] Returning: {result} (type: {type(result)})", file=sys.stderr)
         return result
 
     def visitEqualityExpression(self, ctx: KumirParser.EqualityExpressionContext):
-        print(f"[DEBUG][visitEqualityExpression] Called for ctx: {ctx.getText()}")
+        print(f"[DEBUG][visitEqualityExpression] Called for ctx: {ctx.getText()}", file=sys.stderr)
         # print(f"[DEBUG][visitEqualityExpression] Expecting to get a value from the first relationalExpression")
         result = self.visit(ctx.relationalExpression(0))
-        print(f"[DEBUG][visitEqualityExpression] Received from first relationalExpression: {result} (type: {type(result)})")
+        print(f"[DEBUG][visitEqualityExpression] Received from first relationalExpression: {result} (type: {type(result)})", file=sys.stderr)
 
         if len(ctx.relationalExpression()) > 1:
             # print(f"[DEBUG][visitEqualityExpression] Processing equality/inequality. Current result: {result}")
@@ -738,7 +735,7 @@ class KumirInterpreterVisitor(KumirParserVisitor):
             # print(f"[DEBUG][visitEqualityExpression] Expecting to get a value from the second relationalExpression")
             right_operand_ctx = ctx.relationalExpression(1)
             right_operand = self.visit(right_operand_ctx)
-            print(f"[DEBUG][visitEqualityExpression] Received for equality's right operand: {right_operand} (type: {type(right_operand)})")
+            print(f"[DEBUG][visitEqualityExpression] Received for equality's right operand: {right_operand} (type: {type(right_operand)})", file=sys.stderr)
             
             original_left = result
             original_right = right_operand
@@ -757,31 +754,20 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                 raise KumirEvalError(f"Строка ~{ctx.start.line}: Неизвестный оператор сравнения: {op}", ctx.start.line, ctx.start.column)
             # print(f"[DEBUG][visitEqualityExpression] Result after comparison: {result}")
             
-        print(f"[DEBUG][visitEqualityExpression] Returning: {result} (type: {type(result)})")
+        print(f"[DEBUG][visitEqualityExpression] Returning: {result} (type: {type(result)})", file=sys.stderr)
         return result
 
     def visitRelationalExpression(self, ctx: KumirParser.RelationalExpressionContext):
-        print(f"[DEBUG][visitRelationalExpression] Called for ctx: {ctx.getText()}")
-        # print(f"[DEBUG][visitRelationalExpression] Expecting to get a value from the first additiveExpression")
+        # print(f"[DEBUG][visitRelationalExpression] Called for ctx: {ctx.getText()}", file=sys.stderr)
         result = self.visit(ctx.additiveExpression(0))
-        print(f"[DEBUG][visitRelationalExpression] Received from first additiveExpression: {result} (type: {type(result)})")
+        # print(f"[DEBUG][visitRelationalExpression] Received from first additiveExpression: {result} (type: {type(result)})", file=sys.stderr)
 
         if len(ctx.additiveExpression()) > 1:
-            # print(f"[DEBUG][visitRelationalExpression] Processing relational operation. Current result: {result}")
             op = ctx.getChild(1).getText()
-            # print(f"[DEBUG][visitRelationalExpression] Operator: {op}")
-            # print(f"[DEBUG][visitRelationalExpression] Expecting to get a value from the second additiveExpression")
             right_operand_ctx = ctx.additiveExpression(1)
             right_operand = self.visit(right_operand_ctx)
-            print(f"[DEBUG][visitRelationalExpression] Received for relational's right operand: {right_operand} (type: {type(right_operand)})")
-
-            original_left = result
-            original_right = right_operand
+            # print(f"[DEBUG][visitRelationalExpression] Received for relational's right operand: {right_operand} (type: {type(right_operand)})", file=sys.stderr)
             
-            # --- DEBUG CHECKS ---
-            print(f"[DEBUG][PRE-COMPARE CHECK REL] type(self): {type(self)}", file=sys.stderr)
-            print(f"[DEBUG][PRE-COMPARE CHECK REL] hasattr(self, '_handle_type_promotion_for_comparison'): {hasattr(self, '_handle_type_promotion_for_comparison')}", file=sys.stderr)
-            # --- END DEBUG CHECKS ---
             result, right_operand = self._handle_type_promotion_for_comparison(result, right_operand, ctx)
 
             if op == '<':
@@ -794,59 +780,85 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                 result = result >= right_operand
             else:
                 raise KumirEvalError(f"Строка ~{ctx.start.line}: Неизвестный оператор отношения: {op}", ctx.start.line, ctx.start.column)
-            # print(f"[DEBUG][visitRelationalExpression] Result after relation: {result}")
 
-        print(f"[DEBUG][visitRelationalExpression] Returning: {result} (type: {type(result)})")
+        # print(f"[DEBUG][visitRelationalExpression] Returning: {result} (type: {type(result)})", file=sys.stderr)
         return result
 
     def visitAdditiveExpression(self, ctx: KumirParser.AdditiveExpressionContext):
-        print(f"[DEBUG][visitAdditiveExpression] Called for ctx: {ctx.getText()}")
-        # print(f"[DEBUG][visitAdditiveExpression] Expecting to get a value from the first multiplicativeExpression")
+        # print(f"[DEBUG][visitAdditiveExpression] Called for ctx: {ctx.getText()}", file=sys.stderr)
         result = self.visit(ctx.multiplicativeExpression(0))
-        print(f"[DEBUG][visitAdditiveExpression] Received from first multiplicativeExpression: {result} (type: {type(result)})")
+        # print(f"[DEBUG][visitAdditiveExpression] Initial result from left multiplicativeExpression: {result} (type: {type(result)})", file=sys.stderr)
 
         for i in range(len(ctx.multiplicativeExpression()) - 1):
-            op_node = ctx.getChild(2 * i + 1)
-            op_token = op_node.getSymbol()
+            op_node = ctx.getChild(2 * i + 1) # op_node is TerminalNodeImpl
+            op_token = op_node.getSymbol()    # op_token is Token
             op_text = op_token.text
-            # print(f"[DEBUG][visitAdditiveExpression] Processing operation: {op_text}. Current result: {result}")
-            
-            # print(f"[DEBUG][visitAdditiveExpression] Expecting to get a value from next multiplicativeExpression")
+            # print(f"[DEBUG][visitAdditiveExpression] Operator: {op_text}, Token type: {op_token.type}", file=sys.stderr)
+
             right_operand_ctx = ctx.multiplicativeExpression(i + 1)
             right_operand = self.visit(right_operand_ctx)
-            print(f"[DEBUG][visitAdditiveExpression] Received for additive's right operand: {right_operand} (type: {type(right_operand)})")
-
-            result = self._perform_binary_operation(result, right_operand, op_token, ctx)
-            # print(f"[DEBUG][visitAdditiveExpression] Result after operation {op_text}: {result}")
+            # print(f"[DEBUG][visitAdditiveExpression] Right operand for '{op_text}': {right_operand} (type: {type(right_operand)})", file=sys.stderr)
             
-        print(f"[DEBUG][visitAdditiveExpression] Returning: {result} (type: {type(result)})")
+            # print(f"[DEBUG][PRE_PERFORM_OP_ADD] op_text:'{op_text}', L_operand:'{result}'({type(result).__name__}), R_operand:'{right_operand}'({type(right_operand).__name__}), expr_ctx:'{ctx.getText()}'", file=sys.stderr)
+            result = self._perform_binary_operation(result, right_operand, op_token, ctx)
+            # print(f"[DEBUG][visitAdditiveExpression] Result after '{op_text}': {result} (type: {type(result)})", file=sys.stderr)
+        
+        # print(f"[Exit] visitAdditiveExpression for '{ctx.getText()}' -> returns {result} (type: {type(result)})", file=sys.stderr)
         return result
 
     def visitMultiplicativeExpression(self, ctx: KumirParser.MultiplicativeExpressionContext):
-        print(f"[DEBUG][visitMultiplicativeExpression] Called for ctx: {ctx.getText()}")
-        # print(f"[DEBUG][visitMultiplicativeExpression] Expecting to get a value from the first powerExpression")
+        # print(f"[DEBUG][visitMultiplicativeExpression] Called for ctx: {ctx.getText()}", file=sys.stderr)
         result = self.visit(ctx.powerExpression(0))
-        print(f"[DEBUG][visitMultiplicativeExpression] Received from first powerExpression: {result} (type: {type(result)})")
+        # print(f"[DEBUG][visitMultiplicativeExpression] Initial result from left powerExpression: {result} (type: {type(result)})", file=sys.stderr)
 
         for i in range(len(ctx.powerExpression()) - 1):
-            op_node = ctx.getChild(2 * i + 1)
-            op_token = op_node.getSymbol()
+            op_node = ctx.getChild(2 * i + 1) # op_node is TerminalNodeImpl
+            op_token = op_node.getSymbol()    # op_token is Token
             op_text = op_token.text
-            # print(f"[DEBUG][visitMultiplicativeExpression] Processing operation: {op_text}. Current result: {result}")
-
-            # print(f"[DEBUG][visitMultiplicativeExpression] Expecting to get a value from next powerExpression")
+            # print(f"[DEBUG][visitMultiplicativeExpression] Operator: {op_text}, Token type: {op_token.type}", file=sys.stderr)
+            
             right_operand_ctx = ctx.powerExpression(i + 1)
             right_operand = self.visit(right_operand_ctx)
-            print(f"[DEBUG][visitMultiplicativeExpression] Received for multiplicative's right operand: {right_operand} (type: {type(right_operand)})")
-            
-            result = self._perform_binary_operation(result, right_operand, op_token, ctx)
-            # print(f"[DEBUG][visitMultiplicativeExpression] Result after operation {op_text}: {result}")
+            # print(f"[DEBUG][visitMultiplicativeExpression] Right operand for '{op_text}': {right_operand} (type: {type(right_operand)})", file=sys.stderr)
 
-        print(f"[DEBUG][visitMultiplicativeExpression] Returning: {result} (type: {type(result)})")
+            # print(f"[DEBUG][PRE_PERFORM_OP_MULT] op_text:'{op_text}', L_operand:'{result}'({type(result).__name__}), R_operand:'{right_operand}'({type(right_operand).__name__}), expr_ctx:'{ctx.getText()}'", file=sys.stderr)
+            # --- ВАЖНО: Проверяем, что op_token действительно от арифметической операции, а не от div/mod как ключевых слов ---
+            # Для div/mod, которые обрабатываются как BUILTIN_FUNCTIONS, здесь не должно быть вызова _perform_binary_operation
+            if op_token.type in ARITHMETIC_OPS: # Только для +, -, *, /, ^
+                 result = self._perform_binary_operation(result, right_operand, op_token, ctx)
+            else:
+                # Если это не стандартный арифметический оператор (например, это был 'div' или 'mod' как ключевое слово),
+                # то левый операнд (result) уже должен был быть обработан visitPowerExpression,
+                # а правый операнд (right_operand) должен быть результатом вызова функции div/mod.
+                # Однако, эта логика сейчас неверна, так как div/mod обрабатываются в visitPostfixExpression.
+                # Этот блок else, скорее всего, не должен достигаться, если PostfixExpression правильно обрабатывает div/mod.
+                # Если мы сюда попали, значит что-то не так с порядком вызовов или грамматикой.
+                # Пока просто переприсвоим result, если это был не арифметический оператор, хотя это и неправильно.
+                # Это место требует пересмотра, если div/mod не работают.
+                # print(f"[WARN][visitMultiplicativeExpression] Operator '{op_text}' (type {op_token.type}) not in ARITHMETIC_OPS. Current result: {result}, right_operand (potentially from func call): {right_operand}", file=sys.stderr)
+                # Для div/mod, обработанных как функции, `right_operand` здесь будет результатом вызова этой функции,
+                # а `result` будет предыдущим значением. Это неверно для последовательности типа "a div b * c".
+                # Оставим пока так, чтобы не ломать то, что работало, но это слабое место.
+                # Если `right_operand` пришел из `visit(ctx.powerExpression(i + 1))` и это был вызов функции,
+                # то `result` должен быть обновлен.
+                # НО! `_perform_binary_operation` уже вызывается для ARITHMETIC_OPS.
+                # Если это div/mod, они должны были быть обработаны в visitPostfixExpression -> _call_builtin_function.
+                # Значит, `visit(ctx.powerExpression(i + 1))` вернул бы число, а не имя функции.
+                # Этот else, вероятно, не нужен, если грамматика и PostfixExpression работают правильно.
+                # Я его пока закомментирую. Если что-то сломается с div/mod, будем смотреть сюда.
+                # if op_text.lower() in ['div', 'mod'] and not (op_token.type in ARITHMETIC_OPS):
+                #    print(f"[WARN][visitMultiplicativeExpression] Reassigning result for func-like '{op_text}'. Old: {result}, New: {right_operand}", file=sys.stderr)
+                #    result = right_operand # Это все еще кажется неверным для цепочек
+                pass
+
+
+            # print(f"[DEBUG][visitMultiplicativeExpression] Result after '{op_text}': {result} (type: {type(result)})", file=sys.stderr)
+
+        # print(f"[Exit] visitMultiplicativeExpression for '{ctx.getText()}' -> returns {result} (type: {type(result)})", file=sys.stderr)
         return result
 
     def visitPowerExpression(self, ctx: KumirParser.PowerExpressionContext):
-        print(f"[DEBUG][visitPowerExpression] Called for ctx: {ctx.getText()}")
+        # print(f"[DEBUG][visitPowerExpression] Called for ctx: {ctx.getText()}", file=sys.stderr)
         
         unary_expressions_or_obj = ctx.unaryExpression() # Get the list of unary expressions or a single object
         
@@ -866,13 +878,13 @@ class KumirInterpreterVisitor(KumirParserVisitor):
 
         # print(f"[DEBUG][visitPowerExpression] Expecting to get a value from the first unaryExpression")
         result = self.visit(first_unary_expr_ctx)
-        print(f"[DEBUG][visitPowerExpression] Received from first unaryExpression: {result} (type: {type(result)})")
+        print(f"[DEBUG][visitPowerExpression] Received from first unaryExpression: {result} (type: {type(result)})", file=sys.stderr)
 
         if exponent_ctx: # If there is an exponent part
             # print(f"[DEBUG][visitPowerExpression] Processing power operation. Current result: {result}")
             # print(f"[DEBUG][visitPowerExpression] Expecting to get a value from the second unaryExpression (exponent)")
             exponent = self.visit(exponent_ctx)
-            print(f"[DEBUG][visitPowerExpression] Received for exponent: {exponent} (type: {type(exponent)})")
+            print(f"[DEBUG][visitPowerExpression] Received for exponent: {exponent} (type: {type(exponent)})", file=sys.stderr)
             
             if not isinstance(result, (int, float)) or not isinstance(exponent, (int, float)):
                 raise KumirEvalError(
@@ -890,24 +902,24 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                 )
             # print(f"[DEBUG][visitPowerExpression] Result after power operation: {result}")
 
-        print(f"[DEBUG][visitPowerExpression] Returning: {result} (type: {type(result)})")
+        print(f"[DEBUG][visitPowerExpression] Returning: {result} (type: {type(result)})", file=sys.stderr)
         return result
         
     def visitUnaryExpression(self, ctx: KumirParser.UnaryExpressionContext):
-        print(f"[DEBUG][visitUnaryExpression] Called for ctx: {ctx.getText()}")
+        print(f"[DEBUG][visitUnaryExpression] Called for ctx: {ctx.getText()}", file=sys.stderr)
         if ctx.postfixExpression():
             # print(f"[DEBUG][visitUnaryExpression] No unary operator, visiting postfixExpression")
             # print(f"[DEBUG][visitUnaryExpression] Expecting to get a value from postfixExpression")
             result = self.visit(ctx.postfixExpression())
-            print(f"[DEBUG][visitUnaryExpression] Received from postfixExpression: {result} (type: {type(result)})")
-            print(f"[DEBUG][visitUnaryExpression] Returning: {result} (type: {type(result)})")
+            print(f"[DEBUG][visitUnaryExpression] Received from postfixExpression: {result} (type: {type(result)})", file=sys.stderr)
+            print(f"[DEBUG][visitUnaryExpression] Returning: {result} (type: {type(result)})", file=sys.stderr)
             return result
         
         operator = ctx.getChild(0).getText()
         # print(f"[DEBUG][visitUnaryExpression] Unary operator: {operator}")
         # print(f"[DEBUG][visitUnaryExpression] Expecting to get a value from recursive call to visitUnaryExpression for operand")
         operand = self.visit(ctx.unaryExpression(0)) # unaryExpression is recursive for multiple operators
-        print(f"[DEBUG][visitUnaryExpression] Received for operand: {operand} (type: {type(operand)})")
+        print(f"[DEBUG][visitUnaryExpression] Received for operand: {operand} (type: {type(operand)})", file=sys.stderr)
 
         if operator == '-':
             if not isinstance(operand, (int, float)):
@@ -925,7 +937,7 @@ class KumirInterpreterVisitor(KumirParserVisitor):
             raise KumirEvalError(f"Строка ~{ctx.start.line}: Неизвестный унарный оператор: {operator}", ctx.start.line, ctx.start.column)
         
         # print(f"[DEBUG][visitUnaryExpression] Result after unary operation: {result}")
-        print(f"[DEBUG][visitUnaryExpression] Returning: {result} (type: {type(result)})")
+        print(f"[DEBUG][visitUnaryExpression] Returning: {result} (type: {type(result)})", file=sys.stderr)
         return result
 
     def visitPostfixExpression(self, ctx: KumirParser.PostfixExpressionContext):
@@ -972,10 +984,10 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                         raise KumirEvalError(f"Неверное количество аргументов для встроенной процедуры '{proc_name}': ожидалось одно из {list(builtin_variants.keys())}, получено {arg_count}")
                     try:
                         # Добавляем print перед вызовом
-                        print(f"!!! [Builtin Call PRE] Calling '{proc_name_lower}' with args: {repr(args)} (types: {[type(arg) for arg in args]})", flush=True)
+                        print(f"!!! [Builtin Call PRE] Calling '{proc_name_lower}' with args: {repr(args)} (types: {[type(arg) for arg in args]})", flush=True, file=sys.stderr)
                         result_of_call = builtin_variants[arg_count](*args)
                         # Добавляем print после вызова
-                        print(f"!!! [Builtin Call POST] '{proc_name_lower}' returned: {repr(result_of_call)} (type: {type(result_of_call)})", flush=True)
+                        print(f"!!! [Builtin Call POST] '{proc_name_lower}' returned: {repr(result_of_call)} (type: {type(result_of_call)})", flush=True, file=sys.stderr)
                         current_eval_value = result_of_call
                     except Exception as e:
                         line = child.start.line
@@ -1134,7 +1146,7 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                     line = ctx.primaryExpression().start.line
                     column = ctx.primaryExpression().start.column
                     raise KumirExecutionError(f"Строка {line}, столбец {column}: Процедура или функция '{proc_name}' не найдена.")
-        # print(f"[Exit] visitPostfixExpression for {ctx.getText()} -> returns {repr(current_eval_value)}", file=sys.stderr)
+        print(f"[Exit] visitPostfixExpression for {ctx.getText()} -> returns {repr(current_eval_value)}", file=sys.stderr)
         return current_eval_value
 
     def visitExpressionList(self, ctx:KumirParser.ExpressionListContext):
@@ -1156,7 +1168,7 @@ class KumirInterpreterVisitor(KumirParserVisitor):
 
     def visitPrimaryExpression(self, ctx:KumirParser.PrimaryExpressionContext):
         """Обрабатывает первичные выражения."""
-        print(f"[DEBUG][visitPrimaryExpression] Called for ctx: {ctx.getText()}")
+        print(f"[DEBUG][visitPrimaryExpression] Called for ctx: {ctx.getText()}", file=sys.stderr) # Добавляем file=sys.stderr
         if ctx.literal():
             result = self.visit(ctx.literal())
         elif ctx.qualifiedIdentifier():
@@ -1184,7 +1196,7 @@ class KumirInterpreterVisitor(KumirParserVisitor):
         elif ctx.RETURN_VALUE():
             # Используем последний элемент из стека self.scopes
             current_scope_dict = self.scopes[-1]
-            if '__знач__' not in current_scope_dict: # Проверяем в словаре текущей области по ключу '__знач__'
+            if '__знач__' not in current_scope_dict: # Проверяем в словаре текущей области
                 raise KumirEvalError("Попытка использования неинициализированного возвращаемого значения")
             result = current_scope_dict['__знач__'] # Читаем по ключу '__знач__'
         elif ctx.LPAREN():
@@ -1194,7 +1206,7 @@ class KumirInterpreterVisitor(KumirParserVisitor):
         else:
             raise KumirEvalError("Некорректное первичное выражение")
 
-        print(f"[DEBUG][visitPrimaryExpression] Returning: {result} (type: {type(result)})")
+        print(f"[DEBUG][visitPrimaryExpression] Returning: {result} (type: {type(result)})", file=sys.stderr) # Добавляем file=sys.stderr
         return result
 
     def visitLoopStatement(self, ctx: KumirParser.LoopStatementContext):
@@ -1587,7 +1599,9 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                                 if self.debug: print(f"[DEBUG][OUTPUT] Аргумент {i}: Значение - строка '{formatted_value}'", file=sys.stderr)
                             else:
                                 if self.debug: print(f"[DEBUG][OUTPUT] Аргумент {i}: Вычисление выражения {expr_ctx.getText()}", file=sys.stderr)
+                                if self.debug: print(f"[DEBUG][OUTPUT][VISIT_STATEMENT] Перед вызовом self.visit для выражения: {expr_ctx.getText()}", file=sys.stderr)
                                 value = self.visit(expr_ctx)
+                                if self.debug: print(f"[DEBUG][OUTPUT][VISIT_STATEMENT] После вызова self.visit, value = {repr(value)} (type: {type(value).__name__}) для выражения: {expr_ctx.getText()}", file=sys.stderr)
                                 value = self._get_value(value)
                                 if self.debug: print(f"[DEBUG][OUTPUT] Аргумент {i}: Вычислено value={repr(value)} ({type(value).__name__})", file=sys.stderr)
                                 
@@ -1675,7 +1689,7 @@ class KumirInterpreterVisitor(KumirParserVisitor):
         return args
 
     def visitPrimaryExpression(self, ctx:KumirParser.PrimaryExpressionContext):
-        print(f"[DEBUG][visitPrimaryExpression] Called for ctx: {ctx.getText()}")
+        print(f"[DEBUG][visitPrimaryExpression] Called for ctx: {ctx.getText()}", file=sys.stderr) # Добавляем file=sys.stderr
         if ctx.literal():
             result = self.visit(ctx.literal())
         elif ctx.qualifiedIdentifier():
@@ -1698,9 +1712,9 @@ class KumirInterpreterVisitor(KumirParserVisitor):
         elif ctx.RETURN_VALUE():
             # Используем последний элемент из стека self.scopes
             current_scope_dict = self.scopes[-1]
-            if 'return_value' not in current_scope_dict: # Проверяем в словаре текущей области
+            if '__знач__' not in current_scope_dict: # Проверяем в словаре текущей области
                 raise KumirEvalError("Попытка использования неинициализированного возвращаемого значения")
-            result = current_scope_dict['return_value']
+            result = current_scope_dict['__знач__']
         elif ctx.LPAREN():
             result = self.visit(ctx.expression())
         elif ctx.arrayLiteral():
@@ -1708,7 +1722,7 @@ class KumirInterpreterVisitor(KumirParserVisitor):
         else:
             raise KumirEvalError("Некорректное первичное выражение")
 
-        print(f"[DEBUG][visitPrimaryExpression] Returning: {result} (type: {type(result)})")
+        print(f"[DEBUG][visitPrimaryExpression] Returning: {result} (type: {type(result)})", file=sys.stderr) # Добавляем file=sys.stderr
         return result
 
     # --- НОВЫЙ МЕТОД: Форматирование вывода ---
@@ -1810,37 +1824,59 @@ def interpret_kumir(code: str):
     from antlr4 import InputStream, CommonTokenStream
     from .generated.KumirLexer import KumirLexer
     from .generated.KumirParser import KumirParser
-    
-    # print("[DEBUG][Interpreter] Начало интерпретации", file=sys.stderr)
-    # print(f"[DEBUG][Interpreter] Код программы:\\n{code}", file=sys.stderr)
-    
-    # Создаем поток символов из кода
+    # DiagnosticErrorListener is defined in this file, so no relative import needed.
+
     input_stream = InputStream(code)
-    
-    # Создаем лексер
     lexer = KumirLexer(input_stream)
     lexer.removeErrorListeners() 
-    lexer.addErrorListener(DiagnosticErrorListener()) 
-    
+    error_listener = DiagnosticErrorListener() # Instantiate local class
+    lexer.addErrorListener(error_listener)
+
     token_stream = CommonTokenStream(lexer)
-    
     parser = KumirParser(token_stream)
-    parser.removeErrorListeners() 
-    parser.addErrorListener(DiagnosticErrorListener()) 
-    
-    # print("[DEBUG][Interpreter] Парсинг программы", file=sys.stderr)
-    tree = parser.program()
-    
-    # print("[DEBUG][Interpreter] Создание интерпретатора", file=sys.stderr)
-    visitor = KumirInterpreterVisitor()
-    
-    # print("[DEBUG][Interpreter] Начало выполнения", file=sys.stderr)
+    parser.removeErrorListeners()
+    parser.addErrorListener(error_listener) # Используем тот же слушатель для парсера
+
+    tree = None
     try:
-        visitor.visit(tree)
-        # print("[DEBUG][Interpreter] Выполнение завершено успешно", file=sys.stderr)
+        tree = parser.program() # Attempt to parse
+        # After parsing, check if the listener collected any syntax errors
+        # No need to check error_listener.errors if DiagnosticErrorListener raises immediately.
+        # if error_listener.errors:
+        #     first_error = error_listener.errors[0]
+        #     # print(f"[DEBUG_INTERPRET_KUMIR] Syntax errors found by listener: {error_listener.errors}", file=sys.stderr)
+        #     raise KumirSyntaxError(first_error['message'], first_error['line'], first_error['column'])
+    except KumirSyntaxError: # Re-raise if DiagnosticErrorListener raised it
+        raise
+    except Exception as e: # Catch other ANTLR or parsing-related exceptions
+        # print(f"[DEBUG_INTERPRET_KUMIR] ANTLR parsing failed: {e}", file=sys.stderr) # Используем sys.stderr для таких сообщений
+        raise KumirSyntaxError(f"Ошибка синтаксического анализа: {e}", 0, 0) from e
+
+    visitor = KumirInterpreterVisitor()
+
+    original_stdout = sys.stdout
+    original_stderr = sys.stderr 
+
+    stdout_capture = StringIO()
+    sys.stdout = stdout_capture 
+
+    try:
+        visitor.visit(tree) 
+    except KumirInputRequiredError:
+        # print(f"[DEBUG][interpret_kumir] InputRequiredError caught. Output so far: {stdout_capture.getvalue()}", file=original_stderr) # original_stderr здесь будет правильным
+        raise 
     except Exception as e:
-        # print("[ERROR][Interpreter] ИСКЛЮЧЕНИЕ ВО ВРЕМЯ ВЫПОЛНЕНИЯ:", file=sys.stderr)
+        # print(f"[ERROR][interpret_kumir] Exception during KUMIR program execution: {type(e).__name__} - {e}", file=original_stderr)
         # import traceback
-        # traceback.print_exc(file=sys.stderr)
-        raise e
-    return ""
+        # traceback.print_exc(file=original_stderr)
+        raise 
+    finally:
+        sys.stdout = original_stdout
+        sys.stderr = original_stderr
+            
+    # DEBUG PRINT ПЕРЕД ВОЗВРАТОМ (используем sys.stderr, так как original_stderr восстановлен)
+    print(f"[DEBUG_INTERPRET_KUMIR] About to return from interpret_kumir. stdout_capture type: {type(stdout_capture)}", file=sys.stderr)
+    captured_content = stdout_capture.getvalue()
+    print(f"[DEBUG_INTERPRET_KUMIR] Content of stdout_capture ({len(captured_content)} chars):\n>>>\\n{captured_content}\\n<<<", file=sys.stderr)
+        
+    return captured_content

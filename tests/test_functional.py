@@ -84,20 +84,32 @@ def run_kumir_program(program_path: str, input_data: str | None = None) -> str:
     """
     original_stdin = sys.stdin
     original_stdout = sys.stdout
-    original_stderr = sys.stderr # Сохраняем stderr
+    original_stderr = sys.stderr # Сохраняем оригинальный stderr
 
-    output_buffer = StringIO()
-    input_buffer = StringIO(input_data if input_data else '')
+    input_buffer = StringIO(input_data if input_data else "")
+    # output_buffer больше не нужен здесь для redirect_stdout
+    # output_buffer = StringIO()
+
+    # print(f"[DEBUG_RUN_KUMIR_PROGRAM] BEFORE (no redirect). output_buffer concept removed", file=original_stderr)
+
+    actual_output_value = "" # Переименуем, чтобы не путать с переменной теста
 
     try:
         with open(program_path, 'r', encoding='utf-8') as f:
             code = f.read()
             code = code.replace('\r\n', '\n').replace('\r', '\n')
 
-        with redirect_stdout(output_buffer):
-            sys.stdin = input_buffer
-            interpret_kumir(code)
-
+        # Устанавливаем stdin
+        sys.stdin = input_buffer
+        
+        # interpret_kumir сам захватывает stdout и возвращает его.
+        # Внешнее перенаправление через redirect_stdout(output_buffer) не нужно
+        # и приводило к тому, что output_buffer оставался пустым.
+        actual_output_value = interpret_kumir(code)
+            
+        # DEBUG PRINT ПОСЛЕ ВЫЗОВА INTERPRET_KUMIR
+        print(f"[DEBUG_RUN_KUMIR_PROGRAM] interpret_kumir returned:\n>>>\n{actual_output_value}\n<<<", file=original_stderr)
+            
     except KumirSyntaxError as e:
         pytest.fail(f"KumirSyntaxError for {program_path}: {e}")
     except KumirEvalError as e:
@@ -112,10 +124,19 @@ def run_kumir_program(program_path: str, input_data: str | None = None) -> str:
         sys.stdout = original_stdout
         sys.stderr = original_stderr
 
-    actual_output = output_buffer.getvalue()
-    if actual_output and not actual_output.endswith('\n'):
-        actual_output += '\n'
-    return actual_output
+    # --- DEBUG PRINT ПОСЛЕ try/finally ---
+    # print(f"[DEBUG_RUN_KUMIR_PROGRAM] AFTER try/finally. actual_output_value is: ({len(actual_output_value)} chars)\n>>>\n{actual_output_value}\n<<<", file=original_stderr)
+    
+    # actual_output теперь это то, что вернул interpret_kumir
+    # actual_output = output_buffer.getvalue() # Эта строка больше не нужна
+    
+    # DEBUG PRINT ДЛЯ ACTUAL_OUTPUT (который теперь actual_output_value)
+    # print(f"[DEBUG_RUN_KUMIR_PROGRAM] actual_output (from interpret_kumir) is ({len(actual_output_value)} chars):\n>>>\n{actual_output_value}\n<<<", file=original_stderr)
+
+    # Нормализация конца строки, если нужно (оставляем эту логику)
+    if actual_output_value and not actual_output_value.endswith('\n'):
+        actual_output_value += '\n'
+    return actual_output_value
 
 @pytest.mark.parametrize("program,input_data,expected_output", TEST_CASES)
 def test_kumir_program(program, input_data, expected_output):
