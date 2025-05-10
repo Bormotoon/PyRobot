@@ -1131,5 +1131,31 @@ TODO:
 **Заметки по коду/рефакторингу (на будущее):**
 - Блок `if var_info['is_table']:` в `visitAssignmentStatement` на данный момент содержит только `pass`. Когда будем реализовывать присваивание целых таблиц (например, `Таблица1 := Таблица2`), эту логику нужно будет добавить туда.
 
+## Рефакторинг interpreter.py - Фаза 2
 
-</rewritten_file>
+**Задача:** Продолжить перенос логики выражений из `interpreter.py` в `expression_evaluator.py`.
+
+**Шаг 1 (текущий):**
+1.  Обновить `visitAssignmentStatement` в `interpreter.py`:
+    *   Использовать `self.evaluator.visitExpression()` для правой части.
+    *   Реализовать полную логику присваивания (переменные, таблицы, `__знач__`).
+2.  Удалить из `interpreter.py`:
+    *   Методы: `visitExpression`, `visitLogicalOrExpression`, `visitLogicalAndExpression`, `visitEqualityExpression`, `visitRelationalExpression`, `visitAdditiveExpression`, `visitMultiplicativeExpression`, `visitPowerExpression`, `visitUnaryExpression`, `visitPostfixExpression`, `visitPrimaryExpression`, `visitLiteral`.
+    *   Вспомогательные методы: `_get_value`, `_handle_type_promotion_for_comparison`, `_check_numeric`, `_check_logical`, `_check_comparable`, `_perform_binary_operation`.
+    *   Константы: `ARITHMETIC_OPS`, `COMPARISON_OPS`, `LOGICAL_OPS`.
+
+**Следующие шаги:**
+*   Заменить все вызовы удаленных методов в `interpreter.py` на `self.evaluator.имя_метода(...)`.
+*   Проверить вызовы `self.visitor.visit()` в `ExpressionEvaluator` и скорректировать их.
+
+**Итоги Фазы 2:**
+*   Методы `visit...Expression` и их хелперы теперь полностью находятся в `ExpressionEvaluator`.
+*   Вызовы этих методов из `KumirInterpreterVisitor` (в `visitAssignmentStatement`, `visitVariableDeclaration`, `visitLoopStatement`, `visitIfStatement`, `visitStatement`, `visitArgumentList`) были обновлены для использования `self.evaluator`.
+*   Внутренние вызовы в `ExpressionEvaluator` для обработки подвыражений (например, в `visitPrimaryExpression` для `(выражение)`) также обновлены на `self.visitExpression()`.
+*   Константы операций и дублирующиеся хелперы должны быть удалены из `KumirInterpreterVisitor` (предполагается, что это так, несмотря на сложности с их автоматическим удалением).
+
+**Потенциальные задачи на будущее/проверку:**
+*   Убедиться в полном удалении старых методов `visit...Expression` и хелперов из `interpreter.py`.
+*   Пересмотреть использование `_get_value` в `interpreter.py` после вызовов `self.evaluator.visitExpression()` (вероятно, они избыточны).
+*   Рассмотреть перенос `visitArgumentList` из `interpreter.py` в `expression_evaluator.py`.
+*   Провести тщательное тестирование, включая тест `28-rec-sumdig.kum`.
