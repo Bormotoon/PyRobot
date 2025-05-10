@@ -962,3 +962,436 @@ TODO:
 **Новая проблема (07.08.2024):**
 После добавления детального логгирования в `_perform_binary_operation` для отслеживания типа оператора:
     ```python
+```
+
+## Детальная история отладки теста `28-rec-sumdig.kum` (08.08.2024)
+
+Мы столкнулись с серией проблем при отладке теста `28-rec-sumdig.kum`, который изначально падал с ошибкой `KumirEvalError`. Ниже приведено поэтапное описание процесса.
+
+**Этап 1: Первоначальная ошибка - `KumirEvalError` (неинициализированное значение при выводе)**
+
+*   **Проблема:** Тест падал, потому что оператор `вывод` в программе КуМир пытался напечатать результат рекурсивной функции `sumDig(N)`, но получал `None`.
+*   **Гипотеза:** Потеря значения при передаче из методов `visitLogicalOrExpression` / `visitLogicalAndExpression` в `visitExpression`.
+*   **Действия:**
+    *   Добавлено подробное логирование (`[DEBUG][visit...]`) во все методы обхода выражений.
+    *   Исправлена ошибка в `visitPrimaryExpression`: ключ для `ctx.RETURN_VALUE()` был `'return_value'` вместо `'__знач__'`.
+*   **Находка:** Логирование показало, что `self.visit(sumDig_N_context)` возвращал `None` в `visitStatement` перед вызовом оператора `вывод`.
+
+**Этап 2: Локализация проблемы в бинарных операциях внутри `sumDig`**
+
+*   **Проблема:** Дальнейший анализ показал, что `None` появлялся глубже, внутри вычислений функции `sumDig`.
+*   **Гипотеза:** Ошибка происходит внутри `self._perform_binary_operation`, когда левый операнд (результат `n mod 10`) передается как `None`.
+*   **Действия:**
+    *   Добавлены отладочные `print` перед вызовом `_perform_binary_operation` в `visitAdditiveExpression` и `visitMultiplicativeExpression`.
+    *   Добавлены `print` внутри `_check_numeric`.
+*   **Находка (БИНГО!):**
+    ```
+    [DEBUG][PRE_PERFORM_OP_ADD] op_text:'+', L_operand:'None'(NoneType), R_operand:'1'(int), expr_ctx:'(n mod 10)+sumDig(div(n,10))'
+    [DEBUG][_check_numeric] ENTERED. Op: +. Value initial type: NoneType.
+    [DEBUG][_check_numeric] Value after _get_value for op '+': None (type: NoneType)
+    [DEBUG][_check_numeric] Raising KumirEvalError: processed_value is None for op '+'
+    ```
+    Это подтвердило, что `n mod 10` на каком-то шаге рекурсии вычислялось в `None`.
+
+**Этап 3: Поиск причины `None` от `n mod 10` и попутная ошибка `AttributeError`**
+
+*   **Задача:** Выяснить, почему `n mod 10` дает `None`.
+*   **Действия:**
+    *   Добавлен детальный `print` в `_perform_binary_operation` для отображения типов операторов, используя `KumirLexer.MOD` и `KumirLexer.DIV_KEYWORD`.
+*   **Проблема (новая):** Возникла `AttributeError: type object 'KumirLexer' has no attribute 'MOD'` (и аналогично для `DIV_KEYWORD`).
+*   **Действия (исправление `AttributeError`):**
+    *   С помощью `grep_search` найдены правильные имена токенов: `KumirLexer.DIV` и предположительно `KumirLexer.MOD_KEYWORD` (хотя для `mod` в грамматике используется текстовый токен `'mod'`, а не именованный).
+    *   Отладочный `print` был исправлен (временно убран `KumirLexer.MOD`, оставлен `KumirLexer.DIV`).
+*   **Результат:** После исправления `AttributeError`, программа КуМир начала выполняться корректно, и функция `sumDig` стала возвращать правильное значение (15). **Исходная `KumirEvalError` была решена!**
+
+**Этап 4: Новая проблема - `AssertionError` (пустой вывод)**
+
+*   **Проблема:** Тест `28-rec-sumdig.kum` начал падать с `AssertionError`, так как `actual_output` в `test_functional.py` был пустым (`''`), хотя ожидался вывод `"Сумма цифр: 15\n"`.
+*   **Гипотеза:** Проблема в том, как `run_kumir_program` (или вызываемая ею `interpret_kumir`) захватывает или возвращает `stdout` программы.
+*   **Действия:**
+    *   Проверено, что `visitStatement` для `io_ctx.OUTPUT()` использует `sys.stdout.write`.
+    *   Добавлены отладочные `print` в `interpret_kumir` (перед `return stdout_capture.getvalue()`) и в `run_kumir_program` (для `returned_from_interpret_kumir` и `actual_output`).
+*   **Находка:**
+    *   `interpret_kumir` успешно захватывал вывод "Сумма цифр: 15\n" во внутренний `stdout_capture`.
+    *   `interpret_kumir` возвращал этот захваченный вывод.
+    *   `run_kumir_program` получал этот вывод, но `output_buffer.getvalue()` (который использовался для `actual_output` в тесте) оставался пустым.
+
+**Этап 5: Отладка `DiagnosticErrorListener` (небольшое отступление)**
+
+*   **Проблема:** В логах появилась ошибка `AttributeError: 'DiagnosticErrorListener' object has no attribute 'errors'`.
+*   **Причина:** `DiagnosticErrorListener` был спроектирован для немедленного возбуждения исключения `KumirSyntaxError` при ошибке, а не для сбора ошибок в список `self.errors`.
+*   **Решение:** Удалена проверка `if error_listener.errors:` в `interpret_kumir`.
+
+**Этап 6: Отладка `AttributeError` в `visitAdditive/MultiplicativeExpression` (еще одно отступление)**
+
+*   **Проблема:** Пытаясь "улучшить" обработку выражений без операторов в `visitAdditiveExpression` и `visitMultiplicativeExpression`, я вызвала `AttributeError: 'MultiplicativeExpressionContext' object has no attribute 'multiplicativeOperator'`. Это происходило, когда в выражении не было операторов (например, просто число). ANTLR не создает методы типа `multiplicativeOperator()` если соответствующий элемент грамматики (`(OP multiplicativeExpression)*`) отсутствует в конкретном узле.
+*   **Решение:** Методы `visitAdditiveExpression` и `visitMultiplicativeExpression` были возвращены к их предыдущей, более простой, реализации, которая корректно обрабатывала одиночные операнды, полагаясь на количество дочерних `multiplicativeExpression` (или `powerExpression`).
+
+**Этап 7: Решение `AssertionError` - двойное перенаправление `stdout`**
+
+*   **Ключевая Находка (из логов Этапа 4):**
+    ```
+    [DEBUG_RUN_KUMIR_PROGRAM] BEFORE redirect_stdout. output_buffer is: ''
+    ...
+    [DEBUG_INTERPRET_KUMIR] Content of stdout_capture (18 chars):
+    >>>
+    Сумма цифр: 15
+    <<<
+    [DEBUG_RUN_KUMIR_PROGRAM] interpret_kumir returned:
+    >>>
+    Сумма цифр: 15
+    <<<
+    [DEBUG_RUN_KUMIR_PROGRAM] AFTER redirect_stdout. output_buffer is: ''
+    [DEBUG_RUN_KUMIR_PROGRAM] actual_output which will be asserted: ''
+    ```
+*   **Причина `AssertionError`:**
+    1.  `interpret_kumir` самостоятельно перехватывает `sys.stdout` в свой внутренний `StringIO` (назовем его `interpreter_buffer`) и корректно возвращает его содержимое в виде строки.
+    2.  `run_kumir_program` создавал свой `StringIO` (`output_buffer`) и *дополнительно* оборачивал вызов `interpret_kumir` в `with redirect_stdout(output_buffer):`.
+    3.  Внутри `interpret_kumir` `sys.stdout.write` писал в `interpreter_buffer`.
+    4.  Однако, сам `output_buffer` (внешний) оставался пустым, потому что `interpret_kumir` уже "съел" весь вывод в свой буфер и вернул его как строку. Контекстный менеджер `redirect_stdout` не мог получить доступ к выводу, который уже был перенаправлен и обработан внутри `interpret_kumir`.
+    5.  Тест сравнивал с `output_buffer.getvalue()`, который был пуст.
+*   **Решение:**
+    *   Удалить блок `with redirect_stdout(output_buffer):` из `run_kumir_program`.
+    *   Использовать строку, возвращаемую `interpret_kumir`, напрямую как `actual_output_value`.
+    *   Сравнить `actual_output_value` с ожидаемым результатом в тесте.
+
+**Результат:** После устранения двойного перенаправления `stdout` тест `28-rec-sumdig.kum` успешно ПРОШЕЛ!
+
+
+---
+
+## 2024-08-02 (продолжение): Детальное логирование выражений
+
+**Задача:** Внедрить подробное логирование в методы обхода выражений для отслеживания "путешествия" значения `N` в тесте `28-rec-sumdig.kum`.
+
+**Реализация:**
+Добавлено подробное логирование (через `print` с префиксом `[DEBUG][visitMethodName]`) в следующие методы файла `pyrobot/backend/kumir_interpreter/interpreter.py`:
+*   `visitExpression`
+*   `visitLogicalOrExpression`
+*   `visitLogicalAndExpression`
+*   `visitEqualityExpression`
+*   `visitRelationalExpression`
+*   `visitAdditiveExpression`
+*   `visitMultiplicativeExpression`
+*   `visitPowerExpression`
+*   `visitUnaryExpression`
+*   `visitPrimaryExpression`
+*   `visitLiteral`
+
+Каждый логирующий вызов фиксирует:
+*   Имя вызванного метода.
+*   Контекст (текст узла), для которого он вызван.
+*   Значение, полученное от дочерних вызовов (если применимо), и его тип.
+*   Возвращаемое значение и его тип.
+
+**Ожидаемый результат:** Логи должны помочь точно определить, на каком этапе и в каком методе происходит потеря или некорректное изменение значения переменной `N` или результатов вызова функций `mod`/`div`.
+
+**Результаты тестирования `28-rec-sumdig.kum` (после добавления логирования):**
+*   **Тест упал.**
+*   **Ошибка:** `TypeError: KumirParser.PowerExpressionContext.unaryExpression() takes 1 positional argument but 2 were given`
+    *   **Место:** `pyrobot/backend/kumir_interpreter/interpreter.py`, строка 813, в методе `visitPowerExpression` при вызове `result = self.visit(ctx.unaryExpression(0))`.
+    *   **Причина:** Метод `ctx.unaryExpression()` (сгенерированный ANTLR) не принимает индекс как аргумент (`0`) напрямую. Вместо этого, `ctx.unaryExpression()` следует вызывать без аргументов для получения списка всех дочерних узлов `unaryExpression`, а затем уже этот список индексировать (например, `list[0]`, `list[1]`).
+*   **Предложенное исправление:**
+    ```python
+    # В visitPowerExpression:
+    unary_expressions = ctx.unaryExpression() # Получить список
+    if not unary_expressions:
+        raise KumirEvalError(...)
+    result = self.visit(unary_expressions[0]) # Индексировать список
+    # ...
+    if len(unary_expressions) > 1:
+        exponent_ctx = unary_expressions[1] # Индексировать список
+        exponent = self.visit(exponent_ctx)
+    # ...
+    ```
+*   **Второстепенная ошибка:** `OSError: [WinError 6] Неверный дескриптор` при попытке печати в `sys.__stderr__` в `test_functional.py` после основного исключения. Не критично для логики интерпретатора.
+*   *Анализ логов (если ошибка NoneType сохранилась после исправления TypeError): Место для анализа новых логов.*
+
+**Повторный запуск теста `28-rec-sumdig.kum` (после исправления первой TypeError):**
+*   **Тест снова упал.**
+*   **Ошибка:** `TypeError: 'UnaryExpressionContext' object is not subscriptable`
+    *   **Место:** `pyrobot/backend/kumir_interpreter/interpreter.py`, строка ~819, в методе `visitPowerExpression` при вызове `result = self.visit(unary_expressions[0])` (после первого исправления).
+    *   **Причина:** Предыдущее исправление предполагало, что `ctx.unaryExpression()` всегда возвращает список. Однако, если в грамматике `powerExpression` определено так, что `unaryExpression` может встречаться один раз (без операции степени) или дважды (с операцией степени), то `ctx.unaryExpression()` вернет одиночный объект `UnaryExpressionContext` в первом случае и список объектов во втором.
+    *   **Предложенное исправление (вторая попытка):**
+        ```python
+        # В visitPowerExpression:
+        unary_expressions_or_obj = ctx.unaryExpression()
+        first_unary_expr_ctx = None
+        exponent_ctx = None
+
+        if isinstance(unary_expressions_or_obj, list):
+            if not unary_expressions_or_obj:
+                raise KumirEvalError(...)
+            first_unary_expr_ctx = unary_expressions_or_obj[0]
+            if len(unary_expressions_or_obj) > 1:
+                exponent_ctx = unary_expressions_or_obj[1]
+        elif unary_expressions_or_obj: # Это одиночный объект UnaryExpressionContext
+            first_unary_expr_ctx = unary_expressions_or_obj
+        else:
+            raise KumirEvalError(...)
+
+        result = self.visit(first_unary_expr_ctx)
+        # ...
+        if exponent_ctx:
+            exponent = self.visit(exponent_ctx)
+        # ...
+        ```
+*   *Анализ логов (если ошибка NoneType сохранилась после исправления второй TypeError): Место для анализа новых логов.*
+
+**Повторный запуск теста `28-rec-sumdig.kum` (после исправления второй TypeError):**
+*   **Тест снова упал.**
+*   **Ошибка:** `KumirEvalError: Строка 19, столбец 5: Ошибка вычисления условия: 'KumirInterpreterVisitor' object has no attribute '_handle_type_promotion_for_comparison'`
+    *   **Место:** `pyrobot/backend/kumir_interpreter/interpreter.py`, строка 1316, в методе `visitIfStatement` при вызове `self.visit(condition_ctx)`, который глубже вызывает `visitRelationalExpression`, который, в свою очередь, пытается вызвать `_handle_type_promotion_for_comparison`.
+    *   **Причина:** Отсутствовал метод `_handle_type_promotion_for_comparison` в классе `KumirInterpreterVisitor`. Вероятно, он был случайно удален во время предыдущих автоматических правок.
+    *   **Решение:** Восстановлен метод `_handle_type_promotion_for_comparison`. Он отвечает за приведение типов (например, `цел` к `вещ`) при операциях сравнения.
+        ```python
+        def _handle_type_promotion_for_comparison(self, left, right, ctx):
+            if left is None or right is None:
+                raise KumirEvalError(
+                    f"Строка ~{ctx.start.line}: Нельзя сравнивать с неинициализированным значением.",
+                    ctx.start.line,
+                    ctx.start.column
+                )
+            is_left_int = isinstance(left, int)
+            is_left_float = isinstance(left, float)
+            is_right_int = isinstance(right, int)
+            is_right_float = isinstance(right, float)
+            if is_left_int and is_right_float:
+                return float(left), right
+            if is_left_float and is_right_int:
+                return left, float(right)
+            return left, right
+        ```
+
+**Повторный запуск теста `28-rec-sumdig.kum` (после восстановления `_handle_type_promotion_for_comparison`):**
+*   **Тест снова упал.**
+*   **Ошибка:** `AttributeError: 'KumirInterpreterVisitor' object has no attribute 'current_scope'`
+    *   **Место:** `pyrobot/backend/kumir_interpreter/interpreter.py`, строка 1689 (в старой нумерации, до добавления `_handle_type_promotion_for_comparison`), в методе `visitPrimaryExpression`.
+    *   **Контекст:**
+        ```python
+        elif ctx.RETURN_VALUE():
+            if 'return_value' not in self.current_scope: # Ошибка здесь
+                raise KumirEvalError("Попытка использования неинициализированного возвращаемого значения")
+            result = self.current_scope['return_value']
+        ```
+    *   **Причина:** Атрибут `self.current_scope` не существует. Вместо него для доступа к текущей области видимости следует использовать `self.scopes[-1]`, так как `self.scopes` – это стек (список) словарей областей видимости.
+    *   **Отладочный `print` в `__init__`:**
+        *   Добавленный `print(f"[DEBUG][INIT] ... dir(self) ...")` в `__init__` показал пустой список методов `[]`, что странно и требует отдельного изучения, но не связано напрямую с этой `AttributeError`.
+    *   **Решение:** Заменить `self.current_scope` на `self.scopes[-1]` в соответствующем блоке метода `visitPrimaryExpression`.
+        ```python
+        elif ctx.RETURN_VALUE():
+            current_scope_dict = self.scopes[-1]
+            if 'return_value' not in current_scope_dict:
+                raise KumirEvalError("Попытка использования неинициализированного возвращаемого значения")
+            result = current_scope_dict['return_value']
+        ```
+
+**Повторный запуск теста `28-rec-sumdig.kum` (после исправления `current_scope`):**
+*   **Тест снова упал.**
+*   **Ошибка:** `KumirEvalError: Попытка использования неинициализированного возвращаемого значения`
+    *   **Место:** `pyrobot/backend/kumir_interpreter/interpreter.py`, строка ~1702 (в зависимости от предыдущих правок), в методе `visitPrimaryExpression`.
+    *   **Контекст:**
+        ```python
+        elif ctx.RETURN_VALUE():
+            current_scope_dict = self.scopes[-1]
+            if 'return_value' not in current_scope_dict: # Ошибка здесь, ключ 'return_value'
+                raise KumirEvalError("Попытка использования неинициализированного возвращаемого значения")
+            result = current_scope_dict['return_value']
+        ```
+    *   **Причина:** Несоответствие ключей. При присваивании `знач := ...` (в `visitAssignmentStatement`) и при инициализации возвращаемого значения функции (в `visitPostfixExpression`) используется ключ `'__знач__'`. Однако `visitPrimaryExpression` пытался прочитать значение по ключу `'return_value'`.
+    *   **Решение:** В методе `visitPrimaryExpression` заменить ключ `'return_value'` на `'__знач__'` для консистентности.
+        ```python
+        elif ctx.RETURN_VALUE():
+            current_scope_dict = self.scopes[-1]
+            if '__знач__' not in current_scope_dict: # Исправлено на '__знач__'
+                raise KumirEvalError("Попытка использования неинициализированного возвращаемого значения")
+            result = current_scope_dict['__знач__'] # Исправлено на '__знач__'
+        ```
+    *   **Примечание по отладке:** Отладочные `print` для `type(self)` и `hasattr` в `visitRelationalExpression` и `visitEqualityExpression` показали, что `self` является корректным объектом `KumirInterpreterVisitor` и *имеет* атрибут `_handle_type_promotion_for_comparison` непосредственно перед предыдущей ошибкой `AttributeError`. Это делает предыдущую ошибку еще более загадочной, но, похоже, она была связана не с отсутствием метода, а с чем-то в стеке вызовов, что "маскировало" его для `visitIfStatement`. Текущая ошибка `KumirEvalError` из-за неинициализированного `знач` является более понятной.
+
+---
+
+## Отладка `28-rec-sumdig.kum` (продолжение)
+
+**Проблема:** Тест падает с `KumirEvalError` ("Попытка вывести неинициализированное значение" или "Попытка использовать неинициализированное значение в операции '+'").
+
+**Ключевое наблюдение (из логов пользователя):**
+Выражение `n mod 10` внутри рекурсивной функции `sumDig` вычисляется в `None`.
+Это `None` затем передается как левый операнд в операцию `+` (в выражении `(n mod 10) + sumDig(div(n,10))`), что приводит к ошибке в `_check_numeric`.
+Лог пользователя:
+```
+[DEBUG][PRE_PERFORM_OP_ADD] op_text:'+', L_operand:'None'(NoneType), R_operand:'1'(int), expr_ctx:'(n mod 10)+sumDig(div(n,10))'
+[DEBUG][_check_numeric] ENTERED. Op: +. Value initial type: NoneType.
+[DEBUG][_check_numeric] Value after _get_value for op '+': None (type: NoneType)
+[DEBUG][_check_numeric] Raising KumirEvalError: processed_value is None for op '+'
+```
+
+**Загадка:**
+Почему `n mod 10` вычисляется в `None`?
+Метод `visitMultiplicativeExpression` использует `_perform_binary_operation` для обработки операторов, включая `mod`.
+Словарь `ARITHMETIC_OPS` не содержит оператор `KumirLexer.MOD` (ключевое слово `mod`).
+Следовательно, `_perform_binary_operation` должен был бы обнаружить, что `operation_func` для `mod` не найдена, и сгенерировать `KumirEvalError` с сообщением "Неизвестный или неподдерживаемый арифметический оператор: mod".
+Однако этой ошибки в логах нет, а вместо этого `n mod 10` каким-то образом возвращает `None`.
+
+**Текущие действия (06.08.2024):**
+1.  Обсудили с пользователем способы разделения `stdout` (вывод программы) и `stderr` (отладочные сообщения) при запуске тестов `pytest`.
+2.  Добавили подробные отладочные сообщения в `_perform_binary_operation` в `interpreter.py`, чтобы отследить, как именно обрабатывается оператор `mod` (токен `KumirLexer.MOD`), находится ли для него функция в `ARITHMETIC_OPS`, и выполняется ли блок `if not operation_func:`.
+
+**Следующий шаг:** Проанализировать логи после запуска теста с новыми отладочными сообщениями в `_perform_binary_operation`.
+
+---
+
+**Загадка:**
+Почему `n mod 10` вычисляется в `None`?
+Метод `visitMultiplicativeExpression` должен был бы либо вызвать `_perform_binary_operation` (если там есть `mod` или `div`), либо просто вернуть результат `visitPowerExpression`.
+Если `mod` обрабатывается как встроенная функция (через `visitPostfixExpression` -> `_call_builtin_function`), то там тоже не должно быть проблем с `None`, т.к. `mod(N, 10)` возвращал корректные значения на предыдущих шагах.
+
+**Новая проблема (07.08.2024):**
+После добавления детального логгирования в `_perform_binary_operation` для отслеживания типа оператора:
+    ```python
+```
+
+## Детальная история отладки теста `28-rec-sumdig.kum` (08.08.2024)
+
+Мы столкнулись с серией проблем при отладке теста `28-rec-sumdig.kum`, который изначально падал с ошибкой `KumirEvalError`. Ниже приведено поэтапное описание процесса.
+
+**Этап 1: Первоначальная ошибка - `KumirEvalError` (неинициализированное значение при выводе)**
+
+*   **Проблема:** Тест падал, потому что оператор `вывод` в программе КуМир пытался напечатать результат рекурсивной функции `sumDig(N)`, но получал `None`.
+*   **Гипотеза:** Потеря значения при передаче из методов `visitLogicalOrExpression` / `visitLogicalAndExpression` в `visitExpression`.
+*   **Действия:**
+    *   Добавлено подробное логирование (`[DEBUG][visit...]`) во все методы обхода выражений.
+    *   Исправлена ошибка в `visitPrimaryExpression`: ключ для `ctx.RETURN_VALUE()` был `'return_value'` вместо `'__знач__'`.
+*   **Находка:** Логирование показало, что `self.visit(sumDig_N_context)` возвращал `None` в `visitStatement` перед вызовом оператора `вывод`.
+
+**Этап 2: Локализация проблемы в бинарных операциях внутри `sumDig`**
+
+*   **Проблема:** Дальнейший анализ показал, что `None` появлялся глубже, внутри вычислений функции `sumDig`.
+*   **Гипотеза:** Ошибка происходит внутри `self._perform_binary_operation`, когда левый операнд (результат `n mod 10`) передается как `None`.
+*   **Действия:**
+    *   Добавлены отладочные `print` перед вызовом `_perform_binary_operation` в `visitAdditiveExpression` и `visitMultiplicativeExpression`.
+    *   Добавлены `print` внутри `_check_numeric`.
+*   **Находка (БИНГО!):**
+    ```
+    [DEBUG][PRE_PERFORM_OP_ADD] op_text:'+', L_operand:'None'(NoneType), R_operand:'1'(int), expr_ctx:'(n mod 10)+sumDig(div(n,10))'
+    [DEBUG][_check_numeric] ENTERED. Op: +. Value initial type: NoneType.
+    [DEBUG][_check_numeric] Value after _get_value for op '+': None (type: NoneType)
+    [DEBUG][_check_numeric] Raising KumirEvalError: processed_value is None for op '+'
+    ```
+    Это подтвердило, что `n mod 10` на каком-то шаге рекурсии вычислялось в `None`.
+
+**Этап 3: Поиск причины `None` от `n mod 10` и попутная ошибка `AttributeError`**
+
+*   **Задача:** Выяснить, почему `n mod 10` дает `None`.
+*   **Действия:**
+    *   Добавлен детальный `print` в `_perform_binary_operation` для отображения типов операторов, используя `KumirLexer.MOD` и `KumirLexer.DIV_KEYWORD`.
+*   **Проблема (новая):** Возникла `AttributeError: type object 'KumirLexer' has no attribute 'MOD'` (и аналогично для `DIV_KEYWORD`).
+*   **Действия (исправление `AttributeError`):**
+    *   С помощью `grep_search` найдены правильные имена токенов: `KumirLexer.DIV` и предположительно `KumirLexer.MOD_KEYWORD` (хотя для `mod` в грамматике используется текстовый токен `'mod'`, а не именованный).
+    *   Отладочный `print` был исправлен (временно убран `KumirLexer.MOD`, оставлен `KumirLexer.DIV`).
+*   **Результат:** После исправления `AttributeError`, программа КуМир начала выполняться корректно, и функция `sumDig` стала возвращать правильное значение (15). **Исходная `KumirEvalError` была решена!**
+
+**Этап 4: Новая проблема - `AssertionError` (пустой вывод)**
+
+*   **Проблема:** Тест `28-rec-sumdig.kum` начал падать с `AssertionError`, так как `actual_output` в `test_functional.py` был пустым (`''`), хотя ожидался вывод `"Сумма цифр: 15\n"`.
+*   **Гипотеза:** Проблема в том, как `run_kumir_program` (или вызываемая ею `interpret_kumir`) захватывает или возвращает `stdout` программы.
+*   **Действия:**
+    *   Проверено, что `visitStatement` для `io_ctx.OUTPUT()` использует `sys.stdout.write`.
+    *   Добавлены отладочные `print` в `interpret_kumir` (перед `return stdout_capture.getvalue()`) и в `run_kumir_program` (для `returned_from_interpret_kumir` и `actual_output`).
+*   **Находка:**
+    *   `interpret_kumir` успешно захватывал вывод "Сумма цифр: 15\n" во внутренний `stdout_capture`.
+    *   `interpret_kumir` возвращал этот захваченный вывод.
+    *   `run_kumir_program` получал этот вывод, но `output_buffer.getvalue()` (который использовался для `actual_output` в тесте) оставался пустым.
+
+**Этап 5: Отладка `DiagnosticErrorListener` (небольшое отступление)**
+
+*   **Проблема:** В логах появилась ошибка `AttributeError: 'DiagnosticErrorListener' object has no attribute 'errors'`.
+*   **Причина:** `DiagnosticErrorListener` был спроектирован для немедленного возбуждения исключения `KumirSyntaxError` при ошибке, а не для сбора ошибок в список `self.errors`.
+*   **Решение:** Удалена проверка `if error_listener.errors:` в `interpret_kumir`.
+
+**Этап 6: Отладка `AttributeError` в `visitAdditive/MultiplicativeExpression` (еще одно отступление)**
+
+*   **Проблема:** Пытаясь "улучшить" обработку выражений без операторов в `visitAdditiveExpression` и `visitMultiplicativeExpression`, я вызвала `AttributeError: 'MultiplicativeExpressionContext' object has no attribute 'multiplicativeOperator'`. Это происходило, когда в выражении не было операторов (например, просто число). ANTLR не создает методы типа `multiplicativeOperator()` если соответствующий элемент грамматики (`(OP multiplicativeExpression)*`) отсутствует в конкретном узле.
+*   **Решение:** Методы `visitAdditiveExpression` и `visitMultiplicativeExpression` были возвращены к их предыдущей, более простой, реализации, которая корректно обрабатывала одиночные операнды, полагаясь на количество дочерних `multiplicativeExpression` (или `powerExpression`).
+
+**Этап 7: Решение `AssertionError` - двойное перенаправление `stdout`**
+
+*   **Ключевая Находка (из логов Этапа 4):**
+    ```
+    [DEBUG_RUN_KUMIR_PROGRAM] BEFORE redirect_stdout. output_buffer is: ''
+    ...
+    [DEBUG_INTERPRET_KUMIR] Content of stdout_capture (18 chars):
+    >>>
+    Сумма цифр: 15
+    <<<
+    [DEBUG_RUN_KUMIR_PROGRAM] interpret_kumir returned:
+    >>>
+    Сумма цифр: 15
+    <<<
+    [DEBUG_RUN_KUMIR_PROGRAM] AFTER redirect_stdout. output_buffer is: ''
+    [DEBUG_RUN_KUMIR_PROGRAM] actual_output which will be asserted: ''
+    ```
+*   **Причина `AssertionError`:**
+    1.  `interpret_kumir` самостоятельно перехватывает `sys.stdout` в свой внутренний `StringIO` (назовем его `interpreter_buffer`) и корректно возвращает его содержимое в виде строки.
+    2.  `run_kumir_program` создавал свой `StringIO` (`output_buffer`) и *дополнительно* оборачивал вызов `interpret_kumir` в `with redirect_stdout(output_buffer):`.
+    3.  Внутри `interpret_kumir` `sys.stdout.write` писал в `interpreter_buffer`.
+    4.  Однако, сам `output_buffer` (внешний) оставался пустым, потому что `interpret_kumir` уже "съел" весь вывод в свой буфер и вернул его как строку. Контекстный менеджер `redirect_stdout` не мог получить доступ к выводу, который уже был перенаправлен и обработан внутри `interpret_kumir`.
+    5.  Тест сравнивал с `output_buffer.getvalue()`, который был пуст.
+*   **Решение:**
+    *   Удалить блок `with redirect_stdout(output_buffer):` из `run_kumir_program`.
+    *   Использовать строку, возвращаемую `interpret_kumir`, напрямую как `actual_output_value`.
+    *   Сравнить `actual_output_value` с ожидаемым результатом в тесте.
+
+**Результат:** После устранения двойного перенаправления `stdout` тест `28-rec-sumdig.kum` успешно ПРОШЕЛ!
+
+
+---
+
+## Справка: Массивы (таблицы) в КуМире
+
+**Документация:**
+- Основное описание: `kumir2-master/userdocs/language/indentifiers.xml`, секция "Простые величины и таблицы. Описания величин" (примерно строки 400-450)
+- Примеры объявлений: см. примеры в этом же разделе
+
+### 1. Типы массивов (таблиц)
+- `целтаб` — массив целых чисел
+- `вещтаб` — массив вещественных чисел
+- `логтаб` — массив логических значений
+- `симтаб` — массив символов
+- `литтаб` — массив строк
+- Можно писать как слитно, так и раздельно: `цел таб k[-5:5]` или `вещтаб tab[1:4, 1:12]`
+
+### 2. Размерность и индексы
+- Массивы бывают 1-, 2- и 3-мерные
+- Для каждого измерения указываются границы индексов (например, `[1:4, 1:12]`)
+- Индексы могут быть отрицательными и не обязаны начинаться с 1
+
+### 3. Примеры объявления
+```
+цел таб k[-5:5]
+вещтаб tab[1:4, 1:12]
+```
+- `k` — одномерный массив с индексами от -5 до 5 (11 элементов)
+- `tab` — двумерный массив 4×12 (48 элементов)
+
+### 4. Использование
+- Элемент массива: `a[i]`, `b[i,j]`
+- Присваивание: `a[i] := 2*a[i-2]+a[i-1]`
+- Можно использовать в выражениях, выводе, вводе и т.д.
+
+### 5. Область действия и инициализация
+- Массивы объявляются как обычные переменные, но с указанием типа и размерности
+- По умолчанию элементы не инициализированы (как и обычные переменные)
+
+### 6. Что реализовать в интерпретаторе
+- Парсинг объявлений массивов (`целтаб`, `вещтаб` и т.д.) и их размерностей
+- Хранение массивов в области видимости (например, как dict с ключами-индексами или вложенные списки)
+- Поддержка обращения к элементам по индексу (в том числе с несколькими измерениями)
+- Проверка выхода за границы
+- Корректная инициализация (по умолчанию — неинициализировано)
+- Ввод/вывод элементов массива
+
+---
+
+
+</rewritten_file>

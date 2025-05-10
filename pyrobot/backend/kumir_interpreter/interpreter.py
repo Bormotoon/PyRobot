@@ -794,15 +794,15 @@ class KumirInterpreterVisitor(KumirParserVisitor):
             op_token = op_node.getSymbol()    # op_token is Token
             op_text = op_token.text
             # print(f"[DEBUG][visitAdditiveExpression] Operator: {op_text}, Token type: {op_token.type}", file=sys.stderr)
-
+            
             right_operand_ctx = ctx.multiplicativeExpression(i + 1)
             right_operand = self.visit(right_operand_ctx)
             # print(f"[DEBUG][visitAdditiveExpression] Right operand for '{op_text}': {right_operand} (type: {type(right_operand)})", file=sys.stderr)
-            
+
             # print(f"[DEBUG][PRE_PERFORM_OP_ADD] op_text:'{op_text}', L_operand:'{result}'({type(result).__name__}), R_operand:'{right_operand}'({type(right_operand).__name__}), expr_ctx:'{ctx.getText()}'", file=sys.stderr)
             result = self._perform_binary_operation(result, right_operand, op_token, ctx)
             # print(f"[DEBUG][visitAdditiveExpression] Result after '{op_text}': {result} (type: {type(result)})", file=sys.stderr)
-        
+            
         # print(f"[Exit] visitAdditiveExpression for '{ctx.getText()}' -> returns {result} (type: {type(result)})", file=sys.stderr)
         return result
 
@@ -816,16 +816,16 @@ class KumirInterpreterVisitor(KumirParserVisitor):
             op_token = op_node.getSymbol()    # op_token is Token
             op_text = op_token.text
             # print(f"[DEBUG][visitMultiplicativeExpression] Operator: {op_text}, Token type: {op_token.type}", file=sys.stderr)
-            
+
             right_operand_ctx = ctx.powerExpression(i + 1)
             right_operand = self.visit(right_operand_ctx)
             # print(f"[DEBUG][visitMultiplicativeExpression] Right operand for '{op_text}': {right_operand} (type: {type(right_operand)})", file=sys.stderr)
-
+            
             # print(f"[DEBUG][PRE_PERFORM_OP_MULT] op_text:'{op_text}', L_operand:'{result}'({type(result).__name__}), R_operand:'{right_operand}'({type(right_operand).__name__}), expr_ctx:'{ctx.getText()}'", file=sys.stderr)
             # --- ВАЖНО: Проверяем, что op_token действительно от арифметической операции, а не от div/mod как ключевых слов ---
             # Для div/mod, которые обрабатываются как BUILTIN_FUNCTIONS, здесь не должно быть вызова _perform_binary_operation
             if op_token.type in ARITHMETIC_OPS: # Только для +, -, *, /, ^
-                 result = self._perform_binary_operation(result, right_operand, op_token, ctx)
+            result = self._perform_binary_operation(result, right_operand, op_token, ctx)
             else:
                 # Если это не стандартный арифметический оператор (например, это был 'div' или 'mod' как ключевое слово),
                 # то левый операнд (result) уже должен был быть обработан visitPowerExpression,
@@ -1825,16 +1825,16 @@ def interpret_kumir(code: str):
     from .generated.KumirLexer import KumirLexer
     from .generated.KumirParser import KumirParser
     # DiagnosticErrorListener is defined in this file, so no relative import needed.
-
+    
     input_stream = InputStream(code)
     lexer = KumirLexer(input_stream)
     lexer.removeErrorListeners() 
     error_listener = DiagnosticErrorListener() # Instantiate local class
     lexer.addErrorListener(error_listener)
-
+    
     token_stream = CommonTokenStream(lexer)
     parser = KumirParser(token_stream)
-    parser.removeErrorListeners()
+    parser.removeErrorListeners() 
     parser.addErrorListener(error_listener) # Используем тот же слушатель для парсера
 
     tree = None
@@ -1853,7 +1853,7 @@ def interpret_kumir(code: str):
         raise KumirSyntaxError(f"Ошибка синтаксического анализа: {e}", 0, 0) from e
 
     visitor = KumirInterpreterVisitor()
-
+    
     original_stdout = sys.stdout
     original_stderr = sys.stderr 
 
@@ -1861,7 +1861,7 @@ def interpret_kumir(code: str):
     sys.stdout = stdout_capture 
 
     try:
-        visitor.visit(tree) 
+        visitor.visit(tree)
     except KumirInputRequiredError:
         # print(f"[DEBUG][interpret_kumir] InputRequiredError caught. Output so far: {stdout_capture.getvalue()}", file=original_stderr) # original_stderr здесь будет правильным
         raise 
