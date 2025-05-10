@@ -50,9 +50,8 @@ argumentList // e.g., (a, b+c, 5)
     : expression (COMMA expression)*
     ;
 
-indexList // e.g., [i], [i, j], [k:m]
-    : expression (COLON expression)? // Single index or slice
-    | expression COMMA expression    // 2D index
+indexList
+    : expression (COMMA expression)* // Allows one or more expressions separated by commas
     ;
 
 postfixExpression // Handles array/string access and function calls after a primary expression
