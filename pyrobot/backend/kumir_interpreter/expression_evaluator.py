@@ -4,8 +4,15 @@
 import sys
 import operator
 from .generated.KumirLexer import KumirLexer
+from .generated.KumirParser import KumirParser
 from .kumir_exceptions import KumirEvalError, KumirSyntaxError
 from .kumir_datatypes import KumirTableVar
+from antlr4 import InputStream, CommonTokenStream # type: ignore
+from typing import Any, Dict, List, Optional, Tuple, Union, TYPE_CHECKING
+from antlr4.tree.Tree import TerminalNode
+
+if TYPE_CHECKING:
+    from pyrobot.backend.kumir_interpreter.interpreter import KumirInterpreterVisitor # Для type hinting
 
 ARITHMETIC_OPS = {
     KumirLexer.PLUS: operator.add,
@@ -114,36 +121,72 @@ class ExpressionEvaluator:
         except Exception as e: 
             raise KumirEvalError(f"Строка ~{expression_node_ctx.start.line}: Ошибка при вычислении '{op_text}' в выражении '{expression_node_ctx.getText()}': {e}")
 
-    def visitLiteral(self, ctx): # KumirParser.LiteralContext
-        # visitor = self.visitor
+    def visitLiteral(self, ctx: KumirParser.LiteralContext):
         print(f"[DEBUG][visitLiteralEE] Called for ctx: {ctx.getText()}", file=sys.stderr)
-        if ctx.INTEGER_LITERAL():
-            val = int(ctx.INTEGER_LITERAL().getText())
-            print(f"[DEBUG][visitLiteralEE] Returning INTEGER: {val}", file=sys.stderr)
-            return val
-        elif ctx.REAL_LITERAL():
-            # Заменяем запятую на точку для правильного преобразования в float
-            val_str = ctx.REAL_LITERAL().getText().replace(',', '.')
-            val = float(val_str)
-            print(f"[DEBUG][visitLiteralEE] Returning REAL: {val}", file=sys.stderr)
-            return val
-        elif ctx.BOOLEAN_LITERAL():
-            val = ctx.BOOLEAN_LITERAL().getText().lower() == 'да' # или 'истина' в зависимости от грамматики
-            print(f"[DEBUG][visitLiteralEE] Returning BOOLEAN: {val}", file=sys.stderr)
-            return val
-        elif ctx.CHAR_LITERAL():
-            # Удаляем одинарные кавычки
-            val = ctx.CHAR_LITERAL().getText()[1:-1]
-            print(f"[DEBUG][visitLiteralEE] Returning CHAR: {val}", file=sys.stderr)
-            return val
-        elif ctx.STRING_LITERAL():
-            # Удаляем двойные кавычки
-            val = ctx.STRING_LITERAL().getText()[1:-1]
-            print(f"[DEBUG][visitLiteralEE] Returning STRING: {val}", file=sys.stderr)
-            return val
-        # TODO: Добавить обработку ctx.NL(), если это литерал новой строки в каком-то контексте
-        # print(f"[DEBUG][visitLiteralEE] Unknown literal type, returning None", file=sys.stderr)
-        return None
+        if ctx.INTEGER(): # Token INTEGER
+            print(f"[DEBUG][visitLiteralEE] INTEGER: {ctx.INTEGER().getText()}", file=sys.stderr)
+            return int(ctx.INTEGER().getText())
+        elif ctx.REAL():    # Token REAL
+            print(f"[DEBUG][visitLiteralEE] REAL: {ctx.REAL().getText()}", file=sys.stderr)
+            return float(ctx.REAL().getText().replace(',', '.'))
+        elif ctx.STRING():  # Token STRING
+            print(f"[DEBUG][visitLiteralEE] STRING: {ctx.STRING().getText()}", file=sys.stderr)
+            text = ctx.STRING().getText()
+            if len(text) >= 2: # Строка должна иметь хотя бы кавычки
+                quote_char = text[0]
+                if text.endswith(quote_char) and (quote_char == '"' or quote_char == "'"):
+                    core_text = text[1:-1]
+                    if quote_char == '"':
+                        return core_text.replace('""', '"') # Заменяем "" на "
+                    elif quote_char == "'":
+                        return core_text.replace("''", "'") # Заменяем '' на '
+            # Если структура некорректна (например, непарные кавычки)
+            # или это не стандартная строка в кавычках, это ошибка.
+            # Однако, ANTLR должен был бы поймать синтаксически неверные строки раньше.
+            # Если мы сюда попали с чем-то странным, безопаснее вызвать ошибку.
+            print(f"[WARNING][visitLiteralEE] Potentially malformed STRING literal: {text}", file=sys.stderr)
+            # Возвращаем текст без крайних символов, если они одинаковые кавычки, иначе целиком
+            # Это запасной вариант, если предыдущие проверки не сработали, но он не очень надежен.
+            if len(text) >= 2 and text[0] == text[-1] and (text[0] == '"' or text[0] == "'"):
+                 return text[1:-1] # Очень упрощенное запасное поведение, может быть неверным для сложных случаев
+            return text # Худший случай - вернуть как есть, или лучше ошибка
+
+        elif ctx.CHAR_LITERAL(): # Token CHAR_LITERAL
+            print(f"[DEBUG][visitLiteralEE] CHAR_LITERAL: {ctx.CHAR_LITERAL().getText()}", file=sys.stderr)
+            text = ctx.CHAR_LITERAL().getText()
+            if len(text) == 3 and text[0] == "'" and text[-1] == "'": # e.g. 'A'
+                return text[1]
+            elif text == "''''": # e.g. '''' for single quote char
+                return "'"
+            # По грамматике КуМира, символьный литерал - это один символ в одинарных кавычках.
+            # Либо две одинарные кавычки для представления символа одинарной кавычки.
+            # Все остальное должно быть синтаксической ошибкой, пойманной парсером.
+            # Если мы здесь с чем-то другим, это неожиданно.
+            raise KumirEvalError(f"Некорректный или неподдерживаемый символьный литерал: {text}", ctx.start.line, ctx.start.column if ctx.start else -1)
+        elif ctx.TRUE():    # Token TRUE
+            print(f"[DEBUG][visitLiteralEE] TRUE", file=sys.stderr)
+            return True
+        elif ctx.FALSE():   # Token FALSE
+            print(f"[DEBUG][visitLiteralEE] FALSE", file=sys.stderr)
+            return False
+        elif ctx.NEWLINE_CONST(): # Token NEWLINE_CONST ('нс')
+            print(f"[DEBUG][visitLiteralEE] NEWLINE_CONST (нс)", file=sys.stderr)
+            return '\n'
+        elif ctx.colorLiteral():
+            color_node = ctx.colorLiteral()
+            print(f"[DEBUG][visitLiteralEE] Delegating to colorLiteral: {color_node.getText()}", file=sys.stderr)
+            if hasattr(self, 'visitColorLiteral'):
+                 return self.visitColorLiteral(color_node)
+            else:
+                color_text = color_node.getText()
+                print(f"[WARNING][visitLiteralEE] visitColorLiteral not implemented in EE, returning text: {color_text}", file=sys.stderr)
+                return color_text
+        else:
+            print(f"[ERROR][visitLiteralEE] Unknown literal type: {ctx.getText()}", file=sys.stderr)
+            raise KumirEvalError(f"Неизвестный тип литерала: {ctx.getText()}", ctx.start.line, ctx.start.column if ctx.start else -1)
+
+    def visitColorLiteral(self, ctx: KumirParser.ColorLiteralContext):
+        pass # Заглушка
 
     def visitPrimaryExpression(self, ctx): # KumirParser.PrimaryExpressionContext
         visitor = self.visitor
@@ -209,9 +252,9 @@ class ExpressionEvaluator:
         if len(ctx.children) > 1:
             first_op_token_node = ctx.getChild(1)
 
-            if isinstance(first_op_token_node, visitor.antlr4.tree.Tree.TerminalNode) and first_op_token_node.getSymbol().type == KumirLexer.LBRACK:
-                if len(ctx.children) < 4 or not (ctx.getChild(2).getRuleIndex() == visitor.KumirParser.RULE_indexList and \
-                                                 isinstance(ctx.getChild(3), visitor.antlr4.tree.Tree.TerminalNode) and \
+            if isinstance(first_op_token_node, TerminalNode) and first_op_token_node.getSymbol().type == KumirLexer.LBRACK:
+                if len(ctx.children) < 4 or not (ctx.getChild(2).getRuleIndex() == KumirParser.RULE_indexList and \
+                                                 isinstance(ctx.getChild(3), TerminalNode) and \
                                                  ctx.getChild(3).getSymbol().type == KumirLexer.RBRACK):
                     raise KumirSyntaxError(f"Строка {first_op_token_node.getSymbol().line}: Некорректная структура доступа к элементу таблицы после '['.", first_op_token_node.getSymbol().line, first_op_token_node.getSymbol().column)
                 
@@ -256,7 +299,7 @@ class ExpressionEvaluator:
                      err_col = e.column if hasattr(e, 'column') and e.column is not None else index_list_ctx.start.column
                      raise KumirEvalError(f"Ошибка при доступе к элементу таблицы '{table_display_name}': {e.args[0]}", err_line, err_col)
             
-            elif isinstance(first_op_token_node, visitor.antlr4.tree.Tree.TerminalNode) and first_op_token_node.getSymbol().type == KumirLexer.LPAREN:
+            elif isinstance(first_op_token_node, TerminalNode) and first_op_token_node.getSymbol().type == KumirLexer.LPAREN:
                 if not isinstance(current_eval_value, str):
                     line = primary_expr_ctx.start.line
                     column = primary_expr_ctx.start.column
@@ -265,13 +308,13 @@ class ExpressionEvaluator:
                 proc_name = current_eval_value
                 args = []
                 argument_list_ctx = None
-                if len(ctx.children) > 2 and ctx.getChild(2).getRuleIndex() == visitor.KumirParser.RULE_argumentList:
+                if len(ctx.children) > 2 and ctx.getChild(2).getRuleIndex() == KumirParser.RULE_argumentList:
                     argument_list_ctx = ctx.getChild(2)
                     if argument_list_ctx and argument_list_ctx.expression():
                         # visitArgumentList должен быть методом visitor или ExpressionEvaluator
                         # Если он в visitor, то visitor.visitArgumentList, если в EE, то self.visitArgumentList
                         args = visitor.visit(argument_list_ctx) 
-                elif len(ctx.children) == 3 and isinstance(ctx.getChild(2), visitor.antlr4.tree.Tree.TerminalNode) and ctx.getChild(2).getSymbol().type == KumirLexer.RPAREN:
+                elif len(ctx.children) == 3 and isinstance(ctx.getChild(2), TerminalNode) and ctx.getChild(2).getSymbol().type == KumirLexer.RPAREN:
                     pass
                 else:
                     err_line = first_op_token_node.getSymbol().line

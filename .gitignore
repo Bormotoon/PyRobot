@@ -171,3 +171,6 @@ Thumbs.db
 # Ignore foreign dirs
 kumir2-master/
 antlr4-4.6/
+.cursor/rules/running-tests-on-kum-files.mdc
+.cursor/rules/taking-notes.mdc
+test_log.txt

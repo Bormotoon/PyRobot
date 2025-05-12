@@ -9,7 +9,7 @@ from antlr4.tree.Tree import TerminalNode
 # Импортируем все исключения из одного места
 from .kumir_exceptions import (KumirExecutionError, DeclarationError, AssignmentError,
                                InputOutputError, KumirInputRequiredError, KumirEvalError,
-                               RobotError, KumirSyntaxError)
+                               RobotError, KumirSyntaxError, KumirNotImplementedError)
 # Исключение для команды ВЫХОД из цикла
 class LoopExitException(Exception):
     pass
@@ -111,6 +111,8 @@ class KumirInterpreterVisitor(KumirParserVisitor):
         # --- DEBUG PRINT --- 
         print(f"[DEBUG][INIT] KumirInterpreterVisitor initialized. Available methods starting with '_handle': {[name for name in dir(self) if callable(getattr(self, name)) and name.startswith('_handle')]}", file=sys.stderr) #stdout -> stderr
         # --- END DEBUG PRINT ---
+        self.loop_depth = 0
+        self.exit_flags = []
 
     # --- Управление областями видимости и символами ---
 
@@ -460,10 +462,10 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                     min_idx_val = self.evaluator.visitExpression(bounds_ctx.expression(0))
                     max_idx_val = self.evaluator.visitExpression(bounds_ctx.expression(1))
 
-                    min_idx = self._get_value(min_idx_val)
-                    max_idx = self._get_value(max_idx_val)
+                    min_idx = min_idx_val # Убрали self._get_value()
+                    max_idx = max_idx_val # Убрали self._get_value()
 
-                    if not isinstance(min_idx, int):
+                    if not isinstance(min_idx, int) or not isinstance(max_idx, int):
                         raise KumirEvalError(f"Строка {bounds_ctx.expression(0).start.line}: Нижняя граница измерения {i+1} для таблицы '{var_name}' должна быть целым числом, получено: {min_idx} (тип: {type(min_idx).__name__}).", bounds_ctx.expression(0).start.line, bounds_ctx.expression(0).start.column)
                     if not isinstance(max_idx, int):
                         raise KumirEvalError(f"Строка {bounds_ctx.expression(1).start.line}: Верхняя граница измерения {i+1} для таблицы '{var_name}' должна быть целым числом, получено: {max_idx} (тип: {type(max_idx).__name__}).", bounds_ctx.expression(1).start.line, bounds_ctx.expression(1).start.column)
@@ -494,7 +496,7 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                 
                 if var_decl_item_ctx.expression():
                     value_to_assign = self.evaluator.visitExpression(var_decl_item_ctx.expression())
-                    value_to_assign = self._get_value(value_to_assign)
+                    # value_to_assign = self._get_value(value_to_assign)  # УДАЛЕНО как избыточное
 
                     try:
                         validated_value = self._validate_and_convert_value_for_assignment(value_to_assign, base_kumir_type, var_name)
@@ -547,87 +549,109 @@ class KumirInterpreterVisitor(KumirParserVisitor):
     def visitAssignmentStatement(self, ctx: KumirParser.AssignmentStatementContext):
         print(f"[DEBUG][visitAssignmentStatement] Called for ctx: {ctx.getText()}", file=sys.stderr)
         
-        # Определяем, кому присваиваем: переменной или 'знач'
-        is_return_value_assignment = bool(ctx.RETURN_VALUE())
-        var_name = None
-        # Используем qualifiedIdentifier() для имени переменной, или RETURN_VALUE() как узел для ошибок если это 'знач'
-        var_name_node_for_error_reporting = ctx.qualifiedIdentifier() if not is_return_value_assignment else ctx.RETURN_VALUE()
+        l_value_ctx = ctx.lvalue() # Получаем lvalue
+        expression_ctx = ctx.expression() # Получаем правую часть (выражение)
 
-        if not is_return_value_assignment:
-            var_name_node = ctx.qualifiedIdentifier()
-            if not var_name_node:
-                # Эта ошибка не должна возникать, если грамматика требует qualifiedIdentifier или RETURN_VALUE
-                raise KumirSyntaxError("Отсутствует имя переменной или 'знач' в операторе присваивания.", ctx.start.line, ctx.start.column)
-            var_name = var_name_node.getText()
-        else: # Присваивание в 'знач'
-             var_name = "__знач__" # Для логов и консистентности
+        if not expression_ctx:
+            # Это может быть случай, когда assignmentStatement является просто expression (например, вызов процедуры)
+            # В КуМире это не должно приводить к ошибке здесь, такие statement обрабатываются как expressionStatement
+            # Но если у нас есть ASSIGN, то expression должен быть.
+            if ctx.ASSIGN(): # Если есть оператор присваивания, но нет выражения
+                raise KumirSyntaxError("Отсутствует выражение после оператора присваивания ':='", ctx.ASSIGN().symbol.line, ctx.ASSIGN().symbol.column)
+            # Если это просто expression (например, вызов процедуры без присваивания), то lvalue не будет.
+            # Такая ситуация обрабатывается в visitStatement, который решает, вызывать visitAssignmentStatement или visitProcedureCallStatement.
+            # Если мы здесь и нет lvalue, то это ошибка в логике visitStatement или грамматике.
+            # Однако, грамматика `assignmentStatement: lvalue ASSIGN expression | expression;`.
+            # Если это вторая альтернатива (просто expression), то lvalue() вернет None.
+            if not l_value_ctx and not ctx.ASSIGN():
+                print(f"[DEBUG][visitAssignmentStatement] Interpreting as expression statement: {ctx.getText()}", file=sys.stderr)
+                # Это вызов процедуры или функция, значение которой не используется
+                # Просто вычисляем выражение (это вызовет нужные visit методы для процедуры)
+                self.evaluator.visitExpression(ctx.expression(0)) # expression(0), т.к. это единственное выражение в этой альтернативе
+                return None 
+            # Если мы здесь, что-то пошло не так, должен быть lvalue или это не assignment
+            raise KumirSyntaxError(f"Некорректный оператор присваивания: {ctx.getText()}", ctx.start.line, ctx.start.column)
 
-        # Вычисляем значение выражения
-        value_expr_ctx = ctx.expression()
-        if not value_expr_ctx:
-            raise KumirSyntaxError("Отсутствует выражение в операторе присваивания.", ctx.start.line, ctx.start.column)
+        value_to_assign = self.evaluator.visitExpression(expression_ctx)
+
+        is_return_value_assignment = False
+        if l_value_ctx and l_value_ctx.RETURN_VALUE():
+            is_return_value_assignment = True
         
-        evaluated_value_raw = self.evaluator.visitExpression(value_expr_ctx)
-        # Результат visitExpression из ExpressionEvaluator уже должен быть "чистым" значением.
-        evaluated_value = evaluated_value_raw 
-
-        print(f"[DEBUG][visitAssignmentStatement] Value to assign: {repr(evaluated_value)} (type: {type(evaluated_value).__name__}) to '{var_name}'", file=sys.stderr)
-
-        if evaluated_value is None:
-            print(f"[WARN][visitAssignmentStatement] Присваивается значение None переменной/знач '{var_name}'. Контекст выражения: {value_expr_ctx.getText()}", file=sys.stderr)
-
         if is_return_value_assignment:
-            current_scope = self.scopes[-1]
-            current_scope['__знач__'] = evaluated_value 
-            print(f"[DEBUG][visitAssignmentStatement] Присвоено '__знач__' = {repr(evaluated_value)} в области {len(self.scopes)-1}", file=sys.stderr)
+            # Присваивание 'знач'
+            if not self.current_algorithm_is_function:
+                raise KumirEvalError("Присваивание 'знач' допустимо только внутри функции", l_value_ctx.RETURN_VALUE().symbol.line, l_value_ctx.RETURN_VALUE().symbol.column)
+            
+            # Проверяем тип возвращаемого значения (если он был объявлен для функции)
+            # self.return_value должен быть словарем с ключом 'value' и опционально 'type'
+            if self.return_value is None: # Должно быть инициализировано в visitAlgorithmDefinition
+                 self.return_value = {} 
+
+            # TODO: Проверка типа присваиваемого значения с ожидаемым типом функции, если он есть
+            # func_return_type_name = self.procedures[self.current_algorithm_name].get('return_type_name')
+            # if func_return_type_name:
+            #     value_to_assign = self._validate_and_convert_value_for_assignment(value_to_assign, func_return_type_name, "знач")
+
+            self.return_value['value'] = value_to_assign
+            print(f"[DEBUG][visitAssignmentStatement] Присвоено ЗНАЧ = {value_to_assign}", file=sys.stderr)
         else:
+            # Присваивание переменной или элементу массива
+            if not l_value_ctx or not l_value_ctx.qualifiedIdentifier():
+                 raise KumirSyntaxError("Отсутствует имя переменной в операторе присваивания", ctx.start.line, ctx.start.column)
+
+            var_name = l_value_ctx.qualifiedIdentifier().getText()
             var_info, var_scope = self.find_variable(var_name) 
+
             if var_info is None:
-                err_start_token = var_name_node_for_error_reporting.symbol if hasattr(var_name_node_for_error_reporting, 'symbol') else var_name_node_for_error_reporting.start
-                raise KumirEvalError(f"Переменная '{var_name}' не найдена.", err_start_token.line, err_start_token.column)
+                raise KumirEvalError(f"Переменная '{var_name}' не объявлена", l_value_ctx.qualifiedIdentifier().start.line, l_value_ctx.qualifiedIdentifier().start.column)
 
-            if var_info['is_table']:
-                index_list_ctx = ctx.indexList() 
-                if not index_list_ctx:
-                    err_start_token = var_name_node_for_error_reporting.symbol if hasattr(var_name_node_for_error_reporting, 'symbol') else var_name_node_for_error_reporting.start
-                    raise KumirEvalError(f"Попытка присвоить значение таблице '{var_name}' без указания индексов.", err_start_token.line, err_start_token.column)
+            kumir_target_type = var_info.get('kumir_type', 'неизвестен')
+            is_table = var_info.get('is_table', False)
 
-                kumir_table_var_obj = var_info['value']
-                if not isinstance(kumir_table_var_obj, KumirTableVar):
-                     err_start_token = var_name_node_for_error_reporting.symbol if hasattr(var_name_node_for_error_reporting, 'symbol') else var_name_node_for_error_reporting.start
-                     raise KumirEvalError(f"Внутренняя ошибка: переменная '{var_name}' помечена как таблица, но не является объектом KumirTableVar.", err_start_token.line, err_start_token.column)
+            if l_value_ctx.LBRACK(): # Это присваивание элементу массива/таблицы
+                if not is_table:
+                    raise KumirEvalError(f"Переменная '{var_name}' не является таблицей, но используется с индексами", l_value_ctx.qualifiedIdentifier().start.line)
+                
+                if not var_info.get('value') or not isinstance(var_info['value'], KumirTableVar):
+                    raise KumirEvalError(f"Таблица '{var_name}' не инициализирована правильно (отсутствует KumirTableVar)", l_value_ctx.start.line)
+                
+                kumir_table_var = var_info['value']
+                table_element_type = kumir_table_var.base_kumir_type_name # ИСПРАВЛЕНО
 
+                # Вычисляем индексы
+                index_ctx_list = l_value_ctx.indexList().expression()
                 indices = []
-                for expr_ctx_idx in index_list_ctx.expression():
-                    index_val_raw = self.evaluator.visitExpression(expr_ctx_idx)
-                    index_val = index_val_raw 
-                    if not isinstance(index_val, int):
-                        raise KumirEvalError(f"Индекс таблицы '{var_name}' должен быть целым числом, получено: {index_val} (тип: {type(index_val).__name__}).", expr_ctx_idx.start.line, expr_ctx_idx.start.column)
-                    indices.append(index_val)
-                indices_tuple = tuple(indices)
+                for i_ctx in index_ctx_list:
+                    idx_val = self.evaluator.visitExpression(i_ctx)
+                    if not isinstance(idx_val, int):
+                        raise KumirEvalError(f"Индекс таблицы '{var_name}' должен быть целым числом, получено: {idx_val}", i_ctx.start.line)
+                    indices.append(idx_val)
                 
-                try:
-                    validated_value_for_table = self._validate_and_convert_value_for_assignment(evaluated_value, kumir_table_var_obj.base_kumir_type_name, f"{var_name}{indices_tuple}")
-                except (AssignmentError, DeclarationError, KumirEvalError) as e:
-                    raise type(e)(f"Ошибка типа при присваивании элементу таблицы '{var_name}{indices_tuple}': {e.args[0]}", value_expr_ctx.start.line, value_expr_ctx.start.column) from e
+                # Проверяем количество индексов
+                if len(indices) != len(var_info.get('dimensions_info', [])):
+                    raise KumirEvalError(f"Неверное количество индексов для таблицы '{var_name}'. Ожидалось {len(var_info.get('dimensions_info', []))}, получено {len(indices)}.", l_value_ctx.start.line)
+
+                # Преобразуем значение к типу элемента таблицы
+                value_to_set_in_table = self._validate_and_convert_value_for_assignment(value_to_assign, table_element_type, f"{var_name}[{','.join(map(str, indices))}]")
                 
+                # Присваиваем значение элементу таблицы
                 try:
-                    kumir_table_var_obj.set_value(indices_tuple, validated_value_for_table, index_list_ctx) 
-                    print(f"[DEBUG][visitAssignmentStatement] Присвоено таблице '{var_name}{indices_tuple}' = {repr(validated_value_for_table)}", file=sys.stderr)
-                except KumirEvalError as e:
-                     err_line = e.line if hasattr(e, 'line') and e.line is not None else index_list_ctx.start.line
-                     err_col = e.column if hasattr(e, 'column') and e.column is not None else index_list_ctx.start.column
-                     raise KumirEvalError(f"Ошибка при присваивании элементу таблицы '{var_name}': {e.args[0]}", err_line, err_col)
+                    kumir_table_var.set_value(tuple(indices), value_to_set_in_table, l_value_ctx) # ИЗМЕНЕНО: добавлен l_value_ctx и tuple() для indices
+                    print(f"[DEBUG][visitAssignmentStatement] Присвоено {var_name}[{','.join(map(str, indices))}] = {value_to_set_in_table}", file=sys.stderr)
+                except IndexError as e:
+                    raise KumirEvalError(f"Индекс выходит за границы таблицы '{var_name}': {e}", l_value_ctx.start.line)
+                except TypeError as e: # От KumirTableVar, если что-то не так с индексами/значением
+                    raise KumirEvalError(f"Ошибка присваивания элементу таблицы '{var_name}': {e}", l_value_ctx.start.line)
 
-            else:
-                target_type = var_info['type']
-                try:
-                    validated_value = self._validate_and_convert_value_for_assignment(evaluated_value, target_type, var_name)
-                except (AssignmentError, DeclarationError, KumirEvalError) as e:
-                    raise type(e)(f"Ошибка типа при присваивании переменной '{var_name}': {e.args[0]}", value_expr_ctx.start.line, value_expr_ctx.start.column) from e
+            else: # Присваивание простой переменной
+                if is_table:
+                     raise KumirEvalError(f"Попытка присвоить значение всей таблице '{var_name}' без указания индексов. Такое присваивание не поддерживается.", l_value_ctx.start.line)
 
-                var_scope[var_name]['value'] = validated_value 
-                print(f"[DEBUG][visitAssignmentStatement] Присвоено переменной '{var_name}' = {repr(validated_value)}", file=sys.stderr)
+                # Преобразуем значение к типу переменной
+                validated_value = self._validate_and_convert_value_for_assignment(value_to_assign, kumir_target_type, var_name)
+                var_info['value'] = validated_value
+                print(f"[DEBUG][visitAssignmentStatement] Присвоено {var_name} = {validated_value} (тип {kumir_target_type})", file=sys.stderr)
         return None
 
     def visitStatement(self, ctx:KumirParser.StatementContext):
@@ -724,7 +748,7 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                 if self.debug: print("[DEBUG][OUTPUT] Начало обработки вывода", file=sys.stderr)
                 args = io_ctx.ioArgumentList().ioArgument() if io_ctx.ioArgumentList() else []
                 
-                printed_non_literal = False 
+                # printed_non_literal = False # <--- УДАЛЕНО
 
                 for i, arg_ctx in enumerate(args):
                     arg_text_debug = arg_ctx.getText()
@@ -733,7 +757,7 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                         if arg_ctx.NEWLINE_CONST():
                             if self.debug: print(f"[DEBUG][OUTPUT] Печать НС", file=sys.stderr)
                             sys.stdout.write('\n')
-                            printed_non_literal = True
+                            # printed_non_literal = True # <--- УДАЛЕНО
                             continue 
 
                         formatted_value = ""
@@ -788,7 +812,7 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                                     raise KumirEvalError(f"Строка {line}, столбец {column}: Попытка вывести неинициализированное значение (выражение: {expr_text})")
 
                                 formatted_value = self._format_output_value(value, arg_ctx)
-                                printed_non_literal = True 
+                                # printed_non_literal = True # <--- УДАЛЕНО
                         elif arg_ctx.STRING(): 
                             text_node = arg_ctx.STRING()
                             if not text_node:
@@ -815,10 +839,10 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                         raise
                 
                 # --- Обработка финального переноса строки --- 
-                ends_with_newline_const = args and args[-1].NEWLINE_CONST()
-                if printed_non_literal and not ends_with_newline_const:
-                     sys.stdout.write('\n')
-                # -------------------------------------------
+                # ends_with_newline_const = args and args[-1].NEWLINE_CONST() # <--- УДАЛЕНО
+                # if printed_non_literal and not ends_with_newline_const: # <--- УДАЛЕНО
+                #      sys.stdout.write('\n') # <--- УДАЛЕНО
+                # ------------------------------------------- # <--- УДАЛЕНО
                 if self.debug: print("[DEBUG][OUTPUT] Конец обработки вывода", file=sys.stderr)
                 return None
         elif ctx.exitStatement(): # Обработка команды ВЫХОД
@@ -959,149 +983,126 @@ class KumirInterpreterVisitor(KumirParserVisitor):
 
     def visitLoopStatement(self, ctx: KumirParser.LoopStatementContext):
         """Обработка цикла"""
-        # Проверяем альтернативу REPEAT...UNTIL сначала
-        if ctx.REPEAT(): # Цикл ДО
-            while True:
-                try:
-                    self.visit(ctx.statementSequence())
-                except LoopExitException:
-                    break
-                except Exception as e:
-                    line = ctx.start.line
-                    column = ctx.start.column
-                    raise KumirExecutionError(f"Строка {line}, столбец {column}: Ошибка внутри цикла ДО: {str(e)}")
-                
-                # Проверяем условие выхода ПОСЛЕ выполнения тела
-                condition_expr_for_repeat = ctx.expression() # В REPEAT условие одно
-                if not condition_expr_for_repeat:
-                     raise KumirEvalError(f"Строка {ctx.start.line}: Отсутствует выражение условия для цикла ДО")
-                condition = self.evaluator.visitExpression(condition_expr_for_repeat)
-                
-                # _get_value здесь, вероятно, не нужен, если visitExpression возвращает чистое значение
-                condition_value = self._get_value(condition) if hasattr(self, '_get_value') else condition
+        loop_spec = ctx.loopSpecifier() # Может быть None
+        end_loop_cond = ctx.endLoopCondition() # Может быть None
+        statement_sequence_ctx = ctx.statementSequence()
 
-                if not isinstance(condition_value, bool):
-                    raise KumirEvalError(f"Строка {condition_expr_for_repeat.start.line}: Условие выхода из цикла ДО должно быть логическим, получено {type(condition_value).__name__}")
-                if condition_value: # Выход, если условие истинно
-                    break
-            return None
+        # Устанавливаем флаг, что мы внутри цикла (для оператора ВЫХОД)
+        self.loop_depth += 1
+        self.exit_flags.append(False)
 
-        # Иначе, это цикл НЦ (должен быть loopSpec)
-        loop_spec = ctx.loopSpec()
-        if not loop_spec:
-             raise KumirExecutionError(f"Строка {ctx.start.line}: Неожиданная структура цикла. Ожидался loopSpec или REPEAT.")
-
-        if loop_spec.TIMES():  # Цикл РАЗ
-            count_expr = loop_spec.expression()
-            if not count_expr: # У loopSpec всегда одно expression для TIMES
-                 raise KumirEvalError(f"Строка {loop_spec.start.line}: Отсутствует выражение для количества повторений цикла РАЗ")
-            count = self.evaluator.visitExpression(count_expr)
-            
-            count_value = self._get_value(count) if hasattr(self, '_get_value') else count
-
-            if not isinstance(count_value, int):
-                raise KumirEvalError(f"Строка {count_expr.start.line}: Количество повторений цикла РАЗ должно быть целым числом, получено {type(count_value).__name__}")
-            if count_value < 0:
-                count_value = 0
-                
-            for i in range(count_value):
-                try:
-                    self.visit(ctx.statementSequence())
-                except LoopExitException:
-                    break
-                except Exception as e:
-                    line = ctx.statementSequence().start.line if ctx.statementSequence() else ctx.start.line # Точнее указываем строку
-                    column = ctx.statementSequence().start.column if ctx.statementSequence() else ctx.start.column
-                    raise KumirExecutionError(f"Строка {line}, столбец {column}: Ошибка внутри цикла РАЗ (итерация {i+1}): {str(e)}")
-
-        elif loop_spec.WHILE():  # Цикл ПОКА
-            loop_count = 0 
-            if self.debug: print(f"[DEBUG][While] Вход в цикл ПОКА", file=sys.stderr)
-            while True:
-                condition_expr_for_while = loop_spec.expression() # У loopSpec всегда одно expression для WHILE
-                if not condition_expr_for_while:
-                     raise KumirEvalError(f"Строка {loop_spec.start.line}: Отсутствует выражение условия для цикла ПОКА")
-                condition = self.evaluator.visitExpression(condition_expr_for_while)
-                
-                condition_value = self._get_value(condition) if hasattr(self, '_get_value') else condition
-                
-                condition = self.evaluator.visitExpression(condition_expr)
-                condition_value = self._get_value(condition)
-                if self.debug: print(f"[DEBUG][While 15] Итерация {loop_count}, проверка условия ({condition_expr.getText()}): {condition_value}", file=sys.stderr)
-                if not isinstance(condition_value, bool):
-                    raise KumirEvalError(f"Строка {loop_spec.start.line}: Условие цикла ПОКА должно быть логическим, получено {type(condition_value).__name__}")
-                if not condition_value:
-                    if self.debug: print(f"[DEBUG][While 15] Условие ложно, выход из цикла.", file=sys.stderr)
-                    break
-                # --- DEBUG 15-while --- 
-                n_val_before = self.find_variable('n')[0]['value'] if self.find_variable('n')[0] else 'N/A'
-                count_val_before = self.find_variable('count')[0]['value'] if self.find_variable('count')[0] else 'N/A'
-                if self.debug: print(f"[DEBUG][While 15] Перед телом итерации {loop_count}: n={n_val_before}, count={count_val_before}", file=sys.stderr)
-                # ---------------------
-                try:
-                    self.visit(ctx.statementSequence())
-                except LoopExitException:
-                    break
-                except Exception as e:
-                    line = ctx.start.line
-                    column = ctx.start.column
-                    raise KumirExecutionError(f"Строка {line}, столбец {column}: Ошибка внутри цикла ПОКА: {str(e)}")
-                # --- DEBUG 15-while --- 
-                n_val_after = self.find_variable('n')[0]['value'] if self.find_variable('n')[0] else 'N/A'
-                count_val_after = self.find_variable('count')[0]['value'] if self.find_variable('count')[0] else 'N/A'
-                if self.debug: print(f"[DEBUG][While 15] После тела итерации {loop_count}: n={n_val_after}, count={count_val_after}", file=sys.stderr)
-                # ---------------------
-                loop_count += 1 # Увеличиваем счетчик итераций
-
-        elif loop_spec.FOR():  # Цикл ДЛЯ
-            var_name = loop_spec.ID().getText()
-            if not var_name:
-                 raise KumirEvalError(f"Строка {loop_spec.start.line}: Отсутствует имя переменной для цикла ДЛЯ")
-            
-            expr_list = loop_spec.expression()
-            if len(expr_list) != 2:
-                 raise KumirEvalError(f"Строка {loop_spec.start.line}: Ожидалось 2 выражения (начало, конец) для цикла ДЛЯ, получено {len(expr_list)}")
-            start_expr = expr_list[0]
-            end_expr = expr_list[1]
-
-            start = self.evaluator.visitExpression(start_expr)
-            end = self.evaluator.visitExpression(end_expr)
-            start_value = self._get_value(start)
-            end_value = self._get_value(end)
-            
-            if not isinstance(start_value, int):
-                raise KumirEvalError(f"Строка {start_expr.start.line}: Начальное значение цикла ДЛЯ должно быть целым, получено {type(start_value).__name__}")
-            if not isinstance(end_value, int):
-                raise KumirEvalError(f"Строка {end_expr.start.line}: Конечное значение цикла ДЛЯ должно быть целым, получено {type(end_value).__name__}")
-            
-            # Создаем новую область видимости для переменной цикла
-            self.enter_scope()
-            try:
-                # Объявляем переменную цикла в новой области
-                self.declare_variable(var_name, 'цел') 
-                # Определяем шаг цикла
-                step = 1
-                direction_token_node = loop_spec.getChild(6) # Предполагая структуру: FOR ID FROM expr TO/DOWNTO expr
-                # Убедимся, что это TerminalNode, прежде чем получать symbol.type
-                if isinstance(direction_token_node, antlr4.tree.Tree.TerminalNode) and direction_token_node.symbol.type == KumirLexer.DOWNTO:
-                    step = -1
-                
-                current = start_value
-                while (step > 0 and current <= end_value) or (step < 0 and current >= end_value):
-                    self.update_variable(var_name, current) # Обновляем в текущей (внутренней) области
+        try:
+            if loop_spec:
+                # --- Циклы со спецификатором: ДЛЯ, ПОКА, N РАЗ ---
+                if loop_spec.FOR():
+                    var_name_node = loop_spec.ID()
+                    if not var_name_node:
+                        raise KumirSyntaxError("Отсутствует имя переменной в цикле ДЛЯ", loop_spec.FOR().symbol.line, loop_spec.FOR().symbol.column)
+                    var_name = var_name_node.getText()
+                    self.enter_scope() 
+                    print(f"[DEBUG][Scope] Вошли в локальную область для цикла ДЛЯ (переменная '{var_name}')", file=sys.stderr)
                     try:
-                        self.visit(ctx.statementSequence())
-                    except LoopExitException:
+                        # Вычисляем начальное, конечное значения и шаг
+                        from_expr_ctx = loop_spec.expression(0)
+                        to_expr_ctx = loop_spec.expression(1)
+                        step_expr_ctx = loop_spec.expression(2) if len(loop_spec.expression()) > 2 and loop_spec.STEP() else None
+
+                        start_value = self.evaluator.visitExpression(from_expr_ctx)
+                        end_value = self.evaluator.visitExpression(to_expr_ctx)
+                        
+                        if not isinstance(start_value, int) or not isinstance(end_value, int):
+                            raise KumirEvalError("Границы цикла ДЛЯ должны быть целыми числами", from_expr_ctx.start.line)
+
+                        step_value = 1
+                        if loop_spec.STEP() and step_expr_ctx:
+                            step_val_eval = self.evaluator.visitExpression(step_expr_ctx)
+                            if not isinstance(step_val_eval, int):
+                                raise KumirEvalError("Шаг в цикле ДЛЯ должен быть целым числом", step_expr_ctx.start.line)
+                            step_value = step_val_eval
+                        elif start_value > end_value: 
+                            step_value = -1
+                        
+                        if step_value == 0:
+                            raise KumirEvalError("Шаг в цикле ДЛЯ не может быть равен нулю", loop_spec.STEP().symbol.line if loop_spec.STEP() else from_expr_ctx.start.line)
+
+                        self.scopes[-1][var_name] = {'type': INTEGER_TYPE, 'value': start_value, 'is_table': False, 'kumir_type': 'цел'} 
+                        print(f"[DEBUG][Loop] Цикл ДЛЯ '{var_name}' от {start_value} до {end_value} шаг {step_value}", file=sys.stderr)
+
+                        current_val = start_value
+                        
+                        loop_executed_once = False
+                        while (step_value > 0 and current_val <= end_value) or \
+                              (step_value < 0 and current_val >= end_value):
+                            self.scopes[-1][var_name]['value'] = current_val
+                            loop_executed_once = True
+                            self.visit(statement_sequence_ctx)
+                            if self.exit_flags[-1]: 
+                                print(f"[DEBUG][Loop] Обнаружен ВЫХОД из цикла ДЛЯ", file=sys.stderr)
+                                break
+                            current_val += step_value
+                    finally:
+                        self.exit_scope() 
+                        print(f"[DEBUG][Scope] Вышли из локальной области цикла ДЛЯ (переменная '{var_name}')", file=sys.stderr)
+                elif loop_spec.WHILE():
+                    condition_ctx = loop_spec.expression(0)
+                    print(f"[DEBUG][Loop] Цикл ПОКА, условие: {condition_ctx.getText()}", file=sys.stderr)
+                    condition_value = self.evaluator.visitExpression(condition_ctx)
+                    if not isinstance(condition_value, bool):
+                        raise KumirEvalError("Условие в цикле ПОКА должно быть логического типа", condition_ctx.start.line)
+                    while condition_value:
+                        self.visit(statement_sequence_ctx)
+                        if self.exit_flags[-1]:
+                            print(f"[DEBUG][Loop] Обнаружен ВЫХОД из цикла ПОКА", file=sys.stderr)
+                            break
+                        condition_value = self.evaluator.visitExpression(condition_ctx)
+                        if not isinstance(condition_value, bool):
+                            raise KumirEvalError("Условие в цикле ПОКА должно быть логического типа", condition_ctx.start.line)
+                elif loop_spec.TIMES(): 
+                    count_expr_ctx = loop_spec.expression(0)
+                    print(f"[DEBUG][Loop] Цикл N РАЗ, выражение для кол-ва: {count_expr_ctx.getText()}", file=sys.stderr)
+                    count_value = self.evaluator.visitExpression(count_expr_ctx)
+                    if not isinstance(count_value, int):
+                        raise KumirEvalError("Количество повторений в цикле ...РАЗ должно быть целым числом", count_expr_ctx.start.line)
+                    if count_value < 0:
+                        print(f"[DEBUG][Loop] Цикл N РАЗ: N={count_value} < 0, не будет выполнен.", file=sys.stderr)
+                        count_value = 0
+                    for _ in range(count_value):
+                        self.visit(statement_sequence_ctx)
+                        if self.exit_flags[-1]: 
+                            print(f"[DEBUG][Loop] Обнаружен ВЫХОД из цикла N РАЗ", file=sys.stderr)
+                            break
+                else:
+                    raise KumirNotImplementedError(f"Неизвестный или неподдерживаемый тип loopSpecifier: {loop_spec.getText() if loop_spec else 'None'}", ctx.start.line)
+            elif end_loop_cond:
+                condition_ctx = end_loop_cond.expression()
+                print(f"[DEBUG][Loop] Цикл ДО (нц...кц при), условие выхода: {condition_ctx.getText()}", file=sys.stderr)
+                while True:
+                    self.visit(statement_sequence_ctx)
+                    if self.exit_flags[-1]: 
+                        print(f"[DEBUG][Loop] Обнаружен ВЫХОД из цикла ДО", file=sys.stderr)
                         break
-                    except Exception as e:
-                        line = ctx.start.line # Ошибка в теле цикла
-                        column = ctx.start.column
-                        raise KumirExecutionError(f"Строка {line}, столбец {column}: Ошибка внутри цикла ДЛЯ (значение {var_name}={current}): {str(e)}")
-                    current += step
-            finally:
-                # Гарантируем выход из области видимости даже при ошибке
-                self.exit_scope() # Выходим из области переменной цикла
-        return None # Циклы обычно ничего не возвращают (исправлено с value на None)
+                    condition_value = self.evaluator.visitExpression(condition_ctx)
+                    if not isinstance(condition_value, bool):
+                        raise KumirEvalError("Условие в 'кц при' (цикл ДО) должно быть логического типа", condition_ctx.start.line)
+                    if condition_value:
+                        break
+            else:
+                print(f"[DEBUG][Loop] Простой цикл НЦ...КЦ (без явного условия)", file=sys.stderr)
+                while True:
+                    self.visit(statement_sequence_ctx)
+                    if self.exit_flags[-1]:
+                        print(f"[DEBUG][Loop] Обнаружен ВЫХОД из простого цикла НЦ...КЦ", file=sys.stderr)
+                        break
+        finally:
+            if self.exit_flags:
+                self.exit_flags.pop()
+            self.loop_depth -= 1
+
+        return None
+
+    def visitExitStatement(self, ctx: KumirParser.ExitStatementContext):
+        # ... existing code ...
+        pass
 
     def visitIfStatement(self, ctx:KumirParser.IfStatementContext):
         """Обработка условного оператора."""
@@ -1111,7 +1112,6 @@ class KumirInterpreterVisitor(KumirParserVisitor):
         condition_ctx = ctx.expression()
         try:
             condition_value = self.evaluator.visitExpression(condition_ctx) # ИЗМЕНЕНО
-            condition_value = self._get_value(condition_value) if hasattr(self, '_get_value') else condition_value # ИЗМЕНЕНО
         except Exception as e:
             line = condition_ctx.start.line
             column = condition_ctx.start.column
@@ -1155,6 +1155,14 @@ class KumirInterpreterVisitor(KumirParserVisitor):
             return arg_ctx.CHAR_LITERAL().getText()
         else:
             raise KumirEvalError(f"Неизвестный формат ввода для переменной: {arg_ctx.getText()}")
+
+    def push_scope(self):
+        """Алиас для enter_scope (для совместимости)."""
+        self.enter_scope()
+
+    def pop_scope(self):
+        """Алиас для exit_scope (для совместимости)."""
+        self.exit_scope()
 
 def interpret_kumir(code: str):
     """

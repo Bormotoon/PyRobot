@@ -77,6 +77,12 @@ class KumirSyntaxError(SyntaxError, KumirExecutionError): # Наследуем �
 class RobotError(KumirExecutionError):
 	pass
 
+
+# Ошибка для функциональности, которая еще не реализована
+class KumirNotImplementedError(KumirExecutionError):
+	pass
+
+
 # Можно добавить другие специфичные ошибки при необходимости
 
 # FILE END: kumir_exceptions.py
