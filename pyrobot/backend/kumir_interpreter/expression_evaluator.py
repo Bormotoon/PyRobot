@@ -502,34 +502,57 @@ class ExpressionEvaluator:
         return current_eval_value
 
     def visitUnaryExpression(self, ctx): # KumirParser.UnaryExpressionContext
-        # visitor = self.visitor
-        print(f"[DEBUG][visitUnaryExpressionEE] Called for ctx: {ctx.getText()}", file=sys.stderr)
-        if ctx.postfixExpression():
-            result = self.visitPostfixExpression(ctx.postfixExpression()) # self.visitPostfixExpression
-            print(f"[DEBUG][visitUnaryExpressionEE] Received from postfixExpression: {result} (type: {type(result)})", file=sys.stderr)
-            print(f"[DEBUG][visitUnaryExpressionEE] Returning: {result} (type: {type(result)})", file=sys.stderr)
-            return result
+        # --- ПЕРЕМЕЩЕННЫЙ БЛОК ИНИЦИАЛИЗАЦИИ op_type ---
+        op_type = None
+        if ctx.PLUS(): op_type = KumirLexer.PLUS
+        elif ctx.MINUS(): op_type = KumirLexer.MINUS
+        elif ctx.NOT(): op_type = KumirLexer.NOT
+        # --- КОНЕЦ ПЕРЕМЕЩЕННОГО БЛОКА ---
         
-        operator = ctx.getChild(0).getText()
-        operand = self.visitUnaryExpression(ctx.unaryExpression(0)) # self.visitUnaryExpression (рекурсивный)
-        print(f"[DEBUG][visitUnaryExpressionEE] Received for operand: {operand} (type: {type(operand)})", file=sys.stderr)
+        # visitor = self.visitor # Можно удалить или оставить, если используется где-то еще
+        print(f"[DEBUG][visitUnaryExpressionEE] Called for ctx: {ctx.getText()}, op_type determined: {op_type}", file=sys.stderr)
+        
+        target_node_for_visit = None
+        
+        if op_type is not None: # Альтернатива: (PLUS | MINUS | NOT) unaryExpression
+            # ctx.unaryExpression() возвращает ОДИН дочерний UnaryExpressionContext или None
+            unary_child_node = ctx.unaryExpression() 
+            if unary_child_node:
+                 target_node_for_visit = unary_child_node
+            else: # Этого не должно произойти, если есть оператор
+                 raise KumirSyntaxError(f"Отсутствует операнд для унарного оператора", ctx.start.line, ctx.start.column)
+        
+        elif ctx.postfixExpression(): # Альтернатива: postfixExpression
+            # ctx.postfixExpression() возвращает ОДИН PostfixExpressionContext или None
+            postfix_child_node = ctx.postfixExpression()
+            if postfix_child_node:
+                target_node_for_visit = postfix_child_node
+            else: # Этого не должно произойти
+                 raise KumirSyntaxError(f"Отсутствует постфиксное выражение в унарном выражении", ctx.start.line, ctx.start.column)
+        else: # Не должно быть других альтернатив по грамматике
+            raise KumirSyntaxError(f"Некорректная структура унарного выражения: {ctx.getText()}", ctx.start.line, ctx.start.column)
 
-        if operator == '-':
-            if not isinstance(operand, (int, float)):
-                raise KumirEvalError(f"Строка ~{ctx.start.line}: Унарный минус применим только к числам (получен {type(operand).__name__})", ctx.start.line, ctx.start.column)
-            result = -operand
-        elif operator.lower() == 'не':
-            if not isinstance(operand, (bool, int)):
-                raise KumirEvalError(f"Строка ~{ctx.start.line}: Логическое отрицание 'не' применимо только к логическим или целым значениям (получен {type(operand).__name__})", ctx.start.line, ctx.start.column)
-            result = not bool(operand)
-        elif operator == '+':
-            if not isinstance(operand, (int, float)):
-                raise KumirEvalError(f"Строка ~{ctx.start.line}: Унарный плюс применим только к числам (получен {type(operand).__name__})", ctx.start.line, ctx.start.column)
-            result = operand
-        else:
-            raise KumirEvalError(f"Строка ~{ctx.start.line}: Неизвестный унарный оператор: {operator}", ctx.start.line, ctx.start.column)
-        
-        print(f"[DEBUG][visitUnaryExpressionEE] Returning: {result} (type: {type(result)})", file=sys.stderr)
+        if not target_node_for_visit: # Дополнительная проверка на всякий случай
+             raise KumirSyntaxError(f"Не удалось определить узел для вычисления в унарном выражении {ctx.getText()}", ctx.start.line, ctx.start.column)
+
+        value = target_node_for_visit.accept(self) # <-- ИСПРАВЛЕНИЕ: Используем accept для dispatch
+        print(f"[DEBUG][visitUnaryExpressionEE] Value from sub-expression '{target_node_for_visit.getText()}': {value} (type: {type(value)})", file=sys.stderr)
+
+        # --- ВОССТАНОВЛЕННЫЙ БЛОК ПРИМЕНЕНИЯ ОПЕРАТОРА ---
+        if op_type == KumirLexer.PLUS: # Унарный плюс
+            result = self._check_numeric(value, "унарный +")
+            # Унарный плюс не меняет значение числового типа
+        elif op_type == KumirLexer.MINUS: # Унарный минус
+            result = self._check_numeric(value, "унарный -")
+            result = -result
+        elif op_type == KumirLexer.NOT: # Логическое НЕ
+            result = self._check_logical(value, "не")
+            result = not result
+        else: # Нет унарного оператора, op_type is None
+            result = value # Просто возвращаем значение дочернего узла (postfixExpression)
+        # --- КОНЕЦ ВОССТАНОВЛЕННОГО БЛОКА ---
+
+        print(f"[DEBUG][visitUnaryExpressionEE] Returning: {result} (type: {type(result)}) for ctx: {ctx.getText()}", file=sys.stderr)
         return result
 
     def visitPowerExpression(self, ctx): # KumirParser.PowerExpressionContext
