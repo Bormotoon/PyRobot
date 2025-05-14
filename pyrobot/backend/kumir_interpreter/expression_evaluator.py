@@ -196,8 +196,16 @@ class ExpressionEvaluator:
             result = self.visitLiteral(ctx.literal())
         elif ctx.qualifiedIdentifier():
             name = ctx.qualifiedIdentifier().getText()
+            # --- НАЧАЛО ОТЛАДКИ N В EVALUATOR ---
+            if name == 'N':
+                print(f"[DEBUG][EE_N_Check_Access] Пытаемся получить значение для 'N' в ExpressionEvaluator.", file=sys.stderr)
+            # --- КОНЕЦ ОТЛАДКИ N В EVALUATOR ---
             var_info, _ = visitor.find_variable(name)
             if var_info:
+                # --- НАЧАЛО ОТЛАДКИ N В EVALUATOR (ПОСЛЕ ПОИСКА) ---
+                if name == 'N':
+                    print(f"[DEBUG][EE_N_Check_Value] 'N' найдена в ExpressionEvaluator, var_info['value'] = {var_info['value']}", file=sys.stderr)
+                # --- КОНЕЦ ОТЛАДКИ N В EVALUATOR ---
                 is_table_access = var_info.get('is_table') and not ctx.parentCtx.LPAREN()
                 # Check if it's a direct table access (no indices/args yet, handled by Postfix)
                 is_direct_table_ref = (
