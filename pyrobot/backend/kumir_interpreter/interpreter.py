@@ -876,7 +876,7 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                     print()
                     print(f"[DEBUG][visitIoStatement_Output] нс - перевод строки", file=sys.stderr)
                     continue
-                else:
+                else: # <--- ИСПРАВЛЯЕМ ОТСТУП ЗДЕСЬ
                     print(f"[ERROR][visitIoStatement_Output] Неподдерживаемый тип аргумента для ВЫВОД: {arg_ctx.getText()}", file=sys.stderr)
                     raise KumirEvalError(f"Неподдерживаемый тип аргумента для ВЫВОД: {arg_ctx.getText()}", arg_ctx.start.line, arg_ctx.start.column)
 
@@ -888,11 +888,11 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                 if isinstance(raw_expr_node_or_list, list):
                     if raw_expr_node_or_list:
                         initial_expr_ctx_from_argument = raw_expr_node_or_list[0]
-                    else:
+                    else: # <--- ИСПРАВЛЕННЫЙ ОТСТУП
                         raise KumirEvalError(f"Строка {arg_ctx.start.line}: Отсутствует выражение для оператора ВВОД (получен пустой список выражений).", arg_ctx.start.line, arg_ctx.start.column)
-                else:
+                            else:
                     initial_expr_ctx_from_argument = raw_expr_node_or_list
-                
+
                 if not initial_expr_ctx_from_argument:
                     raise KumirEvalError(f"Строка {arg_ctx.start.line}: Для оператора ВВОД ожидается имя переменной или элемент массива, получено: {arg_ctx.getText()}", arg_ctx.start.line, arg_ctx.start.column)
 
@@ -1005,7 +1005,7 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                         if hasattr(primary_expr_node, 'ID') and primary_expr_node.ID():
                             var_name = primary_expr_node.ID().getText()
                             print(f"[DEBUG][IO] INPUT target var_name: '{var_name}' (извлечено из Primary -> ID)", file=sys.stderr)
-                        else:
+                        else: # <--- ИСПРАВЛЯЕМ ОТСТУП ЗДЕСЬ
                             # Это может быть литерал или что-то не являющееся lvalue
                             raise KumirSyntaxError(f"Недопустимое выражение слева для ввода (нет QIdent или ID в PrimaryExpressionNode: '{primary_expr_node.getText()}')", primary_expr_node.start.line)
                 else: # Fallback, если не нашли primary_expr_node через Postfix
@@ -1020,7 +1020,7 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                     elif hasattr(lvalue_expr_ctx, 'ID') and callable(lvalue_expr_ctx.ID) and lvalue_expr_ctx.ID(): 
                          var_name = lvalue_expr_ctx.ID().getText()
                          print(f"[DEBUG][IO] INPUT target var_name: '{var_name}' (извлечено из lvalue_expr_ctx.ID() - FALLBACK 2)", file=sys.stderr)
-                    else:
+                    else: # <--- ИСПРАВЛЯЕМ ОТСТУП ЭТОГО БЛОКА
                         # Если не удалось извлечь имя переменной через qualifiedIdentifier или ID,
                         # значит это недопустимое выражение слева для ввода
                         raise KumirSyntaxError(
@@ -1110,9 +1110,9 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                     print(f"[IO] ВВОД (переменная): Прочитано \"{input_str}\", конвертировано в ({variable_kumir_type}) {value_to_assign} для '{var_name}'", file=sys.stderr)
                     if var_name == 'N':
                         print(f"[DEBUG][IO_Input_N_Check_SimpleVar] N = {target_var_info['value']}", file=sys.stderr)
-            else:
-                print(f"[ERROR][visitIoStatement] Оператор не является INPUT или OUTPUT: {ctx.getText()}", file=sys.stderr)
-                raise KumirSyntaxError(f"Оператор ввода/вывода не определен: {ctx.getText()}", ctx.start.line, ctx.start.column)
+                            else:
+                        print(f"[ERROR][visitIoStatement] Оператор не является INPUT или OUTPUT: {ctx.getText()}", file=sys.stderr)
+                        raise KumirSyntaxError(f"Оператор ввода/вывода не определен: {ctx.getText()}", ctx.start.line, ctx.start.column)
             print(f"[DEBUG][visitIoStatement_Loop] Iteration {i_loop}, END processing arg_ctx: {arg_ctx.getText()}", file=sys.stderr)
         
         print(f"[DEBUG][visitIoStatement] EXITED. Loop processed {len(io_args_list_candidate) if isinstance(io_args_list_candidate, list) else '1 (not a list)'} arguments.", file=sys.stderr)
@@ -1167,10 +1167,10 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                     # print(f"[WARNING][visitStatement] Unhandled single child of StatementContext: {type(child).__name__} - {child.getText()[:80]}", file=sys.stderr)
                     return self.visitChildren(ctx) 
             elif num_children == 0:
-                return None
-            else:
+            return None
+        else:
                 # print(f"[WARNING][visitStatement] StatementContext with {num_children} children but no direct method: {ctx.getText()[:80]}", file=sys.stderr)
-                return self.visitChildren(ctx)
+            return self.visitChildren(ctx)
 
 
     def visitProcedureCallStatement(self, ctx: KumirParser.ProcedureCallStatementContext):
@@ -1224,25 +1224,65 @@ class KumirInterpreterVisitor(KumirParserVisitor):
         width = None
         precision = None
 
-        if arg_ctx.COLON():
-            format_specs = arg_ctx.INTEGER() 
-            if len(format_specs) == 1:
-                width = int(format_specs[0].getText())
+        # arg_ctx.expression() возвращает список всех выражений в ioArgument.
+        # Первое expression (index 0) - это само выводимое значение (оно уже в 'value').
+        # Если есть форматирование, то expression(1) - это ширина, expression(2) - точность.
+        expressions_in_io_arg = arg_ctx.expression() # Это список
+
+        num_colons = len(arg_ctx.COLON()) if arg_ctx.COLON() else 0
+
+        if num_colons > 0:
+            if len(expressions_in_io_arg) > 1: # Должно быть как минимум выражение для ширины
+                width_expr_ctx = expressions_in_io_arg[1] # Второе выражение - это ширина
+                width_val = self.evaluator.visitExpression(width_expr_ctx)
+                if not isinstance(width_val, int):
+                    raise KumirEvalError(f"Ширина в спецификаторе формата вывода должна быть целым числом, получено: {width_val}", width_expr_ctx.start.line)
+                # --- ДОБАВЛЕНО НАЧАЛО ---
+                if width_val < 0:
+                    raise KumirEvalError(f"Ширина (Ш) в спецификаторе формата вывода не может быть отрицательной, получено: {width_val}", width_expr_ctx.start.line)
+                # --- ДОБАВЛЕНО КОНЕЦ ---
+                width = width_val
                 if self.debug: print(f"[DEBUG][Format] Ширина: {width}", file=sys.stderr)
-            elif len(format_specs) >= 2:
-                width = int(format_specs[0].getText())
-                precision = int(format_specs[1].getText())
-                if self.debug: print(f"[DEBUG][Format] Ширина: {width}, Точность: {precision}", file=sys.stderr)
+
+                if num_colons > 1 and len(expressions_in_io_arg) > 2: # Есть второе ':' и выражение для точности
+                    precision_expr_ctx = expressions_in_io_arg[2] # Третье выражение - это точность
+                    precision_val = self.evaluator.visitExpression(precision_expr_ctx)
+                    if not isinstance(precision_val, int):
+                        raise KumirEvalError(f"Точность в спецификаторе формата вывода должна быть целым числом, получено: {precision_val}", precision_expr_ctx.start.line)
+                    # --- ДОБАВЛЕНО НАЧАЛО ---
+                    if precision_val < 0:
+                        raise KumirEvalError(f"Точность (Т) в спецификаторе формата вывода не может быть отрицательной, получено: {precision_val}", precision_expr_ctx.start.line)
+                    # --- ДОБАВЛЕНО КОНЕЦ ---
+                    precision = precision_val
+                    if self.debug: print(f"[DEBUG][Format] Точность: {precision}", file=sys.stderr)
+                elif num_colons > 1 and len(expressions_in_io_arg) <= 2:
+                    # Есть второе двоеточие, но нет выражения для точности - ошибка
+                    raise KumirSyntaxError("Отсутствует выражение для точности после второго ':' в спецификаторе формата.", arg_ctx.COLON(1).symbol.line if len(arg_ctx.COLON()) > 1 else arg_ctx.start.line)            
+            else:
+                # Есть двоеточие, но нет выражения для ширины - ошибка
+                raise KumirSyntaxError("Отсутствует выражение для ширины после ':' в спецификаторе формата.", arg_ctx.COLON(0).symbol.line if arg_ctx.COLON() else arg_ctx.start.line)
 
         if isinstance(value, (int, float)):
             if precision is not None: 
                 if not isinstance(value, float): value = float(value)
-                format_string = f"{'{'}{width}.{precision}f{'}'}" if width is not None else f"{'{'}{precision}f{'}'}"
+                # --- ИЗМЕНЕНО НАЧАЛО ---
+                if width is not None:
+                    format_string = "{" + f":{width}.{precision}f" + "}" # -> "{:width.precisionf}"
+                else:
+                    format_string = "{" + f":.{precision}f" + "}"    # -> "{:.precisionf}"
+                # --- ИЗМЕНЕНО КОНЕЦ ---
                 formatted = format_string.format(value)
                 return formatted
             elif width is not None: 
-                format_string = f"{'{'}{width}{'}'}"
-                return format_string.format(str(value))
+                # --- ИЗМЕНЕНО НАЧАЛО ---
+                s_value = str(value)
+                if isinstance(value, (int, float)):
+                    # Числа выравниваем по правому краю
+                    return s_value.rjust(width)
+                else:
+                    # Строки (и все остальное) по левому
+                    return s_value.ljust(width)
+                # --- ИЗМЕНЕНО КОНЕЦ ---
             else: 
                 return str(value)
         elif isinstance(value, bool):
