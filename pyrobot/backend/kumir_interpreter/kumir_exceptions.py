@@ -83,6 +83,32 @@ class KumirNotImplementedError(KumirExecutionError):
 	pass
 
 
+# Ошибка, связанная с именами (например, переменная не найдена)
+class KumirNameError(KumirExecutionError):
+	pass
+
+
+# Ошибка, связанная с типами данных
+class KumirTypeError(KumirExecutionError):
+	pass
+
+
+# Ошибка, связанная с индексами массивов (таблиц)
+class KumirIndexError(KumirExecutionError):
+	pass
+
+
+# Ошибка, связанная с некорректным вводом пользователя (ошибка преобразования)
+class KumirInputError(KumirExecutionError):
+	def __init__(self, message, line_index=None, line_content=None, original_type=None, input_value=None):
+		super().__init__(message, line_index, line_content)
+		self.original_type = original_type
+		self.input_value = input_value
+		# Сохраняем оригинальное сообщение для возможного использования
+		# (хотя оно уже должно быть в self.args[0] от KumirExecutionError)
+		self.original_message = message 
+
+
 # Можно добавить другие специфичные ошибки при необходимости
 
 # FILE END: kumir_exceptions.py

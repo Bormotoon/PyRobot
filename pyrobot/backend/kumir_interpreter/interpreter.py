@@ -10,7 +10,8 @@ from antlr4.tree.Tree import TerminalNodeImpl # ДОБАВЛЯЮ ЭТОТ ИМП
 # Импортируем все исключения из одного места
 from .kumir_exceptions import (KumirExecutionError, DeclarationError, AssignmentError,
                                InputOutputError, KumirInputRequiredError, KumirEvalError,
-                               RobotError, KumirSyntaxError, KumirNotImplementedError)
+                                RobotError, KumirSyntaxError, KumirNotImplementedError,
+                                KumirNameError, KumirTypeError, KumirIndexError, KumirInputError)
 
 
 # Исключение для команды ВЫХОД из цикла
@@ -845,41 +846,36 @@ class KumirInterpreterVisitor(KumirParserVisitor):
             print(f"[WARNING][visitIoStatement] ioStatement без аргументов: {ctx.getText()}", file=sys.stderr)
             return None
 
-        # --- ОТЛАДКА --- Добавляем вывод о том, что возвращает ioArgument() --- #
         io_args_list_candidate = ctx.ioArgumentList().ioArgument()
         print(f"[DEBUG][visitIoStatement] ctx.ioArgumentList().ioArgument() is of type: {type(io_args_list_candidate)}", file=sys.stderr)
         if isinstance(io_args_list_candidate, list):
             print(f"[DEBUG][visitIoStatement] It's a list with {len(io_args_list_candidate)} elements.", file=sys.stderr)
             for i, arg_item_debug in enumerate(io_args_list_candidate):
                 print(f"[DEBUG][visitIoStatement]   Arg {i}: {arg_item_debug.getText()} (type: {type(arg_item_debug)})", file=sys.stderr)
-        # --- КОНЕЦ ОТЛАДКИ ---
 
-        for i_loop, arg_ctx in enumerate(io_args_list_candidate): # Используем enumerate для индекса
+        for i_loop, arg_ctx in enumerate(io_args_list_candidate):
             print(f"[DEBUG][visitIoStatement_Loop] Iteration {i_loop}, START processing arg_ctx: {arg_ctx.getText()}", file=sys.stderr)
             if is_output_operation:
                 value_to_output = None
                 if arg_ctx.expression():
-                        # --- ОТЛАДКА ТИПА И ЗНАЧЕНИЯ arg_ctx.expression() ---
                         expr_node_to_eval = arg_ctx.expression()
-                        print(f"[DEBUG][VisitIoStmt_Pre_Eval] Тип expr_node_to_eval: {type(expr_node_to_eval)}, Значение: {expr_node_to_eval!r}", file=sys.stderr)
-                        if isinstance(expr_node_to_eval, list):
-                            print(f"[DEBUG][VisitIoStmt_Pre_Eval] ВНИМАНИЕ! expr_node_to_eval - это СПИСОК! Длина: {len(expr_node_to_eval)}. Первый элемент текста: {'N/A' if not expr_node_to_eval else (expr_node_to_eval[0].getText() if hasattr(expr_node_to_eval[0], 'getText') else 'NO_GETTEXT')}", file=sys.stderr)
-                        # --- КОНЕЦ ОТЛАДКИ ---
+                        # print(f"[DEBUG][VisitIoStmt_Pre_Eval] Тип expr_node_to_eval: {type(expr_node_to_eval)}, Значение: {expr_node_to_eval!r}", file=sys.stderr)
+                        # if isinstance(expr_node_to_eval, list):
+                        #     print(f"[DEBUG][VisitIoStmt_Pre_Eval] ВНИМАНИЕ! expr_node_to_eval - это СПИСОК! Длина: {len(expr_node_to_eval)}. Первый элемент текста: {'N/A' if not expr_node_to_eval else (expr_node_to_eval[0].getText() if hasattr(expr_node_to_eval[0], 'getText') else 'NO_GETTEXT')}", file=sys.stderr)
                         actual_expr_to_visit = expr_node_to_eval[0] if isinstance(expr_node_to_eval, list) and expr_node_to_eval else expr_node_to_eval
-                        print(f"[DEBUG][VisitIoStmt_Pre_Eval2] Тип actual_expr_to_visit: {type(actual_expr_to_visit)}, Текст: {actual_expr_to_visit.getText() if hasattr(actual_expr_to_visit, 'getText') else 'NOT_A_CONTEXT_NODE'}", file=sys.stderr)
+                        # print(f"[DEBUG][VisitIoStmt_Pre_Eval2] Тип actual_expr_to_visit: {type(actual_expr_to_visit)}, Текст: {actual_expr_to_visit.getText() if hasattr(actual_expr_to_visit, 'getText') else 'NOT_A_CONTEXT_NODE'}", file=sys.stderr)
                         value_to_output = self.evaluator.visitExpression(actual_expr_to_visit)
-                        # Также исправим следующий print, чтобы он не падал, если expr_node_to_eval - список
                         expr_text_for_debug = expr_node_to_eval.getText() if hasattr(expr_node_to_eval, 'getText') else f"LIST_OF_NODES_LEN_{len(expr_node_to_eval) if isinstance(expr_node_to_eval, list) else 'Unknown'}"
                         print(f"[DEBUG][visitIoStatement_Output] Выражение: {expr_text_for_debug}, Значение: {repr(value_to_output)}", file=sys.stderr)
 
-                elif arg_ctx.STRING(): 
+                elif arg_ctx.STRING():
                     str_literal = arg_ctx.STRING().getText()
-                    value_to_output = str_literal[1:-1].replace('\\\"', '"').replace("\\\\'", "'").replace('\\\\\\\\', '\\')
+                    value_to_output = str_literal[1:-1].replace('\\"', '"').replace("\\'", "'").replace('\\\\', '\\') # Простое экранирование
                     print(f"[DEBUG][visitIoStatement_Output] Строковый литерал: {str_literal}, Значение: {repr(value_to_output)}", file=sys.stderr)
-                elif arg_ctx.NEWLINE_CONST(): 
-                    print() 
+                elif arg_ctx.NEWLINE_CONST():
+                    print()
                     print(f"[DEBUG][visitIoStatement_Output] нс - перевод строки", file=sys.stderr)
-                    continue 
+                    continue
                 else:
                     print(f"[ERROR][visitIoStatement_Output] Неподдерживаемый тип аргумента для ВЫВОД: {arg_ctx.getText()}", file=sys.stderr)
                     raise KumirEvalError(f"Неподдерживаемый тип аргумента для ВЫВОД: {arg_ctx.getText()}", arg_ctx.start.line, arg_ctx.start.column)
@@ -888,147 +884,240 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                 print(formatted_value, end='')
 
             elif is_input_operation:
-                # Шаг 1: Получаем результат arg_ctx.expression()
                 raw_expr_node_or_list = arg_ctx.expression()
-
-                # Убедимся, что initial_expr_ctx_from_argument - это один узел контекста
                 if isinstance(raw_expr_node_or_list, list):
-                    if raw_expr_node_or_list:  # Если список не пустой
+                    if raw_expr_node_or_list:
                         initial_expr_ctx_from_argument = raw_expr_node_or_list[0]
-                    else: # Пустой список выражений - это ошибка
+                    else:
                         raise KumirEvalError(f"Строка {arg_ctx.start.line}: Отсутствует выражение для оператора ВВОД (получен пустой список выражений).", arg_ctx.start.line, arg_ctx.start.column)
-                else: # Это уже один узел или None
+                else:
                     initial_expr_ctx_from_argument = raw_expr_node_or_list
                 
-                # Теперь проверяем, не None ли initial_expr_ctx_from_argument
                 if not initial_expr_ctx_from_argument:
                     raise KumirEvalError(f"Строка {arg_ctx.start.line}: Для оператора ВВОД ожидается имя переменной или элемент массива, получено: {arg_ctx.getText()}", arg_ctx.start.line, arg_ctx.start.column)
 
-                # --- Начало блока is_input_operation --- 
-                target_is_simple_var = False
-                target_is_table_element = False
+                lvalue_expr_ctx = initial_expr_ctx_from_argument # Это ExpressionContext для A[i]
+                primary_expr_node = None
+                postfix_expr_node = None
+                q_ident_node = None
                 var_name = None
-                indices_ctx_list = None 
-                kumir_target_type = None
-                qualified_identifier_node = None
-                index_list_node = None 
                 
-                # Определение get_child_safely должно быть здесь, до его использования
-                def get_child_safely(parent_ctx, attr_name_str):
-                    if hasattr(parent_ctx, attr_name_str):
-                        child_attr_method = getattr(parent_ctx, attr_name_str)
-                        if callable(child_attr_method):
-                            child_node_or_list = child_attr_method()
-                            if isinstance(child_node_or_list, list):
-                                return child_node_or_list[0] if child_node_or_list else None
-                            return child_node_or_list
-                    return None
+                # --- НАЧАЛО ИЗМЕНЕННОЙ ЛОГИКИ ---
+                # Цель: найти PostfixExpression (для A[i]) или PrimaryExpression (для простого X)
+                # внутри initial_expr_ctx_from_argument (которое является ExpressionContext)
 
-                current_drill_ctx = initial_expr_ctx_from_argument
-                expression_drill_path = [
-                    'logicalOrExpression', 'logicalAndExpression', 'equalityExpression',
-                    'relationalExpression', 'additiveExpression', 'multiplicativeExpression',
-                    'powerExpression', 'unaryExpression', 'postfixExpression'
-                ]
-                drilled_context = current_drill_ctx
-                for method_name_str in expression_drill_path:
-                    next_node_candidate = get_child_safely(drilled_context, method_name_str)
-                    if next_node_candidate:
-                        drilled_context = next_node_candidate
-                    else:
-                        break 
-                temp_expr_ctx = drilled_context 
-                debug_text_for_original_expr = initial_expr_ctx_from_argument.getText() if hasattr(initial_expr_ctx_from_argument, 'getText') else "N/A"
-                print(f"[DEBUG][visitIoStatement_Input] Исходное выражение: {debug_text_for_original_expr}, тип после спуска: {type(temp_expr_ctx).__name__}", file=sys.stderr)
-                if isinstance(temp_expr_ctx, KumirParser.PostfixExpressionContext):
-                    if temp_expr_ctx.primaryExpression() and temp_expr_ctx.primaryExpression().qualifiedIdentifier():
-                        qualified_identifier_node = temp_expr_ctx.primaryExpression().qualifiedIdentifier()
-                    raw_index_list_node_or_list = temp_expr_ctx.indexList()
-                    if isinstance(raw_index_list_node_or_list, list):
-                        index_list_node = raw_index_list_node_or_list[0] if raw_index_list_node_or_list else None
-                    else:
-                        index_list_node = raw_index_list_node_or_list
-                elif isinstance(temp_expr_ctx, KumirParser.PrimaryExpressionContext):
-                    if temp_expr_ctx.qualifiedIdentifier():
-                        qualified_identifier_node = temp_expr_ctx.qualifiedIdentifier()
-                else:
-                    raise KumirEvalError(f"Строка {initial_expr_ctx_from_argument.start.line}: Некорректное выражение для ввода: {initial_expr_ctx_from_argument.getText()}", initial_expr_ctx_from_argument.start.line, initial_expr_ctx_from_argument.start.column)
-                if qualified_identifier_node:
-                    var_name = qualified_identifier_node.getText()
-                    var_info, var_scope = self.find_variable(var_name)
-                    if var_info is None:
-                        raise KumirEvalError(f"Строка {qualified_identifier_node.start.line}: Переменная '{var_name}' не объявлена.", qualified_identifier_node.start.line, qualified_identifier_node.start.column)
-                    kumir_target_type = var_info.get('type')
-                    is_target_table_from_var_info = var_info.get('is_table', False)
-                    if index_list_node: 
-                        if not is_target_table_from_var_info:
-                            raise KumirEvalError(f"Строка {qualified_identifier_node.start.line}: Переменная '{var_name}' не таблица.", qualified_identifier_node.start.line)
-                        target_is_table_element = True
-                        # --- DEBUG PRINT ДЛЯ ПРОВЕРКИ index_list_node (оставляем на всякий случай) ---
-                        print(f"[DEBUG_CULPRIT_CHECK] Перед index_list_node.expression(). Тип index_list_node: {type(index_list_node)}, Текст: {index_list_node.getText() if hasattr(index_list_node, 'getText') else 'N/A'}", file=sys.stderr)
-                        # --- КОНЕЦ DEBUG PRINT ---
-                        indices_ctx_list = index_list_node.expression() 
-                    else: # No indices
-                        if is_target_table_from_var_info:
-                            raise KumirEvalError(f"Строка {qualified_identifier_node.start.line}: Ввод в целую таблицу '{var_name}' невозможен.", qualified_identifier_node.start.line)
-                        # print(f"[DEBUG_IO_INPUT_FLAG] Перед target_is_simple_var=True. var_name='{var_name}'. target_is_simple_var={target_is_simple_var}, target_is_table_element={target_is_table_element}", file=sys.stderr) # УДАЛЕНО
-                        target_is_simple_var = True
-                        # print(f"[DEBUG_IO_INPUT_FLAG] После target_is_simple_var=True. var_name='{var_name}'. target_is_simple_var={target_is_simple_var}, target_is_table_element={target_is_table_element}", file=sys.stderr) # УДАЛЕНО
-                else:
-                    raise KumirEvalError(f"Строка {initial_expr_ctx_from_argument.start.line}: Не удалось определить имя переменной для ввода: {initial_expr_ctx_from_argument.getText()}", initial_expr_ctx_from_argument.start.line, initial_expr_ctx_from_argument.start.column)
+                # Сначала попытаемся найти PostfixExpression, так как он более специфичен для A[i]
+                # Expression -> ... -> PostfixExpression
+                # У ExpressionContext нет прямого .postfixExpression(), нужно пройтись по детям.
                 
-                if not var_name or not kumir_target_type:
-                    raise KumirEvalError(f"Строка {initial_expr_ctx_from_argument.start.line}: Внутренняя ошибка: цель ввода не определена для '{initial_expr_ctx_from_argument.getText()}'.", initial_expr_ctx_from_argument.start.line, initial_expr_ctx_from_argument.start.column)
+                # Попробуем достучаться до PostfixExpression через цепочку:
+                # expression -> logicalOrExpression -> logicalAndExpression -> equalityExpression -> 
+                # relationalExpression -> additiveExpression -> multiplicativeExpression -> 
+                # powerExpression -> unaryExpression -> postfixExpression
                 
-                try:
-                    input_str = self.get_input_line()
-                    if self.echo_input: print(input_str) 
-                except KumirInputRequiredError as e_input: raise e_input
-                except Exception as e_get_line:
-                    raise KumirInputRequiredError(f"Ошибка чтения ввода: {e_get_line}", initial_expr_ctx_from_argument.start.line, initial_expr_ctx_from_argument.start.column) from e_get_line
-                
-                converted_value = self._convert_input_to_type(input_str, kumir_target_type, initial_expr_ctx_from_argument)
+                current_node_for_lvalue_search = lvalue_expr_ctx 
+                path_taken = [type(current_node_for_lvalue_search).__name__] # Для отладки
 
-                # print(f"[DEBUG_IO_INPUT_FLAG] Перед if/elif/else для присваивания. var_name='{var_name}'. target_is_simple_var={target_is_simple_var}, target_is_table_element={target_is_table_element}", file=sys.stderr) # УДАЛЕНО
-                if target_is_simple_var:
-                    var_info_to_update, scope_to_update = self.find_variable(var_name)
-                    if var_info_to_update is None: raise KumirEvalError(f"Внутренняя ошибка: переменная '{var_name}' не найдена.")
-                    var_info_to_update['value'] = converted_value
-                    if var_name == 'N': print(f"[DEBUG][IO_Input_N_Check] N = {var_info_to_update['value']}", file=sys.stderr)
-                elif target_is_table_element:
-                    var_info_table, scope_table = self.find_variable(var_name)
-                    if var_info_table is None or not var_info_table.get('is_table'): raise KumirEvalError(f"Внутренняя ошибка: таблица '{var_name}' не найдена.")
-                    kumir_table_var_obj = var_info_table['value']
-                    if not isinstance(kumir_table_var_obj, KumirTableVar): raise KumirEvalError(f"Переменная '{var_name}' не KumirTableVar.")
+                # Пытаемся "развернуть" выражение до PostfixExpression
+                if hasattr(current_node_for_lvalue_search, 'logicalOrExpression') and callable(current_node_for_lvalue_search.logicalOrExpression):
+                    current_node_for_lvalue_search = current_node_for_lvalue_search.logicalOrExpression()
+                    path_taken.append(type(current_node_for_lvalue_search).__name__)
+                if hasattr(current_node_for_lvalue_search, 'logicalAndExpression') and callable(current_node_for_lvalue_search.logicalAndExpression):
+                    current_node_for_lvalue_search = current_node_for_lvalue_search.logicalAndExpression()
+                    path_taken.append(type(current_node_for_lvalue_search).__name__)
+                # ... и так далее для всех промежуточных узлов по грамматике до unaryExpression
+                # В грамматике Kumir.g4:
+                # expression -> logicalOrExpression
+                # logicalOrExpression -> logicalAndExpression (И logicalAndExpression)*
+                # logicalAndExpression -> equalityExpression (ИЛИ equalityExpression)*
+                # equalityExpression -> relationalExpression ((EQ | NEQ) relationalExpression)*
+                # relationalExpression -> additiveExpression ((LT | LTE | GT | GTE) additiveExpression)*
+                # additiveExpression -> multiplicativeExpression ((PLUS | MINUS) multiplicativeExpression)*
+                # multiplicativeExpression -> powerExpression ((MUL | DIV_OP | MOD_OP | DIV_KW | MOD_KW) powerExpression)*
+                # powerExpression -> unaryExpression (POW unaryExpression)*
+                # unaryExpression -> (MINUS | NOT_OP)? postfixExpression
+                # postfixExpression -> primaryExpression (indexList | argumentList | DOT ID)*
+                
+                # Упрощенный спуск, предполагая, что нет множественных операторов на одном уровне (A и B и C)
+                # и мы всегда берем левую часть.
+                
+                temp_node = lvalue_expr_ctx # ExpressionContext
+                # print(f\"[DEBUG][IO_LValue_Descent] Start: {type(temp_node).__name__} - {temp_node.getText()}\", file=sys.stderr)
+                if hasattr(temp_node, 'logicalOrExpression') and temp_node.logicalOrExpression():
+                    temp_node = temp_node.logicalOrExpression()
+                    if isinstance(temp_node, list): temp_node = temp_node[0] # Берем первый, если список
+                # print(f\"[DEBUG][IO_LValue_Descent] After logicalOr: {type(temp_node).__name__} - {temp_node.getText()}\", file=sys.stderr)
+                if hasattr(temp_node, 'logicalAndExpression') and temp_node.logicalAndExpression():
+                    temp_node = temp_node.logicalAndExpression()
+                    if isinstance(temp_node, list): temp_node = temp_node[0]
+                # print(f\"[DEBUG][IO_LValue_Descent] After logicalAnd: {type(temp_node).__name__} - {temp_node.getText()}\", file=sys.stderr)
+                if hasattr(temp_node, 'equalityExpression') and temp_node.equalityExpression():
+                    temp_node = temp_node.equalityExpression()
+                    if isinstance(temp_node, list): temp_node = temp_node[0]
+                # print(f\"[DEBUG][IO_LValue_Descent] After equality: {type(temp_node).__name__} - {temp_node.getText()}\", file=sys.stderr)
+                if hasattr(temp_node, 'relationalExpression') and temp_node.relationalExpression():
+                    temp_node = temp_node.relationalExpression()
+                    if isinstance(temp_node, list): temp_node = temp_node[0]
+                # print(f\"[DEBUG][IO_LValue_Descent] After relational: {type(temp_node).__name__} - {temp_node.getText()}\", file=sys.stderr)
+                if hasattr(temp_node, 'additiveExpression') and temp_node.additiveExpression():
+                    temp_node = temp_node.additiveExpression()
+                    if isinstance(temp_node, list): temp_node = temp_node[0]
+                # print(f\"[DEBUG][IO_LValue_Descent] After additive: {type(temp_node).__name__} - {temp_node.getText()}\", file=sys.stderr)
+                if hasattr(temp_node, 'multiplicativeExpression') and temp_node.multiplicativeExpression():
+                    temp_node = temp_node.multiplicativeExpression()
+                    if isinstance(temp_node, list): temp_node = temp_node[0]
+                # print(f\"[DEBUG][IO_LValue_Descent] After multiplicative: {type(temp_node).__name__} - {temp_node.getText()}\", file=sys.stderr)
+                if hasattr(temp_node, 'powerExpression') and temp_node.powerExpression():
+                    temp_node = temp_node.powerExpression()
+                    if isinstance(temp_node, list): temp_node = temp_node[0]
+                # print(f\"[DEBUG][IO_LValue_Descent] After power: {type(temp_node).__name__} - {temp_node.getText()}\", file=sys.stderr)
+                if hasattr(temp_node, 'unaryExpression') and temp_node.unaryExpression():
+                    temp_node = temp_node.unaryExpression()
+                    if isinstance(temp_node, list): temp_node = temp_node[0] # unaryExpression не список, но на всякий
+                # print(f\"[DEBUG][IO_LValue_Descent] After unary: {type(temp_node).__name__} - {temp_node.getText()}\", file=sys.stderr)
+
+                # Теперь temp_node должен быть UnaryExpressionContext или что-то, из чего можно получить PostfixExpression
+                if hasattr(temp_node, 'postfixExpression') and temp_node.postfixExpression():
+                    postfix_expr_node = temp_node.postfixExpression()
+                    if isinstance(postfix_expr_node, list): postfix_expr_node = postfix_expr_node[0] # postfixExpression не список
+                    # print(f\"[DEBUG][IO_LValue_Descent] Found PostfixExpression: {type(postfix_expr_node).__name__} - {postfix_expr_node.getText()}\", file=sys.stderr)
+                    if hasattr(postfix_expr_node, 'primaryExpression') and postfix_expr_node.primaryExpression():
+                        primary_expr_node = postfix_expr_node.primaryExpression()
+                        if isinstance(primary_expr_node, list): primary_expr_node = primary_expr_node[0] # primaryExpression не список
+                        # print(f\"[DEBUG][IO_LValue_Descent] Found PrimaryExpression (from Postfix): {type(primary_expr_node).__name__} - {primary_expr_node.getText()}\", file=sys.stderr)
+                elif hasattr(temp_node, 'primaryExpression') and temp_node.primaryExpression(): # Если вдруг это был не unary, а сразу primary
+                    primary_expr_node = temp_node.primaryExpression()
+                    if isinstance(primary_expr_node, list): primary_expr_node = primary_expr_node[0]
+                    # print(f\"[DEBUG][IO_LValue_Descent] Found PrimaryExpression (direct from temp_node): {type(primary_expr_node).__name__} - {primary_expr_node.getText()}\", file=sys.stderr)
+
+
+                # --- КОНЕЦ ИЗМЕНЕННОЙ ЛОГИКИ ---
+                # Дальнейшая логика извлечения var_name из primary_expr_node или q_ident_node остается
+                
+                if primary_expr_node:
+                    # print(f\"[DEBUG][IO_LValue_Final] primary_expr_node is: {type(primary_expr_node).__name__} - {primary_expr_node.getText()}\", file=sys.stderr)
+                    _q_ident_candidate = self.get_child_safely(primary_expr_node, 'qualifiedIdentifier')
+                    if _q_ident_candidate:
+                        q_ident_node = _q_ident_candidate
+                        var_name = self.get_full_identifier(q_ident_node)
+                        print(f"[DEBUG][IO] INPUT target var_name: '{var_name}' (извлечено из Primary -> QIdent)", file=sys.stderr)
+                    else: # Если primary_expr_node это просто ID (например, одиночная переменная без квалификаторов)
+                        if hasattr(primary_expr_node, 'ID') and primary_expr_node.ID():
+                            var_name = primary_expr_node.ID().getText()
+                            print(f"[DEBUG][IO] INPUT target var_name: '{var_name}' (извлечено из Primary -> ID)", file=sys.stderr)
+                        else:
+                            # Это может быть литерал или что-то не являющееся lvalue
+                            raise KumirSyntaxError(f"Недопустимое выражение слева для ввода (нет QIdent или ID в PrimaryExpressionNode: '{primary_expr_node.getText()}')", primary_expr_node.start.line)
+                else: # Fallback, если не нашли primary_expr_node через Postfix
+                    # Этого блока по идее быть не должно, если initial_expr_ctx_from_argument - это ExpressionContext
+                    # и мы правильно спустились до Postfix/Primary.
+                    # Оставим старые fallback'и на всякий случай, но они менее надежны.
+                    # print(f\"[DEBUG][IO_LValue_Final] primary_expr_node NOT found. Fallback to lvalue_expr_ctx: {type(lvalue_expr_ctx).__name__} - {lvalue_expr_ctx.getText()}\", file=sys.stderr)
+                    if hasattr(lvalue_expr_ctx, 'qualifiedIdentifier') and callable(lvalue_expr_ctx.qualifiedIdentifier) and lvalue_expr_ctx.qualifiedIdentifier():
+                         q_ident_node = lvalue_expr_ctx.qualifiedIdentifier()
+                         var_name = self.get_full_identifier(q_ident_node)
+                         print(f"[DEBUG][IO] INPUT target var_name: '{var_name}' (извлечено из lvalue_expr_ctx.qualifiedIdentifier() - FALLBACK 1)", file=sys.stderr)
+                    elif hasattr(lvalue_expr_ctx, 'ID') and callable(lvalue_expr_ctx.ID) and lvalue_expr_ctx.ID(): 
+                         var_name = lvalue_expr_ctx.ID().getText()
+                         print(f"[DEBUG][IO] INPUT target var_name: '{var_name}' (извлечено из lvalue_expr_ctx.ID() - FALLBACK 2)", file=sys.stderr)
+                    else:
+                        # Если не удалось извлечь имя переменной через qualifiedIdentifier или ID,
+                        # значит это недопустимое выражение слева для ввода
+                        raise KumirSyntaxError(
+                            f"Недопустимое выражение слева для ввода: {lvalue_expr_ctx.getText()}", 
+                            lvalue_expr_ctx.start.line
+                        )
+
+                # ... остальная часть visitIoStatement ...
+                # Особенно важно, чтобы index_list_node правильно извлекался из postfix_expr_node
+                # if postfix_expr_node:
+                #     index_list_node = self.get_child_safely(postfix_expr_node, 'indexList')
+                
+
+                target_var_info, _ = self.find_variable(var_name)
+                if not target_var_info:
+                    err_line = q_ident_node.start.line if q_ident_node else lvalue_expr_ctx.start.line
+                    err_col = q_ident_node.start.column if q_ident_node else lvalue_expr_ctx.start.column
+                    raise KumirNameError(f"Переменная '{var_name}' не найдена для ввода", err_line, err_col)
+
+                input_str = self.get_input_line().strip()
+                if self.echo_input:
+                    print(input_str)
+                
+                index_list_node = None
+                if postfix_expr_node: # Только если у нас был PostfixExpression, ищем indexList в нем
+                    index_list_node = self.get_child_safely(postfix_expr_node, 'indexList')
+                # Если не было postfix_expr_node, но lvalue_expr_ctx сам по себе может иметь indexList (менее вероятно по грамматике)
+                # elif hasattr(lvalue_expr_ctx, 'indexList') and callable(lvalue_expr_ctx.indexList) and lvalue_expr_ctx.indexList():
+                #    index_list_node = lvalue_expr_ctx.indexList()
+
+
+                if index_list_node and hasattr(index_list_node, 'expression') and index_list_node.expression():
+                    if not target_var_info.get('is_table', False):
+                        err_line = q_ident_node.start.line if q_ident_node else lvalue_expr_ctx.start.line
+                        raise KumirTypeError(f"Переменная '{var_name}' не является таблицей, но используется с индексами для ввода.", err_line)
+
+                    kumir_table_var_obj = target_var_info['value']
+                    if not isinstance(kumir_table_var_obj, KumirTableVar):
+                        raise KumirEvalError(f"Внутренняя ошибка: переменная '{var_name}' ({target_var_info.get('type')}) помечена как таблица, но ее значение не является KumirTableVar.", lvalue_expr_ctx.start.line)
+
                     indices = []
-                    if not indices_ctx_list: raise KumirEvalError(f"Нет индексов для таблицы '{var_name}'.")
-                    for i_ctx_idx in indices_ctx_list:
-                        idx_val = self.evaluator.visitExpression(i_ctx_idx)
-                        if not isinstance(idx_val, int): raise KumirEvalError(f"Индекс для '{var_name}' не целое: {idx_val}", i_ctx_idx.start.line)
+                    idx_expr_list = index_list_node.expression()
+                    if not isinstance(idx_expr_list, list): # Должен быть список узлов ExpressionContext
+                        idx_expr_list = [idx_expr_list]
+
+                    for index_expr_ctx in idx_expr_list:
+                        idx_val = self.evaluator.visitExpression(index_expr_ctx)
+                        if not isinstance(idx_val, int):
+                            raise KumirTypeError(f"Индекс таблицы '{var_name}' должен быть целым числом, получено: {idx_val} (тип {type(idx_val).__name__})", index_expr_ctx.start.line)
                         indices.append(idx_val)
-                    expected_dims_info = var_info_table.get('dimensions_info')
-                    if expected_dims_info is None: raise KumirEvalError(f"Нет информации о размерностях для '{var_name}'.")
-                    if len(indices) != len(expected_dims_info):
-                        raise KumirEvalError(f"Неверное кол-во индексов для '{var_name}'. Ожидалось {len(expected_dims_info)}, получено {len(indices)}.")
+                    
+                    print(f"[DEBUG][IO] INPUT table '{var_name}', indices: {indices}", file=sys.stderr)
+
+                    if len(indices) != kumir_table_var_obj.dimensions: # <--- ИЗМЕНЕНИЕ ЗДЕСЬ
+                            raise KumirIndexError(f"Неверное число индексов для таблицы '{var_name}'. Ожидалось {kumir_table_var_obj.dimensions}, получено {len(indices)}.", index_list_node.start.line)
+
+                    element_kumir_type = kumir_table_var_obj.base_kumir_type_name
                     try:
-                        error_source_ctx_for_set = index_list_node if index_list_node else initial_expr_ctx_from_argument
-                        kumir_table_var_obj.set_value(tuple(indices), converted_value, error_source_ctx_for_set)
-                    except IndexError as e_idx:
-                        error_source_ctx_for_idx_err = index_list_node if index_list_node else initial_expr_ctx_from_argument
-                        raise KumirEvalError(f"Индекс выходит за границы '{var_name}': {e_idx}", error_source_ctx_for_idx_err.start.line) from e_idx
-                    except Exception as e_setval:
-                        error_source_ctx_for_set_err = index_list_node if index_list_node else initial_expr_ctx_from_argument
-                        raise KumirEvalError(f"Ошибка присвоения элементу таблицы '{var_name}': {e_setval}", error_source_ctx_for_set_err.start.line) from e_setval
-                else:
-                    raise KumirEvalError(f"Внутренняя ошибка: цель ввода не определена: {arg_ctx.getText()}", arg_ctx.start.line)
+                        value_to_assign = self._convert_input_to_type(input_str, element_kumir_type, lvalue_expr_ctx)
+                    except KumirInputError as e:
+                        raise KumirInputError(f"Ошибка при вводе для элемента таблицы '{var_name}{''.join([f'[{i}]' for i in indices])}': {e.original_message}", lvalue_expr_ctx.start.line, original_type=e.original_type, input_value=e.input_value) from e
+                    except KumirEvalError as e_eval:
+                            raise KumirEvalError(f"Ошибка при вводе для элемента таблицы '{var_name}{''.join([f'[{i}]' for i in indices])}': {e_eval.args[0]}", lvalue_expr_ctx.start.line) from e_eval
+                    try:
+                        kumir_table_var_obj.set_value(tuple(indices), value_to_assign, index_list_node)
+                        print(f"[IO] ВВОД (таблица): Прочитано \"{input_str}\", конвертировано в ({element_kumir_type}) {value_to_assign} для '{var_name}{''.join([f'[{i}]' for i in indices])}'", file=sys.stderr)
+                    except (KumirIndexError, KumirTypeError, KumirEvalError) as e_table_set:
+                        raise e_table_set
+                    except Exception as e_generic_table_set:
+                        raise KumirExecutionError(f"Неожиданная ошибка при присвоении элементу таблицы '{var_name}{''.join([f'[{i}]' for i in indices])}': {e_generic_table_set}", index_list_node.start.line) from e_generic_table_set
+                else: # Ввод в простую переменную (или если postfix_expr_node не было, или в нем не было indexList)
+                    if target_var_info.get('is_table', False):
+                        # Если это таблица, но индексы не предоставлены - ошибка
+                        raise KumirSyntaxError(f"Для ввода в таблицу '{var_name}' необходимо указать индекс(ы).", lvalue_expr_ctx.start.line)
+
+                    variable_kumir_type = target_var_info.get('type')
+                    if not variable_kumir_type:
+                            raise KumirEvalError(f"Внутренняя ошибка: не определен тип для переменной '{var_name}'", lvalue_expr_ctx.start.line)
+                    try:
+                        value_to_assign = self._convert_input_to_type(input_str, variable_kumir_type, lvalue_expr_ctx)
+                    except KumirInputError as e:
+                        raise KumirInputError(f"Ошибка при вводе для переменной '{var_name}': {e.original_message}", lvalue_expr_ctx.start.line, original_type=e.original_type, input_value=e.input_value) from e
+                    except KumirEvalError as e_eval: # Если _convert_input_to_type бросает KumirEvalError
+                            raise KumirEvalError(f"Ошибка при вводе для переменной '{var_name}': {e_eval.args[0]}", lvalue_expr_ctx.start.line) from e_eval
+                    
+                    target_var_info['value'] = value_to_assign
+                    print(f"[IO] ВВОД (переменная): Прочитано \"{input_str}\", конвертировано в ({variable_kumir_type}) {value_to_assign} для '{var_name}'", file=sys.stderr)
+                    if var_name == 'N':
+                        print(f"[DEBUG][IO_Input_N_Check_SimpleVar] N = {target_var_info['value']}", file=sys.stderr)
             else:
                 print(f"[ERROR][visitIoStatement] Оператор не является INPUT или OUTPUT: {ctx.getText()}", file=sys.stderr)
                 raise KumirSyntaxError(f"Оператор ввода/вывода не определен: {ctx.getText()}", ctx.start.line, ctx.start.column)
-            print(f"[DEBUG][visitIoStatement_Loop] Iteration {i_loop}, END processing arg_ctx: {arg_ctx.getText()}", file=sys.stderr) # Отладочный вывод в конце итерации
+            print(f"[DEBUG][visitIoStatement_Loop] Iteration {i_loop}, END processing arg_ctx: {arg_ctx.getText()}", file=sys.stderr)
         
         print(f"[DEBUG][visitIoStatement] EXITED. Loop processed {len(io_args_list_candidate) if isinstance(io_args_list_candidate, list) else '1 (not a list)'} arguments.", file=sys.stderr)
-        return None
-
+        return None # Отступ 8 пробелов    
+    
     def get_input_line(self) -> str:
         """Читает строку из стандартного ввода и удаляет символы новой строки."""
         try:
@@ -1398,6 +1487,51 @@ class KumirInterpreterVisitor(KumirParserVisitor):
     def pop_scope(self):
         """Алиас для exit_scope (для совместимости)."""
         self.exit_scope()
+
+    def get_child_safely(self, parent_ctx: antlr4.ParserRuleContext, child_name: str) -> Optional[antlr4.ParserRuleContext]:
+        """
+        Безопасно получает дочерний узел по имени его метода-аксессора.
+        Если метод возвращает список, берет первый элемент.
+        Возвращает None, если атрибут/метод отсутствует или список пуст.
+        """
+        # Используем sys.stderr для отладочных сообщений, если они нужны
+        # import sys # Убедимся, что sys импортирован, если будем раскомментировать принты
+
+        if not parent_ctx or not hasattr(parent_ctx, child_name):
+            # print(f"[DEBUG][get_child_safely] Parent context is None or attribute '{child_name}' not found on {type(parent_ctx).__name__}.", file=sys.stderr)
+            return None
+        
+        try:
+            child_attr = getattr(parent_ctx, child_name)
+            
+            child_node_or_list = None
+            if callable(child_attr):
+                # print(f"[DEBUG][get_child_safely] Calling method '{child_name}()' on {type(parent_ctx).__name__}", file=sys.stderr)
+                child_node_or_list = child_attr()
+            else:
+                # print(f"[DEBUG][get_child_safely] Accessing attribute '{child_name}' on {type(parent_ctx).__name__}", file=sys.stderr)
+                child_node_or_list = child_attr
+
+            if isinstance(child_node_or_list, list):
+                # print(f"[DEBUG][get_child_safely] Method '{child_name}()' returned a list of length {len(child_node_or_list)}", file=sys.stderr)
+                return child_node_or_list[0] if child_node_or_list else None
+            # Проверим, что это экземпляр ParserRuleContext или None, прежде чем вернуть
+            elif isinstance(child_node_or_list, antlr4.ParserRuleContext) or child_node_or_list is None:
+                # print(f"[DEBUG][get_child_safely] Method '{child_name}()' returned: {type(child_node_or_list).__name__}", file=sys.stderr)
+                return child_node_or_list
+            else:
+                # print(f"[DEBUG][get_child_safely] Method '{child_name}()' returned unexpected type: {type(child_node_or_list).__name__}. Value: {str(child_node_or_list)[:100]}", file=sys.stderr)
+                # Если это не список и не ParserRuleContext (и не None), это может быть TerminalNode или что-то еще.
+                # Для LValue разбора мы обычно ожидаем ParserRuleContext.
+                # Если возвращается TerminalNodeImpl, это может быть ID, но get_full_identifier работает с QualifiedIdentifierContext.
+                # Пока что вернем его, если это ANTLR дерево, иначе None.
+                if hasattr(child_node_or_list, 'symbol'): # Признак TerminalNodeImpl
+                    return child_node_or_list 
+                return None # Не то, что мы обычно ищем как "узел контекста" для дальнейшего разбора lvalue
+                
+        except Exception as e:
+            # print(f"[ERROR][get_child_safely] Exception while getting child '{child_name}' from {type(parent_ctx).__name__}: {e}", file=sys.stderr)
+            return None
 
 # Эта функция должна быть на верхнем уровне модуля, а не методом класса
 def interpret_kumir(code: str):
