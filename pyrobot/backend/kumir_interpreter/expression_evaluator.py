@@ -1,6 +1,7 @@
 # expression_evaluator.py
 # Этот файл будет содержать логику вычисления выражений для интерпретатора КуМира. 
 
+from __future__ import annotations
 import sys
 import operator
 from .generated.KumirLexer import KumirLexer
@@ -188,7 +189,7 @@ class ExpressionEvaluator:
     def visitColorLiteral(self, ctx: KumirParser.ColorLiteralContext):
         pass # Заглушка
 
-    def visitPrimaryExpression(self, ctx): # KumirParser.PrimaryExpressionContext
+    def visitPrimaryExpression(self, ctx: KumirParser.PrimaryExpressionContext): # KumirParser.PrimaryExpressionContext
         visitor = self.visitor
         print(f"[DEBUG][visitPrimaryExpressionEE] Called for ctx: {ctx.getText()}", file=sys.stderr)
         result = None
@@ -381,130 +382,59 @@ class ExpressionEvaluator:
 
                             if mode in ['рез', 'арг рез']:
                                 if current_actual_arg_idx < len(actual_arg_expr_nodes):
-                                    arg_expr_node_for_output = actual_arg_expr_nodes[current_actual_arg_idx]
-                                    # Используем visitor._extract_var_name_from_arg_expr
-                                    caller_var_name_for_output = visitor._extract_var_name_from_arg_expr(arg_expr_node_for_output)
+                                    arg_expr_node_for_output: KumirParser.ExpressionContext = actual_arg_expr_nodes[current_actual_arg_idx]
                                     
-                                    if caller_var_name_for_output:
-                                        caller_var_info, _ = visitor.find_variable(caller_var_name_for_output)
-                                        if not caller_var_info:
-                                            raise KumirEvalError(f"Строка {arg_expr_node_for_output.start.line}: Переменная '{caller_var_name_for_output}', переданная для параметра '{mode} {param_name_in_proc}', не найдена.", arg_expr_node_for_output.start.line, arg_expr_node_for_output.start.column)
-                                        
-                                        if caller_var_info['type'] != param_base_type_str or caller_var_info.get('is_table', False) != param_is_table_decl:
-                                             type_err_msg = f"Тип переменной '{caller_var_name_for_output}' ({caller_var_info['type']}{' таб' if caller_var_info.get('is_table', False) else ''}) " \
-                                                            f"несовместим с типом параметра '{mode} {param_name_in_proc}' ({param_base_type_str}{' таб' if param_is_table_decl else ''})."
-                                             raise KumirEvalError(type_err_msg, arg_expr_node_for_output.start.line, arg_expr_node_for_output.start.column)
-                                        output_params_mapping.append({'caller_var_name': caller_var_name_for_output, 'proc_param_name': param_name_in_proc})
-                                    elif mode in ['рез', 'арг рез']: 
-                                        raise KumirEvalError(f"Строка {arg_expr_node_for_output.start.line}: Аргумент для параметра '{mode} {param_name_in_proc}' должен быть переменной.", arg_expr_node_for_output.start.line, arg_expr_node_for_output.start.column)
-                                elif mode == 'арг рез':
-                                     raise KumirEvalError(f"Отсутствует аргумент для параметра 'арг рез {param_name_in_proc}' при вызове '{proc_name}'.", first_op_token_node.getSymbol().line, first_op_token_node.getSymbol().column)
+                                    # Используем новый метод _get_lvalue_structure_for_arg
+                                    lvalue_primary_expr_ctx, lvalue_indices_ctx = self._get_lvalue_structure_for_arg(arg_expr_node_for_output)
+                                    
+                                    if not lvalue_primary_expr_ctx or not lvalue_primary_expr_ctx.qualifiedIdentifier():
+                                        err_line = arg_expr_node_for_output.start.line
+                                        err_col = arg_expr_node_for_output.start.column
+                                        param_display_name = param_var_item_ctx.ID().getText() # Имя параметра из объявления процедуры
+                                        raise KumirEvalError(f"Строка {err_line}: Аргумент '{arg_expr_node_for_output.getText()}' для параметра '{param_display_name}' с режимом '{mode}' должен быть переменной или элементом таблицы.", err_line, err_col)
+
+                                    caller_var_name_for_output = lvalue_primary_expr_ctx.qualifiedIdentifier().getText()
+                                    
+                                    output_params_mapping.append({
+                                        'param_name_in_proc': param_name_in_proc,
+                                        'caller_var_name': caller_var_name_for_output,
+                                        'caller_var_primary_ctx': lvalue_primary_expr_ctx,
+                                        'caller_var_indices_ctx': lvalue_indices_ctx, # Может быть None
+                                        'param_mode': mode
+                                    })
+                                else: # Недостаточно фактических аргументов
+                                    err_line = proc_def_ctx.algorithmHeader().start.line
+                                    err_col = proc_def_ctx.algorithmHeader().start.column
+                                    param_display_name = param_var_item_ctx.ID().getText()
+                                    raise KumirArgumentError(f"Строка {err_line}: Недостаточно аргументов для процедуры '{proc_name}'. Отсутствует аргумент для параметра '{param_display_name}' с режимом '{mode}'.", err_line, err_col)
                             
-                            if mode in ['арг', 'арг рез']:
-                                current_actual_arg_idx +=1
+                            current_actual_arg_idx += 1
                     
                     num_expected_input_params = len([p for p in expected_params_info if p['mode'] in ['арг', 'арг рез']])
                     if len(args) != num_expected_input_params:
                         raise KumirEvalError(f"Неверное количество аргументов для '{proc_name}': ожидалось {num_expected_input_params} входных, передано {len(args)}.", first_op_token_node.getSymbol().line, first_op_token_node.getSymbol().column)
                     
-                    visitor.enter_scope()
-                    local_scope = visitor.scopes[-1]
-                    local_scope['__знач__'] = None # Инициализируем возвращаемое значение функции
+                    # Сохраняем output_params_mapping для передачи в KumirInterpreterVisitor
+                    # и другие данные, необходимые для настройки вызова в visitor'е.
+                    # Этот метод будет определен в KumirInterpreterVisitor.
+                    visitor.prepare_procedure_call_data = {
+                        'proc_def_ctx': proc_def_ctx,
+                        'args_values_for_input_params': args, # Переименовано для ясности
+                        'output_params_mapping': output_params_mapping,
+                        'expected_params_info': expected_params_info,
+                        'actual_arg_expr_nodes': actual_arg_expr_nodes 
+                    }
+
+                    # Вызов тела процедуры. 
+                    # KumirInterpreterVisitor.visitAlgorithmDefinition (вызванный через visit(proc_def_ctx))
+                    # должен будет использовать сохраненные данные из visitor.prepare_procedure_call_data.
+                    current_eval_value = visitor.visit(proc_def_ctx) 
                     
-                    try:
-                        actual_arg_iter_idx = 0 
-                        for param_info in expected_params_info:
-                            p_name, p_type, p_mode, p_is_table, p_decl_ctx = param_info['name'], param_info['type'], param_info['mode'], param_info['is_table'], param_info['decl_ctx']
-
-                            if p_is_table:
-                                if p_mode in ['арг', 'арг рез']:
-                                    arg_value_for_table = args[actual_arg_iter_idx]
-                                    if not isinstance(arg_value_for_table, KumirTableVar):
-                                        raise KumirEvalError(f"При передаче таблицы '{p_name}' в процедуру '{proc_name}' ожидался объект KumirTableVar, получен {type(arg_value_for_table).__name__}.", actual_arg_expr_nodes[actual_arg_iter_idx].start.line, actual_arg_expr_nodes[actual_arg_iter_idx].start.column)
-                                    if arg_value_for_table.base_kumir_type_name != p_type:
-                                        raise KumirEvalError(f"Тип таблицы '{p_name}' ({arg_value_for_table.base_kumir_type_name} таб) не совпадает с ожидаемым ({p_type} таб).", actual_arg_expr_nodes[actual_arg_iter_idx].start.line, actual_arg_expr_nodes[actual_arg_iter_idx].start.column)
-                                    
-                                    copied_table = KumirTableVar(arg_value_for_table.base_kumir_type_name, arg_value_for_table.dimension_bounds_list, p_decl_ctx)
-                                    copied_table.data = visitor.copy.deepcopy(arg_value_for_table.data) # visitor.copy
-                                    local_scope[p_name] = {'type': p_type, 'value': copied_table, 'is_table': True, 'dimensions_info': copied_table.dimension_bounds_list}
-                                    print(f"[DEBUG][ProcCallEE InitParam] Табличный параметр '{p_mode} {p_name}' ({p_type} таб) инициализирован копией таблицы.", file=sys.stderr)
-                                    actual_arg_iter_idx += 1
-                                elif p_mode == 'рез':
-                                    mapped_caller = next((m for m in output_params_mapping if m['proc_param_name'] == p_name), None)
-                                    if not mapped_caller: raise KumirEvalError(f"Внутренняя ошибка: нет сопоставления для 'рез {p_name}'.")
-                                    caller_var_info_for_rez, _ = visitor.find_variable(mapped_caller['caller_var_name'])
-                                    if not caller_var_info_for_rez or not isinstance(caller_var_info_for_rez['value'], KumirTableVar):
-                                        raise KumirEvalError(f"Внутренняя ошибка: переменная для 'рез {p_name}' не таблица в вызывающей стороне.")
-                                    local_scope[p_name] = {'type': p_type, 'value': caller_var_info_for_rez['value'], 'is_table': True, 'dimensions_info': caller_var_info_for_rez['value'].dimension_bounds_list}
-                                    print(f"[DEBUG][ProcCallEE InitParam] Табличный параметр 'рез {p_name}' ({p_type} таб) использует ссылку на таблицу '{mapped_caller['caller_var_name']}'.", file=sys.stderr)
-                            else: 
-                                visitor.declare_variable(p_name, p_type, is_table=False) # Используем visitor.declare_variable
-                                if p_mode in ['арг', 'арг рез']:
-                                    arg_value_scalar = args[actual_arg_iter_idx]
-                                    try:
-                                        # Используем visitor._validate_and_convert_value_for_assignment
-                                        converted_scalar = visitor._validate_and_convert_value_for_assignment(arg_value_scalar, p_type, p_name)
-                                        visitor.update_variable(p_name, converted_scalar) # Используем visitor.update_variable
-                                    except (KumirEvalError) as e: # AssignmentError, DeclarationError наследуются от KumirEvalError
-                                        err_line = actual_arg_expr_nodes[actual_arg_iter_idx].start.line
-                                        err_col = actual_arg_expr_nodes[actual_arg_iter_idx].start.column
-                                        raise type(e)(f"Строка {err_line}: Ошибка типа при передаче аргумента для параметра '{p_name}': {e.args[0]}", err_line, err_col) from e
-                                    actual_arg_iter_idx += 1
-                        
-                        visitor.visit(proc_def_ctx.algorithmBody())
-
-                        for mapping in output_params_mapping:
-                            caller_var_name = mapping['caller_var_name']
-                            proc_param_name = mapping['proc_param_name']
-                            
-                            param_entry_local = local_scope.get(proc_param_name)
-                            if not param_entry_local: raise KumirEvalError(f"Внутренняя ошибка: параметр '{proc_param_name}' не найден.") # KumirExecutionError -> KumirEvalError
-
-                            caller_var_info_to_update, caller_scope_to_update = visitor.find_variable(caller_var_name)
-                            if not caller_var_info_to_update: raise KumirEvalError(f"Внутренняя ошибка: переменная '{caller_var_name}' не найдена для результата.")
-
-                            if param_entry_local['is_table']:
-                                param_mode_of_this = next((p['mode'] for p in expected_params_info if p['name'] == proc_param_name), None)
-                                if param_mode_of_this == 'арг рез':
-                                    if isinstance(param_entry_local['value'], KumirTableVar) and isinstance(caller_var_info_to_update['value'], KumirTableVar):
-                                        source_table = param_entry_local['value']
-                                        target_table = caller_var_info_to_update['value']
-                                        if source_table.dimension_bounds_list != target_table.dimension_bounds_list:
-                                            raise KumirEvalError(f"Несовпадение размерностей при возврате таблицы '{proc_param_name}' в '{caller_var_name}'.")
-                                        target_table.data = visitor.copy.deepcopy(source_table.data)
-                                        print(f"[DEBUG][ProcCallEE Exit] Данные таблицы 'арг рез {proc_param_name}' скопированы обратно в '{caller_var_name}'.", file=sys.stderr)
-                                    else: 
-                                        print(f"[WARN][ProcCallEE Exit] Не удалось скопировать данные для таблицы 'арг рез {proc_param_name}', типы не KumirTableVar.", file=sys.stderr)
-                            else:
-                                final_param_val_scalar = param_entry_local['value']
-                                try:
-                                    converted_for_caller = visitor._validate_and_convert_value_for_assignment(final_param_val_scalar, caller_var_info_to_update['type'], caller_var_name)
-                                    caller_var_info_to_update['value'] = converted_for_caller
-                                except (KumirEvalError) as e:
-                                    param_decl_line = param_entry_local.get('decl_ctx', header).start.line
-                                    raise KumirEvalError(f"Строка ~{param_decl_line}: Ошибка при возврате значения из '{proc_param_name}' в '{caller_var_name}': {e.args[0]}")
-                        
-                        if header.typeSpecifier(): 
-                            current_eval_value = local_scope.get('__знач__')
-                            is_function_not_proc = True 
-                            try: 
-                                if not header.typeSpecifier().basicType() and not header.typeSpecifier().arrayType() and not header.typeSpecifier().actorType():
-                                    is_function_not_proc = False
-                            except AttributeError: 
-                                is_function_not_proc = False
+                    # Старый блок try...finally, который обрабатывал параметры и возвращал значения локально, УДАЛЕН.
+                    # Эта логика теперь полностью перенесена в KumirInterpreterVisitor.visitAlgorithmDefinition (или аналогичный).
                                 
-                            if current_eval_value is None and is_function_not_proc:
-                               func_sig_for_err = header.algorithmNameTokens().getText().strip()
-                               if header.typeSpecifier(): func_sig_for_err = header.typeSpecifier().getText() + " " + func_sig_for_err
-                               raise KumirEvalError(f"Функция '{func_sig_for_err}' не присвоила значение переменной 'знач'.", header.start.line, header.start.column)
-                        else: 
-                            current_eval_value = None 
-                    finally:
-                        visitor.exit_scope()
                 else:
-                    err_line = primary_expr_ctx.start.line
-                    err_col = primary_expr_ctx.start.column
-                    raise KumirEvalError(f"Строка {err_line}, столбец {err_col}: Процедура или функция '{proc_name}' не найдена.", err_line, err_col)
+                    raise KumirEvalError(f"Процедура или функция '{proc_name}' не найдена.", primary_expr_ctx.start.line, primary_expr_ctx.start.column)
 
         print(f"[Exit] visitPostfixExpressionEE for {ctx.getText()} -> returns {repr(current_eval_value)}", file=sys.stderr)
         return current_eval_value
@@ -796,4 +726,174 @@ class ExpressionEvaluator:
         result = self.visitLogicalOrExpression(ctx.logicalOrExpression()) # self.visitLogicalOrExpression
         print(f"[DEBUG][visitExpressionEE] Received from visitLogicalOrExpression: {result} (type: {type(result)})", file=sys.stderr)
         print(f"[DEBUG][visitExpressionEE] Returning: {result} (type: {type(result)})", file=sys.stderr)
+        return result 
+
+    def _get_lvalue_structure_for_arg(self, expr_ctx: KumirParser.ExpressionContext) -> \
+            tuple[KumirParser.PrimaryExpressionContext | None, KumirParser.IndexListContext | None]:
+        """
+        Разбирает ExpressionContext, чтобы найти нижележащие PrimaryExpressionContext (для имени переменной/таблицы)
+        и IndexListContext (для индексов таблицы). Не производит полного вычисления.
+        Возвращает (PrimaryExpressionContext | None, IndexListContext | None).
+        """
+        # print(f"[DEBUG][GetLValueStruct] ENTER for expr: {expr_ctx.getText()}", file=sys.stderr)
+
+        current_ctx = expr_ctx
+        # Спуск по дереву выражения до UnaryExpressionContext
+        # Этот путь должен соответствовать грамматике и порядку разбора в visitXExpression методах
+        if hasattr(current_ctx, 'logicalOrExpression') and current_ctx.logicalOrExpression():
+            current_ctx = current_ctx.logicalOrExpression()
+            if hasattr(current_ctx, 'logicalAndExpression') and current_ctx.logicalAndExpression() and len(current_ctx.logicalAndExpression()) > 0:
+                current_ctx = current_ctx.logicalAndExpression(0)
+                if hasattr(current_ctx, 'equalityExpression') and current_ctx.equalityExpression() and len(current_ctx.equalityExpression()) > 0:
+                    current_ctx = current_ctx.equalityExpression(0)
+                    if hasattr(current_ctx, 'relationalExpression') and current_ctx.relationalExpression() and len(current_ctx.relationalExpression()) > 0:
+                        current_ctx = current_ctx.relationalExpression(0)
+                        if hasattr(current_ctx, 'additiveExpression') and current_ctx.additiveExpression() and len(current_ctx.additiveExpression()) > 0:
+                            current_ctx = current_ctx.additiveExpression(0)
+                            print(f"[DEBUG_LVALUE_TYPES] Path: after add(0): current_ctx type = {type(current_ctx).__name__}", file=sys.stderr)
+                            if hasattr(current_ctx, 'multiplicativeExpression') and current_ctx.multiplicativeExpression() and len(current_ctx.multiplicativeExpression()) > 0:
+                                current_ctx = current_ctx.multiplicativeExpression(0) 
+                                print(f"[DEBUG_LVALUE_TYPES] Path: after mult(0): current_ctx type = {type(current_ctx).__name__}", file=sys.stderr)
+                                if hasattr(current_ctx, 'powerExpression') and current_ctx.powerExpression() and len(current_ctx.powerExpression()) > 0:
+                                    # current_ctx здесь MultiplicativeExpressionContext, его powerExpression() -> list[PowerExpressionContext]
+                                    power_expr_as_list_from_mult = current_ctx.powerExpression()
+                                    print(f"[DEBUG_LVALUE_TYPES] Path: power_expr_as_list_from_mult ({type(power_expr_as_list_from_mult).__name__}), len={len(power_expr_as_list_from_mult)}", file=sys.stderr)
+                                    current_ctx = power_expr_as_list_from_mult[0] # current_ctx теперь PowerExpressionContext
+                                    print(f"[DEBUG_LVALUE_TYPES] Path: current_ctx after power_expr_as_list_from_mult[0] is {type(current_ctx).__name__}", file=sys.stderr)
+                                    
+                                    # unaryExpression() у PowerExpressionContext возвращает список UnaryExpressionContext
+                                    unary_expressions_list = current_ctx.unaryExpression() 
+                                    print(f"[DEBUG_LVALUE_TYPES] Path: unary_expressions_list from PowerExprCtx is {type(unary_expressions_list).__name__}", file=sys.stderr)
+                                    if isinstance(unary_expressions_list, list): # Явная проверка, что это список
+                                        print(f"[DEBUG_LVALUE_TYPES] Path: unary_expressions_list IS a list, len={len(unary_expressions_list)}", file=sys.stderr)
+                                        if unary_expressions_list: # Проверка, что список не пуст
+                                            current_ctx = unary_expressions_list[0] # current_ctx теперь UnaryExpressionContext
+                                            print(f"[DEBUG_LVALUE_TYPES] Path: current_ctx after unary_expressions_list[0] is {type(current_ctx).__name__}", file=sys.stderr)
+                                        else:
+                                            # Список унарных выражений пуст
+                                            print(f"[DEBUG_LVALUE_TYPES] Path: unary_expressions_list is empty for: {expr_ctx.getText()}", file=sys.stderr)
+                                            return None, None
+                                    elif isinstance(unary_expressions_list, KumirParser.UnaryExpressionContext): # Если вдруг вернулся один объект
+                                        print(f"[DEBUG_LVALUE_TYPES] Path: unary_expressions_list IS a single UnaryExpressionContext", file=sys.stderr)
+                                        current_ctx = unary_expressions_list # current_ctx теперь UnaryExpressionContext
+                                    else:
+                                        # Неожиданный тип для unary_expressions_list
+                                        print(f"[DEBUG_LVALUE_TYPES] Path: unary_expressions_list is UNEXPECTED TYPE {type(unary_expressions_list).__name__} for: {expr_ctx.getText()}", file=sys.stderr)
+                                        return None, None                                           
+                                else:
+                                    # print(f"[DEBUG][GetLValueStruct] No powerExpression in multExpression for: {expr_ctx.getText()}", file=sys.stderr)
+                                    return None, None
+                            else:
+                                # print(f"[DEBUG][GetLValueStruct] No multExpression in addExpression for: {expr_ctx.getText()}", file=sys.stderr)
+                                return None, None
+                        else:
+                            # print(f"[DEBUG][GetLValueStruct] No addExpression in relExpression for: {expr_ctx.getText()}", file=sys.stderr)
+                            return None, None
+                    else:
+                        # print(f"[DEBUG][GetLValueStruct] No relExpression in eqExpression for: {expr_ctx.getText()}", file=sys.stderr)
+                        return None, None
+                else:
+                    # print(f"[DEBUG][GetLValueStruct] No eqExpression in logAndExpression for: {expr_ctx.getText()}", file=sys.stderr)
+                    return None, None
+            else:
+                # print(f"[DEBUG][GetLValueStruct] No logAndExpression in logOrExpression for: {expr_ctx.getText()}", file=sys.stderr)
+                return None, None
+        else:
+            # print(f"[DEBUG][GetLValueStruct] Not a standard expression structure starting with logicalOr: {expr_ctx.getText()}", file=sys.stderr)
+            return None, None
+
+        if not isinstance(current_ctx, KumirParser.UnaryExpressionContext):
+            # print(f"[DEBUG][GetLValueStruct] Expected UnaryExpressionContext, got {type(current_ctx).__name__} for: {expr_ctx.getText()}", file=sys.stderr)
+            return None, None
+
+        unary_expr_ctx = current_ctx
+        primary_expr_ctx_candidate = None
+        index_list_ctx_candidate = None
+
+        if unary_expr_ctx.postfixExpression():
+            postfix_expr_ctx = unary_expr_ctx.postfixExpression()
+            primary_expr_ctx_candidate = postfix_expr_ctx.primaryExpression()
+            if len(postfix_expr_ctx.children) > 1 and hasattr(postfix_expr_ctx, 'indexList') and postfix_expr_ctx.indexList():
+                 op_token_node = postfix_expr_ctx.getChild(1)
+                 if isinstance(op_token_node, TerminalNode) and op_token_node.getSymbol().type == KumirLexer.LBRACK:
+                    index_list_ctx_candidate = postfix_expr_ctx.indexList()
+        elif unary_expr_ctx.primaryExpression():
+            primary_expr_ctx_candidate = unary_expr_ctx.primaryExpression()
+            index_list_ctx_candidate = None
+        else:
+            # print(f"[DEBUG][GetLValueStruct] UnaryExpression has neither Postfix nor Primary for: {expr_ctx.getText()}", file=sys.stderr)
+            return None, None
+
+        if primary_expr_ctx_candidate and \
+           primary_expr_ctx_candidate.LPAREN() and \
+           primary_expr_ctx_candidate.expression() and \
+           primary_expr_ctx_candidate.RPAREN():
+            # print(f"[DEBUG][GetLValueStruct] Recursing for parenthesized primary: {primary_expr_ctx_candidate.expression().getText()}", file=sys.stderr)
+            inner_primary, inner_indices = self._get_lvalue_structure_for_arg(primary_expr_ctx_candidate.expression())
+            if inner_indices is not None and index_list_ctx_candidate is None:
+                # print(f"[DEBUG][GetLValueStruct] Parenthesized expression was already indexed: {primary_expr_ctx_candidate.expression().getText()}", file=sys.stderr)
+                return inner_primary, inner_indices
+            # print(f"[DEBUG][GetLValueStruct] Using inner_primary '{inner_primary.getText() if inner_primary else 'None'}' and outer_indices '{index_list_ctx_candidate.getText() if index_list_ctx_candidate else 'None'}'", file=sys.stderr)
+            return inner_primary, index_list_ctx_candidate
+        
+        # print(f"[DEBUG][GetLValueStruct] EXIT for {expr_ctx.getText()}. Primary: {primary_expr_ctx_candidate.getText() if primary_expr_ctx_candidate else 'None'}, Indices: {index_list_ctx_candidate.getText() if index_list_ctx_candidate else 'None'}", file=sys.stderr)
+        return primary_expr_ctx_candidate, index_list_ctx_candidate
+
+    def visitPrimaryExpression(self, ctx: KumirParser.PrimaryExpressionContext): # KumirParser.PrimaryExpressionContext
+        visitor = self.visitor
+        print(f"[DEBUG][visitPrimaryExpressionEE] Called for ctx: {ctx.getText()}", file=sys.stderr)
+        result = None
+        if ctx.literal():
+            result = self.visitLiteral(ctx.literal())
+        elif ctx.qualifiedIdentifier():
+            name = ctx.qualifiedIdentifier().getText()
+            # --- НАЧАЛО ОТЛАДКИ N В EVALUATOR ---
+            if name == 'N':
+                print(f"[DEBUG][EE_N_Check_Access] Пытаемся получить значение для 'N' в ExpressionEvaluator.", file=sys.stderr)
+            # --- КОНЕЦ ОТЛАДКИ N В EVALUATOR ---
+            var_info, _ = visitor.find_variable(name)
+            if var_info:
+                # --- НАЧАЛО ОТЛАДКИ N В EVALUATOR (ПОСЛЕ ПОИСКА) ---
+                if name == 'N':
+                    print(f"[DEBUG][EE_N_Check_Value] 'N' найдена в ExpressionEvaluator, var_info['value'] = {var_info['value']}", file=sys.stderr)
+                # --- КОНЕЦ ОТЛАДКИ N В EVALUATOR ---
+                is_table_access = var_info.get('is_table') and not ctx.parentCtx.LPAREN()
+                # Check if it's a direct table access (no indices/args yet, handled by Postfix)
+                is_direct_table_ref = (
+                    not (hasattr(ctx.parentCtx, 'indexList') and ctx.parentCtx.indexList()) and
+                    not (hasattr(ctx.parentCtx, 'argumentList') and ctx.parentCtx.argumentList())
+                )
+
+                if is_table_access and is_direct_table_ref:
+                    print(f"[DEBUG][visitPrimaryExpressionEE] Returning KumirTableVar object for table: {name}", file=sys.stderr)
+                    result = var_info['value'] 
+                elif var_info.get('is_table'): # Table name for postfix processing
+                    print(f"[DEBUG][visitPrimaryExpressionEE] Returning name for table (to be handled by Postfix): {name}", file=sys.stderr)
+                    result = name
+                else: # Scalar variable or function/procedure name
+                    if callable(var_info.get('value')):
+                        result = name
+                    else:
+                        result = var_info['value']
+            else:
+                print(f"[DEBUG][visitPrimaryExpressionEE] '{name}' not found as variable, assuming proc/func name.", file=sys.stderr)
+                result = name 
+        elif ctx.LPAREN():
+            # When all expressions are moved, this will be self.visitExpression(ctx.expression())
+            result = self.visitExpression(ctx.expression()) 
+            print(f"[DEBUG][visitPrimaryExpressionEE] LPAREN expression result: {result}", file=sys.stderr)
+        elif ctx.RETURN_VALUE():
+            current_scope_dict = visitor.scopes[-1]
+            if '__знач__' not in current_scope_dict:
+                if len(visitor.scopes) > 1 and '__знач__' in visitor.scopes[-2]:
+                    current_scope_dict = visitor.scopes[-2]
+            if '__знач__' not in current_scope_dict:
+                print(f"[DEBUG][visitPrimaryExpressionEE] '__знач__' not in current scope or caller scope. Current scopes: {visitor.scopes}", file=sys.stderr)
+                raise KumirEvalError("Попытка использования неинициализированного возвращаемого значения 'знач'.", ctx.start.line, ctx.start.column)
+            result = current_scope_dict['__знач__']
+            print(f"[DEBUG][visitPrimaryExpressionEE] RETURN_VALUE (__знач__) result: {repr(result)} from scope: {current_scope_dict is visitor.scopes[-1]}", file=sys.stderr)
+        else:
+            print(f"[DEBUG][visitPrimaryExpressionEE] Unknown primary expression type: {ctx.getText()}", file=sys.stderr)
+            raise KumirEvalError(f"Неизвестный тип первичного выражения: {ctx.getText()}", ctx.start.line, ctx.start.column)
+        print(f"[DEBUG][visitPrimaryExpressionEE] Returning: {repr(result)} (type: {type(result)}) for ctx: {ctx.getText()}", file=sys.stderr)
         return result 
