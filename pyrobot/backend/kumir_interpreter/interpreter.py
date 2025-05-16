@@ -1352,7 +1352,12 @@ class KumirInterpreterVisitor(KumirParserVisitor):
 
                 input_str = self.get_input_line().strip()
                 if self.echo_input:
-                    print(input_str) 
+                    # Check if it's the last argument in the current ioStatement's list
+                    is_last_arg_in_input_group = (i_loop == len(io_args_list_candidate) - 1)
+                    if is_last_arg_in_input_group:
+                        print(input_str, end='\n')
+                    else:
+                        print(input_str, end=' ')
                 
                 index_list_node = None
                 if postfix_expr_node:
