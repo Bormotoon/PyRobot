@@ -372,6 +372,7 @@ class ExpressionEvaluator:
                         
                         for param_var_item_ctx in param_decl_node.variableList().variableDeclarationItem():
                             param_name_in_proc = param_var_item_ctx.ID().getText()
+                            # print(f"[DEBUG_PARAM_MODE_EE] Param: {param_name_in_proc}, Mode: {mode}", file=sys.stderr)
                             expected_params_info.append({
                                 'name': param_name_in_proc, 
                                 'type': param_base_type_str, 
@@ -386,6 +387,7 @@ class ExpressionEvaluator:
                                     
                                     # Используем новый метод _get_lvalue_structure_for_arg
                                     lvalue_primary_expr_ctx, lvalue_indices_ctx = self._get_lvalue_structure_for_arg(arg_expr_node_for_output)
+                                    # print(f"[DEBUG_LVALUE_STRUCT_EE] For arg '{arg_expr_node_for_output.getText()}': lvalue_primary_expr_ctx is SET, lvalue_indices_ctx is {'SET' if lvalue_indices_ctx else 'None'}", file=sys.stderr)
                                     
                                     if not lvalue_primary_expr_ctx or not lvalue_primary_expr_ctx.qualifiedIdentifier():
                                         err_line = arg_expr_node_for_output.start.line
@@ -393,8 +395,9 @@ class ExpressionEvaluator:
                                         param_display_name = param_var_item_ctx.ID().getText() # Имя параметра из объявления процедуры
                                         raise KumirEvalError(f"Строка {err_line}: Аргумент '{arg_expr_node_for_output.getText()}' для параметра '{param_display_name}' с режимом '{mode}' должен быть переменной или элементом таблицы.", err_line, err_col)
 
-                                    caller_var_name_for_output = lvalue_primary_expr_ctx.qualifiedIdentifier().getText()
+                                    caller_var_name_for_output = lvalue_primary_expr_ctx.getText() # Имя переменной в вызывающем коде
                                     
+                                    # print(f"[DEBUG_PRE_APPEND_OPM_EE] Appending to OPM: param_name='{param_name_in_proc}', caller_var='{caller_var_name_for_output}', mode='{mode}'", file=sys.stderr)
                                     output_params_mapping.append({
                                         'param_name_in_proc': param_name_in_proc,
                                         'caller_var_name': caller_var_name_for_output,
@@ -409,25 +412,25 @@ class ExpressionEvaluator:
                                     raise KumirArgumentError(f"Строка {err_line}: Недостаточно аргументов для процедуры '{proc_name}'. Отсутствует аргумент для параметра '{param_display_name}' с режимом '{mode}'.", err_line, err_col)
                             
                             current_actual_arg_idx += 1
+                        # print(f"[DEBUG_POST_PARAM_LOOP_EE] OPM after processing all items in param_decl_node '{param_decl_node.getText().replace("\n", " ")}': {output_params_mapping}", file=sys.stderr)
                     
                     num_expected_input_params = len([p for p in expected_params_info if p['mode'] in ['арг', 'арг рез']])
                     if len(args) != num_expected_input_params:
                         raise KumirEvalError(f"Неверное количество аргументов для '{proc_name}': ожидалось {num_expected_input_params} входных, передано {len(args)}.", first_op_token_node.getSymbol().line, first_op_token_node.getSymbol().column)
                     
-                    # Сохраняем output_params_mapping для передачи в KumirInterpreterVisitor
-                    # и другие данные, необходимые для настройки вызова в visitor'е.
-                    # Этот метод будет определен в KumirInterpreterVisitor.
-                    visitor.prepare_procedure_call_data = {
-                        'proc_def_ctx': proc_def_ctx,
-                        'args_values_for_input_params': args, # Переименовано для ясности
-                        'output_params_mapping': output_params_mapping,
-                        'expected_params_info': expected_params_info,
-                        'actual_arg_expr_nodes': actual_arg_expr_nodes 
-                    }
+                    actual_arg_values = args[:num_expected_input_params]
+                    actual_arg_values_for_input_params = actual_arg_values[:num_expected_input_params]
 
-                    # Вызов тела процедуры. 
-                    # KumirInterpreterVisitor.visitAlgorithmDefinition (вызванный через visit(proc_def_ctx))
-                    # должен будет использовать сохраненные данные из visitor.prepare_procedure_call_data.
+                    # Сохраняем данные для _execute_procedure_call
+                    visitor.prepare_procedure_call_data = {
+                        'args_values_for_input_params': actual_arg_values_for_input_params,
+                        'output_params_mapping': output_params_mapping, # Это список словарей
+                        'expected_params_info': expected_params_info,
+                        'actual_arg_expr_nodes': actual_arg_expr_nodes # Для сообщений об ошибках
+                    }
+                    # print(f"[DEBUG_FINAL_OPM_EE] Final OPM before setting prepare_procedure_call_data: {output_params_mapping}", file=sys.stderr)
+
+                    # Это место, где мы должны вызвать self.visitor.visit(proc_def_ctx), а не evaluator
                     current_eval_value = visitor.visit(proc_def_ctx) 
                     
                     # Старый блок try...finally, который обрабатывал параметры и возвращал значения локально, УДАЛЕН.

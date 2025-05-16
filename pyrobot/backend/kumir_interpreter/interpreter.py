@@ -549,9 +549,18 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                 if func_return_type_spec: # Доп. проверка, что typeSpecifier действительно есть
                     func_return_base_type, func_return_is_table = self._get_type_info_from_specifier(func_return_type_spec, alg_ctx.algorithmHeader().start.line)
                     if func_return_is_table:
-                        raise KumirSyntaxError(f"Функция '{name}' не может возвращать табличный тип.", alg_ctx.algorithmHeader().start.line, alg_ctx.algorithmHeader().start.column)
-                    current_scope['__знач__'] = KumirSimpleVar(func_return_base_type, get_default_value(func_return_base_type))
-                    print(f"[DEBUG][ExecuteProcCall] Для функции '{name}' инициализировано __знач__ типом {func_return_base_type}.", file=sys.stderr)
+                        # Пока не поддерживаем возврат таблиц напрямую, но место для ошибки есть
+                        raise KumirNotImplementedError(f"Возврат таблиц из функций ('{name}') пока не поддерживается.", alg_ctx.algorithmHeader().start.line, alg_ctx.algorithmHeader().start.column)
+                    
+                    print(f"[DEBUG][ExecuteProcCall] Setting up return value '__знач__' for func '{name}'. Type: {func_return_base_type}", file=sys.stderr)
+                    # Заменяем KumirSimpleVar на стандартную структуру переменной
+                    current_scope['__знач__'] = {
+                        'type': func_return_base_type,
+                        'value': get_default_value(func_return_base_type),
+                        'is_table': False, # Функции (пока) не возвращают таблицы
+                        'dimensions': None
+                    }
+                    return_value_explicitly_set[0] = False # Изначально не установлено
                 else: # Не должно происходить, если is_function_call is True
                     print(f"[WARNING][ExecuteProcCall] Функция '{name}' не имеет typeSpecifier, __знач__=None.", file=sys.stderr)
 
@@ -721,80 +730,139 @@ class KumirInterpreterVisitor(KumirParserVisitor):
         
         finally:
             # Этот флаг показывает, что мы сейчас внутри finally блока _execute_procedure_call
-            print(f"[DEBUG][ExecuteProcCall_FINALLY_ENTER] Proc: '{proc_name}'. output_params_mapping: {getattr(call_data, 'output_params_mapping', 'NOT FOUND')}", file=sys.stderr)
+            current_opm = call_data.get('output_params_mapping') # Определяем current_opm ПЕРЕД print
+            print(f"[DEBUG][ExecuteProcCall_FINALLY_ENTER] Proc: '{name}'. OPM Exists: {current_opm is not None}", file=sys.stderr)
 
             # 1. Обработка выходных параметров (арг рез, рез)
             # Это должно произойти ДО выхода из области видимости процедуры
-            if hasattr(call_data, 'output_params_mapping') and call_data.output_params_mapping:
-                print(f"[DEBUG][ExecuteProcCall_FINALLY] Processing output_params_mapping for '{proc_name}'. Count: {len(call_data.output_params_mapping)}", file=sys.stderr)
-                for mapping_info in call_data.output_params_mapping:
+            if current_opm: # Проверяем, что current_opm не None и не пустой список
+                print(f"[DEBUG][ExecuteProcCall_FINALLY] Processing output_params_mapping for '{name}'. Count: {len(current_opm)}", file=sys.stderr)
+                for mapping_info in current_opm:
                     param_name_in_proc = mapping_info.get('param_name_in_proc')
-                    lvalue_detail = mapping_info.get('lvalue_detail_for_caller')
+                    # lvalue_detail = mapping_info.get('lvalue_detail_for_caller') # Этого ключа нет, используется caller_var_name и др.
+                    caller_var_name = mapping_info.get('caller_var_name')
+                    caller_var_primary_ctx = mapping_info.get('caller_var_primary_ctx') # Используется для определения строки ошибки
+                    caller_var_indices_ctx = mapping_info.get('caller_var_indices_ctx')
 
-                    if not param_name_in_proc or not lvalue_detail:
-                        print(f"[ERROR][ExecuteProcCall_FINALLY] Invalid mapping_info: {mapping_info}", file=sys.stderr)
+                    if not param_name_in_proc or not caller_var_name:
+                        print(f"[ERROR][ExecuteProcCall_FINALLY] Invalid mapping_info (missing param_name_in_proc or caller_var_name): {mapping_info}", file=sys.stderr)
                         continue
 
-                    print(f"[DEBUG][ExecuteProcCall_FINALLY] Mapping detail: param_in_proc='{param_name_in_proc}', lvalue_detail_type='{lvalue_detail.get('type')}', caller_var_name='{lvalue_detail.get('name')}', caller_scope_idx='{lvalue_detail.get('scope_index')}'", file=sys.stderr)
+                    print(f"[DEBUG][ExecuteProcCall_FINALLY] Mapping detail: param_in_proc='{param_name_in_proc}', caller_var_name='{caller_var_name}', has_indices_ctx={'YES' if caller_var_indices_ctx else 'NO'}", file=sys.stderr)
 
                     # Получаем значение параметра из ТЕКУЩЕЙ (завершающейся) области видимости процедуры
-                    # self.find_variable будет искать в self.scopes[-1] (текущая область процедуры)
-                    param_value_obj_in_proc = self.find_variable(param_name_in_proc, error_if_not_found=False)
+                    param_var_info_in_proc, _ = self.find_variable(param_name_in_proc)
 
-                    if param_value_obj_in_proc:
-                        param_value_to_assign = param_value_obj_in_proc.value # Предполагаем, что .value содержит актуальное значение
-                        print(f"[DEBUG][ExecuteProcCall_FINALLY] Value of '{param_name_in_proc}' in proc scope is: {param_value_to_assign} (type: {type(param_value_to_assign)})", file=sys.stderr)
+                    if param_var_info_in_proc:
+                        param_value_to_assign = param_var_info_in_proc['value']
+                        param_type_in_proc = param_var_info_in_proc['type']
+                        param_is_table_in_proc = param_var_info_in_proc.get('is_table', False)
+                        print(f"[DEBUG][ExecuteProcCall_FINALLY] Value of '{param_name_in_proc}' in proc scope is: {repr(param_value_to_assign)} (type: {param_type_in_proc}, is_table: {param_is_table_in_proc})", file=sys.stderr)
 
-                        if lvalue_detail['type'] == 'simple_var':
-                            original_var_name = lvalue_detail.get('name')
-                            target_scope_idx = lvalue_detail.get('scope_index') # Индекс области видимости вызывающей переменной
+                        # Находим переменную в вызывающем scope (self.scopes[-2], так как текущий self.scopes[-1] это scope процедуры, который вот-вот будет удален)
+                        # Важно: self.exit_scope() еще не был вызван!
+                        if len(self.scopes) < 2:
+                            print(f"[ERROR][ExecuteProcCall_FINALLY] Cannot access caller scope for '{caller_var_name}'. Scope depth: {len(self.scopes)}", file=sys.stderr)
+                            continue
+                        
+                        caller_scope_dict = self.scopes[-2] # Это scope, из которого был вызов
+                        caller_var_info = caller_scope_dict.get(caller_var_name)
 
-                            if original_var_name is None or target_scope_idx is None:
-                                print(f"[ERROR][ExecuteProcCall_FINALLY] Missing 'name' or 'scope_index' in lvalue_detail for simple_var: {lvalue_detail}", file=sys.stderr)
-                                continue
+                        if caller_var_info:
+                            caller_target_type = caller_var_info['type']
+                            caller_is_table = caller_var_info.get('is_table', False)
+                            
+                            if caller_var_indices_ctx: # Запись в элемент таблицы в вызывающей области
+                                if not caller_is_table:
+                                    err_line = caller_var_primary_ctx.start.line if caller_var_primary_ctx else -1
+                                    print(f"[ERROR][ExecuteProcCall_FINALLY] Caller var '{caller_var_name}' is not a table, but indices provided for param '{param_name_in_proc}'. Line ~{err_line}", file=sys.stderr)
+                                    continue
+                                caller_table_obj = caller_var_info['value']
+                                if not isinstance(caller_table_obj, KumirTableVar):
+                                    err_line = caller_var_primary_ctx.start.line if caller_var_primary_ctx else -1
+                                    print(f"[ERROR][ExecuteProcCall_FINALLY] Caller var '{caller_var_name}' is not a KumirTableVar instance. Line ~{err_line}", file=sys.stderr)
+                                    continue
+                                
+                                indices_for_caller = []
+                                for idx_expr_ctx_for_caller in caller_var_indices_ctx.expression():
+                                    # Важно: индексы для ВЫЗЫВАЮЩЕЙ таблицы должны вычисляться в КОНТЕКСТЕ ВЫЗЫВАЮЩЕЙ стороны,
+                                    # но эти выражения (ctx) были получены из ExpressionEvaluator, который работал с аргументами вызова.
+                                    # Их значения уже должны были быть вычислены и сохранены, если бы они были сложными.
+                                    # Однако, _get_lvalue_structure_for_arg возвращает КОНТЕКСТЫ выражений, а не значения.
+                                    # Это означает, что их нужно вычислить ЗДЕСЬ, в scope ВЫЗЫВАЮЩЕГО.
+                                    # Для этого нам нужен ExpressionEvaluator, который работает с вызывающим scope.
+                                    # Создадим временный ExpressionEvaluator или используем существующий, но с правильным scope.
+                                    # Пока что, если индексы - простые переменные или литералы, self.evaluator должен справиться, если он правильно переключает scope.
+                                    # Но ExpressionEvaluator привязан к self.visitor, у которого scopes меняются.
+                                    # Проблема: self.evaluator.visitExpression будет использовать self.visitor.scopes[-1], который сейчас является scope процедуры.
+                                    # Решение: временно изменить scopes для evaluator.
+                                    original_scopes = self.scopes
+                                    self.scopes = original_scopes[:-1] # Временно убираем scope процедуры
+                                    try:
+                                        idx_val_for_caller = self.evaluator.visitExpression(idx_expr_ctx_for_caller)
+                                    finally:
+                                        self.scopes = original_scopes # Восстанавливаем scopes
 
-                            if 0 <= target_scope_idx < len(self.scopes):
-                                caller_scope_dict = self.scopes[target_scope_idx]
-                                if original_var_name in caller_scope_dict:
-                                    # Обновляем значение переменной в словаре области видимости вызывающего кода
-                                    caller_scope_dict[original_var_name].value = param_value_to_assign
-                                    print(f"[SUCCESS][ExecuteProcCall_FINALLY] Updated '{original_var_name}' in caller scope (index {target_scope_idx}) to {param_value_to_assign}", file=sys.stderr)
-                                else:
-                                    print(f"[ERROR][ExecuteProcCall_FINALLY] Variable '{original_var_name}' NOT FOUND in its designated caller scope (index {target_scope_idx}) for update!", file=sys.stderr)
-                            else:
-                                print(f"[ERROR][ExecuteProcCall_FINALLY] Invalid target_scope_idx ({target_scope_idx}) for '{original_var_name}'. Max scope index: {len(self.scopes)-1}", file=sys.stderr)
-                        elif lvalue_detail['type'] == 'array_element':
-                            # TODO: Реализовать обновление элемента массива в вызывающем коде
-                            print(f"[DEBUG][ExecuteProcCall_FINALLY] Array element output for '{lvalue_detail.get('name')}' (index: {lvalue_detail.get('indices')}) not yet fully implemented for update.", file=sys.stderr)
+                                    if not isinstance(idx_val_for_caller, int):
+                                        err_line = idx_expr_ctx_for_caller.start.line
+                                        print(f"[ERROR][ExecuteProcCall_FINALLY] Index for caller table '{caller_var_name}' is not int: {idx_val_for_caller}. Line ~{err_line}", file=sys.stderr)
+                                        # TODO: break inner loop and continue outer
+                                        break 
+                                    indices_for_caller.append(idx_val_for_caller)
+                                else: # Если внутренний цикл по индексам завершился без break
+                                    if len(indices_for_caller) != caller_table_obj.dimensions:
+                                        err_line = caller_var_indices_ctx.start.line
+                                        print(f"[ERROR][ExecuteProcCall_FINALLY] Incorrect number of indices for caller table '{caller_var_name}'. Expected {caller_table_obj.dimensions}, got {len(indices_for_caller)}. Line ~{err_line}", file=sys.stderr)
+                                        continue
+                                    
+                                    # Проверка и конвертация типа значения из процедуры для элемента таблицы в вызывающей стороне
+                                    validated_val_for_caller_table_el = self._validate_and_convert_value_for_assignment(
+                                        param_value_to_assign, 
+                                        caller_table_obj.base_kumir_type_name, 
+                                        f"элементу {caller_var_name}[{','.join(map(str, indices_for_caller))}]"
+                                    )
+                                    caller_table_obj.set_value(tuple(indices_for_caller), validated_val_for_caller_table_el, caller_var_indices_ctx)
+                                    print(f"[SUCCESS][ExecuteProcCall_FINALLY] Updated TABLE ELEMENT '{caller_var_name}[{','.join(map(str, indices_for_caller))}]' in caller scope to {repr(validated_val_for_caller_table_el)}", file=sys.stderr)
+                                    continue # Переходим к следующему mapping_info
+
+                            else: # Запись в простую переменную в вызывающей области
+                                if caller_is_table:
+                                    err_line = caller_var_primary_ctx.start.line if caller_var_primary_ctx else -1
+                                    print(f"[ERROR][ExecuteProcCall_FINALLY] Caller var '{caller_var_name}' IS a table, but no indices provided for param '{param_name_in_proc}'. Line ~{err_line}", file=sys.stderr)
+                                    continue
+
+                                # Отладочный print ПЕРЕД использованием proc_param_name в f-строке
+                                print(f"[DEBUG_FINALLY_PRE_VALIDATE] proc_param_name='{param_name_in_proc}', caller_var_name='{caller_var_name}'", file=sys.stderr)
+                                
+                                description_for_validation = f"переменной '{caller_var_name}' при возврате из параметра '{param_name_in_proc}'"
+                                validated_value_for_caller = self._validate_and_convert_value_for_assignment(
+                                    param_value_to_assign, 
+                                    caller_target_type, 
+                                    description_for_validation
+                                )
+                                caller_var_info['value'] = validated_value_for_caller
+                                print(f"[SUCCESS][ExecuteProcCall_FINALLY] Updated VAR '{caller_var_name}' in caller scope (index {len(self.scopes)-2}) to {repr(validated_value_for_caller)}", file=sys.stderr)
                         else:
-                            print(f"[ERROR][ExecuteProcCall_FINALLY] Unknown lvalue type in output_params_mapping: '{lvalue_detail.get('type')}'", file=sys.stderr)
+                            print(f"[ERROR][ExecuteProcCall_FINALLY] Variable '{caller_var_name}' NOT FOUND in its designated caller scope (index {len(self.scopes)-2}) for update!", file=sys.stderr)
                     else:
-                        print(f"[ERROR][ExecuteProcCall_FINALLY] Param '{param_name_in_proc}' not found in proc's scope ('{proc_name}') upon exit!", file=sys.stderr)
-            elif hasattr(call_data, 'output_params_mapping'):
-                 print(f"[DEBUG][ExecuteProcCall_FINALLY] output_params_mapping for '{proc_name}' is empty or None.", file=sys.stderr)
+                        print(f"[ERROR][ExecuteProcCall_FINALLY] Param '{param_name_in_proc}' not found in proc's scope ('{name}') upon exit!", file=sys.stderr)
+            elif 'output_params_mapping' in call_data: # Проверяем наличие ключа, если current_opm был None или пуст
+                 print(f"[DEBUG][ExecuteProcCall_FINALLY] output_params_mapping for '{name}' is present but empty or None.", file=sys.stderr)
 
 
             # 2. Теперь выходим из области видимости процедуры
-            # self.scope_manager.current_scope_level УЖЕ указывает на уровень процедуры.
-            # exit_scope уменьшит его.
-            exiting_scope_level = self.scope_manager.current_scope_level
-            self.scope_manager.exit_scope()
-            print(f"[DEBUG][Scope] Вышли из области уровня {exiting_scope_level} (для '{proc_name}'). Новый уровень: {self.scope_manager.current_scope_level}", file=sys.stderr)
+            # exiting_scope_level_before_exit = len(self.scopes) # Уровень = количество областей
+            self.exit_scope() # Этот метод уже печатает "[DEBUG][Scope] Вышли из области уровня X"
+            # Можно добавить дополнительный лог, если нужно, специфичный для _execute_procedure_call
+            # print(f"[DEBUG][ExecuteProcCall_FINALLY] Область процедуры '{name}' завершена. Текущий уровень scope: {len(self.scopes) -1}", file=sys.stderr)
 
             # Если это был вызов функции, которая должна была вернуть __знач__
-            if is_function_call and not return_value_explicitly_set[0] and not self.has_return_value(proc_def_ctx):
-                # Если функция не вернула значение через "знач :=" и не имеет __знач__ в параметрах,
-                # КуМир обычно возвращает неинициализированное значение (0 для чисел, "" для строк и т.д.)
-                # или это может быть ошибкой в некоторых реализациях, если возврат ожидается.
-                # Для процедур это нормально, они возвращают None (или ничего).
-                # Для функций без явного возврата, если есть переменная __знач__, она используется.
-                # Если __знач__ нет и нет return, поведение может зависеть от диалекта.
-                # Пока что, если не было явного return, и нет __знач__ в output_params, будем считать None.
-                print(f"[DEBUG][ExecuteProcCall_FINALLY] Function '{proc_name}' did not set a return value explicitly and no '__знач__' in output params. Returning None.", file=sys.stderr)
+            # if is_function_call and not return_value_explicitly_set[0] and not self.has_return_value(proc_def_ctx):
+            #    print(f"[DEBUG][ExecuteProcCall_FINALLY] Function '{name}' did not set a return value explicitly and no '__знач__' in output params. Returning None.", file=sys.stderr)
 
-            print(f"[DEBUG][ExecuteProcCall_FINALLY_EXIT] Proc: '{proc_name}'. Return prep: {return_value[0]}", file=sys.stderr)        
+            # print(f"[DEBUG][ExecuteProcCall_FINALLY_EXIT] Proc: '{name}'. Return prep: {repr(return_value_final)}", file=sys.stderr)
         
-        print(f"[DEBUG][ExecuteProcCall] Завершение вызова '{name}', возврат: {repr(return_value_final)}", file=sys.stderr)
+        # print(f"[DEBUG][ExecuteProcCall] Завершение вызова '{name}', возврат: {repr(return_value_final)}", file=sys.stderr)
         return return_value_final
 
     def visitAlgorithmBody(self, ctx: KumirParser.AlgorithmBodyContext):
