@@ -540,6 +540,7 @@ class KumirInterpreterVisitor(KumirParserVisitor):
         current_scope = self.scopes[-1]
         is_function_call = bool(alg_ctx.algorithmHeader().typeSpecifier())
         return_value_final = None
+        return_value_explicitly_set = [False] # <--- ОБЪЯВЛЯЕМ ЗДЕСЬ
 
         try:
             # Шаг 1: Инициализация параметров в current_scope
@@ -560,7 +561,9 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                         'is_table': False, # Функции (пока) не возвращают таблицы
                         'dimensions': None
                     }
-                    return_value_explicitly_set[0] = False # Изначально не установлено
+                    # return_value_explicitly_set[0] = False # <-- Уже объявлена и инициализирована выше
+                    # Просто используем, если нужно проверить или установить, но инициализация уже сделана.
+                    # Фактически, здесь мы подтверждаем, что она False до первого присваивания __знач__.
                 else: # Не должно происходить, если is_function_call is True
                     print(f"[WARNING][ExecuteProcCall] Функция '{name}' не имеет typeSpecifier, __знач__=None.", file=sys.stderr)
 
