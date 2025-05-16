@@ -6,7 +6,7 @@ import sys
 import operator
 from .generated.KumirLexer import KumirLexer
 from .generated.KumirParser import KumirParser
-from .kumir_exceptions import KumirEvalError, KumirSyntaxError
+from .kumir_exceptions import KumirEvalError, KumirSyntaxError, KumirArgumentError
 from .kumir_datatypes import KumirTableVar
 from antlr4 import InputStream, CommonTokenStream # type: ignore
 from typing import Any, Dict, List, Optional, Tuple, Union, TYPE_CHECKING
@@ -334,25 +334,61 @@ class ExpressionEvaluator:
                 proc_name_lower = proc_name.lower()
                 # Используем visitor.BUILTIN_FUNCTIONS и visitor.procedures
                 if proc_name_lower in visitor.BUILTIN_FUNCTIONS:
-                    arg_count = len(args)
-                    builtin_variants = visitor.BUILTIN_FUNCTIONS[proc_name_lower]
-                    if arg_count not in builtin_variants:
-                        err_ctx_line = argument_list_ctx.start.line if argument_list_ctx else first_op_token_node.getSymbol().line
-                        err_ctx_col = argument_list_ctx.start.column if argument_list_ctx else first_op_token_node.getSymbol().column
-                        raise KumirEvalError(f"Строка ~{err_ctx_line}: Неверное количество аргументов для встроенной процедуры '{proc_name}': ожидалось одно из {list(builtin_variants.keys())}, получено {arg_count}", err_ctx_line, err_ctx_col)
+                    # Вместо прямого доступа к BUILTIN_FUNCTIONS и его структуре,
+                    # используем новый метод visitor._call_builtin_function
                     try:
-                        print(f"!!! [Builtin Call PRE EE] Calling '{proc_name_lower}' with args: {repr(args)} (types: {[type(arg) for arg in args]})", flush=True, file=sys.stderr)
-                        result_of_call = builtin_variants[arg_count](*args)
-                        print(f"!!! [Builtin Call POST EE] '{proc_name_lower}' returned: {repr(result_of_call)} (type: {type(result_of_call)})", flush=True, file=sys.stderr)
-                        current_eval_value = result_of_call
+                        # Передаем first_op_token_node.getSymbol() как ctx для _call_builtin_function,
+                        # так как это токен, связанный с началом вызова функции (скобкой).
+                        # argument_list_ctx может быть None, если аргументов нет.
+                        # Важно использовать правильный контекст для сообщений об ошибках
+                        # ctx - это PostfixExpressionContext, его start указывает на начало всего постфиксного выражения
+                        # first_op_token_node.getSymbol() - это сам токен '('
+                        # argument_list_ctx - это контекст списка аргументов, если он есть
+                        
+                        # Если есть argument_list_ctx, его начало более релевантно для ошибок связанных с аргументами.
+                        # Если его нет (нет аргументов), то токен '(' (first_op_token_node.getSymbol()) - лучшая привязка.
+                        call_context_for_call = argument_list_ctx if argument_list_ctx else first_op_token_node.getSymbol()
+                        
+                        # Инициализируем effective_ctx_for_call значением по умолчанию (самый общий контекст)
+                        effective_ctx_for_call = ctx # PostfixExpressionContext
+
+                        if isinstance(call_context_for_call, TerminalNode): # Если это токен, а не RuleContext
+                             # _call_builtin_function ожидает RuleContext для ctx.start.line и т.д.
+                             # Пока передаем 'ctx' (PostfixExpressionContext) - его .start самая общая точка.
+                             # Но лучше тот, что ближе к ошибке.
+                             # Если argument_list_ctx есть, то он - лучший кандидат.
+                             effective_ctx_for_call = argument_list_ctx if argument_list_ctx is not None else ctx
+    
+                        current_eval_value = visitor._call_builtin_function(proc_name, args, effective_ctx_for_call)
+                    except KumirEvalError as e:
+                        # _call_builtin_function уже должен устанавливать e.line и e.column
+                        # Если они не установлены, попробуем установить здесь
+                        if not (hasattr(e, 'line') and e.line is not None and e.line != "?") :
+                            e.line = argument_list_ctx.start.line if argument_list_ctx else (first_op_token_node.getSymbol().line if first_op_token_node else ctx.start.line)
+                        if not (hasattr(e, 'column') and e.column is not None and e.column != "?") :
+                            e.column = argument_list_ctx.start.column if argument_list_ctx else (first_op_token_node.getSymbol().column if first_op_token_node else ctx.start.column)
+                        raise
                     except Exception as e:
-                        err_ctx_line = argument_list_ctx.start.line if argument_list_ctx else first_op_token_node.getSymbol().line
-                        err_ctx_col = argument_list_ctx.start.column if argument_list_ctx else first_op_token_node.getSymbol().column
-                        if isinstance(e, KumirEvalError):
-                             e.line = e.line if hasattr(e, 'line') and e.line is not None else err_ctx_line
-                             e.column = e.column if hasattr(e, 'column') and e.column is not None else err_ctx_col
-                             raise e
-                        raise KumirEvalError(f"Строка ~{err_ctx_line}: Ошибка выполнения встроенной процедуры '{proc_name}': {e}", err_ctx_line, err_ctx_col) # KumirExecutionError -> KumirEvalError
+                        err_line_num = argument_list_ctx.start.line if argument_list_ctx else (first_op_token_node.getSymbol().line if first_op_token_node else ctx.start.line)
+                        err_col_num = argument_list_ctx.start.column if argument_list_ctx else (first_op_token_node.getSymbol().column if first_op_token_node else ctx.start.column)
+                        
+                        err_line_idx = err_line_num - 1
+                        line_content = None
+                        if visitor and hasattr(visitor, 'lines') and 0 <= err_line_idx < len(visitor.lines):
+                            line_content = visitor.lines[err_line_idx]
+
+                        error_message = f"Ошибка выполнения '{proc_name}': {e}"
+                        # Добавим столбец в сообщение, так как конструктор его не принимает
+                        # full_error_message = f"Строка {err_line_num}, столбец {err_col_num + 1}: {error_message}"
+
+                        if not isinstance(e, KumirEvalError): # Оборачиваем в KumirEvalError, если это еще не он
+                            # Используем KumirExecutionError, так как он базовый и принимает line_index, line_content
+                            # А KumirEvalError сам по себе не добавляет новой логики в конструктор
+                            raise KumirEvalError(error_message, line_index=err_line_idx, line_content=line_content) from e
+                        else:
+                            # Если это уже KumirEvalError, просто перевыбрасываем, предполагая, что у него уже есть контекст
+                            # или он был установлен выше
+                            raise
                 
                 elif proc_name in visitor.procedures:
                     proc_def_ctx = visitor.procedures[proc_name]
@@ -574,18 +610,56 @@ class ExpressionEvaluator:
         result = self.visitMultiplicativeExpression(ctx.multiplicativeExpression(0)) # self.visitMultiplicativeExpression
         print(f"[DEBUG][visitAdditiveExpressionEE] Initial result from left multExpression: {result} (type: {type(result)})", file=sys.stderr)
 
+        # Итерируемся по операторам и правым операндам
         for i in range(len(ctx.multiplicativeExpression()) - 1):
-            op_node = ctx.getChild(2 * i + 1)
-            op_token = op_node.getSymbol()
-            op_text = op_token.text
-            
+            op_token = ctx.getChild(i * 2 + 1).getSymbol() # PLUS или MINUS
             right_operand_ctx = ctx.multiplicativeExpression(i + 1)
-            right_operand = self.visitMultiplicativeExpression(right_operand_ctx) # self.visitMultiplicativeExpression
-            print(f"[DEBUG][visitAdditiveExpressionEE] Right operand for '{op_text}': {right_operand} (type: {type(right_operand)})", file=sys.stderr)
+            # result_right = visitor.visit(right_operand_ctx) # ИСПОЛЬЗУЕМ visitExpression
+            result_right = self.visitMultiplicativeExpression(right_operand_ctx)
 
-            result = self._perform_binary_operation(result, right_operand, op_token, ctx)
-            print(f"[DEBUG][visitAdditiveExpressionEE] Result after '{op_text}': {result} (type: {type(result)})", file=sys.stderr)
-            
+            # _get_value для очистки от KumirTableVar или KumirVariableWrapper, если необходимо
+            val_left_clean = self._get_value(result)
+            val_right_clean = self._get_value(result_right)
+
+            print(f"[DEBUG][visitAdditiveExpressionEE] Op: {op_token.text}, Left: {val_left_clean} (type {type(val_left_clean)}), Right: {val_right_clean} (type {type(val_right_clean)})", file=sys.stderr)
+
+            if op_token.type == KumirLexer.PLUS:
+                # Если оба операнда - строки, выполняем конкатенацию
+                if isinstance(val_left_clean, str) and isinstance(val_right_clean, str):
+                    result = val_left_clean + val_right_clean
+                # Если оба операнда - числа (или могут быть ими)
+                elif (isinstance(val_left_clean, (int, float))) and (isinstance(val_right_clean, (int, float))):
+                    result = val_left_clean + val_right_clean
+                else:
+                    # Попытка сложения несовместимых типов
+                    type_left_str = self.visitor._get_kumir_type_name(val_left_clean)
+                    type_right_str = self.visitor._get_kumir_type_name(val_right_clean)
+                    err_line = op_token.line
+                    err_col = op_token.column
+                    raise KumirEvalError(
+                        f"Строка {err_line}, столбец {err_col + 1}: Операция '+' не применима к операндам типов '{type_left_str}' и '{type_right_str}'.",
+                        line_index=err_line - 1, 
+                        line_content=self.visitor.lines[err_line - 1] if self.visitor and self.visitor.lines and 0 <= err_line -1 < len(self.visitor.lines) else None
+                    )
+            elif op_token.type == KumirLexer.MINUS:
+                # Вычитание определено только для чисел
+                if (isinstance(val_left_clean, (int, float))) and (isinstance(val_right_clean, (int, float))):
+                    result = val_left_clean - val_right_clean
+                else:
+                    type_left_str = self.visitor._get_kumir_type_name(val_left_clean)
+                    type_right_str = self.visitor._get_kumir_type_name(val_right_clean)
+                    err_line = op_token.line
+                    err_col = op_token.column
+                    raise KumirEvalError(
+                        f"Строка {err_line}, столбец {err_col + 1}: Операция '-' не применима к операндам типов '{type_left_str}' и '{type_right_str}'.",
+                        line_index=err_line - 1, 
+                        line_content=self.visitor.lines[err_line - 1] if self.visitor and self.visitor.lines and 0 <= err_line -1 < len(self.visitor.lines) else None
+                    )
+            else:
+                # Это не должно произойти, если грамматика верна
+                raise KumirEvalError(f"Неизвестный аддитивный оператор: {op_token.text}", op_token.line, op_token.column)
+            print(f"[DEBUG][visitAdditiveExpressionEE] Intermediate result: {result}", file=sys.stderr)
+        
         print(f"[Exit] visitAdditiveExpressionEE for '{ctx.getText()}' -> returns {result} (type: {type(result)})", file=sys.stderr)
         return result
 

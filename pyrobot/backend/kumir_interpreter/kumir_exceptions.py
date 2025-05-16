@@ -109,6 +109,11 @@ class KumirInputError(KumirExecutionError):
 		self.original_message = message 
 
 
+# Ошибка, связанная с неверным количеством или типом аргументов функции/процедуры
+class KumirArgumentError(KumirEvalError):
+	pass
+
+
 # Можно добавить другие специфичные ошибки при необходимости
 
 # FILE END: kumir_exceptions.py

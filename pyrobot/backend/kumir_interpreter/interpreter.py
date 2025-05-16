@@ -11,7 +11,8 @@ from antlr4.tree.Tree import TerminalNodeImpl # ДОБАВЛЯЮ ЭТОТ ИМП
 from .kumir_exceptions import (KumirExecutionError, DeclarationError, AssignmentError,
                                InputOutputError, KumirInputRequiredError, KumirEvalError,
                                 RobotError, KumirSyntaxError, KumirNotImplementedError,
-                                KumirNameError, KumirTypeError, KumirIndexError, KumirInputError)
+                                KumirNameError, KumirTypeError, KumirIndexError, KumirInputError,
+                                KumirArgumentError)
 
 
 # Исключение для команды ВЫХОД из цикла
@@ -33,12 +34,15 @@ from antlr4.error.ErrorListener import ErrorListener
 from io import StringIO
 from contextlib import redirect_stderr, redirect_stdout
 import sys
-from typing import Any, Tuple, Optional, Dict
+from typing import Any, Tuple, Optional, Dict, List
 import random  # <-- Добавляем импорт random
 import antlr4
 from .kumir_datatypes import KumirTableVar  # <--- Вот он, наш новый импорт
 # Добавляем ExpressionEvaluator
 from .expression_evaluator import ExpressionEvaluator
+from antlr4 import ParserRuleContext # <--- ДОБАВЛЮ СЮДА
+# Импортируем математические функции Kumir
+from .math_functions import div, mod, irand, rand # <--- ДОБАВЛЯЮ ЭТИ ИМПОРТЫ
 
 MAX_INT = 2147483647
 МАКСЦЕЛ = MAX_INT
@@ -86,26 +90,118 @@ class KumirInterpreterVisitor(KumirParserVisitor):
     # --- Словарь для встроенных функций/процедур ---
     # Используем строки для имен ключей, чтобы избежать путаницы с регистром
     BUILTIN_FUNCTIONS = {
-        'rand': {
-            0: lambda: random.random(),  # rand()
-            2: lambda a, b: random.uniform(a, b)  # rand(A, B)
+        # --- Математические функции (начало) ---
+        'sqrt': { # Квадратный корень
+            'min_args': 1, 'max_args': 1,
+            'arg_types': [['вещ', 'цел']], # Может принимать вещ или цел
+            'handler': lambda visitor_self, args, ctx: visitor_self._handle_sqrt(args[0], ctx)
         },
-        'irand': {
-            0: lambda: random.randint(0, МАКСЦЕЛ),  # irand()
-            1: lambda n: random.randint(0, n - 1) if n > 0 else 0,  # irand(N)
-            2: lambda a, b: random.randint(min(a, b), max(a, b))  # irand(A, B) - Кумир требует min/max
+        'sin': { # Синус
+            'min_args': 1, 'max_args': 1,
+            'arg_types': [['вещ', 'цел']],
+            'handler': lambda visitor_self, args, ctx: visitor_self._handle_sin(args[0], ctx)
         },
-        'printbin': {  # Ключ теперь в нижнем регистре
-            1: lambda n: print(format(n, '08b'), end='')  # Возвращаем на print, который будет использовать sys.stdout
+        'cos': { # Косинус
+            'min_args': 1, 'max_args': 1,
+            'arg_types': [['вещ', 'цел']],
+            'handler': lambda visitor_self, args, ctx: visitor_self._handle_cos(args[0], ctx)
         },
-        'div': {
-            2: lambda a, b: int(a) // int(b) if b != 0 else (_ for _ in ()).throw(
-                KumirEvalError("Целочисленное деление на ноль"))
+        'tan': { # Тангенс
+            'min_args': 1, 'max_args': 1,
+            'arg_types': [['вещ', 'цел']],
+            'handler': lambda visitor_self, args, ctx: visitor_self._handle_tan(args[0], ctx)
         },
-        'mod': {
-            2: lambda a, b: int(a) % int(b) if b != 0 else (_ for _ in ()).throw(
-                KumirEvalError("Остаток от деления на ноль"))
-        }
+        'arctan': { # Арктангенс
+            'min_args': 1, 'max_args': 1,
+            'arg_types': [['вещ', 'цел']],
+            'handler': lambda visitor_self, args, ctx: visitor_self._handle_arctan(args[0], ctx)
+        },
+        'int': { # Целая часть числа
+            'min_args': 1, 'max_args': 1,
+            'arg_types': [['вещ', 'цел']],
+            'handler': lambda visitor_self, args, ctx: int(args[0]) # Простое преобразование в int
+        },
+        'abs': { # Модуль числа
+            'min_args': 1, 'max_args': 1,
+            'arg_types': [['вещ', 'цел']],
+            'handler': lambda visitor_self, args, ctx: abs(args[0])
+        },
+        'sign': { # Знак числа
+            'min_args': 1, 'max_args': 1,
+            'arg_types': [['вещ', 'цел']],
+            'handler': lambda visitor_self, args, ctx: visitor_self._handle_sign(args[0], ctx)
+        },
+        'случайноецелое': { # случайноецелое(A, B) -> случайное целое из [A, B]
+             'min_args': 2, 'max_args': 2,
+             'arg_types': [['цел', 'цел']],
+             'handler': lambda visitor_self, args, ctx: visitor_self._handle_random_integer(args[0], args[1], ctx)
+        },
+        'случайноевещественное': { # случайноевещественное(A, B) -> случайное вещ из [A, B)
+             'min_args': 2, 'max_args': 2,
+             'arg_types': [['вещ', 'вещ'], ['цел', 'цел'], ['вещ', 'цел'], ['цел', 'вещ']],
+             'handler': lambda visitor_self, args, ctx: visitor_self._handle_random_real(args[0], args[1], ctx)
+        },
+        # --- НОВЫЕ ФУНКЦИИ ---
+        'div': { # Целочисленное деление
+            'min_args': 2, 'max_args': 2,
+            'arg_types': [['цел', 'цел']],
+            'handler': lambda visitor_self, args, ctx: div(args[0], args[1])
+        },
+        'mod': { # Остаток от деления
+            'min_args': 2, 'max_args': 2,
+            'arg_types': [['цел', 'цел']],
+            'handler': lambda visitor_self, args, ctx: mod(args[0], args[1])
+        },
+        'irand': { # Случайное целое число из диапазона [a, b]
+            'min_args': 2, 'max_args': 2,
+            'arg_types': [['цел', 'цел']], # оба аргумента должны быть целыми
+            'handler': lambda visitor_self, args, ctx: visitor_self._handle_irand(args[0], args[1], ctx)
+        },
+        'rand': { # Случайное вещественное число из диапазона [a, b]
+            'min_args': 2, 'max_args': 2,
+            # Аргументы могут быть целыми или вещественными, будут преобразованы внутри math_functions.rand
+            'arg_types': [['вещ', 'цел'], ['вещ', 'цел']], 
+            'handler': lambda visitor_self, args, ctx: visitor_self._handle_rand(args[0], args[1], ctx)
+        },
+        # В КуМире есть еще div(цел, цел) -> цел и mod(цел, цел) -> цел
+        # Они обрабатываются как операции в грамматике, а не как функции здесь. # <-- Это утверждение неверно, добавляем их как функции
+        # --- Математические функции (конец) ---
+
+        # --- Строковые функции (начало) ---
+        'длин': {
+            'min_args': 1, 'max_args': 1,
+            'arg_types': [['лит']],
+            'handler': lambda visitor_self, args, ctx: len(args[0])
+        },
+        'позиция': {
+            'min_args': 2, 'max_args': 2,
+            'arg_types': [['лит', 'лит']],
+            'handler': lambda visitor_self, args, ctx: (args[1].find(args[0]) + 1) if args[1].find(args[0]) != -1 else 0
+        },
+        'поз': { # Сокращенный вариант для "позиция"
+            'min_args': 2, 'max_args': 2,
+            'arg_types': [['лит', 'лит']],
+            'handler': lambda visitor_self, args, ctx: (args[1].find(args[0]) + 1) if args[1].find(args[0]) != -1 else 0
+        },
+        'лит_в_цел': {
+            'min_args': 1, 'max_args': 1, # Упрощенный вариант без параметра "успех"
+            'arg_types': [['лит']],
+            'handler': lambda visitor_self, args, ctx: visitor_self._handle_lit_to_int(args[0], ctx) 
+        },
+        # --- Строковые функции (конец) ---
+
+        # --- Функции ввода/вывода (начало) ---
+        'input': {
+            'min_args': 1, 'max_args': 1,
+            'arg_types': [['лит']],
+            'handler': lambda visitor_self, args, ctx: visitor_self._handle_input(args[0], ctx)
+        },
+        'output': {
+            'min_args': 1, 'max_args': 1,
+            'arg_types': [['лит']],
+            'handler': lambda visitor_self, args, ctx: visitor_self._handle_output(args[0], ctx)
+        },
+        # --- Функции ввода/вывода (конец) ---
     }
 
     def __init__(self, output_stream=None, input_stream=None, error_stream=None):
@@ -1881,6 +1977,180 @@ class KumirInterpreterVisitor(KumirParserVisitor):
         except Exception as e:
             # print(f"[ERROR][get_child_safely] Exception while getting child '{child_name}' from {type(parent_ctx).__name__}: {e}", file=sys.stderr)
             return None
+
+    # Вспомогательные методы для evaluate_expression, если еще не там
+    # (или они могут быть в ExpressionEvaluator)
+
+    def _handle_lit_to_int(self, s_val: str, ctx: Optional[ParserRuleContext]):
+        """Обработчик для встроенной функции лит_в_цел(строка).
+        В КуМире эта функция также имеет второй параметр (рез лог успех).
+        Здесь мы реализуем упрощенный вариант, который просто пытается преобразовать
+        и выбрасывает KumirEvalError в случае неудачи.
+        """
+        try:
+            return int(s_val)
+        except ValueError:
+            # Формируем сообщение об ошибке, соответствующее КуМиру
+            err_line = ctx.start.line if ctx and ctx.start else "?"
+            # err_col = ctx.start.column if ctx and ctx.start else "?" # Для большей точности
+            # Вместо простого ValueError, используем KumirEvalError для консистентности
+            raise KumirEvalError(f"Строка {err_line}: Неверный формат целого числа в строке '{s_val}'", line=err_line) #, column=err_col)
+
+
+    def _call_builtin_function(self, func_name: str, args: List[Any], ctx: ParserRuleContext):
+        print(f"[DEBUG][_call_builtin_function] Calling '{func_name}' with args: {args}", file=sys.stderr)
+        func_name_lower = func_name.lower()
+        if func_name_lower not in self.BUILTIN_FUNCTIONS:
+            raise KumirEvalError(f"Строка {ctx.start.line}: Встроенная функция '{func_name}' не найдена.", line=ctx.start.line, column=ctx.start.column)
+
+        func_info = self.BUILTIN_FUNCTIONS[func_name_lower]
+        min_args = func_info.get('min_args', 0)
+        max_args = func_info.get('max_args', float('inf'))
+        arg_count = len(args)
+
+        if not (min_args <= arg_count <= max_args):
+            expected_args_str = str(min_args) if min_args == max_args else f"от {min_args} до {max_args}"
+            raise KumirArgumentError(
+                f"Строка {ctx.start.line}: Неверное количество аргументов для функции '{func_name}'. Ожидалось {expected_args_str}, получено {arg_count}.",
+                line=ctx.start.line, column=ctx.start.column
+            )
+
+        # Проверка типов аргументов, если определены arg_types
+        expected_arg_types_options = func_info.get('arg_types')
+        if expected_arg_types_options: # Это список списков возможных наборов типов
+            actual_arg_types = [self._get_kumir_type_name(arg) for arg in args]
+            match_found = False
+            for expected_types_set in expected_arg_types_options:
+                if len(expected_types_set) == arg_count:
+                    current_set_match = True
+                    for i, expected_type in enumerate(expected_types_set):
+                        if expected_type == 'любой': continue # Тип 'любой' всегда подходит
+                        if not self._check_type_compatibility(actual_arg_types[i], expected_type, args[i]):
+                            current_set_match = False
+                            break
+                    if current_set_match:
+                        match_found = True
+                        break
+            
+            if not match_found:
+                # Формируем сообщение об ошибке с более детальной информацией
+                expected_types_str_list = []
+                for opt_idx, opt_set in enumerate(expected_arg_types_options):
+                    if len(opt_set) == arg_count: # Показываем только те варианты, которые совпадают по количеству аргументов
+                        expected_types_str_list.append(f"вариант {opt_idx+1}: ({', '.join(opt_set)})")
+                
+                if not expected_types_str_list: # Если нет вариантов с таким кол-вом аргументов (хотя это должно было отсечься раньше)
+                    expected_details = f"для количества аргументов {arg_count} не определены ожидаемые типы."
+                else:
+                    expected_details = "ожидались типы: " + " или ".join(expected_types_str_list)
+                
+                raise KumirArgumentError(
+                    f"Строка {ctx.start.line}: Несоответствие типов аргументов для функции '{func_name}'. Переданы типы: ({', '.join(actual_arg_types)}), а {expected_details}.",
+                    line=ctx.start.line, column=ctx.start.column
+                )
+
+        handler = func_info['handler']
+        try:
+            # Передаем self (экземпляр KumirInterpreterVisitor) первым аргументом в handler
+            return handler(self, args, ctx) 
+        except KumirEvalError as e:
+            if not hasattr(e, 'line') or e.line is None:
+                e.line = ctx.start.line
+            if not hasattr(e, 'column') or e.column is None:
+                 e.column = ctx.start.column
+            raise
+        except Exception as e:
+            # Перехватываем другие возможные исключения из хендлера
+            # и оборачиваем их в KumirEvalError с указанием строки
+            print(f"[ERROR][_call_builtin_function] Unexpected error in handler for '{func_name}': {type(e).__name__}: {e}", file=sys.stderr)
+            # traceback.print_exc(file=sys.stderr)
+            raise KumirEvalError(f"Строка {ctx.start.line}: Ошибка при выполнении встроенной функции '{func_name}': {e}", line=ctx.start.line, column=ctx.start.column)
+
+    def _get_kumir_type_name(self, value: Any) -> str:
+        """Возвращает КуМир-совместимое имя типа для данного Python-значения."""
+        py_type = type(value)
+        if py_type is int:
+            return 'цел'
+        elif py_type is float:
+            return 'вещ'
+        elif py_type is bool:
+            return 'лог'
+        elif py_type is str:
+            # В КуМире 'лит' для строк, 'сим' для одиночных символов.
+            # Для общих целей (например, сообщения об ошибках) 'лит' подходит.
+            # Если нужен 'сим', контекст вызова должен это учитывать.
+            return 'лит'
+        elif isinstance(value, KumirTableVar):
+            # Для таблиц возвращаем их базовый тип
+            return value.base_kumir_type_name
+        else:
+            # Для неизвестных Python-типов
+            # print(f"[WARNING][_get_kumir_type_name] Неизвестный Python тип: {py_type.__name__} для значения {repr(value)}. Возвращено 'неизвестный тип'.", file=sys.stderr)
+            return 'неизвестный тип'
+
+    def _check_type_compatibility(self, actual_type_str: str, expected_type_str: str, actual_value: Any) -> bool:
+        """
+        Проверяет совместимость фактического типа значения КуМир с ожидаемым типом.
+        Например, 'цел' совместим с 'вещ'.
+        """
+        if actual_type_str == expected_type_str:
+            return True
+        
+        # Разрешаем целое число там, где ожидается вещественное
+        if expected_type_str == 'вещ' and actual_type_str == 'цел':
+            return True
+        
+        # Разрешаем символ там, где ожидается строка (лит)
+        if expected_type_str == 'лит' and actual_type_str == 'сим':
+            return True
+
+        # Можно добавить другие правила совместимости, если потребуется.
+        # Например, если бы у нас был общий тип "число", который включал бы и цел, и вещ.
+
+        return False
+
+    # --- ОБРАБОТЧИКИ ДЛЯ НОВЫХ ВСТРОЕННЫХ ФУНКЦИЙ ---
+    def _handle_irand(self, a: int, b: int, ctx: Optional[ParserRuleContext]):
+        """Обработчик для встроенной функции irand(a,b)."""
+        # math_functions.irand уже проверяет типы и порядок, но можно добавить доп. проверки Кумир-специфичные если нужно
+        # print(f"[DEBUG][_handle_irand] Called with a={a}, b={b}", file=sys.stderr)
+        try:
+            return irand(a,b) # Вызываем импортированную функцию
+        except Exception as e: # Перехватываем возможные ошибки из math_functions (например, ValueError если a > b)
+            err_line = ctx.start.line if ctx and ctx.start else -1
+            err_col = ctx.start.column if ctx and ctx.start else -1
+            raise KumirEvalError(f"Ошибка при вызове irand({a}, {b}): {e}", line=err_line, column=err_col) from e
+
+    def _handle_rand(self, a: Any, b: Any, ctx: Optional[ParserRuleContext]):
+        """Обработчик для встроенной функции rand(a,b)."""
+        # math_functions.rand уже обрабатывает преобразование типов, если необходимо
+        # print(f"[DEBUG][_handle_rand] Called with a={a} (type {type(a)}), b={b} (type {type(b)})\", file=sys.stderr)
+        try:
+            # Убедимся, что аргументы являются числами (целыми или вещественными)
+            # Это должно быть уже проверено в _call_builtin_function по arg_types,
+            # но для rand специфично, что они могут быть смешанного типа (цел, вещ)
+            # и будут преобразованы в math_functions.rand.
+            # Здесь просто вызываем.
+            return rand(a,b) # Вызываем импортированную функцию
+        except Exception as e:
+            err_line = ctx.start.line if ctx and ctx.start else -1
+            err_col = ctx.start.column if ctx and ctx.start else -1
+            raise KumirEvalError(f"Ошибка при вызове rand({a}, {b}): {e}", line=err_line, column=err_col) from e
+            
+    def _handle_lit_to_int(self, s_val: str, ctx: Optional[ParserRuleContext]):
+        """Обработчик для встроенной функции лит_в_цел(строка).
+        В КуМире эта функция также имеет второй параметр (рез лог успех).
+        Здесь мы реализуем упрощенный вариант, который просто пытается преобразовать
+        и выбрасывает KumirEvalError в случае неудачи.
+        """
+        try:
+            return int(s_val)
+        except ValueError:
+            # Формируем сообщение об ошибке, соответствующее КуМиру
+            err_line = ctx.start.line if ctx and ctx.start else "?"
+            # err_col = ctx.start.column if ctx and ctx.start else "?" # Для большей точности
+            # Вместо простого ValueError, используем KumirEvalError для консистентности
+            raise KumirEvalError(f"Строка {err_line}: Неверный формат целого числа в строке '{s_val}'", line=err_line) #, column=err_col)
 
 # Эта функция должна быть на верхнем уровне модуля, а не методом класса
 def interpret_kumir(code: str):
