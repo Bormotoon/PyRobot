@@ -12,7 +12,7 @@ from .kumir_exceptions import (KumirExecutionError, DeclarationError, Assignment
                                InputOutputError, KumirInputRequiredError, KumirEvalError,
                                 RobotError, KumirSyntaxError, KumirNotImplementedError,
                                 KumirNameError, KumirTypeError, KumirIndexError, KumirInputError,
-                                KumirArgumentError)
+                                KumirArgumentError, ProcedureExitCalled)
 
 
 # Исключение для команды ВЫХОД из цикла
@@ -727,7 +727,13 @@ class KumirInterpreterVisitor(KumirParserVisitor):
             
             # print(f"[DEBUG][ExecuteProcCall] Параметры для '{name}' инициализированы.", file=sys.stderr)
 
-            self.visit(alg_ctx.algorithmBody()) # Выполнение тела процедуры/функции
+            try:
+                self.visit(alg_ctx.algorithmBody()) # Выполнение тела процедуры/функции
+            except ProcedureExitCalled as e_proc_exit:
+                print(f"[DEBUG][ExecuteProcCall] Процедура '{name}' штатно завершилась через 'выход'. Сообщение: {e_proc_exit}", file=sys.stderr)
+                # Это нормальное завершение процедуры из-за команды 'выход'.
+                # Если это функция, текущее значение __знач__ будет ее результатом.
+                pass # Продолжаем для обработки возвращаемого значения и рез-параметров
             
             # TODO: Шаг 2: Получение __знач__ для функций из current_scope
             if is_function_call:
@@ -1975,12 +1981,35 @@ class KumirInterpreterVisitor(KumirParserVisitor):
         return None
 
     def visitExitStatement(self, ctx: KumirParser.ExitStatementContext):
+        print(f"[DEBUG][VisitExit] Entered. loop_depth={self.loop_depth}, call_stack exists: {hasattr(self, 'call_stack') and bool(self.call_stack)}, scopes depth: {len(self.scopes)}", file=sys.stderr)
+
+        # 1. Проверяем, находимся ли мы внутри цикла
         if self.loop_depth > 0 and self.exit_flags:
-            print(f"[DEBUG][VisitExit] Выполнение ВЫХОД из цикла. loop_depth={self.loop_depth}", file=sys.stderr)
+            print(f"[DEBUG][VisitExit] 'выход' из цикла. loop_depth={self.loop_depth}", file=sys.stderr)
             self.exit_flags[-1] = True
-        else:
-            print(f"[WARNING][VisitExit] ВЫХОД вызван вне активного цикла или exit_flags пуст. loop_depth={self.loop_depth}", file=sys.stderr)
-        return None
+            return None
+
+        # 2. Проверяем, находимся ли мы внутри вызова процедуры/функции
+        #    (и не в цикле, так как это было бы обработано выше).
+        #    Будем считать, что мы в процедуре, если глубина scopes > 1 (scope[0] - глобальный/модульный)
+        #    ИЛИ если используется call_stack и он не пуст.
+        #    Для теста Ханои, это условие должно выполниться.
+        is_in_procedure_call = (len(self.scopes) > 1) # Простое предположение
+        if hasattr(self, 'call_stack') and self.call_stack: # Если call_stack реализован, он приоритетнее
+            is_in_procedure_call = True
+
+        if is_in_procedure_call:
+            print(f"[DEBUG][VisitExit] 'выход' из процедуры/функции. Глубина scopes: {len(self.scopes)}. Call_stack active: {hasattr(self, 'call_stack') and bool(self.call_stack)}", file=sys.stderr)
+            raise ProcedureExitCalled(f"Выход из процедуры/функции на строке {ctx.start.line}")
+
+        # 3. 'выход' в основном теле программы (не в цикле, не в процедуре)
+        #    Это должно завершать программу.
+        print(f"[DEBUG][VisitExit] 'выход' из основного блока программы.", file=sys.stderr)
+        # Мы можем использовать специальное исключение, которое будет поймано interpret_kumir
+        # или просто прекратить дальнейшее выполнение, если это возможно.
+        # Пока что возбудим KumirExecutionError, чтобы было видно.
+        # В идеале, это должно быть что-то вроде ProgramTerminationRequest.
+        raise KumirExecutionError("Команда 'выход' в главном блоке программы.", ctx.start.line, ctx.start.column)
 
     def visitIfStatement(self, ctx: KumirParser.IfStatementContext):
         """Обработка условного оператора."""

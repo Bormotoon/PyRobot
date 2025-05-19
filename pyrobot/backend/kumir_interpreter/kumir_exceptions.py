@@ -116,4 +116,7 @@ class KumirArgumentError(KumirEvalError):
 
 # Можно добавить другие специфичные ошибки при необходимости
 
+class ProcedureExitCalled(KumirExecutionError):
+	pass
+
 # FILE END: kumir_exceptions.py
