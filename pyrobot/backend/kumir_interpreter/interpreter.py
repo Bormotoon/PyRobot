@@ -2152,6 +2152,164 @@ class KumirInterpreterVisitor(KumirParserVisitor):
             # Вместо простого ValueError, используем KumirEvalError для консистентности
             raise KumirEvalError(f"Строка {err_line}: Неверный формат целого числа в строке '{s_val}'", line=err_line) #, column=err_col)
 
+    # --- ДОБАВЛЯЕМ НОВЫЙ МЕТОД VISITSWITCHSTATEMENT ---
+    def visitSwitchStatement(self, ctx: KumirParser.SwitchStatementContext):
+        print(f"[DEBUG][visitSwitchStatement] ENTERED for ctx: {ctx.getText()}", file=sys.stderr)
+
+        # Убедимся, что здесь нет старой логики поиска глобального switch_expr_ctx
+        # и генерации KumirSyntaxError, если он не найден.
+        # Пример удаляемых строк (если они есть):
+        # switch_expr_ctx = None 
+        # if hasattr(ctx, 'expression') ... :
+        #    ...
+        # if not switch_expr_ctx:
+        #     raise KumirSyntaxError("Отсутствует выражение в операторе ВЫБОР", ctx.start.line, ctx.start.column)
+
+        # Актуальная логика, основанная на том, что глобального выражения нет:
+        # Выражение, по которому идет switch, видимо, отсутствует как отдельная сущность.
+        # Вместо этого, каждая ветка "при" имеет свое условие.
+
+        executed_branch = False
+        
+        case_block_nodes = [] 
+        if hasattr(ctx, 'caseBlock') and callable(ctx.caseBlock): 
+            potential_case_blocks = ctx.caseBlock() 
+            if isinstance(potential_case_blocks, list):
+                case_block_nodes = potential_case_blocks 
+            elif potential_case_blocks is not None: 
+                case_block_nodes = [potential_case_blocks] 
+        
+        if not case_block_nodes: 
+            typed_case_blocks = ctx.getTypedRuleContexts(KumirParser.CaseBlockContext) 
+            if typed_case_blocks:
+                case_block_nodes = typed_case_blocks
+
+        print(f"[DEBUG][visitSwitchStatement] Found {len(case_block_nodes)} caseBlock node(s).", file=sys.stderr)
+
+        for i_case, current_case_block_ctx in enumerate(case_block_nodes):
+            if not current_case_block_ctx or not isinstance(current_case_block_ctx, KumirParser.CaseBlockContext):
+                print(f"[DEBUG][visitSwitchStatement]   Node {i_case} is None or not a CaseBlockContext, skipping.", file=sys.stderr)
+                continue
+
+            print(f"[DEBUG][visitSwitchStatement] Processing caseBlock {i_case}: {current_case_block_ctx.getText()}", file=sys.stderr)
+            
+            # --- ОТЛАДКА: ЧТО ЕСТЬ ВНУТРИ CaseBlockContext? ---
+            # print(f"[DEBUG][visitSwitchStatement]   Attributes of current_case_block_ctx ({type(current_case_block_ctx).__name__}):", file=sys.stderr)
+            # for attr_name in dir(current_case_block_ctx):
+            #     if not attr_name.startswith('__'):
+            #         try:
+            #             is_method_likely = callable(getattr(current_case_block_ctx, attr_name)) and \
+            #                                hasattr(getattr(current_case_block_ctx, attr_name), '__code__') and \
+            #                                getattr(current_case_block_ctx, attr_name).__code__.co_argcount == 1 # self
+            #             if is_method_likely and attr_name not in ['getText', 'toString', 'parentCtx', 'getPayload', 'getSourceInterval', 'getRuleContext']:
+            #                  print(f"    {attr_name}: <method>", file=sys.stderr)
+            #             else:
+            #                 attr_value = getattr(current_case_block_ctx, attr_name)
+            #                 print(f"    {attr_name}: {attr_value}", file=sys.stderr)
+            #         except Exception as e_attr:
+            #             print(f"    {attr_name}: <Error getting attribute: {e_attr}>", file=sys.stderr)
+            # --- КОНЕЦ ОТЛАДКИ ---
+
+            # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+            condition_expr_ctx = None
+            if hasattr(current_case_block_ctx, 'expression') and callable(current_case_block_ctx.expression):
+                condition_expr_ctx = current_case_block_ctx.expression() # Используем .expression()
+            
+            if not condition_expr_ctx:
+                print(f"[ERROR][visitSwitchStatement]   CaseBlock {i_case} does not have a callable .expression() method or it returned None. Skipping.", file=sys.stderr)
+                continue
+            
+            # Дополнительная проверка типа, если нужно
+            if not isinstance(condition_expr_ctx, KumirParser.ExpressionContext):
+                print(f"[ERROR][visitSwitchStatement]   Call to .expression() on CaseBlock {i_case} did not return an ExpressionContext (got {type(condition_expr_ctx).__name__}). Skipping.", file=sys.stderr)
+                continue
+            # --- КОНЕЦ ИЗМЕНЕНИЙ ---
+
+            # Эта проверка может стать избыточной, но оставим пока для безопасности
+            if not condition_expr_ctx:
+                 print(f"[ERROR][visitSwitchStatement]   CaseBlock {i_case} resolved to a None condition_expr_ctx (this should not happen after previous checks). Skipping.", file=sys.stderr)
+                 continue
+
+            print(f"[DEBUG][visitSwitchStatement]   Condition for case {i_case}: {condition_expr_ctx.getText()}", file=sys.stderr)
+            
+            # Вычисляем условие ветки "при"
+            # Условие должно вычисляться в логическое значение или значение, которое можно сравнить
+            # Например, "при m=1", "при x > 5", "при флаг"
+            # Результат visitExpression должен быть bool или чем-то, что _perform_binary_operation (для =) может обработать
+            
+            # Здесь нам нужно не просто вычислить значение выражения (например, m=1),
+            # а вычислить значение условия (т.е. результат сравнения m с 1).
+            # ExpressionEvaluator.visitExpression должен сам обработать операторы сравнения типа '='
+            condition_value = self.evaluator.visitExpression(condition_expr_ctx) # ИЗМЕНЕНО visit на visitExpression
+            
+            print(f"[DEBUG][visitSwitchStatement]   Condition value for case {i_case}: {condition_value} (type: {type(condition_value).__name__})", file=sys.stderr)
+
+            # Проверяем, истинно ли условие
+            # Для КуМира, если это не bool, то 0/0.0 это ложь, остальное - истина.
+            # Но лучше, если visitExpression для сравнений (m=1) вернет bool.
+            is_condition_true = False
+            if isinstance(condition_value, bool):
+                is_condition_true = condition_value
+            elif isinstance(condition_value, (int, float)):
+                is_condition_true = (condition_value != 0) # В КуМире 0 - ложь, не 0 - истина
+            else:
+                print(f"[WARNING][visitSwitchStatement] Condition for case {i_case} evaluated to non-boolean/non-numeric type: {type(condition_value)}. Treating as FALSE.", file=sys.stderr)
+            
+            if is_condition_true:
+                print(f"[DEBUG][visitSwitchStatement]   Condition for case {i_case} is TRUE. Executing its statementSequence.", file=sys.stderr)
+                
+                statement_seq_ctx = current_case_block_ctx.statementSequence()
+                if statement_seq_ctx:
+                    self.visit(statement_seq_ctx)
+                else:
+                    print(f"[WARNING][visitSwitchStatement] Case {i_case} is TRUE but has no statementSequence.", file=sys.stderr)
+                
+                executed_branch = True
+                break  # Выходим из цикла for по case_branch_nodes, так как нашли подходящую ветку
+
+        # Если ни одна ветка "при" не выполнилась и есть "иначе"
+        if not executed_branch:
+            # Проверяем наличие ELSE на уровне SwitchStatementContext
+            else_token = ctx.ELSE() if hasattr(ctx, 'ELSE') and callable(ctx.ELSE) else None
+            if else_token:
+                 # Ищем statementSequence, которая относится к ELSE.
+                 # В выводе ctx.children, StatementSequenceContext для ELSE шла после токена "иначе".
+                 # Это может быть ctx.statementSequence() или ctx.statementSequence(0) или более сложная логика
+                 # Попробуем найти ее среди детей после токена ELSE
+                 
+                 else_statement_sequence_ctx = None
+                 # Сначала попробуем прямой доступ, если он есть для 'иначе'
+                 if hasattr(ctx, 'statementSequence') and callable(ctx.statementSequence):
+                     # Это может вернуть список или один элемент. Если список, ищем тот, что не принадлежит caseBranch
+                     # Но, судя по грамматике, otherwiseBranch содержит свой statementSequence.
+                     # otherwiseBranch : ELSE statementSequence ;
+                     # Значит, если есть ctx.otherwiseBranch(), то у него будет .statementSequence()
+                     
+                     otherwise_branch_node = ctx.otherwiseBranch() if hasattr(ctx, 'otherwiseBranch') and callable(ctx.otherwiseBranch) else None
+                     if otherwise_branch_node and hasattr(otherwise_branch_node, 'statementSequence') and callable(otherwise_branch_node.statementSequence):
+                         else_statement_sequence_ctx = otherwise_branch_node.statementSequence()
+
+
+                 if not else_statement_sequence_ctx and ctx.children: # Резервный вариант: поиск по детям
+                     found_else_token = False
+                     for child_node in ctx.children:
+                         if hasattr(child_node, 'getSymbol') and child_node.getSymbol() == else_token.getSymbol():
+                             found_else_token = True
+                             continue # Ищем следующий узел после ELSE
+                         if found_else_token and isinstance(child_node, KumirParser.StatementSequenceContext):
+                             else_statement_sequence_ctx = child_node
+                             break # Нашли
+                 
+                 if else_statement_sequence_ctx:
+                    print(f"[DEBUG][visitSwitchStatement] Executing OTHERWISE branch: {else_statement_sequence_ctx.getText()}", file=sys.stderr)
+                    self.visit(else_statement_sequence_ctx)
+                 else:
+                    print(f"[WARNING][visitSwitchStatement] ELSE branch exists, but its statementSequence was not found or is empty.", file=sys.stderr)
+            else:
+                print(f"[DEBUG][visitSwitchStatement] No matching CASE and no OTHERWISE branch.", file=sys.stderr)
+        
+        return None
+
 # Эта функция должна быть на верхнем уровне модуля, а не методом класса
 def interpret_kumir(code: str):
     """
