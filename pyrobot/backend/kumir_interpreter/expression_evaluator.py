@@ -502,10 +502,17 @@ class ExpressionEvaluator:
         elif ctx.postfixExpression(): # Альтернатива: postfixExpression
             # ctx.postfixExpression() возвращает ОДИН PostfixExpressionContext или None
             postfix_child_node = ctx.postfixExpression()
+            # ДОБАВЛЕННЫЙ ЛОГ в visitUnaryExpression
+            if postfix_child_node and postfix_child_node.primaryExpression() and postfix_child_node.primaryExpression().qualifiedIdentifier():
+                var_name_in_unary = postfix_child_node.primaryExpression().qualifiedIdentifier().getText()
+                # Попытка получить значение переменной, если это M
+                if var_name_in_unary == 'M':
+                    var_info_m, _ = self.visitor.find_variable(var_name_in_unary)
+                    m_value_in_unary = var_info_m['value'] if var_info_m else 'NOT_FOUND'
+                    print(f"[DEBUG_UNARY_M_CHECK] visitUnaryExpression: M detected. Text: '{var_name_in_unary}', Value: {m_value_in_unary}", file=sys.stderr)
+
             if postfix_child_node:
                 target_node_for_visit = postfix_child_node
-            else: # Этого не должно произойти
-                 raise KumirSyntaxError(f"Отсутствует постфиксное выражение в унарном выражении", ctx.start.line, ctx.start.column)
         else: # Не должно быть других альтернатив по грамматике
             raise KumirSyntaxError(f"Некорректная структура унарного выражения: {ctx.getText()}", ctx.start.line, ctx.start.column)
 
@@ -532,49 +539,45 @@ class ExpressionEvaluator:
         print(f"[DEBUG][visitUnaryExpressionEE] Returning: {result} (type: {type(result)}) for ctx: {ctx.getText()}", file=sys.stderr)
         return result
 
-    def visitPowerExpression(self, ctx): # KumirParser.PowerExpressionContext
-        # visitor = self.visitor
-        print(f"[DEBUG][visitPowerExpressionEE] Called for ctx: {ctx.getText()}", file=sys.stderr)
+    def visitPowerExpression(self, ctx: KumirParser.PowerExpressionContext):
+        # print(f"[DEBUG_POWER_V5] Called for ctx: {ctx.getText()}", file=sys.stderr)
+
+        # Грамматика: powerExpression : unaryExpression (POWER powerExpression)?;
+        # Это означает право-ассоциативную операцию.
+        # Пример: a ** b ** c  парсится как a ** (b ** c)
+
+        # 1. Получаем левый операнд (базу)
+        base_unary_expr_ctx = ctx.unaryExpression() # Должен быть всегда, это UnaryExpressionContext
+        if not base_unary_expr_ctx:
+            raise KumirEvalError(f"Строка {ctx.start.line}: Отсутствует базовое выражение в powerExpression. Текст: {ctx.getText()}", ctx.start.line, ctx.start.column)
         
-        unary_expressions_or_obj = ctx.unaryExpression()
-        first_unary_expr_ctx = None
-        exponent_ctx = None
+        base_value = self.visitUnaryExpression(base_unary_expr_ctx)
+        # print(f"[DEBUG_POWER_V5] Base unary ctx: {base_unary_expr_ctx.getText()}, Base value: {base_value}", file=sys.stderr)
 
-        if isinstance(unary_expressions_or_obj, list):
-            if not unary_expressions_or_obj:
-                raise KumirEvalError(f"Строка ~{ctx.start.line}: Отсутствует базовое выражение в выражении степени.")
-            first_unary_expr_ctx = unary_expressions_or_obj[0]
-            if len(unary_expressions_or_obj) > 1:
-                exponent_ctx = unary_expressions_or_obj[1]
-        elif unary_expressions_or_obj:
-            first_unary_expr_ctx = unary_expressions_or_obj
-        else:
-            raise KumirEvalError(f"Строка ~{ctx.start.line}: Неожиданная структура для unaryExpression в powerExpression.")
+        # 2. Проверяем наличие оператора POWER и правой части (рекурсивного powerExpression)
+        power_op_token_node = ctx.POWER() # TerminalNodeImpl для '**' или None
 
-        result = self.visitUnaryExpression(first_unary_expr_ctx) # self.visitUnaryExpression
-        print(f"[DEBUG][visitPowerExpressionEE] Received from first unaryExpression: {result} (type: {type(result)})", file=sys.stderr)
-
-        if exponent_ctx:
-            exponent = self.visitUnaryExpression(exponent_ctx) # self.visitUnaryExpression
-            print(f"[DEBUG][visitPowerExpressionEE] Received for exponent: {exponent} (type: {type(exponent)})", file=sys.stderr)
+        if power_op_token_node:
+            # Если есть '**', то должна быть и правая часть (рекурсивный powerExpression)
+            exponent_power_expr_ctx = ctx.powerExpression() # Это PowerExpressionContext для показателя степени
+            if not exponent_power_expr_ctx:
+                raise KumirEvalError(f"Строка {ctx.start.line}: Отсутствует выражение для показателя степени после '**'. Текст: {ctx.getText()}", ctx.start.line, ctx.start.column)
             
-            if not isinstance(result, (int, float)) or not isinstance(exponent, (int, float)):
-                raise KumirEvalError(
-                    f"Строка ~{ctx.start.line}: Операция возведения в степень применима только к числовым типам (получены {type(result).__name__} и {type(exponent).__name__})",
-                    ctx.start.line,
-                    ctx.start.column
-                )
-            try:
-                result = result ** exponent
-            except TypeError:
-                 raise KumirEvalError(
-                    f"Строка ~{ctx.start.line}: Ошибка типа при возведении в степень: {type(result).__name__} ** {type(exponent).__name__}",
-                    ctx.start.line,
-                    ctx.start.column
-                )
-        print(f"[DEBUG][visitPowerExpressionEE] Returning: {result} (type: {type(result)})", file=sys.stderr)
-        return result
-        
+            # Рекурсивно вычисляем значение показателя степени
+            # Сам visitPowerExpression разберет его (может быть просто unary, или снова power)
+            exponent_value = self.visitPowerExpression(exponent_power_expr_ctx)
+            # print(f"[DEBUG_POWER_V5] Exponent value: {exponent_value}", file=sys.stderr)
+
+            # 3. Выполняем операцию
+            op_symbol = power_op_token_node.symbol
+            current_result = self._perform_binary_operation(base_value, exponent_value, op_symbol, ctx)
+            # print(f"[DEBUG_POWER_V5] Result of {base_value} ** {exponent_value} = {current_result}", file=sys.stderr)
+            return current_result
+        else:
+            # Оператора POWER нет, значит это просто unaryExpression
+            # print(f"[DEBUG_POWER_V5] No POWER op. Returning base value: {base_value}", file=sys.stderr)
+            return base_value
+
     def visitMultiplicativeExpression(self, ctx): # KumirParser.MultiplicativeExpressionContext
         # visitor = self.visitor
         print(f"[DEBUG][visitMultiplicativeExpressionEE] Called for ctx: {ctx.getText()}", file=sys.stderr)
@@ -915,62 +918,3 @@ class ExpressionEvaluator:
         
         # print(f"[DEBUG][GetLValueStruct] EXIT for {expr_ctx.getText()}. Primary: {primary_expr_ctx_candidate.getText() if primary_expr_ctx_candidate else 'None'}, Indices: {index_list_ctx_candidate.getText() if index_list_ctx_candidate else 'None'}", file=sys.stderr)
         return primary_expr_ctx_candidate, index_list_ctx_candidate
-
-    def visitPrimaryExpression(self, ctx: KumirParser.PrimaryExpressionContext): # KumirParser.PrimaryExpressionContext
-        visitor = self.visitor
-        print(f"[DEBUG][visitPrimaryExpressionEE] Called for ctx: {ctx.getText()}", file=sys.stderr)
-        result = None
-        if ctx.literal():
-            result = self.visitLiteral(ctx.literal())
-        elif ctx.qualifiedIdentifier():
-            name = ctx.qualifiedIdentifier().getText()
-            # --- НАЧАЛО ОТЛАДКИ N В EVALUATOR ---
-            if name == 'N':
-                print(f"[DEBUG][EE_N_Check_Access] Пытаемся получить значение для 'N' в ExpressionEvaluator.", file=sys.stderr)
-            # --- КОНЕЦ ОТЛАДКИ N В EVALUATOR ---
-            var_info, _ = visitor.find_variable(name)
-            if var_info:
-                # --- НАЧАЛО ОТЛАДКИ N В EVALUATOR (ПОСЛЕ ПОИСКА) ---
-                if name == 'N':
-                    print(f"[DEBUG][EE_N_Check_Value] 'N' найдена в ExpressionEvaluator, var_info['value'] = {var_info['value']}", file=sys.stderr)
-                # --- КОНЕЦ ОТЛАДКИ N В EVALUATOR ---
-                is_table_access = var_info.get('is_table') and not ctx.parentCtx.LPAREN()
-                # Check if it's a direct table access (no indices/args yet, handled by Postfix)
-                is_direct_table_ref = (
-                    not (hasattr(ctx.parentCtx, 'indexList') and ctx.parentCtx.indexList()) and
-                    not (hasattr(ctx.parentCtx, 'argumentList') and ctx.parentCtx.argumentList())
-                )
-
-                if is_table_access and is_direct_table_ref:
-                    print(f"[DEBUG][visitPrimaryExpressionEE] Returning KumirTableVar object for table: {name}", file=sys.stderr)
-                    result = var_info['value'] 
-                elif var_info.get('is_table'): # Table name for postfix processing
-                    print(f"[DEBUG][visitPrimaryExpressionEE] Returning name for table (to be handled by Postfix): {name}", file=sys.stderr)
-                    result = name
-                else: # Scalar variable or function/procedure name
-                    if callable(var_info.get('value')):
-                        result = name
-                    else:
-                        result = var_info['value']
-            else:
-                print(f"[DEBUG][visitPrimaryExpressionEE] '{name}' not found as variable, assuming proc/func name.", file=sys.stderr)
-                result = name 
-        elif ctx.LPAREN():
-            # When all expressions are moved, this will be self.visitExpression(ctx.expression())
-            result = self.visitExpression(ctx.expression()) 
-            print(f"[DEBUG][visitPrimaryExpressionEE] LPAREN expression result: {result}", file=sys.stderr)
-        elif ctx.RETURN_VALUE():
-            current_scope_dict = visitor.scopes[-1]
-            if '__знач__' not in current_scope_dict:
-                if len(visitor.scopes) > 1 and '__знач__' in visitor.scopes[-2]:
-                    current_scope_dict = visitor.scopes[-2]
-            if '__знач__' not in current_scope_dict:
-                print(f"[DEBUG][visitPrimaryExpressionEE] '__знач__' not in current scope or caller scope. Current scopes: {visitor.scopes}", file=sys.stderr)
-                raise KumirEvalError("Попытка использования неинициализированного возвращаемого значения 'знач'.", ctx.start.line, ctx.start.column)
-            result = current_scope_dict['__знач__']
-            print(f"[DEBUG][visitPrimaryExpressionEE] RETURN_VALUE (__знач__) result: {repr(result)} from scope: {current_scope_dict is visitor.scopes[-1]}", file=sys.stderr)
-        else:
-            print(f"[DEBUG][visitPrimaryExpressionEE] Unknown primary expression type: {ctx.getText()}", file=sys.stderr)
-            raise KumirEvalError(f"Неизвестный тип первичного выражения: {ctx.getText()}", ctx.start.line, ctx.start.column)
-        print(f"[DEBUG][visitPrimaryExpressionEE] Returning: {repr(result)} (type: {type(result)}) for ctx: {ctx.getText()}", file=sys.stderr)
-        return result 

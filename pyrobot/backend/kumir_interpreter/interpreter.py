@@ -339,13 +339,11 @@ class KumirInterpreterVisitor(KumirParserVisitor):
             return 'арг'  # По умолчанию 'арг'
 
     def find_variable(self, var_name: str) -> Tuple[Optional[Dict], Optional[Dict]]:
-        """Ищет переменную во всех областях видимости и возвращает её информацию и область видимости."""
-        if self.debug: print(f"[DEBUG][FindVar] Поиск переменной '{var_name}'", file=sys.stderr)  # stdout -> stderr
-        for i, scope in enumerate(reversed(self.scopes)):
-            scope_level = len(self.scopes) - 1 - i
+        """Ищет переменную в текущей и всех внешних областях видимости."""
+        print(f"[DEBUG][FindVar_Interpreter] Ищем '{var_name}'. Всего scopes: {len(self.scopes)}. Текущие scopes: {self.scopes}", file=sys.stderr) # ДОБАВЛЕНО
+        for scope in reversed(self.scopes):
             if var_name in scope:
-                if self.debug: print(f"[DEBUG][FindVar] Найдена '{var_name}' в области {scope_level}",
-                                     file=sys.stderr)  # stdout -> stderr
+                # print(f"[DEBUG][FindVar] Найдена '{var_name}' в области {self.scopes.index(scope)}", file=sys.stderr)
                 return scope[var_name], scope
         if self.debug: print(f"[DEBUG][FindVar] Переменная '{var_name}' НЕ найдена",
                              file=sys.stderr)  # stdout -> stderr
@@ -1280,6 +1278,18 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                 l_value_text_for_err = l_value_ctx.getText() if l_value_ctx else "None"
                 raise KumirSyntaxError(f"Отсутствует имя переменной в операторе присваивания (lvalue: '{l_value_text_for_err}')", ctx.start.line, ctx.start.column)
             var_name = l_value_ctx.qualifiedIdentifier().getText()
+
+            # >>> НАЧАЛО ИСПРАВЛЕННОЙ ВСТАВКИ 1 <<<
+            # Этот print поможет увидеть, что вычисляется для правой части n := 2**M
+            if var_name == 'n' and r_value_expr_ctx and "M" in r_value_expr_ctx.getText(): # Используем r_value_expr_ctx
+                rhs_expr_text = r_value_expr_ctx.getText()
+                # Убедимся, что evaluator инициализирован
+                if hasattr(self, 'evaluator') and self.evaluator is not None:
+                    print(f"[DEBUG_ASSIGN_RHS_18_INTERPRETER] Для '{var_name} := {rhs_expr_text}'", file=sys.stderr)
+                else:
+                    print(f"[DEBUG_ASSIGN_RHS_18_INTERPRETER] 'evaluator' не найден, логируем только текст: '{var_name} := {rhs_expr_text}'", file=sys.stderr)
+            # >>> КОНЕЦ ИСПРАВЛЕННОЙ ВСТАВКИ 1 <<<
+
             var_info, var_scope = self.find_variable(var_name)
             if var_info is None:
                 raise KumirEvalError(f"Переменная '{var_name}' не объявлена", l_value_ctx.qualifiedIdentifier().start.line, l_value_ctx.qualifiedIdentifier().start.column)
@@ -1312,9 +1322,28 @@ class KumirInterpreterVisitor(KumirParserVisitor):
             else:
                 if is_table:
                     raise KumirEvalError(f"Попытка присвоить значение всей таблице '{var_name}' без указания индексов. Такое присваивание не поддерживается.", l_value_ctx.start.line)
-                validated_value = self._validate_and_convert_value_for_assignment(value_to_assign, kumir_target_type, var_name)
-                var_info['value'] = validated_value
-                print(f"[DEBUG][visitAssignmentStatement] Присвоено {var_name} = {validated_value} (тип {kumir_target_type})", file=sys.stderr)
+                
+                final_value_to_assign = None # Инициализируем на всякий случай
+                try:
+                    # value_to_assign было вычислено в самом начале метода
+                    final_value_to_assign = self._validate_and_convert_value_for_assignment(value_to_assign, kumir_target_type, var_name)
+                except KumirTypeError as e:
+                    err_line = r_value_expr_ctx.start.line
+                    err_col = r_value_expr_ctx.start.column
+                    raise KumirEvalError(
+                        f"Строка {err_line}: Ошибка типа при присваивании переменной '{var_name}': {e.args[0]}",
+                        err_line, err_col
+                    ) from e
+
+                # >>> НАЧАЛО ПЕРЕМЕЩЕННОЙ ИСПРАВЛЕННОЙ ВСТАВКИ 2 <<<
+                # Этот print покажет, какое значение присваивается 'n'
+                if var_name == 'n' and r_value_expr_ctx and "M" in r_value_expr_ctx.getText(): # Используем r_value_expr_ctx
+                    print(f"[DEBUG_ASSIGN_FINAL_18_INTERPRETER] Финальное значение для '{var_name}': {final_value_to_assign} (тип: {type(final_value_to_assign)})", file=sys.stderr)
+                # >>> КОНЕЦ ПЕРЕМЕЩЕННОЙ ИСПРАВЛЕННОЙ ВСТАВКИ 2 <<<
+
+                # Фактическое присвоение значения
+                var_scope[var_name]['value'] = final_value_to_assign
+                var_info['is_assigned_once'] = True
         return None
 
     def visitIoStatement(self, ctx: KumirParser.IoStatementContext):
@@ -1621,6 +1650,7 @@ class KumirInterpreterVisitor(KumirParserVisitor):
         #     # Обработка литералов должна быть в ExpressionEvaluator.visitLiteral
         #     # result = self.evaluator.visitLiteral(ctx.literal()) # Пример
         #     pass
+        print(f"[DEBUG][visitPrimaryEE_FindVar] Ищем '{var_name}'. Visitor scopes: {self.visitor.scopes}", file=sys.stderr)
         return None # Явный return
 
     # --- НОВЫЙ МЕТОД: Форматирование вывода (уже был, проверяем отступ)---
