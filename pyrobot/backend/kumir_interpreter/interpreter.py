@@ -1225,7 +1225,108 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                 elif expr_node_or_list:
                     actual_expr_to_visit = expr_node_or_list
                 if actual_expr_to_visit:
-                    self.evaluator.visitExpression(actual_expr_to_visit)
+                    # ======== НАЧАЛО ВСТАВКИ ДЛЯ ВЫЗОВА ПРОЦЕДУРЫ ========
+                    expr_text_potential_proc_call = actual_expr_to_visit.getText()
+                    is_simple_identifier_call = False
+                    
+                    # Упрощенная проверка, что это простой идентификатор (без (), [], и т.д.)
+                    # Мы ожидаем, что actual_expr_to_visit это ExpressionContext
+                    # Путь: Expression -> ... -> Unary -> Postfix -> Primary -> QualifiedIdentifier
+                    # И у PostfixExpression не должно быть дочерних LPAREN или LBRACK
+                    temp_path_ctx = actual_expr_to_visit
+                    try:
+                        if hasattr(temp_path_ctx, 'logicalOrExpression') and temp_path_ctx.logicalOrExpression():
+                            temp_path_ctx = temp_path_ctx.logicalOrExpression()
+                        if hasattr(temp_path_ctx, 'logicalAndExpression') and temp_path_ctx.logicalAndExpression():
+                            children = temp_path_ctx.logicalAndExpression()
+                            temp_path_ctx = children[0] if isinstance(children, list) and children else children
+                        if hasattr(temp_path_ctx, 'equalityExpression') and temp_path_ctx.equalityExpression():
+                            children = temp_path_ctx.equalityExpression()
+                            temp_path_ctx = children[0] if isinstance(children, list) and children else children
+                        if hasattr(temp_path_ctx, 'relationalExpression') and temp_path_ctx.relationalExpression():
+                            children = temp_path_ctx.relationalExpression()
+                            temp_path_ctx = children[0] if isinstance(children, list) and children else children
+                        if hasattr(temp_path_ctx, 'additiveExpression') and temp_path_ctx.additiveExpression():
+                            children = temp_path_ctx.additiveExpression()
+                            temp_path_ctx = children[0] if isinstance(children, list) and children else children
+                        if hasattr(temp_path_ctx, 'multiplicativeExpression') and temp_path_ctx.multiplicativeExpression():
+                            children = temp_path_ctx.multiplicativeExpression()
+                            temp_path_ctx = children[0] if isinstance(children, list) and children else children
+                        
+                        # Добрались до PowerExpression или ниже
+                        if hasattr(temp_path_ctx, 'powerExpression'):
+                            power_children = temp_path_ctx.powerExpression()
+                            power_expr_node = power_children[0] if isinstance(power_children, list) and power_children else power_children
+                            if power_expr_node and hasattr(power_expr_node, 'unaryExpression'):
+                                unary_children = power_expr_node.unaryExpression()
+                                unary_expr_node = unary_children[0] if isinstance(unary_children, list) and unary_children else unary_children
+                                if unary_expr_node and hasattr(unary_expr_node, 'postfixExpression') and unary_expr_node.postfixExpression():
+                                    postfix_expr = unary_expr_node.postfixExpression()
+                                    if postfix_expr and hasattr(postfix_expr, 'primaryExpression') and postfix_expr.primaryExpression():
+                                        primary_expr = postfix_expr.primaryExpression()
+                                        # Проверяем, что это QualifiedIdentifier и НЕТ скобок/индексов в PostfixExpression
+                                        if primary_expr.qualifiedIdentifier() and not postfix_expr.LPAREN() and not postfix_expr.LBRACK():
+                                            is_simple_identifier_call = True
+                                            expr_text_potential_proc_call = primary_expr.qualifiedIdentifier().getText()
+                    except Exception as e_path_check:
+                        print(f"[DEBUG][ProcCallInAssign] Error during path check for simple ID: {e_path_check}", file=sys.stderr)
+                        is_simple_identifier_call = False
+
+                    proc_name_lower = expr_text_potential_proc_call.lower()
+                    
+                    if is_simple_identifier_call and proc_name_lower in self.procedures:
+                        proc_def_ctx = self.procedures[proc_name_lower]
+                        header = proc_def_ctx.algorithmHeader()
+                        can_call_without_args = True
+                        if header and header.parameterList():
+                            for param_decl_node in header.parameterList().parameterDeclaration():
+                                mode = self._get_param_mode(param_decl_node)
+                                if mode in ['арг', 'арг рез']: # Есть входные параметры
+                                    # Здесь можно добавить проверку на значения по умолчанию, если они будут реализованы
+                                    can_call_without_args = False
+                                    break
+                        
+                        if can_call_without_args:
+                            print(f"[DEBUG][visitAssignmentStatement] Detected parameterless procedure call: '{expr_text_potential_proc_call}'. Executing.", file=sys.stderr)
+                            
+                            # Подготовка данных для вызова (аналогично PostfixExpression)
+                            expected_params_info_list = []
+                            if header and header.parameterList():
+                                for param_decl_node_inner in header.parameterList().parameterDeclaration():
+                                    param_type_spec_ctx_inner = param_decl_node_inner.typeSpecifier()
+                                    param_base_type_str_inner, param_is_table_decl_inner = self._get_type_info_from_specifier(param_type_spec_ctx_inner, param_decl_node_inner.start.line)
+                                    mode_inner = self._get_param_mode(param_decl_node_inner)
+                                    for param_var_item_ctx_inner in param_decl_node_inner.variableList().variableDeclarationItem():
+                                        param_name_in_proc_inner = param_var_item_ctx_inner.ID().getText()
+                                        expected_params_info_list.append({
+                                            'name': param_name_in_proc_inner, 
+                                            'type': param_base_type_str_inner, 
+                                            'mode': mode_inner, 
+                                            'is_table': param_is_table_decl_inner,
+                                            'decl_ctx': param_var_item_ctx_inner
+                                        })
+                            
+                            call_data_for_no_arg_proc = {
+                                'args_values_for_input_params': [],
+                                'output_params_mapping': [], 
+                                'expected_params_info': expected_params_info_list,
+                                'actual_arg_expr_nodes': [] 
+                            }
+                            self.prepare_procedure_call_data = call_data_for_no_arg_proc
+                            self.visit(proc_def_ctx) # Выполняем тело процедуры
+                            self.prepare_procedure_call_data = None # Очищаем
+                        else:
+                            # Процедура требует аргументы, но вызывается без них.
+                            # Это может быть ошибкой, но пока просто вычисляем как выражение.
+                            # Или можно бросить KumirArgumentError.
+                            print(f"[DEBUG][visitAssignmentStatement] Procedure '{expr_text_potential_proc_call}' requires arguments. Evaluating as expression.", file=sys.stderr)
+                            self.evaluator.visitExpression(actual_expr_to_visit)
+                    else:
+                        # Не является известной процедурой без параметров или не простой идентификатор.
+                        # Просто вычисляем выражение (может иметь побочные эффекты или быть ошибкой, если это просто идентификатор без присваивания).
+                        print(f"[DEBUG][visitAssignmentStatement] Expression '{expr_text_potential_proc_call}' is not a known parameterless procedure. Evaluating as expression.", file=sys.stderr)
+                        self.evaluator.visitExpression(actual_expr_to_visit)
+                    # ======== КОНЕЦ ВСТАВКИ ДЛЯ ВЫЗОВА ПРОЦЕДУРЫ ========
             else:
                 raise KumirSyntaxError(f"Ошибка: отсутствует выражение в операторе '{ctx.getText()}'", ctx.start.line, ctx.start.column)
             return None
@@ -1505,7 +1606,7 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                     for index_expr_ctx in idx_expr_list:
                         idx_val = self.evaluator.visitExpression(index_expr_ctx)
                         if not isinstance(idx_val, int):
-                            raise KumirTypeError(f"Индекс таблицы '{var_name}' должен быть целым числом, получено: {idx_val} (тип {type(idx_val).__name__})", index_expr_ctx.start.line)
+                            raise KumirTypeError(f"Индекс таблицы '{var_name}' должен быть целым числом, получено: {idx_val}", i_ctx.start.line)
                         indices.append(idx_val)
                     print(f"[DEBUG][IO] INPUT table '{var_name}', indices: {indices}", file=sys.stderr)
                     if len(indices) != kumir_table_var_obj.dimensions:
