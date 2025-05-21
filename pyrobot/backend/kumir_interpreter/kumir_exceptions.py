@@ -86,7 +86,8 @@ class KumirSyntaxError(SyntaxError, KumirExecutionError): # Наследуем �
 
 # Ошибка, связанная с командами или состоянием робота
 class RobotError(KumirExecutionError):
-	pass
+	def __init__(self, message, line_index=None, column_index=None, line_content=None):
+		super().__init__(message, line_index, column_index, line_content)
 
 
 # Ошибка для функциональности, которая еще не реализована
