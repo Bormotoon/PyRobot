@@ -281,4 +281,33 @@ class KumirNameError(KumirExecutionError):
     *   Результат: `8 failed, 48 passed` (ожидаем, что не изменится).
 
 **Коммит:**
+*   НЕТ.
+
+---
+
+### Шаг: Задача 0.2.10: Стандартизация `KumirTypeError`
+
+**Цель:** Обновить конструктор `KumirTypeError` для приема `column_index` и передачи всех параметров в `super().__init__`.
+
+**Изменяемый файл:** `pyrobot/backend/kumir_interpreter/kumir_exceptions.py`
+
+**Изменения:**
+```python
+# Строки ~99-101 (было ~105-107 до правок)
+class KumirTypeError(KumirExecutionError):
+	def __init__(self, message, line_index=None, column_index=None, line_content=None):
+		super().__init__(message, line_index, column_index, line_content)
+```
+
+**Тестирование:**
+
+1.  **Тест `47-str-ops.kum`:**
+    *   Команда: `python -m pytest -v tests/test_functional.py -k "47-str-ops.kum"`
+    *   Результат: `1 failed, 55 deselected` (ожидаем, что не изменится).
+
+2.  **Все тесты:**
+    *   Команда: `python -m pytest -v tests/test_functional.py`
+    *   Результат: `8 failed, 48 passed` (ожидаем, что не изменится).
+
+**Коммит:**
 *   НЕТ. 
