@@ -102,7 +102,8 @@ class KumirTypeError(KumirExecutionError):
 
 # Ошибка, связанная с индексами массивов (таблиц)
 class KumirIndexError(KumirExecutionError):
-	pass
+	def __init__(self, message, line_index=None, column_index=None, line_content=None):
+		super().__init__(message, line_index, column_index, line_content)
 
 
 # Ошибка, связанная с некорректным вводом пользователя (ошибка преобразования)

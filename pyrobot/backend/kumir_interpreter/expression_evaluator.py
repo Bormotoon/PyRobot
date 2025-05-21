@@ -6,7 +6,7 @@ import sys
 import operator
 from .generated.KumirLexer import KumirLexer
 from .generated.KumirParser import KumirParser
-from .kumir_exceptions import KumirEvalError, KumirSyntaxError, KumirArgumentError
+from .kumir_exceptions import KumirEvalError, KumirSyntaxError, KumirArgumentError, KumirIndexError
 from .kumir_datatypes import KumirTableVar
 from antlr4 import InputStream, CommonTokenStream # type: ignore
 from typing import Any, Dict, List, Optional, Tuple, Union, TYPE_CHECKING
