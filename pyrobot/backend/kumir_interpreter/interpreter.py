@@ -1402,30 +1402,78 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                 raise KumirEvalError(f"Переменная '{var_name}' не объявлена", l_value_ctx.qualifiedIdentifier().start.line, l_value_ctx.qualifiedIdentifier().start.column)
             kumir_target_type = var_info.get('type', 'неизвестен')
             is_table = var_info.get('is_table', False)
-            if l_value_ctx.LBRACK():
-                if not is_table:
-                    raise KumirEvalError(f"Переменная '{var_name}' не является таблицей, но используется с индексами", l_value_ctx.qualifiedIdentifier().start.line)
-                if not var_info.get('value') or not isinstance(var_info['value'], KumirTableVar):
-                    raise KumirEvalError(f"Таблица '{var_name}' не инициализирована правильно (отсутствует KumirTableVar)", l_value_ctx.start.line)
-                kumir_table_var = var_info['value']
-                table_element_type = kumir_table_var.base_kumir_type_name
-                index_ctx_list = l_value_ctx.indexList().expression()
-                indices = []
-                for i_ctx in index_ctx_list:
-                    idx_val = self.evaluator.visitExpression(i_ctx)
-                    if not isinstance(idx_val, int):
-                        raise KumirEvalError(f"Индекс таблицы '{var_name}' должен быть целым числом, получено: {idx_val}", i_ctx.start.line)
-                    indices.append(idx_val)
-                if len(indices) != len(var_info.get('dimensions_info', [])):
-                    raise KumirEvalError(f"Неверное количество индексов для таблицы '{var_name}'. Ожидалось {len(var_info.get('dimensions_info', []))}, получено {len(indices)}.", l_value_ctx.start.line)
-                value_to_set_in_table = self._validate_and_convert_value_for_assignment(value_to_assign, table_element_type, f"{var_name}[{','.join(map(str, indices))}]")
-                try:
-                    kumir_table_var.set_value(tuple(indices), value_to_set_in_table, l_value_ctx)
-                    print(f"[DEBUG][visitAssignmentStatement] Присвоено {var_name}[{','.join(map(str, indices))}] = {value_to_set_in_table}", file=sys.stderr)
-                except IndexError as e:
-                    raise KumirEvalError(f"Индекс выходит за границы таблицы '{var_name}': {e}", l_value_ctx.start.line, l_value_ctx.start.column)
-                except TypeError as e:
-                    raise KumirEvalError(f"Ошибка присваивания элементу таблицы '{var_name}': {e}", l_value_ctx.start.line, l_value_ctx.start.column)
+            
+            if l_value_ctx.LBRACK(): # Если есть w[N+1]
+                if kumir_target_type == 'лит' and not is_table:
+                    # Это присваивание символу строки: S[i] := char
+                    index_ctx_list = l_value_ctx.indexList().expression()
+                    indices = []
+                    for i_ctx in index_ctx_list:
+                        idx_val = self.evaluator.visitExpression(i_ctx)
+                        if not isinstance(idx_val, int):
+                            raise KumirEvalError(f"Индекс для строки '{var_name}' должен быть целым числом, получено: {idx_val}", i_ctx.start.line)
+                        indices.append(idx_val)
+
+                    if len(indices) != 1:
+                        raise KumirIndexError(f"Для присваивания символу строки '{var_name}' ожидается один индекс.", l_value_ctx.indexList().start.line)
+                    
+                    kumir_idx = indices[0]
+                    # value_to_assign уже вычислена ранее в visitAssignmentStatement
+                    
+                    if not isinstance(value_to_assign, str) or len(value_to_assign) != 1:
+                        val_type = type(value_to_assign).__name__
+                        val_repr = repr(value_to_assign)
+                        raise KumirTypeError(
+                            f"При присваивании символу строки '{var_name}' ожидался один символ (тип 'лит'), получено: {val_repr} (тип '{val_type}')",
+                            r_value_expr_ctx.start.line, r_value_expr_ctx.start.column
+                        )
+                    
+                    char_to_assign = value_to_assign
+                    
+                    current_string_value = var_info['value']
+                    if not isinstance(current_string_value, str):
+                         raise KumirEvalError(f"Внутренняя ошибка: переменная '{var_name}' типа 'лит', но ее значение не строка.", l_value_ctx.start.line)
+
+                    py_idx = kumir_idx - 1 # Кумир 1-индексированный
+
+                    if 0 <= py_idx < len(current_string_value):
+                        # Строки неизменяемы, создаем новую
+                        str_list = list(current_string_value)
+                        str_list[py_idx] = char_to_assign
+                        new_string_value = "".join(str_list)
+                        
+                        var_scope[var_name]['value'] = new_string_value
+                        var_info['is_assigned_once'] = True # Обновляем и в var_info на всякий случай
+                        print(f"[DEBUG][visitAssignmentStatement] Присвоено {var_name}[{kumir_idx}] = '{char_to_assign}'. Новое значение строки: '{new_string_value}'", file=sys.stderr)
+                    else:
+                        # Поведение КуМира: не расширяет строку, а выдает ошибку
+                        raise KumirIndexError(f"Индекс {kumir_idx} выходит за границы строки '{var_name}' (длина {len(current_string_value)}). Присваивание символу невозможно.", l_value_ctx.indexList().start.line)
+
+                elif not is_table: # Если это не строка 'лит' и не таблица, но есть LBRACK
+                    raise KumirEvalError(f"Переменная '{var_name}' не является ни строкой, ни таблицей, но используется с индексами для присваивания.", l_value_ctx.qualifiedIdentifier().start.line)
+                else: # Это таблица (is_table == True)
+                    # Сюда переносится оригинальный код для обработки таблиц
+                    if not var_info.get('value') or not isinstance(var_info['value'], KumirTableVar):
+                        raise KumirEvalError(f"Таблица '{var_name}' не инициализирована правильно (отсутствует KumirTableVar)", l_value_ctx.start.line)
+                    kumir_table_var = var_info['value']
+                    table_element_type = kumir_table_var.base_kumir_type_name
+                    index_ctx_list = l_value_ctx.indexList().expression()
+                    indices = []
+                    for i_ctx in index_ctx_list:
+                        idx_val = self.evaluator.visitExpression(i_ctx)
+                        if not isinstance(idx_val, int):
+                            raise KumirEvalError(f"Индекс таблицы '{var_name}' должен быть целым числом, получено: {idx_val}", i_ctx.start.line)
+                        indices.append(idx_val)
+                    if len(indices) != len(var_info.get('dimensions_info', [])):
+                        raise KumirEvalError(f"Неверное количество индексов для таблицы '{var_name}'. Ожидалось {len(var_info.get('dimensions_info', []))}, получено {len(indices)}.", l_value_ctx.start.line)
+                    value_to_set_in_table = self._validate_and_convert_value_for_assignment(value_to_assign, table_element_type, f"{var_name}[{','.join(map(str, indices))}]")
+                    try:
+                        kumir_table_var.set_value(tuple(indices), value_to_set_in_table, l_value_ctx)
+                        print(f"[DEBUG][visitAssignmentStatement] Присвоено {var_name}[{','.join(map(str, indices))}] = {value_to_set_in_table}", file=sys.stderr)
+                    except IndexError as e:
+                        raise KumirEvalError(f"Индекс выходит за границы таблицы '{var_name}': {e}", l_value_ctx.start.line, l_value_ctx.start.column)
+                    except TypeError as e:
+                        raise KumirEvalError(f"Ошибка присваивания элементу таблицы '{var_name}': {e}", l_value_ctx.start.line, l_value_ctx.start.column)
             else:
                 if is_table:
                     raise KumirEvalError(f"Попытка присвоить значение всей таблице '{var_name}' без указания индексов. Такое присваивание не поддерживается.", l_value_ctx.start.line)

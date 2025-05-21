@@ -267,47 +267,71 @@ class ExpressionEvaluator:
                                                  ctx.getChild(3).getSymbol().type == KumirLexer.RBRACK):
                     raise KumirSyntaxError(f"Строка {first_op_token_node.getSymbol().line}: Некорректная структура доступа к элементу таблицы после '['.", first_op_token_node.getSymbol().line, first_op_token_node.getSymbol().column)
                 
-                index_list_ctx = ctx.getChild(2)
+                index_list_ctx = ctx.getChild(2) # Это KumirParser.RULE_indexList
                 print(f"[DEBUG][PostfixEE] Обработка indexList: {index_list_ctx.getText()}", file=sys.stderr)
-                
-                table_name_or_value = current_eval_value
-                kumir_table_var_obj = None
-
-                if isinstance(table_name_or_value, str):
-                    var_info, _ = visitor.find_variable(table_name_or_value)
-                    if var_info is None:
-                        raise KumirEvalError(f"Строка {primary_expr_ctx.start.line}: Таблица '{table_name_or_value}' не найдена.", primary_expr_ctx.start.line, primary_expr_ctx.start.column)
-                    if not var_info['is_table']:
-                        raise KumirEvalError(f"Строка {primary_expr_ctx.start.line}: Переменная '{table_name_or_value}' не является таблицей, доступ по индексу невозможен.", primary_expr_ctx.start.line, primary_expr_ctx.start.column)
-                    kumir_table_var_obj = var_info['value']
-                elif isinstance(table_name_or_value, KumirTableVar):
-                    kumir_table_var_obj = table_name_or_value
-                else: 
-                    raise KumirEvalError(f"Строка {primary_expr_ctx.start.line}: Попытка доступа по индексу к выражению ('{primary_expr_ctx.getText()}'), которое не является таблицей.", primary_expr_ctx.start.line, primary_expr_ctx.start.column)
-
-                if not isinstance(kumir_table_var_obj, KumirTableVar):
-                     raise KumirEvalError(f"Строка {primary_expr_ctx.start.line}: Внутренняя ошибка: основа для индексации ('{primary_expr_ctx.getText()}') не является объектом KumirTableVar.", primary_expr_ctx.start.line, primary_expr_ctx.start.column)
-
                 indices = []
                 for expr_ctx_idx in index_list_ctx.expression():
-                    # Здесь вызов visitor.visit, т.к. visitExpression еще не в этом классе
-                    index_val = self.visitExpression(expr_ctx_idx) 
+                    index_val = self.visitExpression(expr_ctx_idx)
                     index_val_clean = self._get_value(index_val)
                     if not isinstance(index_val_clean, int):
-                        raise KumirEvalError(f"Строка {expr_ctx_idx.start.line}: Индекс таблицы должен быть целым числом, получено: {index_val_clean} (тип: {type(index_val_clean).__name__}).", expr_ctx_idx.start.line, expr_ctx_idx.start.column)
+                        raise KumirEvalError(f"Строка {expr_ctx_idx.start.line}: Индекс должен быть целым числом, получено: {index_val_clean} (тип: {type(index_val_clean).__name__}).", expr_ctx_idx.start.line, expr_ctx_idx.start.column)
                     indices.append(index_val_clean)
                 
-                indices_tuple = tuple(indices)
-                table_display_name = primary_expr_ctx.getText()
-                print(f"[DEBUG][PostfixEE] Попытка чтения из таблицы '{table_display_name}' по индексам {indices_tuple}", file=sys.stderr)
-                try:
-                    current_eval_value = kumir_table_var_obj.get_value(indices_tuple, index_list_ctx)
-                    print(f"[DEBUG][PostfixEE] Значение из таблицы '{table_display_name}{indices_tuple}': {repr(current_eval_value)}", file=sys.stderr)
-                except KumirEvalError as e:
-                     err_line = e.line if hasattr(e, 'line') and e.line is not None else index_list_ctx.start.line
-                     err_col = e.column if hasattr(e, 'column') and e.column is not None else index_list_ctx.start.column
-                     raise KumirEvalError(f"Ошибка при доступе к элементу таблицы '{table_display_name}': {e.args[0]}", err_line, err_col)
-            
+                base_var_name = primary_expr_ctx.getText() 
+                var_info_for_base, _ = visitor.find_variable(base_var_name)
+
+                if var_info_for_base and var_info_for_base.get('type') == 'лит' and not var_info_for_base.get('is_table'):
+                    string_to_index = current_eval_value 
+                    if not isinstance(string_to_index, str):
+                        raise KumirEvalError(f"Внутренняя ошибка: переменная '{base_var_name}' типа 'лит', но ее значение не строка ({type(string_to_index).__name__}).", primary_expr_ctx.start.line, primary_expr_ctx.start.column)
+
+                    if len(indices) != 1:
+                        raise KumirIndexError(f"Строка {index_list_ctx.start.line}: Для доступа к символу строки '{base_var_name}' ожидается один индекс.", index_list_ctx.start.line, index_list_ctx.start.column)
+                    
+                    kumir_idx = indices[0]
+                    py_idx = kumir_idx - 1 
+                    
+                    if 0 <= py_idx < len(string_to_index):
+                        current_eval_value = string_to_index[py_idx]
+                        print(f"[DEBUG][PostfixEE] Доступ к символу строки '{base_var_name}'[{kumir_idx}] -> '{current_eval_value}'", file=sys.stderr)
+                    else:
+                        raise KumirIndexError(f"Строка {index_list_ctx.start.line}: Индекс {kumir_idx} выходит за границы строки '{base_var_name}' (значение: '{string_to_index}', длина {len(string_to_index)}).", index_list_ctx.start.line, index_list_ctx.start.column)
+                
+                elif isinstance(current_eval_value, KumirTableVar):
+                    kumir_table_var_obj = current_eval_value
+                    table_display_name = base_var_name 
+                    print(f"[DEBUG][PostfixEE] Попытка чтения из объекта таблицы '{table_display_name}' по индексам {tuple(indices)}", file=sys.stderr)
+                    try:
+                        current_eval_value = kumir_table_var_obj.get_value(tuple(indices), index_list_ctx)
+                        print(f"[DEBUG][PostfixEE] Значение из таблицы '{table_display_name}{tuple(indices)}': {repr(current_eval_value)}", file=sys.stderr)
+                    except KumirEvalError as e:
+                        err_line = e.line if hasattr(e, 'line') and e.line is not None else index_list_ctx.start.line
+                        err_col = e.column if hasattr(e, 'column') and e.column is not None else index_list_ctx.start.column
+                        raise KumirEvalError(f"Ошибка при доступе к элементу таблицы '{table_display_name}': {e.args[0]}", err_line, err_col)
+
+                elif isinstance(current_eval_value, str) and var_info_for_base and var_info_for_base.get('is_table'):
+                    table_name = current_eval_value 
+                    kumir_table_var_obj = var_info_for_base['value']
+                    if not isinstance(kumir_table_var_obj, KumirTableVar):
+                         raise KumirEvalError(f"Строка {primary_expr_ctx.start.line}: Внутренняя ошибка: переменная '{table_name}' помечена как таблица, но не является объектом KumirTableVar.", primary_expr_ctx.start.line, primary_expr_ctx.start.column)
+                    
+                    table_display_name = table_name
+                    print(f"[DEBUG][PostfixEE] Попытка чтения из таблицы (по имени) '{table_display_name}' по индексам {tuple(indices)}", file=sys.stderr)
+                    try:
+                        current_eval_value = kumir_table_var_obj.get_value(tuple(indices), index_list_ctx)
+                        print(f"[DEBUG][PostfixEE] Значение из таблицы '{table_display_name}{tuple(indices)}': {repr(current_eval_value)}", file=sys.stderr)
+                    except KumirEvalError as e:
+                        err_line = e.line if hasattr(e, 'line') and e.line is not None else index_list_ctx.start.line
+                        err_col = e.column if hasattr(e, 'column') and e.column is not None else index_list_ctx.start.column
+                        raise KumirEvalError(f"Ошибка при доступе к элементу таблицы '{table_display_name}': {e.args[0]}", err_line, err_col)
+                else:
+                    type_of_val = type(current_eval_value).__name__
+                    is_var_info_found = "найдена" if var_info_for_base else "не найдена"
+                    var_type_if_found = var_info_for_base.get('type') if var_info_for_base else "N/A"
+                    is_table_if_found = var_info_for_base.get('is_table') if var_info_for_base else "N/A"
+                    print(f"[DEBUG][PostfixEE] Не удалось обработать индексацию: base_var_name='{base_var_name}', var_info_for_base {is_var_info_found} (type='{var_type_if_found}', is_table='{is_table_if_found}'), current_eval_value (от primary)='{repr(current_eval_value)}' (type='{type_of_val}')", file=sys.stderr)
+                    raise KumirEvalError(f"Строка {primary_expr_ctx.start.line}: Попытка доступа по индексу к выражению ('{base_var_name}'), которое не является ни строкой (для чтения символа), ни таблицей (тип значения от primary: {type_of_val}).", primary_expr_ctx.start.line, primary_expr_ctx.start.column)
+
             elif isinstance(first_op_token_node, TerminalNode) and first_op_token_node.getSymbol().type == KumirLexer.LPAREN:
                 if not isinstance(current_eval_value, str):
                     line = primary_expr_ctx.start.line
