@@ -61,19 +61,23 @@ class KumirInputRequiredError(Exception):  # Не наследуем от KumirE
 
 # Ошибка во время вычисления выражения (AST или safe_eval)
 class KumirEvalError(KumirExecutionError):
-	pass
+	def __init__(self, message, line_index=None, column_index=None, line_content=None):
+		super().__init__(message, line_index, column_index, line_content)
 
 
 # Синтаксическая ошибка в коде Кумира
 class KumirSyntaxError(SyntaxError, KumirExecutionError): # Наследуем от SyntaxError и нашего базового
-	def __init__(self, message, line_index=None, line_content=None, offset=None):
-		# Инициализируем SyntaxError с дополнительными параметрами
+	def __init__(self, message, line_index=None, column_index=None, line_content=None, offset=None):
+		# Сначала инициализируем наш базовый класс для line_index, column_index, line_content
+		KumirExecutionError.__init__(self, message, line_index, column_index, line_content)
+		# Затем инициализируем SyntaxError (он принимает только msg, filename, lineno, offset, text, print_file_and_line)
+		# Мы передадим основные параметры, которые он может использовать. filename и text у нас нет в явном виде здесь.
 		SyntaxError.__init__(self, message)
-		# Устанавливаем атрибуты для KumirExecutionError
-		self.line_index = line_index
-		self.line_content = line_content
-		# Дополнительно сохраняем смещение, если оно есть
-		self.offset = offset
+		# Устанавливаем атрибуты SyntaxError вручную, если они не установились через конструктор
+		self.msg = message
+		self.lineno = line_index + 1 if line_index is not None else None
+		self.offset = offset # offset - это позиция в строке (1-based)
+		self.text = line_content
 
 	def __str__(self):
 		# Используем __str__ от KumirExecutionError для форматирования
