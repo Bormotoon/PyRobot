@@ -1342,3 +1342,176 @@ elif proc_name_lower in self.visitor.procedures: # <--- ДОБАВИТЬ ЭТУ 
 
 Это должно восстановить корректную передачу аргументов для пользовательских процедур.
 // ... existing code ...
+
+## План по исправлению `47-str-ops.kum` и связанных проблем (16.08.2024)
+
+**Основная цель:** Исправить тест `47-str-ops.kum`, который падает из-за некорректной обработки строковых операций (доступ к символам/срезам) и встроенных строковых функций (`копировать`, `удалить`, `вставить`), минимизируя риск поломки других тестов.
+
+**Общий План:**
+
+1.  **Точечное исправление строковых операций в `ExpressionEvaluator.visitPostfixExpression`:**
+    *   Корректная обработка доступа к символам строки (`s[i]`) и срезам (`s[i:j]`), четкое разграничение с доступом к элементам таблиц.
+    *   Правильное преобразование 1-индексированных индексов КуМира в 0-индексированные для Python.
+    *   Обработка ошибок выхода за границы.
+
+2.  **Реализация встроенных строковых функций в `KumirInterpreterVisitor`:**
+    *   Корректная регистрация `копировать`, `удалить`, `вставить` в `BUILTIN_FUNCTIONS` (включая `min_args`, `max_args`, `arg_types`, `param_modes` и `handler`).
+    *   Реализация методов-обработчиков: `_handle_kopirovat`, `_handle_udalit`, `_handle_vstavit`.
+    *   Для `_handle_udalit` и `_handle_vstavit` обеспечить изменение строки-аргумента (режим `arg_res`), передавая имя переменной.
+
+3.  **Обработка аргументов для `arg_res` в `ExpressionEvaluator.visitPostfixExpression` (изолированно для встроенных строковых функций):**
+    *   При вызове встроенных функций `удалить` или `вставить`, если параметр имеет режим `arg_res`, передавать в `_call_builtin_function` *имя переменной*, а не ее значение.
+    *   Изменения не должны затрагивать логику обработки аргументов для пользовательских процедур на данном этапе.
+
+4.  **Корректировка конструкторов исключений:**
+    *   Стандартизировать конструкторы всех пользовательских исключений в `kumir_exceptions.py` для единообразного приема `line_index`, `column_index`, `line_content`.
+    *   Обновить все места вызова исключений для передачи корректных параметров.
+
+5.  **Проверка `expected_output` для `47-str-ops.kum`:**
+    *   Убедиться, что ожидаемый вывод в `TEST_CASES` соответствует логике файла `.kum` и корректной работе строковых функций.
+
+---
+## Детализированные задачи по исправлению `47-str-ops.kum` (16.08.2024)
+
+**Задача 0: Подготовка - Обновление конструкторов исключений и их вызовов**
+    *   **Файл:** `pyrobot/backend/kumir_interpreter/kumir_exceptions.py`
+        *   **Действие:** Обеспечить, чтобы базовый `KumirExecutionError` и все его наследники (`KumirEvalError`, `KumirArgumentError`, `KumirIndexError`, `KumirNameError`, `KumirTypeError`, `KumirSyntaxError`, `DeclarationError`, `ProcedureExitCalled`, `KumirInputError`) в своих `__init__` методах последовательно принимали `message: str, line_index: Optional[int] = None, column_index: Optional[int] = None, line_content: Optional[str] = None`.
+        *   `line_index` должен быть 0-индексированным.
+    *   **Файл:** `pyrobot/backend/kumir_interpreter/interpreter.py`
+        *   **Действие:** Добавить вспомогательный метод `get_line_content_from_ctx(self, ctx)` для получения строки кода по контексту ANTLR (предполагается наличие `self.program_lines` - списка строк программы, 0-индексированного).
+            ```python
+            # Примерная реализация в KumirInterpreterVisitor
+            # def get_line_content_from_ctx(self, ctx):
+            #     if ctx and ctx.start and hasattr(self, 'program_lines') and self.program_lines:
+            #         line_num_0_indexed = ctx.start.line - 1
+            #         if 0 <= line_num_0_indexed < len(self.program_lines):
+            #             return self.program_lines[line_num_0_indexed]
+            #     return None
+            ```
+        *   **Действие:** Убедиться, что `self.program_lines` инициализируется в `__init__` или при загрузке программы.
+    *   **Файлы:** `pyrobot/backend/kumir_interpreter/interpreter.py`, `pyrobot/backend/kumir_interpreter/expression_evaluator.py`
+        *   **Действие:** Найти все места, где возбуждаются пользовательские исключения.
+        *   **Действие:** Изменить вызовы для передачи:
+            *   `line_index=(ctx.start.line - 1 if ctx and hasattr(ctx, 'start') and ctx.start else None)`
+            *   `column_index=(ctx.start.column if ctx and hasattr(ctx, 'start') and ctx.start else None)`
+            *   `line_content=(self.visitor.get_line_content_from_ctx(ctx) if hasattr(self, 'visitor') and hasattr(self.visitor, 'get_line_content_from_ctx') and ctx else (self.get_line_content_from_ctx(ctx) if hasattr(self, 'get_line_content_from_ctx') and ctx else None))` (адаптировать в зависимости от того, где вызывается - в `ExpressionEvaluator` или `KumirInterpreterVisitor`).
+    *   **Тестирование:** Запустить все тесты. Ожидается, что функциональность не изменится, но сообщения об ошибках (если тесты падают) станут более информативными.
+
+**Задача 1: Реализация строковых срезов и доступа к символу в `ExpressionEvaluator.visitPostfixExpression`**
+    *   **Файл:** `pyrobot/backend/kumir_interpreter/expression_evaluator.py`
+    *   **Метод:** `visitPostfixExpression`
+    *   **Логика:** Внутри блока `if postfix_op_ctx.LBRACK():` (где `current_eval_value` уже получено из `primary_expr_ctx`):
+        *   Проверить `isinstance(current_eval_value, str)`.
+        *   Если `True` (это строка):
+            *   Получить список выражений индексов: `index_expr_nodes = index_list_node.expression()`.
+            *   Определить количество индексов: `num_indices = len(index_expr_nodes)`.
+            *   Вычислить значения индексов: `indices = [self.visitExpression(expr_node) for expr_node in index_expr_nodes]`. Убедиться, что они целые.
+            *   **Если `num_indices == 1` (доступ к символу, например, `s[i]`):**
+                *   `kumir_idx = indices[0]`.
+                *   Преобразовать в 0-based: `py_idx = kumir_idx - 1`.
+                *   Проверить границы: `if not (0 <= py_idx < len(current_eval_value))`, то `KumirIndexError`.
+                *   Результат: `result = current_eval_value[py_idx]`.
+            *   **Если `num_indices == 2` (срез, например, `s[i:j]`):**
+                *   `kumir_idx1, kumir_idx2 = indices[0], indices[1]`.
+                *   Преобразовать в 0-based для среза Python: `py_idx_start = kumir_idx1 - 1`, `py_idx_end = kumir_idx2` (так как КуМир-срез включает правую границу, а Python - нет).
+                *   Проверить границы: `if not (0 <= py_idx_start < len(current_eval_value) and py_idx_start < py_idx_end and py_idx_end <= len(current_eval_value))`, то `KumirIndexError`. (Возможно, уточнить условия, например, `py_idx_start` может быть равен `py_idx_end` для пустого среза, или `py_idx_end` может быть больше `len` для среза до конца). Для КуМира `s[i,i]` это один символ, а `s[i,i-1]` - пустая строка. Классический КуМир: `Копировать(S,I,N)` где `N` - длина. `S[I:J]` => `Копировать(S, I, J-I+1)`.
+                *   Результат: `result = current_eval_value[py_idx_start:py_idx_end]`.
+            *   **Если `num_indices` не 1 и не 2:** `KumirArgumentError("Неверное количество индексов для строки")`.
+            *   Обновить `current_eval_value = result`.
+        *   (существующая логика для таблиц `elif isinstance(current_eval_value, KumirTableVar):` должна остаться).
+    *   **Тестирование:** Запустить `47-str-ops.kum`. Ошибки, связанные со срезами, должны исчезнуть или измениться. Запустить все тесты, чтобы убедиться, что не сломан доступ к таблицам.
+
+**Задача 2: Регистрация и реализация встроенной функции `копировать`**
+    *   **Файл:** `pyrobot/backend/kumir_interpreter/interpreter.py`
+    *   **Словарь:** `BUILTIN_FUNCTIONS`
+        *   **Действие:** Добавить/исправить запись для `'копировать'`:
+            ```python
+            # 'копировать': {
+            #     'min_args': 3, 'max_args': 3,
+            #     'arg_types': [['лит', 'цел', 'цел']], # Первый аргумент может быть и переменной типа лит
+            #     'param_modes': ['arg', 'arg', 'arg'],
+            #     'handler': lambda visitor, args, ctx: visitor._handle_kopirovat(args, ctx)
+            # },
+            ```
+    *   **Метод:** Создать `_handle_kopirovat(self, args, ctx)`:
+        *   Аргументы: `s_val, i_val, n_val = args[0], args[1], args[2]`.
+        *   Проверить типы: `s_val` (строка), `i_val` (целое), `n_val` (целое).
+        *   Преобразовать КуМир-индекс `i_val` (1-based) в Python-индекс: `py_i_start = i_val - 1`.
+        *   Проверить `n_val >= 0`. Если `n_val == 0`, вернуть пустую строку.
+        *   Проверить границы: `0 <= py_i_start < len(s_val)` и `py_i_start + n_val <= len(s_val)`. Если выход за границы, то `KumirArgumentError` или `KumirIndexError`.
+        *   Вернуть `s_val[py_i_start : py_i_start + n_val]`.
+    *   **Тестирование:** Запустить `47-str-ops.kum`. Вызовы `копировать` должны работать. Проверить все тесты.
+
+**Задача 3: Реализация передачи имен переменных для `arg_res` (только для встроенных строковых функций)**
+    *   **Файл:** `pyrobot/backend/kumir_interpreter/expression_evaluator.py`
+    *   **Метод:** `visitPostfixExpression`
+    *   **Логика:** В блоке сбора аргументов для вызова (`if postfix_op_ctx.LPAREN():`), после получения `proc_name_lower`:
+        *   **Если `proc_name_lower in self.visitor.BUILTIN_FUNCTIONS`:**
+            *   `func_info = self.visitor.BUILTIN_FUNCTIONS[proc_name_lower]`
+            *   `current_param_modes = func_info.get('param_modes', [])`
+            *   В цикле по аргументам (`for i, expr_node in enumerate(expression_nodes):`):
+                *   `current_param_mode = current_param_modes[i] if i < len(current_param_modes) else 'arg'`
+                *   **Если `current_param_mode == 'arg_res'` (и, возможно, добавить условие `and proc_name_lower in ['удалить', 'вставить']` для строгой изоляции):**
+                    *   Попытаться извлечь имя переменной из `expr_node`. Самый простой случай: `if isinstance(expr_node, KumirParser.PrimaryExpressionContext) and expr_node.qualifiedIdentifier(): var_name = expr_node.qualifiedIdentifier().getText()`. Более сложная логика для `_get_lvalue_structure_for_arg` может понадобиться, если `expr_node` — это `ExpressionContext`.
+                    *   Если `var_name` успешно извлечено, добавить `var_name` (строку) в `actual_args_for_call`.
+                    *   Иначе (если `expr_node` не является простым идентификатором, а, например, выражением или литералом) — возбудить `KumirArgumentError`, т.к. `arg_res` требует модифицируемую переменную.
+                *   Иначе (режим `'arg'` или другая встроенная функция):
+                    *   `actual_args_for_call.append(self.visitExpression(expr_node))`
+        *   (Логика для пользовательских процедур остается без изменений на этом этапе).
+    *   **Тестирование:** Запустить `47-str-ops.kum`. Он еще не пройдет, но подготовка к `удалить`/`вставить` сделана. Проверить все тесты на регрессии.
+
+**Задача 4: Регистрация и реализация встроенной функции `удалить`**
+    *   **Файл:** `pyrobot/backend/kumir_interpreter/interpreter.py`
+    *   **Словарь:** `BUILTIN_FUNCTIONS`
+        *   **Действие:** Добавить/исправить запись для `'удалить'`:
+            ```python
+            # 'удалить': {
+            #     'min_args': 3, 'max_args': 3,
+            #     'arg_types': [['лит', 'цел', 'цел']], # Первый 'лит' - это имя переменной
+            #     'param_modes': ['arg_res', 'arg', 'arg'],
+            #     'handler': lambda visitor, args, ctx: visitor._handle_udalit(args, ctx)
+            # },
+            ```
+    *   **Метод:** Создать `_handle_udalit(self, args, ctx)`:
+        *   Аргументы: `var_name_s, i_val, n_val = args[0], args[1], args[2]`. (`var_name_s` — это строка с именем переменной).
+        *   Найти переменную: `var_info = self.find_variable(var_name_s)`. Если не найдена или не строка, `KumirNameError` или `KumirTypeError`.
+        *   `current_s_value = var_info['value']`.
+        *   Проверить типы `i_val` (целое), `n_val` (целое).
+        *   Преобразовать КуМир-индекс `i_val` (1-based) в Python: `py_i_start = i_val - 1`.
+        *   Проверить `n_val >= 0`. Если `n_val == 0`, ничего не делать.
+        *   Проверить границы: `0 <= py_i_start < len(current_s_value)` и `py_i_start + n_val <= len(current_s_value)`. Если выход за границы, `KumirArgumentError` или `KumirIndexError`.
+        *   Сформировать новую строку: `new_s_value = current_s_value[:py_i_start] + current_s_value[py_i_start + n_val:]`.
+        *   Обновить переменную: `self.update_variable(var_name_s, new_s_value, ctx)`.
+        *   Функция ничего не возвращает.
+    *   **Тестирование:** Запустить `47-str-ops.kum`. Вызовы `удалить` должны работать. Проверить все тесты.
+
+**Задача 5: Регистрация и реализация встроенной функции `вставить`**
+    *   **Файл:** `pyrobot/backend/kumir_interpreter/interpreter.py`
+    *   **Словарь:** `BUILTIN_FUNCTIONS`
+        *   **Действие:** Добавить/исправить запись для `'вставить'`:
+            ```python
+            # 'вставить': {
+            #     'min_args': 3, 'max_args': 3,
+            #     'arg_types': [['лит', 'лит', 'цел']], # Первый 'лит' - имя переменной
+            #     'param_modes': ['arg_res', 'arg', 'arg'],
+            #     'handler': lambda visitor, args, ctx: visitor._handle_vstavit(args, ctx)
+            # },
+            ```
+    *   **Метод:** Создать `_handle_vstavit(self, args, ctx)`:
+        *   Аргументы: `var_name_s1, s2_val, i_val = args[0], args[1], args[2]`.
+        *   Найти переменную: `var_info_s1 = self.find_variable(var_name_s1)`.
+        *   `current_s1_value = var_info_s1['value']`.
+        *   Проверить типы `current_s1_value` (строка), `s2_val` (строка), `i_val` (целое).
+        *   Преобразовать КуМир-индекс `i_val` (1-based) в Python: `py_i_insert = i_val - 1`.
+        *   Проверить границы: `0 <= py_i_insert <= len(current_s1_value)`. (Можно вставлять в конец строки, т.е. по индексу `len`).
+        *   Сформировать новую строку: `new_s1_value = current_s1_value[:py_i_insert] + s2_val + current_s1_value[py_i_insert:]`.
+        *   Обновить переменную: `self.update_variable(var_name_s1, new_s1_value, ctx)`.
+        *   Функция ничего не возвращает.
+    *   **Тестирование:** Запустить `47-str-ops.kum`. Он должен успешно пройти. Проверить все тесты.
+
+**Задача 6: Финальная проверка и рефакторинг**
+    *   Убедиться, что `expected_output` для `47-str-ops.kum` в `test_functional.py` (`'Привет, Вася!\\n34567\\n129\\n12ABC3456789\\n\\n'`) точно соответствует результатам работы.
+    *   Удалить временные отладочные `print` из измененных методов.
+    *   Провести полный прогон всех тестов и убедиться, что количество пройденных тестов увеличилось и нет новых падений.
+
+Эта детализация должна помочь нам двигаться шаг за шагом.
