@@ -7,9 +7,10 @@
 
 # Базовый класс для ошибок во время выполнения кода Кумира
 class KumirExecutionError(Exception):
-	def __init__(self, message, line_index=None, line_content=None):
+	def __init__(self, message, line_index=None, column_index=None, line_content=None):
 		super().__init__(message)
 		self.line_index = line_index
+		self.column_index = column_index
 		self.line_content = line_content
 
 	def __str__(self):
@@ -17,8 +18,11 @@ class KumirExecutionError(Exception):
 		context = ""
 		if self.line_index is not None:
 			context += f"строка {self.line_index + 1}"
+			if self.column_index is not None:
+				context += f", столбец {self.column_index + 1}"
+
 		if self.line_content is not None:
-			if self.line_index is not None:
+			if self.line_index is not None or self.column_index is not None:
 				context += ":"
 			context += f" '{self.line_content}'"
 		return f"{base_message} ({context.strip()})" if context else base_message
@@ -26,17 +30,20 @@ class KumirExecutionError(Exception):
 
 # Ошибка, связанная с объявлениями
 class DeclarationError(KumirExecutionError):
-	pass
+	def __init__(self, message, line_index=None, column_index=None, line_content=None):
+		super().__init__(message, line_index, column_index, line_content)
 
 
 # Ошибка, связанная с присваиванием
 class AssignmentError(KumirExecutionError):
-	pass
+	def __init__(self, message, line_index=None, column_index=None, line_content=None):
+		super().__init__(message, line_index, column_index, line_content)
 
 
 # Ошибка, связанная с вводом/выводом
 class InputOutputError(KumirExecutionError):
-	pass
+	def __init__(self, message, line_index=None, column_index=None, line_content=None):
+		super().__init__(message, line_index, column_index, line_content)
 
 
 # Специальное исключение для запроса ввода
