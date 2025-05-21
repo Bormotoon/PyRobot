@@ -116,8 +116,8 @@ class KumirIndexError(KumirExecutionError):
 
 # Ошибка, связанная с некорректным вводом пользователя (ошибка преобразования)
 class KumirInputError(KumirExecutionError):
-	def __init__(self, message, line_index=None, line_content=None, original_type=None, input_value=None):
-		super().__init__(message, line_index, line_content)
+	def __init__(self, message, line_index=None, column_index=None, line_content=None, original_type=None, input_value=None):
+		super().__init__(message, line_index, column_index, line_content)
 		self.original_type = original_type
 		self.input_value = input_value
 		# Сохраняем оригинальное сообщение для возможного использования
