@@ -1543,4 +1543,9 @@ elif proc_name_lower in self.visitor.procedures: # <--- ДОБАВИТЬ ЭТУ 
         *   `KumirEvalError` (ВЫПОЛНЕНО 2024-08-16) 
         *   `KumirSyntaxError` (ВЫПОЛНЕНО 2024-08-16)
         *   `RobotError` (ВЫПОЛНЕНО 2024-08-16)
-        *   `KumirNotImplementedError`
+        *   `KumirNotImplementedError` (ВЫПОЛНЕНО 2024-08-16)
+        *   `KumirNameError`
+        *   `KumirTypeError`
+        *   `KumirInputError`
+        *   `ProcedureExitCalled`
+*   **0.3: Стандартизация вызовов исключений**
