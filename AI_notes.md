@@ -1542,4 +1542,5 @@ elif proc_name_lower in self.visitor.procedures: # <--- ДОБАВИТЬ ЭТУ 
         *   `KumirIndexError` (ВЫПОЛНЕНО 2024-08-16)
         *   `KumirEvalError` (ВЫПОЛНЕНО 2024-08-16) 
         *   `KumirSyntaxError` (ВЫПОЛНЕНО 2024-08-16)
-        *   `RobotError`
+        *   `RobotError` (ВЫПОЛНЕНО 2024-08-16)
+        *   `KumirNotImplementedError`

@@ -92,7 +92,8 @@ class RobotError(KumirExecutionError):
 
 # Ошибка для функциональности, которая еще не реализована
 class KumirNotImplementedError(KumirExecutionError):
-	pass
+	def __init__(self, message, line_index=None, column_index=None, line_content=None):
+		super().__init__(message, line_index, column_index, line_content)
 
 
 # Ошибка, связанная с именами (например, переменная не найдена)

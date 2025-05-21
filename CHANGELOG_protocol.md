@@ -220,4 +220,36 @@ class RobotError(KumirExecutionError):
 *   Изменение в `RobotError` внесено.
 
 **Коммит:**
+*   НЕТ.
+
+---
+
+### Шаг: Задача 0.2.8: Стандартизация `KumirNotImplementedError`
+
+**Цель:** Обновить конструктор `KumirNotImplementedError` для приема `column_index` и передачи всех параметров в `super().__init__`.
+
+**Изменяемый файл:** `pyrobot/backend/kumir_interpreter/kumir_exceptions.py`
+
+**Изменения:**
+```python
+# Строки ~87-89
+class KumirNotImplementedError(KumirExecutionError):
+	def __init__(self, message, line_index=None, column_index=None, line_content=None):
+		super().__init__(message, line_index, column_index, line_content)
+```
+
+**Тестирование:**
+
+1.  **Тест `47-str-ops.kum`:**
+    *   Команда: `python -m pytest -v tests/test_functional.py -k "47-str-ops.kum"`
+    *   Результат: `1 failed, 55 deselected` (ожидаем, что не изменится).
+
+2.  **Все тесты:**
+    *   Команда: `python -m pytest -v tests/test_functional.py`
+    *   Результат: `8 failed, 48 passed` (ожидаем, что не изменится).
+
+**Выводы по шагу:**
+*   Изменение в `KumirNotImplementedError` внесено.
+
+**Коммит:**
 *   НЕТ. 
