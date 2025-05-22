@@ -1532,7 +1532,7 @@ elif proc_name_lower in self.visitor.procedures: # <--- ДОБАВИТЬ ЭТУ 
     *   Цель: Добавить `column_index` в конструктор и обновить `__str__`.
     *   Файл: `pyrobot/backend/kumir_interpreter/kumir_exceptions.py`.
     *   Действие: Внести изменения. Протестировать.
-*   **0.2: Стандартизация остальных исключений**
+*   **0.2: Стандартизировать остальные исключения**
     *   Цель: У всех наследников `KumirExecutionError` конструктор должен принимать `(self, message, line_index=None, column_index=None, line_content=None)` и вызывать `super().__init__(message, line_index, column_index, line_content)`.
     *   Файл: `pyrobot/backend/kumir_interpreter/kumir_exceptions.py`.
     *   Действия:
@@ -1574,7 +1574,7 @@ elif proc_name_lower in self.visitor.procedures: # <--- ДОБАВИТЬ ЭТУ 
     *   0.3. В `KumirInterpreterVisitor` (`interpreter.py`):\
         *   0.3.1. Инициализировать `self.program_lines = []` в `__init__` и заполнять его в `interpret` из `program_text.splitlines()`. **(ВЫПОЛНЕНО)**
         *   0.3.2. Реализовать хелпер `get_line_content_from_ctx(self, ctx)` для получения строки из `self.program_lines`. **(ВЫПОЛНЕНО)**
-        *   0.3.3. Обновить **все** места выбрасывания исключений, чтобы передавать `line_index`, `column_index` (где применимо) и `line_content` (полученный через `get_line_content_from_ctx`). **(В ПРОЦЕССЕ)**
+        *   0.3.3. Обновить **все** места выбрасывания исключений, чтобы передавать `line_index`, `column_index` (где применимо) и `line_content` (полученный через `get_line_content_from_ctx`). **(ВЫПОЛНЕНО)**
             *   `declare_variable` -> `DeclarationError` **(ВЫПОЛНЕНО)**
             *   `_get_type_info_from_specifier` -> `DeclarationError` **(ВЫПОЛНЕНО)**
             *   `update_variable` -> `KumirEvalError` **(ВЫПОЛНЕНО)**
