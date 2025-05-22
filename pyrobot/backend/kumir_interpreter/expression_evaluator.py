@@ -293,7 +293,12 @@ class ExpressionEvaluator:
                         raise KumirEvalError(f"Внутренняя ошибка: переменная '{base_var_name}' типа 'лит', но ее значение не строка ({type(string_to_index).__name__}).", primary_expr_ctx.start.line, primary_expr_ctx.start.column)
 
                     if len(indices) != 1:
-                        raise KumirIndexError(f"Строка {index_list_ctx.start.line}: Для доступа к символу строки '{base_var_name}' ожидается один индекс.", index_list_ctx.start.line, index_list_ctx.start.column)
+                        raise KumirIndexError(
+                            f"Для доступа к символу строки '{base_var_name}' ожидается один индекс, получено {len(indices)}.",
+                            line_index=index_list_ctx.start.line - 1,
+                            column_index=index_list_ctx.start.column,
+                            line_content=self.visitor.get_line_content_from_ctx(index_list_ctx)
+                        )
                     
                     kumir_idx = indices[0]
                     py_idx = kumir_idx - 1 
