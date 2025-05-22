@@ -307,19 +307,26 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                 base_kumir_type = CHAR_TYPE
             elif array_type_node.STRING_ARRAY_TYPE():
                 base_kumir_type = STRING_TYPE
-            else: # <--- Проблемный else, теперь закомментирован
+            else:
+                l_content = self.get_line_content_from_ctx(type_ctx) # Используем type_ctx
                 raise DeclarationError(
                     f"Неизвестный или неподдерживаемый тип таблицы (из arrayType): {array_type_node.getText()}",
-                    err_line, err_col)
+                    line_index=err_line - 1 if err_line is not None and err_line > 0 else None, # err_line 1-индексированный
+                    column_index=err_col,
+                    line_content=l_content
+                )
 
         elif type_ctx.actorType():
             actor_name = type_ctx.actorType().getText()
             # Параметры типа "исполнитель" требуют особого рассмотрения.
             # Этот метод предназначен для базовых типов и таблиц, что может быть недостаточно для исполнителей.
+            l_content = self.get_line_content_from_ctx(type_ctx)
             raise DeclarationError(
                 f"Обработка параметров типа исполнитель ('{actor_name}') через _get_type_info_from_specifier не реализована полностью. "
                 f"Требуется специальная логика.",
-                err_line, err_col
+                line_index=err_line - 1 if err_line is not None and err_line > 0 else None,
+                column_index=err_col,
+                line_content=l_content
             )
 
         else: # <--- УМЕНЬШЕН ОТСТУП ДО 8 ПРОБЕЛОВ
@@ -330,8 +337,13 @@ class KumirInterpreterVisitor(KumirParserVisitor):
             print("[DEBUG] base_kumir_type is None ПОСЛЕ ЗАКОММЕНТИРОВАННОГО arrayType", file=sys.stderr) # Добавим отладку
             # Можно временно присвоить что-то, чтобы избежать ошибки здесь, если мы тестируем только SyntaxError
             # base_kumir_type = "TEMP_FIX_FOR_SYNTAX_ERROR_TEST" 
-            raise DeclarationError(f"Внутренняя ошибка: базовый тип не был определен для '{type_ctx.getText()}'.",
-                                   err_line, err_col)
+            l_content = self.get_line_content_from_ctx(type_ctx)
+            raise DeclarationError(
+                f"Внутренняя ошибка: базовый тип не был определен для '{type_ctx.getText()}'.",
+                line_index=err_line - 1 if err_line is not None and err_line > 0 else None,
+                column_index=err_col,
+                line_content=l_content
+            )
 
         return base_kumir_type, is_table_type
 
@@ -357,33 +369,89 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                              file=sys.stderr)  # stdout -> stderr
         return None, None
 
-    def update_variable(self, var_name: str, value: Any) -> None:
+    def update_variable(self, var_name: str, value: Any, ctx_for_error: Optional[ParserRuleContext] = None) -> None:
         """Обновляет значение переменной в текущей области видимости."""
         var_info, scope = self.find_variable(var_name)
         if var_info is None or scope is None:
-            raise KumirEvalError(f"Переменная '{var_name}' не найдена")
+            line_idx = ctx_for_error.start.line - 1 if ctx_for_error and hasattr(ctx_for_error, 'start') else None
+            col_idx = ctx_for_error.start.column if ctx_for_error and hasattr(ctx_for_error, 'start') else None
+            l_content = self.get_line_content_from_ctx(ctx_for_error) if ctx_for_error else None
+            raise KumirEvalError(
+                f"Переменная '{var_name}' не найдена",
+                line_index=line_idx,
+                column_index=col_idx,
+                line_content=l_content
+            )
 
         # Проверяем тип значения
         if value is None:
-            raise KumirEvalError(f"Попытка присвоить значение None переменной '{var_name}'")
+            line_idx = ctx_for_error.start.line - 1 if ctx_for_error and hasattr(ctx_for_error, 'start') else None
+            col_idx = ctx_for_error.start.column if ctx_for_error and hasattr(ctx_for_error, 'start') else None
+            l_content = self.get_line_content_from_ctx(ctx_for_error) if ctx_for_error else None
+            raise KumirEvalError(
+                f"Попытка присвоить значение None переменной '{var_name}'",
+                line_index=line_idx,
+                column_index=col_idx,
+                line_content=l_content
+            )
 
         var_type = var_info.get('type')
         if var_type == INTEGER_TYPE:
             if not isinstance(value, int):
-                raise KumirEvalError(f"Ожидалось целое число для '{var_name}', получено {type(value)}")
+                line_idx = ctx_for_error.start.line - 1 if ctx_for_error and hasattr(ctx_for_error, 'start') else None
+                col_idx = ctx_for_error.start.column if ctx_for_error and hasattr(ctx_for_error, 'start') else None
+                l_content = self.get_line_content_from_ctx(ctx_for_error) if ctx_for_error else None
+                raise KumirEvalError(
+                    f"Ожидалось целое число для '{var_name}', получено {type(value)}",
+                    line_index=line_idx,
+                    column_index=col_idx,
+                    line_content=l_content
+                )
         elif var_type == FLOAT_TYPE:
             if not isinstance(value, (int, float)):
-                raise KumirEvalError(f"Ожидалось вещественное число для '{var_name}', получено {type(value)}")
+                line_idx = ctx_for_error.start.line - 1 if ctx_for_error and hasattr(ctx_for_error, 'start') else None
+                col_idx = ctx_for_error.start.column if ctx_for_error and hasattr(ctx_for_error, 'start') else None
+                l_content = self.get_line_content_from_ctx(ctx_for_error) if ctx_for_error else None
+                raise KumirEvalError(
+                    f"Ожидалось вещественное число для '{var_name}', получено {type(value)}",
+                    line_index=line_idx,
+                    column_index=col_idx,
+                    line_content=l_content
+                )
             value = float(value)
         elif var_type == BOOLEAN_TYPE:
             if not isinstance(value, bool):
-                raise KumirEvalError(f"Ожидалось логическое значение для '{var_name}', получено {type(value)}")
+                line_idx = ctx_for_error.start.line - 1 if ctx_for_error and hasattr(ctx_for_error, 'start') else None
+                col_idx = ctx_for_error.start.column if ctx_for_error and hasattr(ctx_for_error, 'start') else None
+                l_content = self.get_line_content_from_ctx(ctx_for_error) if ctx_for_error else None
+                raise KumirEvalError(
+                    f"Ожидалось логическое значение для '{var_name}', получено {type(value)}",
+                    line_index=line_idx,
+                    column_index=col_idx,
+                    line_content=l_content
+                )
         elif var_type == CHAR_TYPE:
             if not isinstance(value, str) or len(value) != 1:
-                raise KumirEvalError(f"Ожидался символ для '{var_name}', получено {type(value)}")
+                line_idx = ctx_for_error.start.line - 1 if ctx_for_error and hasattr(ctx_for_error, 'start') else None
+                col_idx = ctx_for_error.start.column if ctx_for_error and hasattr(ctx_for_error, 'start') else None
+                l_content = self.get_line_content_from_ctx(ctx_for_error) if ctx_for_error else None
+                raise KumirEvalError(
+                    f"Ожидался символ для '{var_name}', получено {type(value)}",
+                    line_index=line_idx,
+                    column_index=col_idx,
+                    line_content=l_content
+                )
         elif var_type == STRING_TYPE:
             if not isinstance(value, str):
-                raise KumirEvalError(f"Ожидалась строка для '{var_name}', получено {type(value)}")
+                line_idx = ctx_for_error.start.line - 1 if ctx_for_error and hasattr(ctx_for_error, 'start') else None
+                col_idx = ctx_for_error.start.column if ctx_for_error and hasattr(ctx_for_error, 'start') else None
+                l_content = self.get_line_content_from_ctx(ctx_for_error) if ctx_for_error else None
+                raise KumirEvalError(
+                    f"Ожидалась строка для '{var_name}', получено {type(value)}",
+                    line_index=line_idx,
+                    column_index=col_idx,
+                    line_content=l_content
+                )
 
         var_info['value'] = value
         print(f"[DEBUG][Update] Обновлено значение переменной '{var_name}' = {value}",
@@ -725,7 +793,9 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                             arg_value = args_values[actual_arg_iter_idx]
                             try:
                                 converted_value = self._validate_and_convert_value_for_assignment(arg_value, p_type, p_name)
-                                self.update_variable(p_name, converted_value) # Обновляем в current_scope
+                                # Определяем err_ctx для передачи в update_variable
+                                err_ctx_for_update = actual_arg_expr_nodes[actual_arg_iter_idx] if actual_arg_iter_idx < len(actual_arg_expr_nodes) else p_decl_ctx
+                                self.update_variable(p_name, converted_value, ctx_for_error=err_ctx_for_update) # Обновляем в current_scope
                             except KumirTypeError as e:
                                 err_ctx = actual_arg_expr_nodes[actual_arg_iter_idx] if actual_arg_iter_idx < len(actual_arg_expr_nodes) else p_decl_ctx
                                 raise KumirArgumentError(f"Строка {err_ctx.start.line if err_ctx else '??'}: Ошибка типа при передаче аргумента для параметра '{p_name}': {e.args[0]}", err_ctx.start.line if err_ctx else 0, err_ctx.start.column if err_ctx else 0) from e
