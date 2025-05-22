@@ -270,13 +270,20 @@ class ExpressionEvaluator:
                 index_list_ctx = ctx.getChild(2) # Это KumirParser.RULE_indexList
                 print(f"[DEBUG][PostfixEE] Обработка indexList: {index_list_ctx.getText()}", file=sys.stderr)
                 indices = []
-                for expr_ctx_idx in index_list_ctx.expression():
-                    index_val = self.visitExpression(expr_ctx_idx)
-                    index_val_clean = self._get_value(index_val)
-                    if not isinstance(index_val_clean, int):
-                        raise KumirEvalError(f"Строка {expr_ctx_idx.start.line}: Индекс должен быть целым числом, получено: {index_val_clean} (тип: {type(index_val_clean).__name__}).", expr_ctx_idx.start.line, expr_ctx_idx.start.column)
-                    indices.append(index_val_clean)
+                for i_expr_ctx in index_list_ctx.expression():
+                    idx_val = i_expr_ctx.accept(self)
+                    if not isinstance(idx_val, int):
+                        # Используем primary_expr_ctx.getText() напрямую, так как base_var_name определяется позже
+                        var_name_for_err = primary_expr_ctx.getText() if primary_expr_ctx else "<неизвестная переменная>"
+                        raise KumirEvalError(
+                            f"Индекс для '{var_name_for_err}' должен быть целым числом, получено: {idx_val} (тип {type(idx_val).__name__})",
+                            line_index=i_expr_ctx.start.line - 1,
+                            column_index=i_expr_ctx.start.column,
+                            line_content=self.visitor.get_line_content_from_ctx(i_expr_ctx)
+                        )
+                    indices.append(idx_val)
                 
+                # base_var_name определяется здесь, после цикла по индексам
                 base_var_name = primary_expr_ctx.getText() 
                 var_info_for_base, _ = visitor.find_variable(base_var_name)
 
