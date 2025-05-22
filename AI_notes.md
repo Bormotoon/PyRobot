@@ -1628,3 +1628,49 @@ elif proc_name_lower in self.visitor.procedures: # <--- ДОБАВИТЬ ЭТУ 
 
 ---
 Мы продолжаем отладку `47-str-ops.kum`. Текущий фокус на Задаче 0.3.3 (обновление оставшихся вызовов исключений в `interpreter.py`), а затем на Задаче 1 (реализация строковых операций в `expression_evaluator.py`).
+
+*   **Task 1.2: Implement correct access to string characters (S[i]) AND slices (S[i:j]) (COMPLETED):**
+    *   The `visitPostfixExpression` method in `expression_evaluator.py` was modified to differentiate between single-index access (character) and double-index access (slice) for string types.
+    *   Logic was added for `len(indices) == 2` to handle string slicing. Kumir 1-based indices are converted to Python 0-based. Slice is performed using `string_to_index[py_start_idx:py_end_idx]`.
+    *   The `KumirIndexError` for an incorrect number of indices was updated.
+    *   Test `47-str-ops.kum` was run after this change. It failed with `AttributeError: 'CommonToken' object has no attribute 'getType'` due to model's incorrect edit of `.type` to `.getType()`. This was later fixed.
+
+*   **Task 2: Register and Implement `копировать` (copy) built-in function (COMPLETED):**
+    *   **Task 2.1: Register `копировать` in `BUILTIN_FUNCTIONS` (COMPLETED):**
+        *   Added `'копировать'` to `BUILTIN_FUNCTIONS` in `interpreter.py` with `min_args: 3, max_args: 3`, `arg_types: [['лит', 'цел', 'цел']]` and a handler `_handle_copy`.
+    *   **Task 2.2: Implement `_handle_copy` method (COMPLETED):**
+        *   Implemented `_handle_copy(self, s: str, i: int, k: int, ctx)` in `interpreter.py`.
+        *   Handles Kumir 1-based indexing and slice logic:
+            *   If `i > len(s)` or `k < 0`, returns `""`.
+            *   Converts `i` to `py_i` (0-based). If `py_i < 0`, it's set to `0`.
+            *   `py_end_idx` is `py_i + k`.
+            *   `py_end_idx` is capped at `len(s)`.
+            *   If `py_i >= py_end_idx`, returns `""`.
+            *   Otherwise, returns `s[py_i:py_end_idx]`.
+    *   **Testing `47-str-ops.kum`:**
+        *   After implementing `копировать`, the test `47-str-ops.kum` now fails with `KumirEvalError: Процедура или функция 'удалить' не найдена. (строка 25, столбец 1)`. This is expected as `удалить` is the next function used in the test and is not yet implemented.
+
+*   **Task 3: Handle `arg_res` for Built-in String Functions in `ExpressionEvaluator.visitPostfixExpression` (PENDING).**
+    *   This is crucial for functions like `удалить` and `вставить` that modify their string argument.
+
+## 2024-08-17 (Продолжение)
+
+*   **ЗАДАЧА:** Приостановить работу над `47-str-ops.kum`.
+*   **ПРИЧИНА:** Накопилось большое количество ошибок линтера в `interpreter.py` (более 60), которые мешают разработке и могут скрывать другие проблемы.
+*   **НОВЫЙ ПЛАН:** Полностью исправить все ошибки линтера в `pyrobot/backend/kumir_interpreter/interpreter.py`. После этого вернуться к функциональным задачам.
+*   **Текущий прогресс по `47-str-ops.kum` (до остановки):**
+    *   **Task 0: Update Exception Constructors and Calls (COMPLETED)**
+    *   **Task 1: Implement String Slicing and Symbol Access in `ExpressionEvaluator.visitPostfixExpression` (COMPLETED)**
+    *   **Task 2: Register and Implement `копировать` (copy) built-in function (COMPLETED)**
+    *   **Task 3: Handle `arg_res` for Built-in String Functions in `ExpressionEvaluator.visitPostfixExpression` (POSTPONED - "Заглушка" в `_handle_udalit`)**
+    *   **Task 4: Register and Implement `удалить` (delete) built-in function (IN PROGRESS - "Заглушка")**
+        *   Регистрация `удалить` в `BUILTIN_FUNCTIONS` (COMPLETED).
+        *   Реализация `_handle_udalit` (базовая заглушка добавлена, но предыдущая правка испортила `_handle_copy`).
+*   **Последний известный результат теста `47-str-ops.kum`:** FAILED - `KumirEvalError: Процедура или функция 'удалить' не найдена.` (до попытки добавить `_handle_udalit`). После регистрации `удалить` и добавления заглушки, тест должен был продвинуться, но был испорчен `_handle_copy`.
+
+--END OF SESSION 2024-08-17 --
+
+## 2024-08-18
+
+*   **НОВЫЙ ПРИОРИТЕТ:** Полностью исправить все ошибки линтера в `pyrobot/backend/kumir_interpreter/interpreter.py`.
+*   Работа над `47-str-ops.kum` приостановлена до завершения исправления линтера.
