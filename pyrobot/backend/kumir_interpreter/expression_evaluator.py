@@ -291,11 +291,24 @@ class ExpressionEvaluator:
                     kumir_idx = indices[0]
                     py_idx = kumir_idx - 1 
                     
-                    if 0 <= py_idx < len(string_to_index):
+                    try:
+                        if not (0 <= py_idx < len(string_to_index)):
+                            # Эта проверка остается на случай, если мы хотим кастомное сообщение ДО стандартного IndexError
+                            raise KumirIndexError(
+                                f"Индекс {kumir_idx} (Python: {py_idx}) выходит за границы строки '{base_var_name}' (длина {len(string_to_index)}).",
+                                line_index=index_list_ctx.start.line -1, # index_list_ctx это IndexListContext
+                                column_index=index_list_ctx.start.column,
+                                line_content=self.visitor.get_line_content_from_ctx(index_list_ctx)
+                                )
                         current_eval_value = string_to_index[py_idx]
                         print(f"[DEBUG][PostfixEE] Доступ к символу строки '{base_var_name}'[{kumir_idx}] -> '{current_eval_value}'", file=sys.stderr)
-                    else:
-                        raise KumirIndexError(f"Строка {index_list_ctx.start.line}: Индекс {kumir_idx} выходит за границы строки '{base_var_name}' (значение: '{string_to_index}', длина {len(string_to_index)}).", index_list_ctx.start.line, index_list_ctx.start.column)
+                    except IndexError: # Перехватываем стандартный питоновский IndexError
+                        raise KumirIndexError(
+                            f"Попытка доступа к символу строки '{base_var_name}' по индексу {kumir_idx} (Python: {py_idx}), который выходит за границы (длина строки: {len(string_to_index)}).",
+                            line_index=index_list_ctx.start.line -1,
+                            column_index=index_list_ctx.start.column,
+                            line_content=self.visitor.get_line_content_from_ctx(index_list_ctx)
+                        )
                 
                 elif isinstance(current_eval_value, KumirTableVar):
                     kumir_table_var_obj = current_eval_value

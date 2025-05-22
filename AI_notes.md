@@ -1549,3 +1549,82 @@ elif proc_name_lower in self.visitor.procedures: # <--- ДОБАВИТЬ ЭТУ 
         *   `KumirInputError`
         *   `ProcedureExitCalled`
 *   **0.3: Стандартизация вызовов исключений**
+
+---
+
+## Стратегия отладки `47-str-ops.kum` (2024-08-16 и далее)
+
+**Цель:** Заставить тест `47-str-ops.kum` проходить.
+
+**Ключевые моменты:**
+
+1.  **Инкрементальность:** Делаем очень маленькие шаги.
+2.  **Тесты после каждого шага:**
+    *   `python -m pytest -v tests/test_functional.py -k "47-str-ops.kum"`
+    *   `python -m pytest -v tests/test_functional.py` (все тесты)
+3.  **Изоляция:** Убеждаемся, что изменения для одного теста не ломают другую логику.
+4.  **Протоколирование:** Ведем подробный `CHANGELOG_protocol.md`.
+5.  **Коммиты:** Коммитим после каждого успешного, протестированного шага.
+
+**План Задач (по мере продвижения может уточняться):**
+
+*   **Задача 0: Обновление конструкторов исключений и их вызовов (для лучшей диагностики).**
+    *   0.1. Стандартизировать `KumirExecutionError` (добавить `column_index`, обновить `__str__`). **(ВЫПОЛНЕНО)**
+    *   0.2. Стандартизировать остальные классы исключений в `kumir_exceptions.py` (`DeclarationError`, `AssignmentError`, `KumirEvalError`, `KumirSyntaxError`, `RobotError`, `KumirNotImplementedError`, `KumirNameError`, `KumirTypeError`, `KumirIndexError`, `KumirInputError`) для приема `message: str, line_index: Optional[int] = None, column_index: Optional[int] = None, line_content: Optional[str] = None` и корректного вызова `super().__init__`. **(ВЫПОЛНЕНО)**
+    *   0.3. В `KumirInterpreterVisitor` (`interpreter.py`):\
+        *   0.3.1. Инициализировать `self.program_lines = []` в `__init__` и заполнять его в `interpret` из `program_text.splitlines()`. **(ВЫПОЛНЕНО)**
+        *   0.3.2. Реализовать хелпер `get_line_content_from_ctx(self, ctx)` для получения строки из `self.program_lines`. **(ВЫПОЛНЕНО)**
+        *   0.3.3. Обновить **все** места выбрасывания исключений, чтобы передавать `line_index`, `column_index` (где применимо) и `line_content` (полученный через `get_line_content_from_ctx`). **(В ПРОЦЕССЕ)**
+            *   `declare_variable` -> `DeclarationError` **(ВЫПОЛНЕНО)**
+            *   `_get_type_info_from_specifier` -> `DeclarationError` **(ВЫПОЛНЕНО)**
+            *   `update_variable` -> `KumirEvalError` **(ВЫПОЛНЕНО)**
+            *   `_convert_input_to_type` -> `KumirEvalError` **(ВЫПОЛНЕНО)**
+            *   `visitVariableDeclaration` -> `KumirEvalError` **(ВЫПОЛНЕНО)**
+            *   `visitAssignmentStatement` -> `KumirEvalError` (присваивание в 'знач', переменная не объявлена, **неверный тип индекса строки - СЛЕДУЮЩИЙ ШАГ**, неверный тип индекса таблицы, выход за границы таблицы)
+            *   `visitIoStatement` -> `KumirEvalError` (неверный тип индекса таблицы при вводе/выводе)
+            *   `visitProcedureCallStatement` -> `KumirArgumentError`
+            *   `_execute_procedure_call` -> `KumirArgumentError`, `KumirEvalError`, `KumirTypeError`
+            *   `ExpressionEvaluator.visitPostfixExpression` -> `KumirNameError`, `KumirTypeError`, `KumirArgumentError`, `KumirIndexError` **(KumirIndexError для доступа к строке обновлен 2024-08-19)**
+            *   `ExpressionEvaluator._evaluate_builtin_function` -> `KumirArgumentError`, `KumirTypeError`, `KumirEvalError`
+            *   ... (и другие места, если есть)
+
+*   **Задача 1: Реализация строкового слайсинга и доступа к символу в `ExpressionEvaluator.visitPostfixExpression`.**
+    *   1.1. Доступ к символу `S[i]`: Убедиться, что `KumirIndexError` выбрасывается корректно с новыми параметрами. **(Частично выполнено - KumirIndexError обновлен, но основная ошибка в `47-str-ops.kum` еще не решена этим)**
+    *   1.2. Слайсинг `S[i:j]`: Реализовать логику, включая проверки индексов и `KumirIndexError`.
+
+*   **Задача 2: Регистрация и реализация встроенной функции `копировать(S, i, k)` (copy).**
+    *   2.1. Зарегистрировать в `BUILTIN_FUNCTIONS` в `ExpressionEvaluator`.
+    *   2.2. Реализовать логику в `_evaluate_builtin_function`, включая проверки типов аргументов, корректную работу с индексами КуМира (1-based), обработку выхода за границы.
+
+*   **Задача 3: Обработка `арг рез` для встроенных строковых функций в `ExpressionEvaluator.visitPostfixExpression`.**
+    *   Убедиться, что если встроенная функция (типа `копировать`, `удалить`, `вставить`) меняет строковую переменную, переданную как `арг рез`, то эта переменная корректно обновляется в `scopes`.
+
+*   **Задача 4: Регистрация и реализация встроенной функции `удалить(S, i, k)` (delete).**
+    *   4.1. Зарегистрировать в `BUILTIN_FUNCTIONS`.
+    *   4.2. Реализовать логику в `_evaluate_builtin_function`.
+
+*   **Задача 5: Регистрация и реализация встроенной функции `вставить(S_куда, S_что, i)` (insert).**
+    *   5.1. Зарегистрировать в `BUILTIN_FUNCTIONS`.
+    *   5.2. Реализовать логику в `_evaluate_builtin_function`.
+
+*   **Задача 6: Финальные проверки и рефакторинг.**
+    *   Проверить все строковые операции в `47-str-ops.kum`.
+    *   Прогнать все тесты.
+    *   Просмотреть код на предмет возможных улучшений.
+
+---
+**Прогресс по Задаче 0.3.3 (Обновление вызовов исключений в `interpreter.py`):**
+* `declare_variable`: `DeclarationError` - **ОК**
+* `_get_type_info_from_specifier`: `DeclarationError` - **ОК**
+* `update_variable`: `KumirEvalError` - **ОК**
+* `_convert_input_to_type`: `KumirEvalError` - **ОК**
+* `visitVariableDeclaration`: `KumirEvalError` - **ОК**
+
+---
+**Прогресс по Задаче 1.1 (Обновление `KumirIndexError` в `ExpressionEvaluator.visitPostfixExpression`):**
+* Обновлен `KumirIndexError` при доступе к символу `S[i]` для использования `line_index`, `column_index`, `line_content`.
+* Тест `47-str-ops.kum` по-прежнему падает с "Unexpected exception".
+* Общий набор тестов (`8 failed, 48 passed`) не изменился. Это хорошо, значит, мы не сломали ничего другого.
+
+---
+Мы продолжаем отладку `47-str-ops.kum`. Текущий фокус на Задаче 0.3.3 (обновление оставшихся вызовов исключений в `interpreter.py`), а затем на Задаче 1 (реализация строковых операций в `expression_evaluator.py`).

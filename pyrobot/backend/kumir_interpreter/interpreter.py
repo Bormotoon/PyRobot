@@ -751,7 +751,12 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                          if actual_arg_iter_idx < len(args_values):
                             actual_arg_iter_idx += 1 # Пропускаем аргумент-таблицу
                          else: # Не хватило аргументов (даже для пропуска)
-                            raise KumirArgumentError(f"Недостаточно аргументов для '{name}', табличный параметр '{p_name}' ('{p_mode}').", alg_ctx.start.line, alg_ctx.start.column)
+                            raise KumirArgumentError(
+                                f"Недостаточно аргументов для '{name}', табличный параметр '{p_name}' ('{p_mode}').",
+                                line_index=alg_ctx.start.line - 1,
+                                column_index=alg_ctx.start.column,
+                                line_content=self.get_line_content_from_ctx(alg_ctx)
+                            )
                     elif p_mode == 'рез':
                         # Для 'рез таб' параметр ссылается на переменную вызывающей стороны.
                         # Сама переменная уже существует в вызывающем scope. Здесь мы создаем локальное имя,
@@ -798,9 +803,20 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                                 self.update_variable(p_name, converted_value, ctx_for_error=err_ctx_for_update) # Обновляем в current_scope
                             except KumirTypeError as e:
                                 err_ctx = actual_arg_expr_nodes[actual_arg_iter_idx] if actual_arg_iter_idx < len(actual_arg_expr_nodes) else p_decl_ctx
-                                raise KumirArgumentError(f"Строка {err_ctx.start.line if err_ctx else '??'}: Ошибка типа при передаче аргумента для параметра '{p_name}': {e.args[0]}", err_ctx.start.line if err_ctx else 0, err_ctx.start.column if err_ctx else 0) from e
+                                raise KumirArgumentError(
+                                    f"Ошибка типа при передаче аргумента для параметра '{p_name}': {e.args[0]}",
+                                    line_index=err_ctx.start.line - 1 if err_ctx else None,
+                                    column_index=err_ctx.start.column if err_ctx else None,
+                                    line_content=self.get_line_content_from_ctx(err_ctx) if err_ctx else None
+                                ) from e
                             actual_arg_iter_idx += 1
-                        else: raise KumirArgumentError(f"Недостаточно аргументов для '{name}', скалярный параметр '{p_name}' ('{p_mode}').", alg_ctx.start.line, alg_ctx.start.column)
+                        else:
+                            raise KumirArgumentError(
+                                f"Недостаточно аргументов для '{name}', скалярный параметр '{p_name}' ('{p_mode}').",
+                                line_index=alg_ctx.start.line - 1,
+                                column_index=alg_ctx.start.column,
+                                line_content=self.get_line_content_from_ctx(alg_ctx)
+                            )
                     # Для 'рез' скалярных параметров - они просто объявлены со значением по умолчанию.
             
             # print(f"[DEBUG][ExecuteProcCall] Параметры для '{name}' инициализированы.", file=sys.stderr)
@@ -1491,7 +1507,15 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                     for i_ctx in index_ctx_list:
                         idx_val = self.evaluator.visitExpression(i_ctx)
                         if not isinstance(idx_val, int):
-                            raise KumirEvalError(f"Индекс для строки '{var_name}' должен быть целым числом, получено: {idx_val}", i_ctx.start.line)
+                            line_idx = i_ctx.start.line - 1 if i_ctx and hasattr(i_ctx, 'start') else None
+                            col_idx = i_ctx.start.column if i_ctx and hasattr(i_ctx, 'start') else None
+                            l_content = self.get_line_content_from_ctx(i_ctx) if i_ctx else None
+                            raise KumirEvalError(
+                                f"Индекс для строки '{var_name}' должен быть целым числом, получено: {idx_val}",
+                                line_index=line_idx,
+                                column_index=col_idx,
+                                line_content=l_content
+                            )
                         indices.append(idx_val)
 
                     if len(indices) != 1:
@@ -1542,7 +1566,15 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                     for i_ctx in index_ctx_list:
                         idx_val = self.evaluator.visitExpression(i_ctx)
                         if not isinstance(idx_val, int):
-                            raise KumirEvalError(f"Индекс таблицы '{var_name}' должен быть целым числом, получено: {idx_val}", i_ctx.start.line)
+                            line_idx = i_ctx.start.line - 1 if i_ctx and hasattr(i_ctx, 'start') else None
+                            col_idx = i_ctx.start.column if i_ctx and hasattr(i_ctx, 'start') else None
+                            l_content = self.get_line_content_from_ctx(i_ctx) if i_ctx else None
+                            raise KumirEvalError(
+                                f"Индекс таблицы '{var_name}' должен быть целым числом, получено: {idx_val}",
+                                line_index=line_idx,
+                                column_index=col_idx,
+                                line_content=l_content
+                            )
                         indices.append(idx_val)
                     if len(indices) != len(var_info.get('dimensions_info', [])):
                         raise KumirEvalError(f"Неверное количество индексов для таблицы '{var_name}'. Ожидалось {len(var_info.get('dimensions_info', []))}, получено {len(indices)}.", l_value_ctx.start.line)
@@ -1740,7 +1772,15 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                     for index_expr_ctx in idx_expr_list:
                         idx_val = self.evaluator.visitExpression(index_expr_ctx)
                         if not isinstance(idx_val, int):
-                            raise KumirTypeError(f"Индекс таблицы '{var_name}' должен быть целым числом, получено: {idx_val}", i_ctx.start.line)
+                            line_idx = index_expr_ctx.start.line - 1 if index_expr_ctx and hasattr(index_expr_ctx, 'start') else None
+                            col_idx = index_expr_ctx.start.column if index_expr_ctx and hasattr(index_expr_ctx, 'start') else None
+                            l_content = self.get_line_content_from_ctx(index_expr_ctx) if index_expr_ctx else None
+                            raise KumirEvalError(
+                                f"Индекс таблицы '{var_name}' должен быть целым числом, получено: {idx_val}",
+                                line_index=line_idx,
+                                column_index=col_idx,
+                                line_content=l_content
+                            )
                         indices.append(idx_val)
                     print(f"[DEBUG][IO] INPUT table '{var_name}', indices: {indices}", file=sys.stderr)
                     if len(indices) != kumir_table_var_obj.dimensions:
@@ -2299,8 +2339,10 @@ class KumirInterpreterVisitor(KumirParserVisitor):
         if not (min_args <= arg_count <= max_args):
             expected_args_str = str(min_args) if min_args == max_args else f"от {min_args} до {max_args}"
             raise KumirArgumentError(
-                f"Строка {ctx.start.line}: Неверное количество аргументов для функции '{func_name}'. Ожидалось {expected_args_str}, получено {arg_count}.",
-                line=ctx.start.line, column=ctx.start.column
+                f"Неверное количество аргументов для функции '{func_name}'. Ожидалось {expected_args_str}, получено {arg_count}.",
+                line_index=ctx.start.line - 1,
+                column_index=ctx.start.column,
+                line_content=self.get_line_content_from_ctx(ctx)
             )
 
         # Проверка типов аргументов, если определены arg_types
@@ -2333,8 +2375,10 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                     expected_details = "ожидались типы: " + " или ".join(expected_types_str_list)
                 
                 raise KumirArgumentError(
-                    f"Строка {ctx.start.line}: Несоответствие типов аргументов для функции '{func_name}'. Переданы типы: ({', '.join(actual_arg_types)}), а {expected_details}.",
-                    line=ctx.start.line, column=ctx.start.column
+                    f"Несоответствие типов аргументов для функции '{func_name}'. Переданы типы: ({', '.join(actual_arg_types)}), а {expected_details}.",
+                    line_index=ctx.start.line - 1,
+                    column_index=ctx.start.column,
+                    line_content=self.get_line_content_from_ctx(ctx)
                 )
 
         handler = func_info['handler']

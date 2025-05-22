@@ -365,3 +365,57 @@ class KumirInputError(KumirExecutionError):
 *   Переход к подзадаче 0.3: Реализация хелпера `get_line_content_from_ctx` в `KumirInterpreterVisitor` и обновление вызовов исключений для использования `line_content`.
 
 </details> 
+
+---
+
+### Шаг: Задача 1.1 (частично): Обновление KumirIndexError в `visitPostfixExpression`
+
+**Цель:** Обновить `KumirIndexError` при доступе к символу строки (S[i]) в `ExpressionEvaluator.visitPostfixExpression`, чтобы он использовал новый конструктор с `line_index`, `column_index` и `line_content`. Это часть задачи 1 по реализации строковых операций.
+
+**Изменяемый файл:** `pyrobot/backend/kumir_interpreter/expression_evaluator.py`
+
+**Изменения:**
+```python
+# Строки ~445-456 в ExpressionEvaluator.visitPostfixExpression
+# ...
+                    kumir_idx = indices[0]
+                    py_idx = kumir_idx - 1 
+                    
+                    try:
+                        if not (0 <= py_idx < len(string_to_index)):
+                            # Эта проверка остается на случай, если мы хотим кастомное сообщение ДО стандартного IndexError
+                            raise KumirIndexError(
+                                f"Индекс {kumir_idx} (Python: {py_idx}) выходит за границы строки '{base_var_name}' (длина {len(string_to_index)}).",
+                                line_index=index_list_ctx.start.line -1, # index_list_ctx это IndexListContext
+                                column_index=index_list_ctx.start.column,
+                                line_content=self.visitor.get_line_content_from_ctx(index_list_ctx)
+                                )
+                        current_eval_value = string_to_index[py_idx]
+                    except IndexError: # Стандартная ошибка Python, если вдруг наша проверка не сработала
+                        raise KumirIndexError(
+                            f"Внутренняя ошибка: Индекс {kumir_idx} (Python: {py_idx}) вызвал IndexError для строки '{base_var_name}' (длина {len(string_to_index)}).",
+                            line_index=index_list_ctx.start.line -1,
+                            column_index=index_list_ctx.start.column,
+                            line_content=self.visitor.get_line_content_from_ctx(index_list_ctx)
+                        )
+# ...
+```
+
+**Тестирование:**
+
+1.  **Тест `47-str-ops.kum`:**
+    *   Команда: `python -m pytest -v tests/test_functional.py -k "47-str-ops.kum"`
+    *   Результат: `FAILED tests/test_functional.py::test_kumir_program[47-str-ops.kum-None-...] - Failed: Unexpected exception for C:\Users\Bormotoon\CursorPro...` (Тест все еще падает, но это ожидаемо, так как основная логика строковых операций еще не исправлена. Важно, что характер падения не изменился на что-то новое/неожиданное из-за этого конкретного изменения `KumirIndexError`).
+
+2.  **Все тесты:**
+    *   Команда: `python -m pytest -v tests/test_functional.py`
+    *   Результат: `================= 8 failed, 48 passed in 55.36s =================` (Количество упавших и пройденных тестов не изменилось, что хорошо).
+
+**Выводы по шагу:**
+*   Успешно. Изменение в `ExpressionEvaluator.visitPostfixExpression` для `KumirIndexError` не привело к новым падениям.
+*   Тест `47-str-ops.kum` все еще падает, что ожидаемо.
+
+**Коммит:**
+*   НЕТ (пока не завершена вся Задача 1).
+
+--- 
