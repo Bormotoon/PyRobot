@@ -6,7 +6,7 @@ import sys
 import operator
 from .generated.KumirLexer import KumirLexer
 from .generated.KumirParser import KumirParser
-from .kumir_exceptions import KumirEvalError, KumirSyntaxError, KumirArgumentError, KumirIndexError
+from .kumir_exceptions import KumirEvalError, KumirSyntaxError, KumirArgumentError, KumirIndexError, KumirTypeError
 from .kumir_datatypes import KumirTableVar
 from antlr4 import InputStream, CommonTokenStream # type: ignore
 from typing import Any, Dict, List, Optional, Tuple, Union, TYPE_CHECKING
@@ -103,8 +103,7 @@ class ExpressionEvaluator:
         operation_func = ARITHMETIC_OPS.get(op_type)
         print(f"[DEBUG][PBO_OP_DETAILSEE] op_text='{op_text}', op_type_val={op_type}, operation_func_found={bool(operation_func)}", file=sys.stderr)
         if not operation_func:
-            if op_type == KumirLexer.MOD or op_type == KumirLexer.DIV:
-                 print(f"[DEBUG][PBO_OP_DETAILSEE] Keyword '{op_text}' was not found in ARITHMETIC_OPS. Raising error as expected.", file=sys.stderr)
+            print(f"[DEBUG][PBO_OP_DETAILSEE] Keyword '{op_text}' was not found in ARITHMETIC_OPS. Raising error as expected.", file=sys.stderr)
             raise KumirEvalError(f"Строка ~{expression_node_ctx.start.line}: Неизвестный или неподдерживаемый арифметический оператор: {op_text} в выражении '{expression_node_ctx.getText()}'")
         if op_type == KumirLexer.DIV:
             if checked_right_val == 0:
@@ -292,32 +291,63 @@ class ExpressionEvaluator:
                     if not isinstance(string_to_index, str):
                         raise KumirEvalError(f"Внутренняя ошибка: переменная '{base_var_name}' типа 'лит', но ее значение не строка ({type(string_to_index).__name__}).", primary_expr_ctx.start.line, primary_expr_ctx.start.column)
 
-                    if len(indices) != 1:
-                        raise KumirIndexError(
-                            f"Для доступа к символу строки '{base_var_name}' ожидается один индекс, получено {len(indices)}.",
-                            line_index=index_list_ctx.start.line - 1,
-                            column_index=index_list_ctx.start.column,
-                            line_content=self.visitor.get_line_content_from_ctx(index_list_ctx)
-                        )
-                    
-                    kumir_idx = indices[0]
-                    py_idx = kumir_idx - 1 
-                    
-                    try:
-                        if not (0 <= py_idx < len(string_to_index)):
-                            # Эта проверка остается на случай, если мы хотим кастомное сообщение ДО стандартного IndexError
+                    if len(indices) == 1: # Доступ к символу
+                        kumir_idx = indices[0]
+                        py_idx = kumir_idx - 1 
+                        
+                        try:
+                            if not (0 <= py_idx < len(string_to_index)):
+                                raise KumirIndexError(
+                                    f"Индекс {kumir_idx} (Python: {py_idx}) выходит за границы строки '{base_var_name}' (длина {len(string_to_index)}).",
+                                    line_index=index_list_ctx.start.line -1,
+                                    column_index=index_list_ctx.start.column,
+                                    line_content=self.visitor.get_line_content_from_ctx(index_list_ctx)
+                                    )
+                            current_eval_value = string_to_index[py_idx]
+                            print(f"[DEBUG][PostfixEE] Доступ к символу строки '{base_var_name}'[{kumir_idx}] -> '{current_eval_value}'", file=sys.stderr)
+                        except IndexError: 
                             raise KumirIndexError(
-                                f"Индекс {kumir_idx} (Python: {py_idx}) выходит за границы строки '{base_var_name}' (длина {len(string_to_index)}).",
-                                line_index=index_list_ctx.start.line -1, # index_list_ctx это IndexListContext
+                                f"Попытка доступа к символу строки '{base_var_name}' по индексу {kumir_idx} (Python: {py_idx}), который выходит за границы (длина строки: {len(string_to_index)}).",
+                                line_index=index_list_ctx.start.line -1,
                                 column_index=index_list_ctx.start.column,
                                 line_content=self.visitor.get_line_content_from_ctx(index_list_ctx)
-                                )
-                        current_eval_value = string_to_index[py_idx]
-                        print(f"[DEBUG][PostfixEE] Доступ к символу строки '{base_var_name}'[{kumir_idx}] -> '{current_eval_value}'", file=sys.stderr)
-                    except IndexError: # Перехватываем стандартный питоновский IndexError
+                            )
+                    elif len(indices) == 2: # Срез строки S[i:j]
+                        start_kumir_idx = indices[0]
+                        end_kumir_idx = indices[1]
+                        
+                        # В КуМире индексы 1-based и включающие. В Python 0-based и не включающий конец.
+                        py_start_idx = start_kumir_idx - 1
+                        py_end_idx = end_kumir_idx # Для среза [start:end] в Python end не включается
+
+                        # Простая валидация и корректировка индексов
+                        str_len = len(string_to_index)
+                        
+                        # Начальный индекс должен быть в пределах строки (от 0 до str_len-1 для доступа, или str_len для пустого среза в конце)
+                        # Конечный индекс должен быть в пределах строки (от 0 до str_len для среза)
+                        # Также старт не должен быть больше конца для непустого среза.
+                        # КуМир позволяет s[5:2] - это пустая строка. Python s[4:1] - тоже пустая.
+
+                        if not (0 <= py_start_idx <= str_len and 0 <= py_end_idx <= str_len):
+                             # Более детальные проверки и ошибки можно добавить позже
+                            raise KumirIndexError(
+                                f"Неверные границы среза [{start_kumir_idx}:{end_kumir_idx}] (Python: [{py_start_idx}:{py_end_idx}]) для строки '{base_var_name}' (длина {str_len}).",
+                                line_index=index_list_ctx.start.line - 1,
+                                column_index=index_list_ctx.start.column,
+                                line_content=self.visitor.get_line_content_from_ctx(index_list_ctx)
+                            )
+
+                        # КуМир: если start_kumir_idx > end_kumir_idx, результат - пустая строка.
+                        # Python: если py_start_idx >= py_end_idx, результат - пустая строка.
+                        # Это поведение совпадает, если py_start_idx = start_kumir_idx - 1 и py_end_idx = end_kumir_idx.
+                        # Пример: КуМир s[5:2] -> пустая. Python s[4:2] -> пустая.
+                        
+                        current_eval_value = string_to_index[py_start_idx:py_end_idx]
+                        print(f"[DEBUG][PostfixEE] Срез строки '{base_var_name}'[{start_kumir_idx}:{end_kumir_idx}] -> '{current_eval_value}'", file=sys.stderr)
+                    else: # Не 1 и не 2 индекса
                         raise KumirIndexError(
-                            f"Попытка доступа к символу строки '{base_var_name}' по индексу {kumir_idx} (Python: {py_idx}), который выходит за границы (длина строки: {len(string_to_index)}).",
-                            line_index=index_list_ctx.start.line -1,
+                            f"Для доступа к строке '{base_var_name}' ожидается один индекс (для символа) или два индекса (для среза), получено {len(indices)}.",
+                            line_index=index_list_ctx.start.line - 1,
                             column_index=index_list_ctx.start.column,
                             line_content=self.visitor.get_line_content_from_ctx(index_list_ctx)
                         )
@@ -330,9 +360,21 @@ class ExpressionEvaluator:
                         current_eval_value = kumir_table_var_obj.get_value(tuple(indices), index_list_ctx)
                         print(f"[DEBUG][PostfixEE] Значение из таблицы '{table_display_name}{tuple(indices)}': {repr(current_eval_value)}", file=sys.stderr)
                     except KumirEvalError as e:
-                        err_line = e.line if hasattr(e, 'line') and e.line is not None else index_list_ctx.start.line
-                        err_col = e.column if hasattr(e, 'column') and e.column is not None else index_list_ctx.start.column
-                        raise KumirEvalError(f"Ошибка при доступе к элементу таблицы '{table_display_name}': {e.args[0]}", err_line, err_col)
+                        # Используем line_index, column_index и line_content из перехваченного исключения e, если они есть.
+                        # Иначе, берем из index_list_ctx.
+                        new_line_index = e.line_index if hasattr(e, 'line_index') and e.line_index is not None else index_list_ctx.start.line - 1
+                        new_column_index = e.column_index if hasattr(e, 'column_index') and e.column_index is not None else index_list_ctx.start.column
+                        new_line_content = e.line_content if hasattr(e, 'line_content') and e.line_content is not None else self.visitor.get_line_content_from_ctx(index_list_ctx)
+                        
+                        # Сообщение из оригинального исключения e.args[0]
+                        original_message = e.args[0] if e.args else "Неизвестная ошибка при доступе к таблице"
+                        
+                        raise KumirEvalError(
+                            f"Ошибка при доступе к элементу таблицы '{table_display_name}': {original_message}",
+                            line_index=new_line_index,
+                            column_index=new_column_index,
+                            line_content=new_line_content
+                        )
 
                 elif isinstance(current_eval_value, str) and var_info_for_base and var_info_for_base.get('is_table'):
                     table_name = current_eval_value 
@@ -346,9 +388,21 @@ class ExpressionEvaluator:
                         current_eval_value = kumir_table_var_obj.get_value(tuple(indices), index_list_ctx)
                         print(f"[DEBUG][PostfixEE] Значение из таблицы '{table_display_name}{tuple(indices)}': {repr(current_eval_value)}", file=sys.stderr)
                     except KumirEvalError as e:
-                        err_line = e.line if hasattr(e, 'line') and e.line is not None else index_list_ctx.start.line
-                        err_col = e.column if hasattr(e, 'column') and e.column is not None else index_list_ctx.start.column
-                        raise KumirEvalError(f"Ошибка при доступе к элементу таблицы '{table_display_name}': {e.args[0]}", err_line, err_col)
+                        # Используем line_index, column_index и line_content из перехваченного исключения e, если они есть.
+                        # Иначе, берем из index_list_ctx.
+                        new_line_index = e.line_index if hasattr(e, 'line_index') and e.line_index is not None else index_list_ctx.start.line - 1
+                        new_column_index = e.column_index if hasattr(e, 'column_index') and e.column_index is not None else index_list_ctx.start.column
+                        new_line_content = e.line_content if hasattr(e, 'line_content') and e.line_content is not None else self.visitor.get_line_content_from_ctx(index_list_ctx)
+                        
+                        # Сообщение из оригинального исключения e.args[0]
+                        original_message = e.args[0] if e.args else "Неизвестная ошибка при доступе к таблице"
+                        
+                        raise KumirEvalError(
+                            f"Ошибка при доступе к элементу таблицы '{table_display_name}': {original_message}",
+                            line_index=new_line_index,
+                            column_index=new_column_index,
+                            line_content=new_line_content
+                        )
                 else:
                     type_of_val = type(current_eval_value).__name__
                     is_var_info_found = "найдена" if var_info_for_base else "не найдена"
@@ -412,19 +466,33 @@ class ExpressionEvaluator:
                     except KumirEvalError as e:
                         # _call_builtin_function уже должен устанавливать e.line и e.column
                         # Если они не установлены, попробуем установить здесь
-                        if not (hasattr(e, 'line') and e.line is not None and e.line != "?") :
-                            e.line = argument_list_ctx.start.line if argument_list_ctx else (first_op_token_node.getSymbol().line if first_op_token_node else ctx.start.line)
-                        if not (hasattr(e, 'column') and e.column is not None and e.column != "?") :
-                            e.column = argument_list_ctx.start.column if argument_list_ctx else (first_op_token_node.getSymbol().column if first_op_token_node else ctx.start.column)
+                        if not (hasattr(e, 'line_index') and e.line_index is not None and e.line_index != -1) : # Используем line_index
+                            # Пытаемся установить line_index из наиболее подходящего контекста
+                            error_source_ctx = argument_list_ctx if argument_list_ctx else (first_op_token_node if first_op_token_node else ctx)
+                            # Убедимся, что error_source_ctx это токен или у него есть start
+                            start_attr_holder = error_source_ctx.getSymbol() if isinstance(error_source_ctx, TerminalNode) else error_source_ctx.start
+                            if start_attr_holder:
+                                e.line_index = start_attr_holder.line -1
+                        if not (hasattr(e, 'column_index') and e.column_index is not None and e.column_index != -1) : # Используем column_index
+                            error_source_ctx = argument_list_ctx if argument_list_ctx else (first_op_token_node if first_op_token_node else ctx)
+                            start_attr_holder = error_source_ctx.getSymbol() if isinstance(error_source_ctx, TerminalNode) else error_source_ctx.start
+                            if start_attr_holder:
+                                e.column_index = start_attr_holder.column
+                        # line_content останется None, если не был установлен при создании исключения
                         raise
                     except Exception as e:
-                        err_line_num = argument_list_ctx.start.line if argument_list_ctx else (first_op_token_node.getSymbol().line if first_op_token_node else ctx.start.line)
-                        err_col_num = argument_list_ctx.start.column if argument_list_ctx else (first_op_token_node.getSymbol().column if first_op_token_node else ctx.start.column)
-                        
-                        err_line_idx = err_line_num - 1
+                        error_source_ctx = argument_list_ctx if argument_list_ctx else (first_op_token_node if first_op_token_node else ctx)
+                        start_attr_holder = error_source_ctx.getSymbol() if isinstance(error_source_ctx, TerminalNode) else error_source_ctx.start
+
+                        err_line_idx = -1
+                        err_col_idx = -1
                         line_content = None
-                        if visitor and hasattr(visitor, 'lines') and 0 <= err_line_idx < len(visitor.lines):
-                            line_content = visitor.lines[err_line_idx]
+
+                        if start_attr_holder:
+                            err_line_idx = start_attr_holder.line - 1
+                            err_col_idx = start_attr_holder.column
+                            if visitor and hasattr(visitor, 'get_line_content_from_ctx'):
+                                line_content = visitor.get_line_content_from_ctx(start_attr_holder) # Передаем токен или RuleContext.start
 
                         error_message = f"Ошибка выполнения '{proc_name}': {e}"
                         # Добавим столбец в сообщение, так как конструктор его не принимает
@@ -501,7 +569,18 @@ class ExpressionEvaluator:
                     
                     num_expected_input_params = len([p for p in expected_params_info if p['mode'] in ['арг', 'арг рез']])
                     if len(args) != num_expected_input_params:
-                        raise KumirEvalError(f"Неверное количество аргументов для '{proc_name}': ожидалось {num_expected_input_params} входных, передано {len(args)}.", first_op_token_node.getSymbol().line, first_op_token_node.getSymbol().column)
+                        # В KumirArgumentError передаем сам токен first_op_token_node.getSymbol() или ctx если токена нет
+                        call_site_token_for_error = first_op_token_node.getSymbol() if first_op_token_node else None
+                        err_line = call_site_token_for_error.line if call_site_token_for_error else (ctx.start.line if ctx else -1)
+                        err_col = call_site_token_for_error.column if call_site_token_for_error else (ctx.start.column if ctx else -1)
+                        err_content = self.visitor.get_line_content_from_ctx(call_site_token_for_error if call_site_token_for_error else ctx)
+
+                        raise KumirArgumentError(
+                            f"Неверное количество аргументов для '{proc_name}': ожидалось {num_expected_input_params} входных, передано {len(args)}.",
+                            line_index=err_line -1 if err_line != -1 else -1,
+                            column_index=err_col,
+                            line_content=err_content
+                        )
                     
                     actual_arg_values = args[:num_expected_input_params]
                     actual_arg_values_for_input_params = actual_arg_values[:num_expected_input_params]
@@ -939,31 +1018,41 @@ class ExpressionEvaluator:
         primary_expr_ctx_candidate = None
         index_list_ctx_candidate = None
 
-        if unary_expr_ctx.postfixExpression():
-            postfix_expr_ctx = unary_expr_ctx.postfixExpression()
-            primary_expr_ctx_candidate = postfix_expr_ctx.primaryExpression()
-            if len(postfix_expr_ctx.children) > 1 and hasattr(postfix_expr_ctx, 'indexList') and postfix_expr_ctx.indexList():
-                 op_token_node = postfix_expr_ctx.getChild(1)
-                 if isinstance(op_token_node, TerminalNode) and op_token_node.getSymbol().type == KumirLexer.LBRACK:
-                    index_list_ctx_candidate = postfix_expr_ctx.indexList()
-        elif unary_expr_ctx.primaryExpression():
-            primary_expr_ctx_candidate = unary_expr_ctx.primaryExpression()
-            index_list_ctx_candidate = None
-        else:
-            # print(f"[DEBUG][GetLValueStruct] UnaryExpression has neither Postfix nor Primary for: {expr_ctx.getText()}", file=sys.stderr)
+        postfix_expr_ctx = None
+        if hasattr(current_ctx, 'postfixExpression') and callable(current_ctx.postfixExpression) and current_ctx.postfixExpression():
+            postfix_expr_ctx = current_ctx.postfixExpression()
+            # print(f"[DEBUG_LVALUE_HELPER_EE] -> Postfix: {postfix_expr_ctx.getText()}", file=sys.stderr)
+        else: # Если нет postfixExpression, это не l-value
+            # print(f"[DEBUG_LVALUE_HELPER_EE] No postfixExpression found in UnaryExpression.", file=sys.stderr)
             return None, None
 
-        if primary_expr_ctx_candidate and \
-           primary_expr_ctx_candidate.LPAREN() and \
-           primary_expr_ctx_candidate.expression() and \
-           primary_expr_ctx_candidate.RPAREN():
-            # print(f"[DEBUG][GetLValueStruct] Recursing for parenthesized primary: {primary_expr_ctx_candidate.expression().getText()}", file=sys.stderr)
-            inner_primary, inner_indices = self._get_lvalue_structure_for_arg(primary_expr_ctx_candidate.expression())
-            if inner_indices is not None and index_list_ctx_candidate is None:
-                # print(f"[DEBUG][GetLValueStruct] Parenthesized expression was already indexed: {primary_expr_ctx_candidate.expression().getText()}", file=sys.stderr)
-                return inner_primary, inner_indices
-            # print(f"[DEBUG][GetLValueStruct] Using inner_primary '{inner_primary.getText() if inner_primary else 'None'}' and outer_indices '{index_list_ctx_candidate.getText() if index_list_ctx_candidate else 'None'}'", file=sys.stderr)
-            return inner_primary, index_list_ctx_candidate
+        # PostfixExpression -> PrimaryExpression ( LBRACK IndexList RBRACK | LPAREN ArgumentList RPAREN )*
+        # Нам нужен PrimaryExpression и, возможно, IndexList.
+        # Вызовы функций (LPAREN) не являются l-value для присваивания.
         
-        # print(f"[DEBUG][GetLValueStruct] EXIT for {expr_ctx.getText()}. Primary: {primary_expr_ctx_candidate.getText() if primary_expr_ctx_candidate else 'None'}, Indices: {index_list_ctx_candidate.getText() if index_list_ctx_candidate else 'None'}", file=sys.stderr)
+        primary_expr_ctx_candidate = postfix_expr_ctx.primaryExpression()
+        if not primary_expr_ctx_candidate:
+            # print(f"[DEBUG_LVALUE_HELPER_EE] No primaryExpression in PostfixExpression.", file=sys.stderr)
+            return None, None
+        
+        # print(f"[DEBUG_LVALUE_HELPER_EE] Found primary: {primary_expr_ctx_candidate.getText()}", file=sys.stderr)
+
+        # Проверяем, есть ли вызов функции (LPAREN) - это не l-value
+        if postfix_expr_ctx.LPAREN():
+            # print(f"[DEBUG_LVALUE_HELPER_EE] LPAREN found, not an l-value for assignment.", file=sys.stderr)
+            return None, None
+
+        index_list_ctx_candidate = None
+        # Ищем LBRACK, за которым следует IndexListContext
+        # Дети PostfixExpression: PrimaryExpr, потом опционально [ LBRACK, IndexList, RBRACK ] или [ LPAREN, ArgumentList, RPAREN ] и т.д.
+        children = postfix_expr_ctx.children
+        if children and len(children) > 1:
+            # Ищем LBRACK, который должен быть вторым ребенком (индекс 1), если первый - PrimaryExpression
+            if isinstance(children[1], TerminalNode) and children[1].getSymbol().type == KumirLexer.LBRACK:
+                # IndexList должен быть третьим ребенком (индекс 2)
+                if len(children) > 2 and hasattr(children[2], 'getRuleIndex') and children[2].getRuleIndex() == KumirParser.RULE_indexList:
+                    index_list_ctx_candidate = children[2]
+                    # print(f"[DEBUG_LVALUE_HELPER_EE] Found indexList: {index_list_ctx_candidate.getText()}", file=sys.stderr)
+        
+        # print(f"[DEBUG_LVALUE_HELPER_EE] Returning: primary_is_set={'SET' if primary_expr_ctx_candidate else 'None'}, index_list_is_set={'SET' if index_list_ctx_candidate else 'None'}", file=sys.stderr)
         return primary_expr_ctx_candidate, index_list_ctx_candidate

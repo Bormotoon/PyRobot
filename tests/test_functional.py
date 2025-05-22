@@ -1,4 +1,4 @@
-import pytest
+import pytest  # type: ignore
 import os
 import sys
 from io import StringIO
@@ -113,11 +113,12 @@ def run_kumir_program(program_path: str, input_data: str | None = None) -> str:
     except KumirSyntaxError as e:
         pytest.fail(f"KumirSyntaxError for {program_path}: {e}")
     except KumirEvalError as e:
+        actual_output_value += f"\nОШИБКА ВЫПОЛНЕНИЯ: {e}\n"
         pytest.fail(f"KumirEvalError for {program_path}: {e}")
     except Exception as e:
-        # print(f"--- НЕПРЕДВИДЕННАЯ ОШИБКА {os.path.basename(program_path)} ---", file=original_stderr)
-        # import traceback
-        # traceback.print_exc(file=original_stderr)
+        print(f"--- НЕПРЕДВИДЕННАЯ ОШИБКА {os.path.basename(program_path)} ---", file=original_stderr)
+        import traceback
+        traceback.print_exc(file=original_stderr)
         pytest.fail(f"Unexpected exception for {program_path}: {e}")
     finally:
         sys.stdin = original_stdin
@@ -160,7 +161,6 @@ def test_kumir_program(program, input_data, expected_output):
     except KumirSyntaxError as e:
         pytest.fail(f"KumirSyntaxError for {program_path}: {e}")
     except KumirEvalError as e:
-        actual_output += f"\nОШИБКА ВЫПОЛНЕНИЯ: {e}\n"
         pytest.fail(f"KumirEvalError for {program_path}: {e}")
     except Exception as e:
         pytest.fail(f"Unexpected exception for {program_path}: {e}")
