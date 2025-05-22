@@ -1519,7 +1519,13 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                         indices.append(idx_val)
 
                     if len(indices) != 1:
-                        raise KumirIndexError(f"Для присваивания символу строки '{var_name}' ожидается один индекс.", l_value_ctx.indexList().start.line)
+                        err_ctx = l_value_ctx.indexList()
+                        raise KumirIndexError(
+                            f"Для присваивания символу строки '{var_name}' ожидается один индекс.",
+                            line_index=err_ctx.start.line - 1,
+                            column_index=err_ctx.start.column,
+                            line_content=self.get_line_content_from_ctx(err_ctx)
+                        )
                     
                     kumir_idx = indices[0]
                     # value_to_assign уже вычислена ранее в visitAssignmentStatement
@@ -1551,6 +1557,15 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                         print(f"[DEBUG][visitAssignmentStatement] Присвоено {var_name}[{kumir_idx}] = '{char_to_assign}'. Новое значение строки: '{new_string_value}'", file=sys.stderr)
                     else:
                         # Поведение КуМира: не расширяет строку, а выдает ошибку
+                        err_ctx = l_value_ctx.indexList() # Контекст тот же - список индексов
+                        raise KumirIndexError(
+                            f"Индекс {kumir_idx} выходит за границы строки '{var_name}' (длина {len(current_string_value)}). Присваивание символу невозможно.",
+                            line_index=err_ctx.start.line - 1,
+                            column_index=err_ctx.start.column,
+                            line_content=self.get_line_content_from_ctx(err_ctx)
+                        )
+
+                elif not is_table: # Если это не строка 'лит' и не таблица, но есть LBRACK
                         raise KumirIndexError(f"Индекс {kumir_idx} выходит за границы строки '{var_name}' (длина {len(current_string_value)}). Присваивание символу невозможно.", l_value_ctx.indexList().start.line)
 
                 elif not is_table: # Если это не строка 'лит' и не таблица, но есть LBRACK
@@ -1784,12 +1799,25 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                         indices.append(idx_val)
                     print(f"[DEBUG][IO] INPUT table '{var_name}', indices: {indices}", file=sys.stderr)
                     if len(indices) != kumir_table_var_obj.dimensions:
-                            raise KumirIndexError(f"Неверное число индексов для таблицы '{var_name}'. Ожидалось {kumir_table_var_obj.dimensions}, получено {len(indices)}.", index_list_node.start.line)
+                            err_ctx_for_index = index_list_node if index_list_node else lvalue_expr_ctx # Fallback
+                            raise KumirIndexError(
+                                f"Неверное число индексов для таблицы '{var_name}'. Ожидалось {kumir_table_var_obj.dimensions}, получено {len(indices)}.",
+                                line_index=err_ctx_for_index.start.line - 1,
+                                column_index=err_ctx_for_index.start.column,
+                                line_content=self.get_line_content_from_ctx(err_ctx_for_index)
+                            )
                     element_kumir_type = kumir_table_var_obj.base_kumir_type_name
                     try:
                         value_to_assign = self._convert_input_to_type(input_str, element_kumir_type, lvalue_expr_ctx)
                     except KumirInputError as e:
-                        raise KumirInputError(f"Ошибка при вводе для элемента таблицы '{var_name}{''.join([f'[{i}]' for i in indices])}': {e.original_message}", lvalue_expr_ctx.start.line, original_type=e.original_type, input_value=e.input_value) from e
+                        raise KumirInputError(
+                            f"Ошибка при вводе для элемента таблицы '{var_name}{''.join([f'[{i}]' for i in indices])}': {e.original_message}",
+                            line_index=lvalue_expr_ctx.start.line - 1,
+                            column_index=lvalue_expr_ctx.start.column,
+                            line_content=self.get_line_content_from_ctx(lvalue_expr_ctx),
+                            original_type=e.original_type,
+                            input_value=e.input_value
+                        ) from e
                     except KumirEvalError as e_eval:
                             raise KumirEvalError(f"Ошибка при вводе для элемента таблицы '{var_name}{''.join([f'[{i}]' for i in indices])}': {e_eval.args[0]}", lvalue_expr_ctx.start.line) from e_eval
                     try:
@@ -1808,7 +1836,14 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                     try:
                         value_to_assign = self._convert_input_to_type(input_str, variable_kumir_type, lvalue_expr_ctx)
                     except KumirInputError as e:
-                        raise KumirInputError(f"Ошибка при вводе для переменной '{var_name}': {e.original_message}", lvalue_expr_ctx.start.line, original_type=e.original_type, input_value=e.input_value) from e
+                        raise KumirInputError(
+                            message=f"Ошибка при вводе для переменной '{var_name}': {e.original_message}",
+                            line_index=lvalue_expr_ctx.start.line - 1,
+                            column_index=lvalue_expr_ctx.start.column,
+                            line_content=self.get_line_content_from_ctx(lvalue_expr_ctx),
+                            original_type=e.original_type,
+                            input_value=e.input_value
+                        ) from e
                     except KumirEvalError as e_eval: 
                             raise KumirEvalError(f"Ошибка при вводе для переменной '{var_name}': {e_eval.args[0]}", lvalue_expr_ctx.start.line) from e_eval
                     target_var_info['value'] = value_to_assign
