@@ -5,8 +5,8 @@
 ## Общая информация по проекту
 
 * **Запуск тестов:**
-  * Все тесты: `pytest -v`
-  * Конкретный тест: `pytest -v tests/test_functional.py -k "имя_файла.kum"` или `python -m pytest -v tests/test_functional.py -k "имя_файла.kum"`
+  * Все тесты: `python -m pytest -v tests/test_functional.py`
+  * Конкретный тест: `python -m pytest -v tests/test_functional.py -k "имя_файла.kum"`
   * Все файлы kum: `tests/polyakov_kum`
 * **Документация по языку Кумир:** `kumir2-master/userdocs/`
 * **Исходный код оригинального Кумира (C++):** `kumir2-master/src`
@@ -656,7 +656,7 @@ TODO:
 Почему `n mod 10` вычисляется в `None`?
 Метод `visitMultiplicativeExpression` использует `_perform_binary_operation` для обработки операторов, включая `mod`.
 Словарь `ARITHMETIC_OPS` не содержит оператор `KumirLexer.MOD` (ключевое слово `mod`).
-Следовательно, `_perform_binary_operation` должен был бы обнаружить, что `operation_func` для `mod` не найдена, и сгенерировать `KumirEvalError` с сообщением "Неизвестный или неподдерживаемый арифметический оператор: mod".
+Следовательно, `_perform_binary_operation` должен был обнаружить, что `operation_func` для `mod` не найдена, и сгенерировать `KumirEvalError` с сообщением "Неизвестный или неподдерживаемый арифметический оператор: mod".
 Однако этой ошибки в логах нет, а вместо этого `n mod 10` каким-то образом возвращает `None`.
 
 **Текущие действия (06.08.2024):**
@@ -1379,7 +1379,7 @@ elif proc_name_lower in self.visitor.procedures: # <--- ДОБАВИТЬ ЭТУ 
     *   Убедиться, что ожидаемый вывод в `TEST_CASES` соответствует логике файла `.kum` и корректной работе строковых функций.
 
 ---
-## Детализированные задачи по исправлению `47-str-ops.kum` (16.08.2024)
+## Детальные задачи по исправлению `47-str-ops.kum` (16.08.2024)
 
 **Задача 0: Подготовка - Обновление конструкторов исключений и их вызовов**
     *   **Файл:** `pyrobot/backend/kumir_interpreter/kumir_exceptions.py`

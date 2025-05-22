@@ -66,22 +66,19 @@ class KumirEvalError(KumirExecutionError):
 
 
 # Синтаксическая ошибка в коде Кумира
-class KumirSyntaxError(SyntaxError, KumirExecutionError): # Наследуем от SyntaxError и нашего базового
-	def __init__(self, message, line_index=None, column_index=None, line_content=None, offset=None):
-		# Сначала инициализируем наш базовый класс для line_index, column_index, line_content
-		KumirExecutionError.__init__(self, message, line_index, column_index, line_content)
-		# Затем инициализируем SyntaxError (он принимает только msg, filename, lineno, offset, text, print_file_and_line)
-		# Мы передадим основные параметры, которые он может использовать. filename и text у нас нет в явном виде здесь.
-		SyntaxError.__init__(self, message)
-		# Устанавливаем атрибуты SyntaxError вручную, если они не установились через конструктор
-		self.msg = message
-		self.lineno = line_index + 1 if line_index is not None else None
-		self.offset = offset # offset - это позиция в строке (1-based)
-		self.text = line_content
+class KumirSyntaxError(SyntaxError, KumirExecutionError):
+    def __init__(self, message, line_index=None, column_index=None, line_content=None, offset=None):
+        KumirExecutionError.__init__(self, message, line_index, column_index, line_content)
+        SyntaxError.__init__(self, message)
+        self.msg = message
+        self.lineno = line_index + 1 if line_index is not None else None
+        self.offset = offset # offset - это позиция в строке (1-based) или None
+        self.text = line_content
+    # __str__ уже использует KumirExecutionError.__str__(self)
 
-	def __str__(self):
+    def __str__(self):
 		# Используем __str__ от KumirExecutionError для форматирования
-		return KumirExecutionError.__str__(self)
+        return KumirExecutionError.__str__(self)
 
 
 # Ошибка, связанная с командами или состоянием робота
@@ -116,13 +113,11 @@ class KumirIndexError(KumirExecutionError):
 
 # Ошибка, связанная с некорректным вводом пользователя (ошибка преобразования)
 class KumirInputError(KumirExecutionError):
-	def __init__(self, message, line_index=None, column_index=None, line_content=None, original_type=None, input_value=None):
-		super().__init__(message, line_index, column_index, line_content)
-		self.original_type = original_type
-		self.input_value = input_value
-		# Сохраняем оригинальное сообщение для возможного использования
-		# (хотя оно уже должно быть в self.args[0] от KumirExecutionError)
-		self.original_message = message 
+    def __init__(self, message, line_index=None, column_index=None, line_content=None, original_type=None, input_value=None):
+        super().__init__(message, line_index, column_index, line_content)
+        self.original_type = original_type
+        self.input_value = input_value
+        self.original_message = message
 
 
 # Ошибка, связанная с неверным количеством или типом аргументов функции/процедуры

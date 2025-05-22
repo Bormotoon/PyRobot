@@ -204,7 +204,7 @@ class KumirInterpreterVisitor(KumirParserVisitor):
         # --- Функции ввода/вывода (конец) ---
     }
 
-    def __init__(self, output_stream=None, input_stream=None, error_stream=None):
+    def __init__(self, robot=None, input_stream=None, output_stream=None, error_stream=None, echo_input=True):
         super().__init__()
         self.scopes = [{}]  # Глобальная область видимости
         self.procedures = {} # Словарь для хранения узлов AST процедур и функций
@@ -213,7 +213,7 @@ class KumirInterpreterVisitor(KumirParserVisitor):
         self.exit_flags = []  # Флаг для выхода из циклов (один на уровень вложенности)
         self.loop_depth = 0   # Глубина вложенности циклов для ВЫХОД
         self.debug = True  # Флаг для отладочного вывода (ВКЛЮЧЕН)
-        self.echo_input = True # <--- ИЗМЕНЕНО: Включаем эхо ввода обратно
+        self.echo_input = echo_input # <--- ИЗМЕНЕНО: Включаем эхо ввода обратно
         self.logger = logging.getLogger(__name__)  # <--- ДОБАВЛЕНО
         self.evaluator = ExpressionEvaluator(self)  # <--- СОЗДАЕМ ЭКЗЕМПЛЯР EVALUATOR
         # --- DEBUG PRINT ---
@@ -221,6 +221,7 @@ class KumirInterpreterVisitor(KumirParserVisitor):
             f"[DEBUG][INIT] KumirInterpreterVisitor initialized. Available methods starting with '_handle': {[name for name in dir(self) if callable(getattr(self, name)) and name.startswith('_handle')]}",
             file=sys.stderr)  # stdout -> stderr
         # --- END DEBUG PRINT ---
+        self.program_lines = [] # Добавляем эту строку
 
     # --- Управление областями видимости и символами ---
 
@@ -237,12 +238,19 @@ class KumirInterpreterVisitor(KumirParserVisitor):
         else:  # <--- 8 пробелов
             print("[ERROR][Scope] Попытка выйти из глобальной области!", file=sys.stderr)
 
-    def declare_variable(self, name, kumir_type, is_table=False, dimensions=None):
+    def declare_variable(self, name, kumir_type, is_table=False, dimensions=None, ctx_declaration_item=None):
         """Объявляет переменную в текущей области видимости."""
         current_scope = self.scopes[-1]
         if name in current_scope:
-            # TODO: Использовать KumirExecutionError или DeclarationError (используем DeclarationError)
-            raise DeclarationError(f"Переменная '{name}' уже объявлена в этой области видимости.", -1, -1) # Указываем line/col как -1
+            line_idx = ctx_declaration_item.start.line - 1 if ctx_declaration_item and hasattr(ctx_declaration_item, 'start') else None
+            col_idx = ctx_declaration_item.start.column if ctx_declaration_item and hasattr(ctx_declaration_item, 'start') else None
+            l_content = self.get_line_content_from_ctx(ctx_declaration_item) if ctx_declaration_item else None
+            raise DeclarationError(
+                f"Переменная '{name}' уже объявлена в этой области видимости.",
+                line_index=line_idx,
+                column_index=col_idx,
+                line_content=l_content
+            )
 
         default_value = {} if is_table else get_default_value(kumir_type)
         current_scope[name] = {
@@ -1142,12 +1150,14 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                         f"Строка {var_decl_item_ctx.LBRACK().getSymbol().line}: Скалярная переменная '{var_name}' (тип {base_kumir_type}) не может иметь указания границ массива.",
                         var_decl_item_ctx.LBRACK().getSymbol().line, var_decl_item_ctx.LBRACK().getSymbol().column)
 
-                default_value = get_default_value(base_kumir_type)
-                current_scope[var_name] = {'type': base_kumir_type, 'value': default_value, 'is_table': False,
-                                           'dimensions_info': None}
-                print(
-                    f"[DEBUG][VisitVarDecl] Объявлена переменная '{var_name}' тип {base_kumir_type}, значение по умолчанию: {default_value}",
-                    file=sys.stderr)
+                # Заменяем прямое добавление в current_scope на вызов declare_variable
+                # default_value = get_default_value(base_kumir_type)
+                # current_scope[var_name] = {'type': base_kumir_type, 'value': default_value, 'is_table': False,
+                #                            'dimensions_info': None}
+                # print(
+                #     f"[DEBUG][VisitVarDecl] Объявлена переменная '{var_name}' тип {base_kumir_type}, значение по умолчанию: {default_value}",
+                #     file=sys.stderr)
+                self.declare_variable(var_name, base_kumir_type, False, None, ctx_declaration_item=var_decl_item_ctx)
 
                 if var_decl_item_ctx.expression():
                     value_to_assign = self.evaluator.visitExpression(var_decl_item_ctx.expression())
@@ -2517,6 +2527,19 @@ class KumirInterpreterVisitor(KumirParserVisitor):
                 print(f"[DEBUG][visitSwitchStatement] No matching CASE and no OTHERWISE branch.", file=sys.stderr)
         
         return None
+
+    def get_line_content_from_ctx(self, ctx):
+        if ctx and hasattr(ctx, 'start') and ctx.start and hasattr(self, 'program_lines') and self.program_lines:
+            # ANTLR линии 1-индексированные, self.program_lines 0-индексированный
+            line_num_0_indexed = ctx.start.line - 1
+            if 0 <= line_num_0_indexed < len(self.program_lines):
+                return self.program_lines[line_num_0_indexed]
+        return None
+
+    def interpret(self, tree, program_text):
+        self.program_lines = program_text.splitlines() # <--- Добавляем эту строку в начало метода
+        # --- Инициализация состояния интерпретатора ---
+        # ... остальной существующий код метода interpret ...
 
 # Эта функция должна быть на верхнем уровне модуля, а не методом класса
 def interpret_kumir(code: str):

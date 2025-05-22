@@ -339,4 +339,29 @@ class KumirInputError(KumirExecutionError):
     *   Результат: `8 failed, 48 passed` (ожидаем, что не изменится).
 
 **Коммит:**
-*   НЕТ. 
+*   НЕТ.
+
+---
+
+<details>
+<summary>16.08.2024 (продолжение): Завершение стандартизации конструкторов исключений (Задача 0.2) и фиксация команды pytest</summary>
+
+**Изменения:**
+
+*   Проверены и подтверждены корректные конструкторы для `InputOutputError`, `KumirEvalError`, `KumirSyntaxError`, `RobotError`, `KumirNotImplementedError`, `KumirNameError`, `KumirTypeError`, `KumirIndexError`, `KumirInputError`, `KumirArgumentError` (и `ProcedureExitCalled`) в `pyrobot/backend/kumir_interpreter/kumir_exceptions.py`. Обнаружено, что они уже были в необходимом состоянии.
+
+**Тестирование (со слов пользователя):**
+
+*   `python -m pytest -v tests/test_functional.py -k "47-str-ops.kum"`: Тест по-прежнему падает с ожидаемой ошибкой. Новых проблем нет.
+*   `python -m pytest -v tests/test_functional.py`: Все ранее проходившие тесты по-прежнему проходят. Новых проблем нет.
+
+**Выводы:**
+
+*   Подзадача 0.2 по стандартизации конструкторов исключений успешно завершена (большая часть уже была сделана ранее).
+*   Зафиксирован правильный способ запуска тестов: `python -m pytest ...` в `AI_notes.md` (изменение внесено пользователем).
+
+**План на следующий шаг:**
+
+*   Переход к подзадаче 0.3: Реализация хелпера `get_line_content_from_ctx` в `KumirInterpreterVisitor` и обновление вызовов исключений для использования `line_content`.
+
+</details> 
