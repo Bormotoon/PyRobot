@@ -11,6 +11,7 @@ from .kumir_datatypes import KumirTableVar
 from antlr4 import InputStream, CommonTokenStream # type: ignore
 from typing import Any, Dict, List, Optional, Tuple, Union, TYPE_CHECKING
 from antlr4.tree.Tree import TerminalNode
+from antlr4 import ParserRuleContext # <--- ДОБАВЛЕНО
 
 if TYPE_CHECKING:
     from pyrobot.backend.kumir_interpreter.interpreter import KumirInterpreterVisitor # Для type hinting
@@ -38,20 +39,42 @@ LOGICAL_OPS = {
 }
 
 class ExpressionEvaluator:
-    def __init__(self, visitor):
+    def __init__(self, visitor: 'KumirInterpreterVisitor'): # <--- Тип для visitor
         self.visitor = visitor
+
+    def _get_error_info(self, ctx: Optional[Union[ParserRuleContext, TerminalNode]]) -> Tuple[Optional[int], Optional[int], Optional[str]]: # <--- Новый метод
+        line_idx, col_idx, lc = None, None, None
+        source_for_lc = ctx 
+        if isinstance(ctx, TerminalNode):
+            if ctx.symbol:
+                line_idx = ctx.symbol.line - 1
+                col_idx = ctx.symbol.column
+        elif isinstance(ctx, ParserRuleContext):
+            if hasattr(ctx, 'start') and ctx.start:
+                line_idx = ctx.start.line - 1
+                col_idx = ctx.start.column
+        
+        if self.visitor and hasattr(self.visitor, 'get_line_content_from_ctx') and source_for_lc:
+            # get_line_content_from_ctx ожидает ParserRuleContext или TerminalNode
+            lc = self.visitor.get_line_content_from_ctx(source_for_lc)
+        return line_idx, col_idx, lc
 
     def _get_value(self, value):
         if isinstance(value, dict) and 'value' in value and 'type' in value:
             return value['value']
         return value
 
-    def _handle_type_promotion_for_comparison(self, left, right, ctx):
+    def _handle_type_promotion_for_comparison(self, left, right, ctx: ParserRuleContext): # <--- ctx добавлен тип
         if left is None or right is None:
-            raise KumirEvalError(
-                f"Строка ~{ctx.start.line}: Нельзя сравнивать с неинициализированным значением.",
-                ctx.start.line,
-                ctx.start.column
+            # raise KumirEvalError( # СТАРЫЙ КОД
+            #     f\"Строка ~{ctx.start.line}: Нельзя сравнивать с неинициализированным значением.\",
+            #     ctx.start.line,
+            #     ctx.start.column
+            # )
+            line_idx, col_idx, lc = self._get_error_info(ctx) # НОВЫЙ КОД
+            raise KumirEvalError( # НОВЫЙ КОД
+                "Нельзя сравнивать с неинициализированным значением.",
+                line_index=line_idx, column_index=col_idx, line_content=lc
             )
         is_left_int = isinstance(left, int)
         is_left_float = isinstance(left, float)
@@ -65,61 +88,97 @@ class ExpressionEvaluator:
             return left, float(right)
         return left, right
 
-    def _check_numeric(self, value, operation_name):
+    def _check_numeric(self, value, operation_name: str, ctx: Optional[Union[ParserRuleContext, TerminalNode]]): # <--- ctx добавлен
         print(f"[DEBUG][_check_numericEE] ENTERED. Op: {operation_name}. Value initial type: {type(value).__name__}.", file=sys.stderr)
         processed_value = self._get_value(value)
         print(f"[DEBUG][_check_numericEE] Value after _get_value for op '{operation_name}': {repr(processed_value)} (type: {type(processed_value).__name__})", file=sys.stderr)
         if processed_value is None:
             print(f"[DEBUG][_check_numericEE] Raising KumirEvalError: processed_value is None for op '{operation_name}'", file=sys.stderr)
-            raise KumirEvalError(f"Попытка использовать неинициализированное значение в операции '{operation_name}'")
+            # raise KumirEvalError(f"Попытка использовать неинициализированное значение в операции '{operation_name}'") # СТАРЫЙ КОД
+            line_idx, col_idx, lc = self._get_error_info(ctx) # НОВЫЙ КОД
+            raise KumirEvalError(f"Попытка использовать неинициализированное значение в операции '{operation_name}'", # НОВЫЙ КОД
+                                 line_index=line_idx, column_index=col_idx, line_content=lc)
         if not isinstance(processed_value, (int, float)):
             print(f"[DEBUG][_check_numericEE] Raising KumirEvalError: not int/float for op '{operation_name}'. Value: {repr(processed_value)}, Type: {type(processed_value).__name__}", file=sys.stderr)
-            raise KumirEvalError(f"Операция '{operation_name}' не применима к нечисловому типу {type(processed_value).__name__}.")
+            # raise KumirEvalError(f"Операция '{operation_name}' не применима к нечисловому типу {type(processed_value).__name__}.") # СТАРЫЙ КОД
+            line_idx, col_idx, lc = self._get_error_info(ctx) # НОВЫЙ КОД
+            raise KumirEvalError(f"Операция '{operation_name}' не применима к нечисловому типу {type(processed_value).__name__}.", # НОВЫЙ КОД
+                                 line_index=line_idx, column_index=col_idx, line_content=lc)
         return processed_value
 
-    def _check_logical(self, value, operation_name):
+    def _check_logical(self, value, operation_name: str, ctx: Optional[Union[ParserRuleContext, TerminalNode]]): # <--- ctx добавлен
         processed_value = self._get_value(value)
         if processed_value is None:
-            raise KumirEvalError(f"Попытка использовать неинициализированное значение в операции '{operation_name}'")
+            # raise KumirEvalError(f"Попытка использовать неинициализированное значение в операции '{operation_name}'") # СТАРЫЙ КОД
+            line_idx, col_idx, lc = self._get_error_info(ctx) # НОВЫЙ КОД
+            raise KumirEvalError(f"Попытка использовать неинициализированное значение в операции '{operation_name}'", # НОВЫЙ КОД
+                                 line_index=line_idx, column_index=col_idx, line_content=lc)
         if not isinstance(processed_value, bool):
-            if not isinstance(processed_value, int):
-                 raise KumirEvalError(f"Операция '{operation_name}' не применима к нелогическому типу {type(processed_value).__name__}.")
+            if not isinstance(processed_value, int): # В КуМире целые числа могут использоваться в логических операциях
+                # raise KumirEvalError(f"Операция '{operation_name}' не применима к нелогическому типу {type(processed_value).__name__}.") # СТАРЫЙ КОД
+                line_idx, col_idx, lc = self._get_error_info(ctx) # НОВЫЙ КОД
+                raise KumirEvalError(f"Операция '{operation_name}' не применима к нелогическому типу {type(processed_value).__name__}.", # НОВЫЙ КОД
+                                     line_index=line_idx, column_index=col_idx, line_content=lc)
         return processed_value
 
-    def _check_comparable(self, value, operation_name):
+    def _check_comparable(self, value, operation_name: str, ctx: Optional[Union[ParserRuleContext, TerminalNode]]): # <--- ctx добавлен
         processed_value = self._get_value(value)
         if processed_value is None:
-            raise KumirEvalError(f"Попытка использовать неинициализированное значение в операции '{operation_name}'")
-        if not isinstance(processed_value, (int, float, str, bool)):
-            raise KumirEvalError(f"Операция '{operation_name}' не применима к типу {type(processed_value).__name__}.")
+            # raise KumirEvalError(f"Попытка использовать неинициализированное значение в операции '{operation_name}'") # СТАРЫЙ КОД
+            line_idx, col_idx, lc = self._get_error_info(ctx) # НОВЫЙ КОД
+            raise KumirEvalError(f"Попытка использовать неинициализированное значение в операции '{operation_name}'", # НОВЫЙ КОД
+                                 line_index=line_idx, column_index=col_idx, line_content=lc)
+        if not isinstance(processed_value, (int, float, str, bool)): # Строки и булевы тоже сравнимы
+            # raise KumirEvalError(f"Операция '{operation_name}' не применима к типу {type(processed_value).__name__}.") # СТАРЫЙ КОД
+            line_idx, col_idx, lc = self._get_error_info(ctx) # НОВЫЙ КОД
+            raise KumirEvalError(f"Операция '{operation_name}' не применима к типу {type(processed_value).__name__}.", # НОВЫЙ КОД
+                                 line_index=line_idx, column_index=col_idx, line_content=lc)
         return processed_value
         
-    def _perform_binary_operation(self, left_val, right_val, op_token, expression_node_ctx):
+    def _perform_binary_operation(self, left_val, right_val, op_token: TerminalNode, expression_node_ctx: ParserRuleContext): # <--- типы для op_token и expression_node_ctx
         op_text = op_token.text
         op_type = op_token.type
         print(f"[DEBUG][PBO_OP_DETAILSEE] op_text='{op_text}', op_type_val={op_type}, KumirLexer.DIV={KumirLexer.DIV}", file=sys.stderr)
-        checked_left_val = self._check_numeric(left_val, op_text)
-        checked_right_val = self._check_numeric(right_val, op_text)
+        # Передаем expression_node_ctx в _check_numeric, т.к. ошибка относится ко всему выражению
+        checked_left_val = self._check_numeric(left_val, op_text, expression_node_ctx) 
+        checked_right_val = self._check_numeric(right_val, op_text, expression_node_ctx)
         operation_func = ARITHMETIC_OPS.get(op_type)
         print(f"[DEBUG][PBO_OP_DETAILSEE] op_text='{op_text}', op_type_val={op_type}, operation_func_found={bool(operation_func)}", file=sys.stderr)
         if not operation_func:
-            print(f"[DEBUG][PBO_OP_DETAILSEE] Keyword '{op_text}' was not found in ARITHMETIC_OPS. Raising error as expected.", file=sys.stderr)
-            raise KumirEvalError(f"Строка ~{expression_node_ctx.start.line}: Неизвестный или неподдерживаемый арифметический оператор: {op_text} в выражении '{expression_node_ctx.getText()}'")
+                 print(f"[DEBUG][PBO_OP_DETAILSEE] Keyword '{op_text}' was not found in ARITHMETIC_OPS. Raising error as expected.", file=sys.stderr)
+            # raise KumirEvalError(f"Строка ~{expression_node_ctx.start.line}: Неизвестный или неподдерживаемый арифметический оператор: {op_text} в выражении '{expression_node_ctx.getText()}'") # СТАРЫЙ КОД
+            line_idx, col_idx, lc = self._get_error_info(op_token) # Ошибка в самом токене операции
+            raise KumirEvalError(f"Неизвестный или неподдерживаемый арифметический оператор: {op_text}", # НОВЫЙ КОД
+                                 line_index=line_idx, column_index=col_idx, line_content=lc)
         if op_type == KumirLexer.DIV:
             if checked_right_val == 0:
-                raise KumirEvalError(f"Строка ~{expression_node_ctx.start.line}: Деление на ноль в выражении '{expression_node_ctx.getText()}'")
+                # raise KumirEvalError(f"Строка ~{expression_node_ctx.start.line}: Деление на ноль в выражении '{expression_node_ctx.getText()}'") # СТАРЫЙ КОД
+                line_idx, col_idx, lc = self._get_error_info(expression_node_ctx) # Ошибка относится ко всему выражению
+                raise KumirEvalError("Деление на ноль", line_index=line_idx, column_index=col_idx, line_content=lc) # НОВЫЙ КОД
             return float(checked_left_val) / float(checked_right_val)
         try:
             result = operation_func(checked_left_val, checked_right_val)
             return result
         except TypeError as e:
-            raise KumirEvalError(f"Строка ~{expression_node_ctx.start.line}: Ошибка типа при выполнении операции '{op_text}' ({type(checked_left_val).__name__} {op_text} {type(checked_right_val).__name__}) в выражении '{expression_node_ctx.getText()}': {e}")
+            # raise KumirEvalError(f"Строка ~{expression_node_ctx.start.line}: Ошибка типа при выполнении операции '{op_text}' ({type(checked_left_val).__name__} {op_text} {type(checked_right_val).__name__}) в выражении '{expression_node_ctx.getText()}': {e}") # СТАРЫЙ КОД
+            line_idx, col_idx, lc = self._get_error_info(expression_node_ctx) # НОВЫЙ КОД
+            raise KumirEvalError(f"Ошибка типа при выполнении операции '{op_text}' ({type(checked_left_val).__name__} {op_text} {type(checked_right_val).__name__}): {e}", # НОВЫЙ КОД
+                                 line_index=line_idx, column_index=col_idx, line_content=lc)
         except ZeroDivisionError:
-             raise KumirEvalError(f"Строка ~{expression_node_ctx.start.line}: Ошибка деления на ноль или некорректная операция со степенью при вычислении '{op_text}' в выражении '{expression_node_ctx.getText()}'")
+            # raise KumirEvalError(f"Строка ~{expression_node_ctx.start.line}: Ошибка деления на ноль или некорректная операция со степенью при вычислении '{op_text}' в выражении '{expression_node_ctx.getText()}'") # СТАРЫЙ КОД
+            line_idx, col_idx, lc = self._get_error_info(expression_node_ctx) # НОВЫЙ КОД
+            raise KumirEvalError(f"Ошибка деления на ноль или некорректная операция со степенью при вычислении '{op_text}'", # НОВЫЙ КОД
+                                 line_index=line_idx, column_index=col_idx, line_content=lc)
         except OverflowError:
-            raise KumirEvalError(f"Строка ~{expression_node_ctx.start.line}: Переполнение при вычислении '{op_text}' в выражении '{expression_node_ctx.getText()}'")
+            # raise KumirEvalError(f"Строка ~{expression_node_ctx.start.line}: Переполнение при вычислении '{op_text}' в выражении '{expression_node_ctx.getText()}'") # СТАРЫЙ КОД
+            line_idx, col_idx, lc = self._get_error_info(expression_node_ctx) # НОВЫЙ КОД
+            raise KumirEvalError(f"Переполнение при вычислении '{op_text}'", # НОВЫЙ КОД
+                                 line_index=line_idx, column_index=col_idx, line_content=lc)
         except Exception as e: 
-            raise KumirEvalError(f"Строка ~{expression_node_ctx.start.line}: Ошибка при вычислении '{op_text}' в выражении '{expression_node_ctx.getText()}': {e}")
+            # raise KumirEvalError(f"Строка ~{expression_node_ctx.start.line}: Ошибка при вычислении '{op_text}' в выражении '{expression_node_ctx.getText()}': {e}") # СТАРЫЙ КОД
+            line_idx, col_idx, lc = self._get_error_info(expression_node_ctx) # НОВЫЙ КОД
+            raise KumirEvalError(f"Ошибка при вычислении '{op_text}': {e}", # НОВЫЙ КОД
+                                 line_index=line_idx, column_index=col_idx, line_content=lc)
 
     def visitLiteral(self, ctx: KumirParser.LiteralContext):
         print(f"[DEBUG][visitLiteralEE] Called for ctx: {ctx.getText()}", file=sys.stderr)
@@ -162,7 +221,10 @@ class ExpressionEvaluator:
             # Либо две одинарные кавычки для представления символа одинарной кавычки.
             # Все остальное должно быть синтаксической ошибкой, пойманной парсером.
             # Если мы здесь с чем-то другим, это неожиданно.
-            raise KumirEvalError(f"Некорректный или неподдерживаемый символьный литерал: {text}", ctx.start.line, ctx.start.column if ctx.start else -1)
+            # raise KumirEvalError(f"Некорректный или неподдерживаемый символьный литерал: {text}", ctx.start.line, ctx.start.column if ctx.start else -1) # СТАРЫЙ КОД
+            line_idx, col_idx, lc = self._get_error_info(ctx) # НОВЫЙ КОД
+            raise KumirEvalError(f"Некорректный или неподдерживаемый символьный литерал: {text}", # НОВЫЙ КОД
+                                 line_index=line_idx, column_index=col_idx, line_content=lc)
         elif ctx.TRUE():    # Token TRUE
             print(f"[DEBUG][visitLiteralEE] TRUE", file=sys.stderr)
             return True
@@ -183,7 +245,10 @@ class ExpressionEvaluator:
                 return color_text
         else:
             print(f"[ERROR][visitLiteralEE] Unknown literal type: {ctx.getText()}", file=sys.stderr)
-            raise KumirEvalError(f"Неизвестный тип литерала: {ctx.getText()}", ctx.start.line, ctx.start.column if ctx.start else -1)
+            # raise KumirEvalError(f"Неизвестный тип литерала: {ctx.getText()}", ctx.start.line, ctx.start.column if ctx.start else -1) # СТАРЫЙ КОД
+            line_idx, col_idx, lc = self._get_error_info(ctx) # НОВЫЙ КОД
+            raise KumirEvalError(f"Неизвестный тип литерала: {ctx.getText()}", # НОВЫЙ КОД
+                                 line_index=line_idx, column_index=col_idx, line_content=lc)
 
     def visitColorLiteral(self, ctx: KumirParser.ColorLiteralContext):
         pass # Заглушка
@@ -200,51 +265,42 @@ class ExpressionEvaluator:
             if name == 'N':
                 print(f"[DEBUG][EE_N_Check_Access] Пытаемся получить значение для 'N' в ExpressionEvaluator.", file=sys.stderr)
             # --- КОНЕЦ ОТЛАДКИ N В EVALUATOR ---
-            var_info, _ = visitor.find_variable(name)
-            if var_info:
-                # --- НАЧАЛО ОТЛАДКИ N В EVALUATOR (ПОСЛЕ ПОИСКА) ---
-                if name == 'N':
-                    print(f"[DEBUG][EE_N_Check_Value] 'N' найдена в ExpressionEvaluator, var_info['value'] = {var_info['value']}", file=sys.stderr)
-                # --- КОНЕЦ ОТЛАДКИ N В EVALUATOR ---
-                is_table_access = var_info.get('is_table') and not ctx.parentCtx.LPAREN()
-                # Check if it's a direct table access (no indices/args yet, handled by Postfix)
-                is_direct_table_ref = (
-                    not (hasattr(ctx.parentCtx, 'indexList') and ctx.parentCtx.indexList()) and
-                    not (hasattr(ctx.parentCtx, 'argumentList') and ctx.parentCtx.argumentList())
-                )
+            var_info, _ = visitor.scope_manager.find_variable(name) # Используем scope_manager
+            if not var_info:
+                line_idx, col_idx, lc = self._get_error_info(ctx.qualifiedIdentifier())
+                raise KumirEvalError("Переменная или функция не найдена: " + name,
+                                     line_index=line_idx, column_index=col_idx, line_content=lc)
+            
+            value = var_info['value']
+            # Проверка на неинициализированную переменную
+            if value is None and not var_info.get('is_function', False) and not var_info.get('is_builtin', False):
+                line_idx, col_idx, lc = self._get_error_info(ctx.qualifiedIdentifier())
+                raise KumirEvalError("Попытка использования неинициализированной переменной: " + name,
+                                     line_index=line_idx, column_index=col_idx, line_content=lc)
+            
+            print(f"[DEBUG][visitPrimaryExpressionEE] Identifier '{name}' resolved to: {value} (type: {type(value).__name__})", file=sys.stderr)
+            result = value # Это может быть значение переменной, KumirTableVar или информация о функции
 
-                if is_table_access and is_direct_table_ref:
-                    print(f"[DEBUG][visitPrimaryExpressionEE] Returning KumirTableVar object for table: {name}", file=sys.stderr)
-                    result = var_info['value'] 
-                elif var_info.get('is_table'): # Table name for postfix processing
-                    print(f"[DEBUG][visitPrimaryExpressionEE] Returning name for table (to be handled by Postfix): {name}", file=sys.stderr)
-                    result = name
-                else: # Scalar variable or function/procedure name
-                    if callable(var_info.get('value')):
-                        result = name
-                    else:
-                        result = var_info['value']
-            else:
-                print(f"[DEBUG][visitPrimaryExpressionEE] '{name}' not found as variable, assuming proc/func name.", file=sys.stderr)
-                result = name 
-        elif ctx.LPAREN():
-            # When all expressions are moved, this will be self.visitExpression(ctx.expression())
-            result = self.visitExpression(ctx.expression()) 
-            print(f"[DEBUG][visitPrimaryExpressionEE] LPAREN expression result: {result}", file=sys.stderr)
         elif ctx.RETURN_VALUE():
-            current_scope_dict = visitor.scopes[-1]
-            if '__знач__' not in current_scope_dict:
-                if len(visitor.scopes) > 1 and '__знач__' in visitor.scopes[-2]:
-                    current_scope_dict = visitor.scopes[-2]
-            if '__знач__' not in current_scope_dict:
-                print(f"[DEBUG][visitPrimaryExpressionEE] '__знач__' not in current scope or caller scope. Current scopes: {visitor.scopes}", file=sys.stderr)
-                raise KumirEvalError("Попытка использования неинициализированного возвращаемого значения 'знач'.", ctx.start.line, ctx.start.column)
-            result = current_scope_dict['__знач__']
-            print(f"[DEBUG][visitPrimaryExpressionEE] RETURN_VALUE (__знач__) result: {repr(result)} from scope: {current_scope_dict is visitor.scopes[-1]}", file=sys.stderr)
+            print(f"[DEBUG][visitPrimaryExpressionEE] RETURN_VALUE token found", file=sys.stderr)
+            var_info, _ = visitor.scope_manager.find_variable('__знач__')
+
+            if var_info is None or var_info['value'] is None:
+                line_idx, col_idx, lc = self._get_error_info(ctx.RETURN_VALUE())
+                raise KumirEvalError("Попытка использования неинициализированного возвращаемого значения",
+                                     line_index=line_idx, column_index=col_idx, line_content=lc)
+                    result = var_info['value'] 
+
+        elif ctx.LPAREN() and ctx.RPAREN() and ctx.expression():
+            print(f"[DEBUG][visitPrimaryExpressionEE] Parenthesized expression found: {ctx.expression().getText()}", file=sys.stderr)
+            result = self.visitExpression(ctx.expression()) 
         else:
-            print(f"[DEBUG][visitPrimaryExpressionEE] Unknown primary expression type: {ctx.getText()}", file=sys.stderr)
-            raise KumirEvalError(f"Неизвестный тип первичного выражения: {ctx.getText()}", ctx.start.line, ctx.start.column)
-        print(f"[DEBUG][visitPrimaryExpressionEE] Returning: {repr(result)} (type: {type(result)}) for ctx: {ctx.getText()}", file=sys.stderr)
+            print(f"[ERROR][visitPrimaryExpressionEE] Unknown primary expression structure: {ctx.getText()}", file=sys.stderr)
+            line_idx, col_idx, lc = self._get_error_info(ctx)
+            raise KumirSyntaxError(f"Некорректная структура первичного выражения: '{ctx.getText()}'",
+                                   line_index=line_idx, column_index=col_idx, line_content=lc)
+        
+        print(f"[DEBUG][visitPrimaryExpressionEE] Returning: {result} (type: {type(result).__name__}) for expression {ctx.getText()}", file=sys.stderr)
         return result 
 
     def visitPostfixExpression(self, ctx): # KumirParser.PostfixExpressionContext
@@ -292,19 +348,25 @@ class ExpressionEvaluator:
                         raise KumirEvalError(f"Внутренняя ошибка: переменная '{base_var_name}' типа 'лит', но ее значение не строка ({type(string_to_index).__name__}).", primary_expr_ctx.start.line, primary_expr_ctx.start.column)
 
                     if len(indices) == 1: # Доступ к символу
-                        kumir_idx = indices[0]
-                        py_idx = kumir_idx - 1 
+                    kumir_idx = indices[0]
+                        if not isinstance(kumir_idx, int):
+                            err_line, err_col, err_content = self._get_error_info(index_list_ctx.expression(0) if index_list_ctx.expression() else index_list_ctx) # Более безопасный доступ к ctx для ошибки
+                            raise KumirTypeError(
+                                f"Индекс для доступа к символу строки '{base_var_name}' должен быть целым числом, получен тип {type(kumir_idx).__name__}.",
+                                line_index=err_line, column_index=err_col, line_content=err_content
+                            )
+
+                        py_idx = kumir_idx - 1 # КуМир 1-based -> Python 0-based
                         
                         try:
                             if not (0 <= py_idx < len(string_to_index)):
+                                err_line, err_col, err_content = self._get_error_info(index_list_ctx.expression(0) if index_list_ctx.expression() else index_list_ctx) # Более безопасный доступ к ctx для ошибки
                                 raise KumirIndexError(
-                                    f"Индекс {kumir_idx} (Python: {py_idx}) выходит за границы строки '{base_var_name}' (длина {len(string_to_index)}).",
-                                    line_index=index_list_ctx.start.line -1,
-                                    column_index=index_list_ctx.start.column,
-                                    line_content=self.visitor.get_line_content_from_ctx(index_list_ctx)
-                                    )
-                            current_eval_value = string_to_index[py_idx]
-                            print(f"[DEBUG][PostfixEE] Доступ к символу строки '{base_var_name}'[{kumir_idx}] -> '{current_eval_value}'", file=sys.stderr)
+                                    f"Индекс символа {kumir_idx} вне допустимого диапазона [1..{len(string_to_index)}] для строки '{base_var_name}' (длина {len(string_to_index)}).",
+                                    line_index=err_line, column_index=err_col, line_content=err_content
+                                )
+                        current_eval_value = string_to_index[py_idx]
+                        print(f"[DEBUG][PostfixEE] Доступ к символу строки '{base_var_name}'[{kumir_idx}] -> '{current_eval_value}'", file=sys.stderr)
                         except IndexError: 
                             raise KumirIndexError(
                                 f"Попытка доступа к символу строки '{base_var_name}' по индексу {kumir_idx} (Python: {py_idx}), который выходит за границы (длина строки: {len(string_to_index)}).",
@@ -313,43 +375,54 @@ class ExpressionEvaluator:
                                 line_content=self.visitor.get_line_content_from_ctx(index_list_ctx)
                             )
                     elif len(indices) == 2: # Срез строки S[i:j]
-                        start_kumir_idx = indices[0]
-                        end_kumir_idx = indices[1]
-                        
-                        # В КуМире индексы 1-based и включающие. В Python 0-based и не включающий конец.
-                        py_start_idx = start_kumir_idx - 1
-                        py_end_idx = end_kumir_idx # Для среза [start:end] в Python end не включается
+                        k_idx1 = indices[0]
+                        k_idx2 = indices[1]
 
-                        # Простая валидация и корректировка индексов
-                        str_len = len(string_to_index)
-                        
-                        # Начальный индекс должен быть в пределах строки (от 0 до str_len-1 для доступа, или str_len для пустого среза в конце)
-                        # Конечный индекс должен быть в пределах строки (от 0 до str_len для среза)
-                        # Также старт не должен быть больше конца для непустого среза.
-                        # КуМир позволяет s[5:2] - это пустая строка. Python s[4:1] - тоже пустая.
-
-                        if not (0 <= py_start_idx <= str_len and 0 <= py_end_idx <= str_len):
-                             # Более детальные проверки и ошибки можно добавить позже
-                            raise KumirIndexError(
-                                f"Неверные границы среза [{start_kumir_idx}:{end_kumir_idx}] (Python: [{py_start_idx}:{py_end_idx}]) для строки '{base_var_name}' (длина {str_len}).",
-                                line_index=index_list_ctx.start.line - 1,
-                                column_index=index_list_ctx.start.column,
-                                line_content=self.visitor.get_line_content_from_ctx(index_list_ctx)
+                        if not isinstance(k_idx1, int):
+                            err_line, err_col, err_content = self._get_error_info(index_list_ctx.expression(0) if index_list_ctx.expression() else index_list_ctx)
+                            raise KumirTypeError(
+                                f"Начальный индекс среза строки '{base_var_name}' должен быть целым числом, получен тип {type(k_idx1).__name__}.",
+                                line_index=err_line, column_index=err_col, line_content=err_content
+                            )
+                        if not isinstance(k_idx2, int):
+                            err_line, err_col, err_content = self._get_error_info(index_list_ctx.expression(1) if index_list_ctx.expression() and len(index_list_ctx.expression()) > 1 else index_list_ctx) # Более безопасный доступ
+                            raise KumirTypeError(
+                                f"Конечный индекс среза строки '{base_var_name}' должен быть целым числом, получен тип {type(k_idx2).__name__}.",
+                                line_index=err_line, column_index=err_col, line_content=err_content
                             )
 
-                        # КуМир: если start_kumir_idx > end_kumir_idx, результат - пустая строка.
-                        # Python: если py_start_idx >= py_end_idx, результат - пустая строка.
-                        # Это поведение совпадает, если py_start_idx = start_kumir_idx - 1 и py_end_idx = end_kumir_idx.
-                        # Пример: КуМир s[5:2] -> пустая. Python s[4:2] -> пустая.
+                        # Логика среза и проверка KumirIndexError
+                        s_len = len(string_to_index) # Получаем длину строки здесь
+                        if k_idx1 < 1 or k_idx2 < k_idx1: # В КуМире конечный индекс может быть меньше начального (пустая строка), но оба должны быть >=1
+                                                        # Однако, для согласованности с копировать(S,I,N), где N>=0, и для упрощения,
+                                                        # потребуем k_idx2 >= k_idx1. Если k_idx1 > k_idx2, будет пустая строка.
+                                                        # И k_idx1 должен быть >= 1.
+                            err_line, err_col, err_content = self._get_error_info(index_list_ctx)
+                            raise KumirIndexError(
+                                f"Неверные границы среза для строки '{base_var_name}'. Начальный индекс ({k_idx1}) должен быть >= 1, а конечный индекс ({k_idx2}) >= начального.",
+                                line_index=err_line, column_index=err_col, line_content=err_content
+                            )
                         
-                        current_eval_value = string_to_index[py_start_idx:py_end_idx]
-                        print(f"[DEBUG][PostfixEE] Срез строки '{base_var_name}'[{start_kumir_idx}:{end_kumir_idx}] -> '{current_eval_value}'", file=sys.stderr)
+                        num_chars_requested = k_idx2 - k_idx1 + 1 # Количество символов, как в КуМир `копировать(S,I,N)` где N = k_idx2 - k_idx1 + 1
+                        
+                        if k_idx1 > s_len: # Начало среза за пределами строки
+                            current_eval_value = "" # Пустая строка, как в КуМир
+                    else:
+                            # Преобразуем КуМир 1-based индексы в Python 0-based
+                            py_start_idx = k_idx1 - 1
+                            # Рассчитываем, сколько символов реально можно взять
+                            actual_num_chars_to_take = min(num_chars_requested, s_len - py_start_idx)
+                            
+                            if actual_num_chars_to_take <= 0: # Если просят 0 или меньше символов, или начало среза такое, что взять нечего
+                                current_eval_value = ""
+                            else:
+                                current_eval_value = string_to_index[py_start_idx : py_start_idx + actual_num_chars_to_take]
+                    
                     else: # Не 1 и не 2 индекса
+                        err_line, err_col, err_content = self._get_error_info(index_list_ctx)
                         raise KumirIndexError(
-                            f"Для доступа к строке '{base_var_name}' ожидается один индекс (для символа) или два индекса (для среза), получено {len(indices)}.",
-                            line_index=index_list_ctx.start.line - 1,
-                            column_index=index_list_ctx.start.column,
-                            line_content=self.visitor.get_line_content_from_ctx(index_list_ctx)
+                            f"Для операций со строкой '{base_var_name}' ожидается 1 индекс (доступ к символу) или 2 индекса (срез). Получено {len(indices)}.",
+                            line_index=err_line, column_index=err_col, line_content=err_content
                         )
                 
                 elif isinstance(current_eval_value, KumirTableVar):
@@ -483,7 +556,7 @@ class ExpressionEvaluator:
                     except Exception as e:
                         error_source_ctx = argument_list_ctx if argument_list_ctx else (first_op_token_node if first_op_token_node else ctx)
                         start_attr_holder = error_source_ctx.getSymbol() if isinstance(error_source_ctx, TerminalNode) else error_source_ctx.start
-
+                        
                         err_line_idx = -1
                         err_col_idx = -1
                         line_content = None
@@ -1030,11 +1103,11 @@ class ExpressionEvaluator:
         # Нам нужен PrimaryExpression и, возможно, IndexList.
         # Вызовы функций (LPAREN) не являются l-value для присваивания.
         
-        primary_expr_ctx_candidate = postfix_expr_ctx.primaryExpression()
+            primary_expr_ctx_candidate = postfix_expr_ctx.primaryExpression()
         if not primary_expr_ctx_candidate:
             # print(f"[DEBUG_LVALUE_HELPER_EE] No primaryExpression in PostfixExpression.", file=sys.stderr)
             return None, None
-        
+
         # print(f"[DEBUG_LVALUE_HELPER_EE] Found primary: {primary_expr_ctx_candidate.getText()}", file=sys.stderr)
 
         # Проверяем, есть ли вызов функции (LPAREN) - это не l-value

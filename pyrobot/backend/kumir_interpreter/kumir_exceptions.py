@@ -69,16 +69,16 @@ class KumirEvalError(KumirExecutionError):
 class KumirSyntaxError(SyntaxError, KumirExecutionError):
     def __init__(self, message, line_index=None, column_index=None, line_content=None, offset=None):
         KumirExecutionError.__init__(self, message, line_index, column_index, line_content)
-        SyntaxError.__init__(self, message)
+		SyntaxError.__init__(self, message)
         self.msg = message
         self.lineno = line_index + 1 if line_index is not None else None
         self.offset = offset # offset - это позиция в строке (1-based) или None
         self.text = line_content
     # __str__ уже использует KumirExecutionError.__str__(self)
 
-    def __str__(self):
+	def __str__(self):
 		# Используем __str__ от KumirExecutionError для форматирования
-        return KumirExecutionError.__str__(self)
+		return KumirExecutionError.__str__(self)
 
 
 # Ошибка, связанная с командами или состоянием робота
@@ -86,6 +86,18 @@ class RobotError(KumirExecutionError):
 	def __init__(self, message, line_index=None, column_index=None, line_content=None):
 		super().__init__(message, line_index, column_index, line_content)
 
+
+class RobotMovementError(RobotError):
+    """Ошибка, связанная с движением робота."""
+    pass
+
+class RobotActionError(RobotError):
+    """Ошибка, связанная с действиями робота (например, закрасить, копать)."""
+    pass
+
+class RobotSensorError(RobotError):
+    """Ошибка, связанная с датчиками робота."""
+    pass
 
 # Ошибка для функциональности, которая еще не реализована
 class KumirNotImplementedError(KumirExecutionError):
@@ -115,19 +127,47 @@ class KumirIndexError(KumirExecutionError):
 class KumirInputError(KumirExecutionError):
     def __init__(self, message, line_index=None, column_index=None, line_content=None, original_type=None, input_value=None):
         super().__init__(message, line_index, column_index, line_content)
-        self.original_type = original_type
-        self.input_value = input_value
-        self.original_message = message
+		self.original_type = original_type
+		self.input_value = input_value
+		self.original_message = message 
 
 
 # Ошибка, связанная с неверным количеством или типом аргументов функции/процедуры
 class KumirArgumentError(KumirEvalError):
 	pass
 
+class KumirReturnError(KumirEvalError):
+    """Ошибка, связанная с оператором 'знач' (например, 'знач' вне функции)."""
+    pass
 
 # Можно добавить другие специфичные ошибки при необходимости
 
 class ProcedureExitCalled(KumirExecutionError):
 	pass
+
+# Исключения для управления потоком в циклах
+class LoopExitException(KumirExecutionError): # Наследуем от KumirExecutionError
+    def __init__(self, message="Выход из цикла (LoopExitException)", line_index=None, column_index=None, line_content=None):
+        super().__init__(message, line_index, column_index, line_content)
+
+class LoopBreakException(KumirExecutionError): # Наследуем от KumirExecutionError
+    """Исключение для команды ВЫХОД из цикла (аналог LoopExitException, используется в try-except)."""
+    def __init__(self, message="Выход из цикла (LoopBreakException)", line_index=None, column_index=None, line_content=None):
+        super().__init__(message, line_index, column_index, line_content)
+
+class LoopContinueException(KumirExecutionError): # Наследуем от KumirExecutionError
+    """Исключение для команды ПРОДОЛЖИТЬ в цикле (если будет реализована)."""
+    def __init__(self, message="Продолжение цикла (LoopContinueException)", line_index=None, column_index=None, line_content=None):
+        super().__init__(message, line_index, column_index, line_content)
+
+class StopExecutionException(KumirExecutionError):
+    """Исключение для оператора СТОП."""
+    def __init__(self, message="Выполнение программы остановлено оператором СТОП.", line_index=None, column_index=None, line_content=None):
+        super().__init__(message, line_index, column_index, line_content)
+
+class AssertionError_(KumirExecutionError): # Используем AssertionError_ чтобы не конфликтовать со встроенным AssertionError
+    """Исключение для оператора УТВЕРЖДЕНИЕ."""
+    def __init__(self, message="Утверждение не выполнено.", line_index=None, column_index=None, line_content=None):
+        super().__init__(message, line_index, column_index, line_content)
 
 # FILE END: kumir_exceptions.py
