@@ -17,7 +17,7 @@ class KumirExecutionError(Exception):
 	def __init__(self, message, line_index=None, column_index=None, line_content=None): # Добавлен column_index
 		super().__init__(message)
 		self.line_index = line_index
-		self.column_index = column_index # Добавлено
+		self.column_index = column_index # Добtавлено
 		self.line_content = line_content
 
 	def __str__(self):

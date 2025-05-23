@@ -94,4 +94,50 @@
         *   Восстановлен и проверен метод `visitStatementSequence`.
         *   Добавлена заглушка для `visitRobotCommand`.
         *   Вызов `self.evaluator.visit()` в `visitStatement` для `procedureCallStatement` заменен на `self.evaluator.visitExpression()`.
-    *   **Примечание:** Некоторые ошибки линтера (отступы, доступ к атрибутам `StatementContext`) в `interpreter.py` остаются. 
+    *   **Примечание:** Некоторые ошибки линтера (отступы, доступ к атрибутам `StatementContext`) в `interpreter.py` остаются.
+
+## 2024-08-21 (Продолжение рефакторинга)
+
+*   **Шаг 9: Выделение `DeclarationVisitorMixin` и исправление ошибок типизации**
+    *   Создан `interpreter_components/declaration_visitors.py` с классом `DeclarationVisitorMixin`.
+    *   **Цель:** Перенести логику обработки объявлений переменных, процедур и функций из `KumirInterpreterVisitor` в этот миксин.
+    *   **Проблема `TypeError` (циклическая зависимость типов):**
+        *   Изначально методы в `DeclarationVisitorMixin` имели тип `self: 'KumirInterpreterVisitor'`, что приводило к `TypeError` из-за того, что `KumirInterpreterVisitor` должен был бы наследоваться от миксина, который ссылается на него.
+        *   **Решение:**
+            *   Тип `self` в методах `DeclarationVisitorMixin` изменен на неявный (т.е. `DeclarationVisitorMixin`).
+            *   В начале каждого метода миксина, которому нужен доступ к членам основного класса `KumirInterpreterVisitor`, добавлена строка `kiv_self = cast('KumirInterpreterVisitor', self)`.
+            *   Добавлен импорт `from typing import cast`.
+    *   **Проблема `AttributeError` и некорректные имена контекстов ANTLR:**
+        *   После решения `TypeError`, возникли `AttributeError`, так как некоторые имена контекстов ANTLR (например, `Var_declare_statementContext`) были указаны неверно в type hints методов.
+        *   **Решение:**
+            *   Проанализирован файл грамматики `KumirParser.g4` для определения корректных имен правил и соответствующих им контекстных классов.
+            *   Некорректные имена контекстов (например, `KumirParser.Var_declare_statementContext`, `KumirParser.TypeContext`) заменены на правильные (например, `KumirParser.VariableDeclarationContext`, `KumirParser.TypeSpecifierContext`, `KumirParser.AlgorithmDefinitionContext`).
+    *   **Коррекция импортов:**
+        *   Добавлены недостающие импорты: `from ..kumir_exceptions import DeclarationError, AssignmentError`.
+        *   Исправлен путь импорта `get_type_info_from_specifier`: `from .type_utils import get_type_info_from_specifier` (вместо `..type_utils`).
+    *   **Консолидация методов посетителя:**
+        *   Удалены избыточные/специфичные методы посетителя объявлений (например, `visitVar_declare_assign_statement`, `visitProc_declare_statement`, `visitFunc_declare_statement`).
+        *   Логика обработки объявлений переменных консолидирована в `visitVariableDeclaration(self, ctx: KumirParser.VariableDeclarationContext)`.
+        *   Логика обработки объявлений процедур и функций консолидирована в `visitAlgorithmDefinition(self, ctx: KumirParser.AlgorithmDefinitionContext)`.
+    *   **Интеграция с `KumirInterpreterVisitor`:**
+        *   `KumirInterpreterVisitor` теперь должен наследоваться от `DeclarationVisitorMixin`.
+        *   Соответствующие методы `visitVariableDeclaration` и `visitAlgorithmDefinition` в `KumirInterpreterVisitor` должны быть удалены или делегировать вызов методам миксина (предпочтительно удаление, если миксин полностью покрывает логику).
+        *   Метод `_get_type_info_from_specifier` также должен быть удален из `KumirInterpreterVisitor`, так как его аналог используется в `declaration_visitors.py` (импортируется из `type_utils`).
+    *   **Статус:** Логика объявлений вынесена, основные ошибки типизации и именования контекстов в `declaration_visitors.py` исправлены. Требуется обновление `interpreter.py` для интеграции миксина.
+
+## 2025-05-23
+
+**Контекст:** Продолжение рефакторинга `interpreter.py` с выделением `ExpressionEvaluator`. Пользователь выразил понимание сложности процесса и готов продолжать.
+
+**План на текущий момент:**
+1.  Завершить реализацию методов в `pyrobot/backend/kumir_interpreter/interpreter_components/expression_evaluator.py`.
+    *   Реализовать `visitUnaryExpression`.
+    *   Реализовать `visitPowerExpression`.
+    *   Заполнить операционную логику в `visitMultiplicativeExpression`.
+    *   Заполнить операционную логику в `visitAdditiveExpression`.
+2.  Интегрировать и тщательно протестировать `ExpressionEvaluator`.
+
+**Предпринятые действия (в этой сессии):**
+*   Обсуждение с пользователем сложности рефакторинга.
+*   Зафиксирован план по дальнейшей работе над `ExpressionEvaluator`.
+*   Предложение пользователю начать с реализации `visitUnaryExpression`.

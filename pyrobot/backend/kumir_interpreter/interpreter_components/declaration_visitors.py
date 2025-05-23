@@ -1,19 +1,14 @@
-# Visitor methods for declaration statements (variables, etc.) 
+# Visitor methods for declaration statements (variables, etc.)
 import sys # Для print отладки
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Union, cast
 
 from ..generated.KumirParser import KumirParser
-from ..kumir_exceptions import DeclarationError, KumirEvalError, AssignmentError, KumirNotImplementedError
-from ..kumir_datatypes import KumirTableVar
+from ..kumir_exceptions import (KumirEvalError, KumirNotImplementedError,
+                                DeclarationError, AssignmentError)
 from .type_utils import get_type_info_from_specifier
-# Импортируем константы типов из constants.py, если они нужны напрямую,
-# но TYPE_MAP и конкретные типы (INTEGER_TYPE и т.д.) лучше брать из visitor (self)
-# или передавать как аргументы, если это возможно, чтобы избежать циклов.
-# Пока что для простоты предположим, что они будут доступны через self (visitor).
-# from .constants import TYPE_MAP, INTEGER_TYPE, FLOAT_TYPE, BOOLEAN_TYPE, CHAR_TYPE, STRING_TYPE
 
 if TYPE_CHECKING:
-    from ..interpreter import KumirInterpreterVisitor # Для аннотации типов
+    from .main_visitor import KumirInterpreterVisitor
 
 
 class DeclarationVisitorMixin:
@@ -26,13 +21,14 @@ class DeclarationVisitorMixin:
     # self.INTEGER_TYPE, self.FLOAT_TYPE и т.д. (аналогично)
     # self.get_line_content_from_ctx (для KumirEvalError)
 
-    def visitVariableDeclaration(self: 'KumirInterpreterVisitor', ctx: KumirParser.VariableDeclarationContext):
+    def visitVariableDeclaration(self, ctx: KumirParser.VariableDeclarationContext):
+        kiv_self = cast('KumirInterpreterVisitor', self)
         print(f"[DEBUG][VisitVarDecl_Mixin] Обработка variableDeclaration: {ctx.getText()}", file=sys.stderr)
         type_ctx = ctx.typeSpecifier()
         
         # Используем новую функцию для получения информации о типе
         try:
-            base_kumir_type, is_table_type = get_type_info_from_specifier(self, type_ctx)
+            base_kumir_type, is_table_type = get_type_info_from_specifier(kiv_self, type_ctx)
         except DeclarationError as e:
             # Если get_type_info_from_specifier уже установил line_index, column_index, line_content,
             # то просто перевыбрасываем. Если нет, добавляем их.
@@ -41,7 +37,7 @@ class DeclarationVisitorMixin:
                     hasattr(e, 'line_content') and e.line_content is not None):
                 line = type_ctx.start.line if hasattr(type_ctx, 'start') else -1
                 col = type_ctx.start.column if hasattr(type_ctx, 'start') else -1
-                lc = self.get_line_content_from_ctx(type_ctx)
+                lc = kiv_self.get_line_content_from_ctx(type_ctx)
                 # Пересоздаем исключение, чтобы добавить информацию, если ее не было
                 raise DeclarationError(str(e.args[0] if e.args else "Ошибка определения типа"), 
                                      line_index=line-1 if line != -1 else None, 
@@ -52,16 +48,8 @@ class DeclarationVisitorMixin:
 
         print(f"[DEBUG][VisitVarDecl_Mixin] Тип определен через get_type_info_from_specifier: {base_kumir_type}, таблица: {is_table_type}", file=sys.stderr)
 
-        # Удаляем старую логику определения типа, так как она теперь в get_type_info_from_specifier
-        # base_kumir_type = None # <-- УДАЛИТЬ
-        # is_table_type = False # <-- УДАЛИТЬ
-        # TYPE_MAP = self.TYPE_MAP # <-- УДАЛИТЬ
-        # INTEGER_TYPE = self.INTEGER_TYPE # <-- УДАЛИТЬ
-        # ... и так далее для всех старых проверок type_ctx.basicType(), type_ctx.arrayType() ...
-        # Этот блок кода (строки ~20-68 в оригинальном файле) должен быть полностью заменен вызовом выше.
-
         if not base_kumir_type: # Эта проверка может быть избыточной, если get_type_info_from_specifier всегда возвращает тип или кидает исключение
-            lc_fallback = self.get_line_content_from_ctx(type_ctx)
+            lc_fallback = kiv_self.get_line_content_from_ctx(type_ctx)
             raise DeclarationError(f"Строка {type_ctx.start.line}: Не удалось определить базовый тип для: {type_ctx.getText()}",
                                    line_index=type_ctx.start.line -1, 
                                    column_index=type_ctx.start.column,
@@ -77,7 +65,7 @@ class DeclarationVisitorMixin:
                         f"Строка {var_decl_item_ctx.ID().getSymbol().line}: Для таблицы '{var_name}' ({base_kumir_type} таб) должны быть указаны границы в квадратных скобках.",
                         line_index=var_decl_item_ctx.ID().getSymbol().line -1, 
                         column_index=var_decl_item_ctx.ID().getSymbol().column,
-                        line_content=self.get_line_content_from_ctx(var_decl_item_ctx))
+                        line_content=kiv_self.get_line_content_from_ctx(var_decl_item_ctx))
 
                 dimension_bounds_list = []
                 array_bounds_nodes = var_decl_item_ctx.arrayBounds()
@@ -86,7 +74,7 @@ class DeclarationVisitorMixin:
                         f"Строка {var_decl_item_ctx.LBRACK().getSymbol().line}: Отсутствуют определения границ для таблицы '{var_name}'.",
                         line_index=var_decl_item_ctx.LBRACK().getSymbol().line -1, 
                         column_index=var_decl_item_ctx.LBRACK().getSymbol().column,
-                        line_content=self.get_line_content_from_ctx(var_decl_item_ctx))
+                        line_content=kiv_self.get_line_content_from_ctx(var_decl_item_ctx))
 
                 for i, bounds_ctx in enumerate(array_bounds_nodes):
                     print(f"[DEBUG][VisitVarDecl_Mixin] Обработка границ измерения {i + 1} для '{var_name}': {bounds_ctx.getText()}",
@@ -97,13 +85,13 @@ class DeclarationVisitorMixin:
                         expr1_text = bounds_ctx.expression(1).getText()
                         print(f"[DEBUG][VarDecl_N_Check_Bounds_Mixin] Table '{var_name}', Dim {i+1}, MinExpr: '{expr0_text}', MaxExpr: '{expr1_text}'", file=sys.stderr)
                         if expr1_text == 'N':
-                            n_info_check, _ = self.scope_manager.find_variable('N')
+                            n_info_check, _ = kiv_self.scope_manager.find_variable('N')
                             if n_info_check:
                                 print(f"[DEBUG][VarDecl_N_Check_Value_Mixin] ПЕРЕД вычислением MaxExpr ('N'), N = {n_info_check['value']}", file=sys.stderr)
                             else:
                                 print(f"[DEBUG][VarDecl_N_Check_Value_Mixin] ПЕРЕД вычислением MaxExpr ('N'), N не найдена!", file=sys.stderr)
                         if expr0_text == 'N':
-                            n_info_check, _ = self.scope_manager.find_variable('N')
+                            n_info_check, _ = kiv_self.scope_manager.find_variable('N')
                             if n_info_check:
                                 print(f"[DEBUG][VarDecl_N_Check_Value_Mixin] ПЕРЕД вычислением MinExpr ('N'), N = {n_info_check['value']}", file=sys.stderr)
                             else:
@@ -114,10 +102,10 @@ class DeclarationVisitorMixin:
                             f"Строка {bounds_ctx.start.line}: Некорректный формат границ для измерения {i + 1} таблицы '{var_name}'. Ожидается [нижняя:верхняя].",
                             line_index=bounds_ctx.start.line -1, 
                             column_index=bounds_ctx.start.column,
-                            line_content=self.get_line_content_from_ctx(bounds_ctx))
+                            line_content=kiv_self.get_line_content_from_ctx(bounds_ctx))
 
-                    min_idx_val = self.evaluator.visitExpression(bounds_ctx.expression(0))
-                    max_idx_val = self.evaluator.visitExpression(bounds_ctx.expression(1))
+                    min_idx_val = kiv_self.evaluator.visitExpression(bounds_ctx.expression(0))
+                    max_idx_val = kiv_self.evaluator.visitExpression(bounds_ctx.expression(1))
                     min_idx = min_idx_val
                     max_idx = max_idx_val
 
@@ -126,13 +114,13 @@ class DeclarationVisitorMixin:
                             f"Строка {bounds_ctx.expression(0).start.line}: Нижняя граница измерения {i + 1} для таблицы '{var_name}' должна быть целым числом, получено: {min_idx} (тип: {type(min_idx).__name__}).",
                             line_index=bounds_ctx.expression(0).start.line -1, 
                             column_index=bounds_ctx.expression(0).start.column,
-                            line_content=self.get_line_content_from_ctx(bounds_ctx.expression(0)))
+                            line_content=kiv_self.get_line_content_from_ctx(bounds_ctx.expression(0)))
                     if not isinstance(max_idx, int):
                         raise KumirEvalError(
                             f"Строка {bounds_ctx.expression(1).start.line}: Верхняя граница измерения {i + 1} для таблицы '{var_name}' должна быть целым числом, получено: {max_idx} (тип: {type(max_idx).__name__}).",
                             line_index=bounds_ctx.expression(1).start.line -1, 
                             column_index=bounds_ctx.expression(1).start.column,
-                            line_content=self.get_line_content_from_ctx(bounds_ctx.expression(1)))
+                            line_content=kiv_self.get_line_content_from_ctx(bounds_ctx.expression(1)))
 
                     dimension_bounds_list.append((min_idx, max_idx))
 
@@ -141,10 +129,10 @@ class DeclarationVisitorMixin:
                         f"Строка {var_decl_item_ctx.ID().getSymbol().line}: Не удалось определить границы для таблицы '{var_name}'.",
                         line_index=var_decl_item_ctx.ID().getSymbol().line -1, 
                         column_index=var_decl_item_ctx.ID().getSymbol().column,
-                        line_content=self.get_line_content_from_ctx(var_decl_item_ctx))
+                        line_content=kiv_self.get_line_content_from_ctx(var_decl_item_ctx))
 
                 try:
-                    self.scope_manager.declare_variable(var_name, base_kumir_type + 'таб', 
+                    kiv_self.scope_manager.declare_variable(var_name, base_kumir_type + 'таб', 
                                           is_table=True, dimensions=dimension_bounds_list, 
                                           ctx_declaration_item=var_decl_item_ctx)
                     print(
@@ -155,9 +143,8 @@ class DeclarationVisitorMixin:
                          e.line_index = var_decl_item_ctx.start.line -1 if hasattr(var_decl_item_ctx, 'start') else None
                     if not hasattr(e, 'column_index') or e.column_index is None:
                          e.column_index = var_decl_item_ctx.start.column if hasattr(var_decl_item_ctx, 'start') else None
-                    # Добавляем line_content если его нет
                     if not hasattr(e, 'line_content') or e.line_content is None:
-                        e.line_content = self.get_line_content_from_ctx(var_decl_item_ctx)
+                        e.line_content = kiv_self.get_line_content_from_ctx(var_decl_item_ctx)
                     raise
 
                 if var_decl_item_ctx.expression():
@@ -165,7 +152,7 @@ class DeclarationVisitorMixin:
                         f"Строка {var_decl_item_ctx.expression().start.line}: Инициализация таблиц при объявлении ('{var_name} = ...') пока не поддерживается.",
                         line_index=var_decl_item_ctx.expression().start.line -1, 
                         column_index=var_decl_item_ctx.expression().start.column,
-                        line_content=self.get_line_content_from_ctx(var_decl_item_ctx.expression()))
+                        line_content=kiv_self.get_line_content_from_ctx(var_decl_item_ctx.expression()))
 
             else:  # Обычная (скалярная) переменная
                 if var_decl_item_ctx.LBRACK():
@@ -173,17 +160,17 @@ class DeclarationVisitorMixin:
                         f"Строка {var_decl_item_ctx.LBRACK().getSymbol().line}: Скалярная переменная '{var_name}' (тип {base_kumir_type}) не может иметь указания границ массива.",
                         line_index=var_decl_item_ctx.LBRACK().getSymbol().line -1, 
                         column_index=var_decl_item_ctx.LBRACK().getSymbol().column,
-                        line_content=self.get_line_content_from_ctx(var_decl_item_ctx))
+                        line_content=kiv_self.get_line_content_from_ctx(var_decl_item_ctx))
                 
-                self.scope_manager.declare_variable(var_name, base_kumir_type, False, None, ctx_declaration_item=var_decl_item_ctx)
+                kiv_self.scope_manager.declare_variable(var_name, base_kumir_type, False, None, ctx_declaration_item=var_decl_item_ctx)
 
                 if var_decl_item_ctx.expression():
-                    value_to_assign = self.evaluator.visitExpression(var_decl_item_ctx.expression())
+                    value_to_assign = kiv_self.evaluator.visitExpression(var_decl_item_ctx.expression())
 
                     try:
                         # Используем метод self._validate_and_convert_value_for_assignment из основного класса Visitor
-                        validated_value = self._validate_and_convert_value_for_assignment(value_to_assign, base_kumir_type, var_name)
-                        self.scope_manager.update_variable(var_name, validated_value, ctx_for_error=var_decl_item_ctx.expression())
+                        validated_value = kiv_self._validate_and_convert_value_for_assignment(value_to_assign, base_kumir_type, var_name)
+                        kiv_self.scope_manager.update_variable(var_name, validated_value, ctx_for_error=var_decl_item_ctx.expression())
                         print(
                             f"[DEBUG][VisitVarDecl_Mixin] Переменной '{var_name}' присвоено значение при инициализации: {validated_value}",
                             file=sys.stderr)
@@ -195,14 +182,72 @@ class DeclarationVisitorMixin:
                         if isinstance(e, KumirEvalError):
                              raise KumirEvalError(
                                 f"Строка {line}, столбец {column}: Ошибка при инициализации переменной '{var_name}': {e.args[0]}",
-                                line_index=line-1, column_index=column, line_content=self.get_line_content_from_ctx(var_decl_item_ctx.expression())
+                                line_index=line-1, column_index=column, line_content=kiv_self.get_line_content_from_ctx(var_decl_item_ctx.expression())
                             ) from e
                         elif isinstance(e, (AssignmentError, DeclarationError)): # Эти ошибки не имеют line/col в конструкторе
                              # Оборачиваем в KumirEvalError
                              raise KumirEvalError(
                                 f"Строка {line}, столбец {column}: Ошибка при инициализации переменной '{var_name}': {e.args[0]}",
-                                line_index=line-1, column_index=column, line_content=self.get_line_content_from_ctx(var_decl_item_ctx.expression())
+                                line_index=line-1, column_index=column, line_content=kiv_self.get_line_content_from_ctx(var_decl_item_ctx.expression())
                              ) from e
                         else: # pragma: no cover
                              raise # Другие типы ошибок
-        return None 
+        return None # Explicitly return None as variable declarations are statements
+
+    # The following visit methods are for specific statement types if defined in grammar
+    # and if they are not already handled by a more general rule like 'statement'
+    # that then calls visitVariableDeclaration. If these are direct children of 'statement',
+    # they might not be needed if visitVariableDeclaration covers all var decls.
+    # However, if grammar has distinct rules like 'var_declare_assign_statement',
+    # then dedicated visitors are appropriate.
+
+    # Based on KumirParser.g4, 'variableDeclaration' seems to be the main rule for declarations
+    # within a statement context. Other specific declaration-like rules might be for global scope
+    # or specific algorithm parts. For now, focusing on visitVariableDeclaration.
+
+    # Placeholder for procedure/function declaration (handled by visitAlgorithmDefinition)
+    def visitAlgorithmDefinition(self, ctx: KumirParser.AlgorithmDefinitionContext):
+        kiv_self = cast('KumirInterpreterVisitor', self)
+        # Logic for registering procedures/functions using kiv_self.procedure_manager
+        # This will involve extracting name, parameters, body, etc.
+        # For example:
+        algo_header_ctx = ctx.algorithmHeader()
+        algo_name_tokens = algo_header_ctx.algorithmNameTokens().getText() # Simplified
+        is_func = algo_header_ctx.typeSpecifier() is not None
+        
+        print(f"[DEBUG][DeclVisitor] Visiting Algorithm Definition for: {algo_name_tokens}, Is function: {is_func}", file=sys.stderr)
+
+        # Detailed implementation would go here to extract params, return type, body context
+        # and then register with procedure_manager
+        # kiv_self.procedure_manager.register_procedure(...) or register_function(...)
+        
+        # After registration, if it's the main algorithm to be executed immediately (not just declared),
+        # the visitor might proceed to visit the body. Otherwise, it just registers.
+        # For now, we assume this visitor is part of a full interpretation pass.
+        
+        # If procedures/functions are only declared and then called, actual execution of their body
+        # happens when visitProcedureCallStatement or similar is invoked.
+        # However, the main algorithm block is typically executed after parsing.
+
+        # Let's assume for now that if we are visiting an AlgorithmDefinition,
+        # we should try to execute its body if it's the main 'алг' block.
+        # This needs careful handling of scopes and execution flow.
+
+        # For simplicity in this refactoring step, we will assume that the actual execution
+        # of the main algorithm or called procedures/functions is handled by other parts
+        # of the KumirInterpreterVisitor (e.g., a top-level interpret method or specific
+        # call visitors).
+        # This mixin method primarily ensures they are *declared* (registered).
+
+        # Example of how it might be structured if this visitor also handles execution:
+        # if kiv_self.is_main_algorithm(algo_name_tokens): # Some logic to identify the entry point
+        #     kiv_self.scope_manager.enter_scope(f"algo_{algo_name_tokens}")
+        #     # Process parameters if any
+        #     self.visit(ctx.algorithmBody()) # Execute body
+        #     # Handle return value for functions
+        #     kiv_self.scope_manager.exit_scope()
+
+        return None # Algorithm definition is a declaration, not an expression with a value
+
+    # Removed duplicated/placeholder visit methods for specific var/arr/proc/func declare statements
+    # as visitVariableDeclaration and visitAlgorithmDefinition should cover these based on the G4 structure.

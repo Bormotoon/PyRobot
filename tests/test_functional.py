@@ -4,7 +4,7 @@ import sys
 from io import StringIO
 from contextlib import redirect_stdout, redirect_stderr
 
-from pyrobot.backend.kumir_interpreter.interpreter import interpret_kumir
+from pyrobot.backend.kumir_interpreter.runtime_utils import interpret_kumir
 from pyrobot.backend.kumir_interpreter.kumir_exceptions import KumirSyntaxError, KumirEvalError
 
 # Определяем директорию с примерами КуМир относительно текущего файла
@@ -167,4 +167,4 @@ def test_kumir_program(program, input_data, expected_output):
 
     if expected_output is not None and "ОШИБКА ВЫПОЛНЕНИЯ" not in actual_output:
         assert actual_output == expected_output, \
-            f"Неверный вывод для {program}:\nОжидалось:\n{expected_output}\nПолучено:\n{actual_output}" 
+            f"Неверный вывод для {program}:\nОжидалось:\n{expected_output}\nПолучено:\n{actual_output}"

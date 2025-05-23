@@ -1,3 +1,4 @@
+from typing import Any
 from .kumir_exceptions import KumirEvalError
 
 class KumirTableVar:
@@ -65,8 +66,17 @@ class KumirTableVar:
     def set_value(self, indices_tuple, value, access_ctx):
         self._validate_indices(indices_tuple, access_ctx)
         
-        # TODO: Здесь должна быть проверка типа 'value' на совместимость с self.base_kumir_type_name
+        # TODO: Здесь должна быть проверка типа \'value\' на совместимость с self.base_kumir_type_name
         # KumirValueType.get_kumir_type(value) поможет определить тип Python-значения.
         # Затем сравнить с self.base_kumir_type_name.
 
-        self.data[indices_tuple] = value 
+        self.data[indices_tuple] = value
+
+class KumirReturnValue:
+    """Класс для инкапсуляции возвращаемого значения из функции Кумира."""
+    def __init__(self, value: Any, type: str):
+        self.value = value
+        self.type = type # Строковое представление типа Кумира, например, \'цел\', \'вещ\'
+
+    def __repr__(self):
+        return f"KumirReturnValue(value={self.value!r}, type=\'{self.type}\')"

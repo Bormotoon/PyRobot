@@ -114,17 +114,19 @@ class ScopeManager:
         # print(f"[DEBUG][ScopeManager] Объявлена {'таблица' if is_table else 'переменная'} '{name}' типа '{kumir_type}' со значением по умолчанию: {current_scope[name_lower]['value']}", file=sys.stderr)
 
 
-    def find_variable(self, var_name: str) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+    def find_variable(self, var_name: str, ctx: Optional[ParserRuleContext] = None) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]: # Добавлен ctx
         """Ищет переменную во всех областях видимости, начиная с текущей."""
         var_name_lower = var_name.lower()
         for scope in reversed(self.scopes):
             if var_name_lower in scope:
                 return scope[var_name_lower], scope  # Возвращаем информацию о переменной и саму область видимости
+        # Если переменная не найдена, ctx здесь не используется для генерации ошибки,
+        # это делается в вызывающем коде (например, в lookup_variable или update_variable)
         return None, None
 
     def update_variable(self, var_name: str, value: Any, ctx_for_error: Optional[ParserRuleContext] = None) -> None:
         """Обновляет значение существующей переменной."""
-        var_info, scope = self.find_variable(var_name)
+        var_info, scope = self.find_variable(var_name, ctx=ctx_for_error) # Передаем ctx_for_error дальше
         var_name_lower = var_name.lower()
 
         if not var_info or scope is None: # pragma: no cover
@@ -179,4 +181,17 @@ class ScopeManager:
                 scope[var_name_lower]['value'] = value
                 scope[var_name_lower]['initialized'] = True
         
-        # print(f"[DEBUG][ScopeManager] Обновлена переменная '{var_name}'. Новое значение: {scope[var_name_lower]['value']}", file=sys.stderr) 
+        # print(f\"[DEBUG][ScopeManager] Обновлена переменная '{var_name}'. Новое значение: {scope[var_name_lower]['value']}\", file=sys.stderr)
+
+    def lookup_variable(self, var_name: str, ctx_for_error: Optional[ParserRuleContext] = None) -> Optional[Dict[str, Any]]:
+        """Ищет переменную и возвращает её информацию или возбуждает KumirNameError."""
+        var_info, _ = self.find_variable(var_name)
+        if var_info is None:
+            line_idx = ctx_for_error.start.line - 1 if ctx_for_error and hasattr(ctx_for_error, 'start') else None
+            col_idx = ctx_for_error.start.column if ctx_for_error and hasattr(ctx_for_error, 'start') else None
+            l_content = self.get_line_content_from_ctx(ctx_for_error)
+            raise KumirNameError(
+                f"Переменная '{var_name}' не найдена.",
+                line_index=line_idx, column_index=col_idx, line_content=l_content
+            )
+        return var_info

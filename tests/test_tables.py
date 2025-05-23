@@ -1,5 +1,5 @@
 import pytest
-from pyrobot.backend.kumir_interpreter.interpreter import interpret_kumir
+from pyrobot.backend.kumir_interpreter.runtime_utils import interpret_kumir
 from pyrobot.backend.kumir_interpreter.kumir_exceptions import KumirEvalError, KumirSyntaxError
 
 def test_simple_1d_table_declaration_assignment_output():
@@ -84,4 +84,4 @@ def test_2d_table_operations():
 # - Передача таблиц в процедуры/функции (арг, рез, арг рез)
 # - Использование таблиц в выражениях
 # - Инициализация таблиц при объявлении (если будет поддержана)
-# - Пустые таблицы или таблицы с "перевернутыми" границами (например, [5:1]) 
+# - Пустые таблицы или таблицы с "перевернутыми" границами (например, [5:1])

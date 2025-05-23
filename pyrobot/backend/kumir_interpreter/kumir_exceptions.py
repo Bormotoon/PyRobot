@@ -137,37 +137,31 @@ class KumirArgumentError(KumirEvalError):
 	pass
 
 class KumirReturnError(KumirEvalError):
-    """Ошибка, связанная с оператором 'знач' (например, 'знач' вне функции)."""
+    """Ошибка, связанная с оператором \'знач\' (например, \'знач\' вне функции)."""
     pass
 
 # Можно добавить другие специфичные ошибки при необходимости
 
-class ProcedureExitCalled(KumirExecutionError):
+class ProcedureExitCalled(KumirExecutionError): # Уже существует, просто для контекста
 	pass
 
 # Исключения для управления потоком в циклах
-class LoopExitException(KumirExecutionError): # Наследуем от KumirExecutionError
+class LoopExitException(KumirExecutionError): # Уже существует, просто для контекста
     def __init__(self, message="Выход из цикла (LoopExitException)", line_index=None, column_index=None, line_content=None):
         super().__init__(message, line_index, column_index, line_content)
 
-class LoopBreakException(KumirExecutionError): # Наследуем от KumirExecutionError
-    """Исключение для команды ВЫХОД из цикла (аналог LoopExitException, используется в try-except)."""
-    def __init__(self, message="Выход из цикла (LoopBreakException)", line_index=None, column_index=None, line_content=None):
+# Добавляем недостающие исключения
+class KumirSemanticError(KumirExecutionError):
+    """Общая семантическая ошибка, не подпадающая под другие категории."""
+    def __init__(self, message, line_index=None, column_index=None, line_content=None):
         super().__init__(message, line_index, column_index, line_content)
 
-class LoopContinueException(KumirExecutionError): # Наследуем от KumirExecutionError
-    """Исключение для команды ПРОДОЛЖИТЬ в цикле (если будет реализована)."""
-    def __init__(self, message="Продолжение цикла (LoopContinueException)", line_index=None, column_index=None, line_content=None):
-        super().__init__(message, line_index, column_index, line_content)
-
-class StopExecutionException(KumirExecutionError):
-    """Исключение для оператора СТОП."""
-    def __init__(self, message="Выполнение программы остановлено оператором СТОП.", line_index=None, column_index=None, line_content=None):
-        super().__init__(message, line_index, column_index, line_content)
-
-class AssertionError_(KumirExecutionError): # Используем AssertionError_ чтобы не конфликтовать со встроенным AssertionError
-    """Исключение для оператора УТВЕРЖДЕНИЕ."""
-    def __init__(self, message="Утверждение не выполнено.", line_index=None, column_index=None, line_content=None):
-        super().__init__(message, line_index, column_index, line_content)
+class StopExecutionSignal(Exception): # Не наследуем от KumirExecutionError, это сигнал
+    """Сигнал для полной остановки выполнения программы (команда СТОП)."""
+    def __init__(self, message="Выполнение программы остановлено командой СТОП", line_index=None, column_index=None, line_content=None):
+        super().__init__(message)
+        self.line_index = line_index
+        self.column_index = column_index
+        self.line_content = line_content
 
 # FILE END: kumir_exceptions.py
