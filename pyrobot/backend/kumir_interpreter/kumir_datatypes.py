@@ -1,5 +1,23 @@
-from typing import Any
+from typing import Any, Dict, List, Optional, Union
 from .kumir_exceptions import KumirEvalError
+
+class KumirValue:
+    """
+    Represents a value in the Kumir language, encapsulating both the
+    Python-level value and its Kumir type.
+    """
+    def __init__(self, value: Any, kumir_type: str):
+        self.value: Any = value
+        self.kumir_type: str = kumir_type # "ЦЕЛ", "ВЕЩ", "ЛОГ", "СИМ", "ТАБ"
+
+    def __repr__(self) -> str:
+        return f"KumirValue(value={self.value!r}, kumir_type='{self.kumir_type}')"
+
+    def __str__(self) -> str:
+        # For practical purposes, often we just need the string representation of the value
+        if self.kumir_type == "ЛОГ":
+            return "да" if self.value else "нет"
+        return str(self.value)
 
 class KumirTableVar:
     def __init__(self, base_kumir_type_name, dimension_bounds_list, ctx):

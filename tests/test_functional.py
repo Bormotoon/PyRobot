@@ -69,6 +69,16 @@ TEST_CASES = [
     ('55-matr-declare.kum', None, ''),
     ('56-matr-rand.kum', None, None),
     ('57-matr-sum.kum', None, 'Матрица: \n2 3 4 5 \n3 4 5 6 \n4 5 6 7 \nСумма элементов 54\n'),
+
+    # Новые тесты для выход/возврат
+    ('cf_exit_for_loop.kum', None, '1 2 3 Конец\n'),
+    ('cf_exit_while_loop.kum', None, '1 2 3 Конец\n'),
+    ('cf_exit_nested_loop.kum', None, '(1,1) (1,2) Внешний_Цикл 1 (2,1) (2,2) Внешний_Цикл 2 (3,1) (3,2) Внешний_Цикл 3 Конец_Программы\n'),
+    ('cf_exit_from_alg.kum', None, 'Начало \n'),
+    ('cf_return_from_proc.kum', None, 'До вызова процедуры Внутри процедуры до возврата После вызова процедуры\n'),
+    ('cf_exit_from_proc.kum', None, 'До вызова процедуры Внутри процедуры до выхода После вызова процедуры\n'),
+    ('cf_return_from_func_no_val.kum', None, 'До вызова функции Внутри функции до возврата Функция вернула: 0 После вызова функции\n'),
+    ('cf_exit_from_func_no_val.kum', None, 'До вызова функции Внутри функции до выхода Функция вернула: 0 После вызова функции\n'),
 ]
 
 def run_kumir_program(program_path: str, input_data: str | None = None) -> str:

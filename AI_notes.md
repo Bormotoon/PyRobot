@@ -199,46 +199,120 @@
 **План по `ExpressionEvaluator` (после устранения `ImportError`):**
 1.  Выбрать нереализованный метод в `interpreter_components/expression_evaluator.py` (например, `visitUnaryExpression`).
 2.  Найти его реализацию в `kumir_interpreter/expression_evaluator.py`.
-3.  Перенести и адаптировать реализацию в новый компонент.
-4.  Повторять для других методов.
+
+---
+## 2025-05-24 (Продолжение): Отладка `statement_handlers.py` и `utils.py`
+
+**Контекст:** После серии исправлений, связанных с импортами и структурой компонентов, фокус сместился на ошибки времени выполнения, возникающие в `statement_handlers.py` и связанные с ним утилиты в `utils.py`.
+
+**Обнаруженные и исправленные ошибки:**
+
+1.  **`AttributeError: 'KumirTypeConverter' object has no attribute 'to_kumir_type'` и `AttributeError: 'KumirValue' object has no attribute 'name'` в `utils.py` (`to_python_number`)**
+    *   **Причина:** `KumirType` был заменен на строковые представления (`type_str`), но не все обращения были обновлены.
+    *   **Действия:**
+        *   В `KumirValue` поле `type` заменено на `type_str`.
+        *   В `KumirTypeConverter.to_python_number` убрано обращение к `.name` у `kumir_value.type`.
+        *   В `KumirValue.convert_string_to_type` параметр `kumir_type` заменен на `kumir_type_str`.
+        *   В `KumirValue.are_types_compatible` параметры `type1` и `type2` заменены на `type1_str` и `type2_str`.
+        *   В `KumirTypeConverter.to_python_bool` `kumir_value.type.name` заменено на `kumir_value.type`.
+        *   В `KumirTypeConverter.to_kumir_value` параметр `kumir_type` заменен на `kumir_type_str`.
+        *   В `TypeDeterminer.determine_type` возвращаемые значения `KumirType.*` заменены на строки ("ЛОГ", "ЦЕЛ", "ВЕЩ", "ЛИТ").
+    *   **Статус:** Исправлено в `utils.py`.
+
+2.  **`AttributeError: 'StatementHandler' object has no attribute 'visitExpression'` и другие ошибки, связанные с отсутствием методов `visit<RuleName>` в `StatementHandler`**
+    *   **Причина:** `StatementHandler` должен наследовать от `KumirParserVisitor` (сгенерированного ANTLR), а не от `KumirVisitor` (который, возможно, был старым или кастомным классом). `KumirParserVisitor` содержит необходимые методы `visit*`.
+    *   **Действия:**
+        *   Базовый класс `StatementHandler` изменен на `KumirParserVisitor`.
+        *   Импорт изменен с `.generated.KumirVisitor` на `from .generated.KumirParserVisitor import KumirParserVisitor`.
+    *   **Статус:** Исправлено в `statement_handlers.py`.
+
+3.  **Ошибки доступа к атрибутам контекста ANTLR в `statement_handlers.py` (например, `ctx.ID()`, `ctx.block()`, `ctx.KW_WHILE`, `ctx.KW_ELSE`)**
+    *   **Причина:** После смены базового класса на `KumirParserVisitor` и анализа `KumirParser.py`, стало ясно, что методы доступа к токенам и под-правилам изменились (например, `KW_WHILE()` стало `WHILE()`, `block()` стало `statementSequence()`).
+    *   **Действия:**
+        *   `visitIfStatement`: `ctx.block(0)` заменено на `ctx.statementSequence(0)`, `ctx.KW_ELSE()` на `ctx.ELSE()`.
+        *   `visitLoopStatement`: Переписан для использования `ctx.loopSpecifier()` (с проверками `WHILE()`, `FOR()`, `TIMES()`) и `ctx.endLoopCondition()`. Добавлено управление областью видимости для переменной цикла `FOR`.
+        *   `visitSwitchStatement`: Переписан для итерации по `ctx.caseBlock()` и получения выражения из `case_ctx.expression()`.
+        *   `visitIoStatement`: `ctx.KW_INPUT()` на `ctx.INPUT()`, `ctx.KW_OUTPUT()` на `ctx.OUTPUT()`. `arg.expr()` на `arg.expression(0)`.
+        *   `visitAssignmentStatement`: `ctx.IDENTIFIER()` (в `lvalue`) на `ctx.qualifiedIdentifier().ID()`.
+        *   `visitProcedureCallStatement`: `ctx.procedureIdentifier()` на `ctx.qualifiedIdentifier()`.
+        *   `visitExitStatement`: `ctx.KW_EXIT()` на `ctx.EXIT()`.
+        *   `visitPauseStatement`: `ctx.KW_PAUSE()` на `ctx.PAUSE()`.
+        *   Добавлены `visitStopStatement` и `visitAssertionStatement` на основе правил из `KumirParser.py`.
+        *   Вызовы `self.visit(child_ctx)` заменены на `self.interpreter.visit(child_ctx)` для корректной диспетчеризации через главный визитор.
+    *   **Статус:** В основном исправлено, но требует тщательной проверки всех методов.
+
+4.  **Проблемы с сигналами `BreakSignal`, `ContinueSignal`, `ReturnSignal`, `ExitSignal`**
+    *   **Причина:** Эти сигналы не были определены.
+    *   **Действия:** Добавлены классы `BreakSignal`, `ContinueSignal`, `ReturnSignal`, `ExitSignal` в `kumir_exceptions.py`.
+    *   **Статус:** Исправлено.
+
+5.  **Ошибки в `statement_handlers.py` при последней попытке редактирования (24 мая 2025):**
+    *   `AttributeError: Cannot access attribute "to_boolean" for class "KumirTypeConverter"`.
+        *   **Причина:** В `utils.py` метод называется `to_python_bool`.
+        *   **Действие:** В `statement_handlers.py` вызовы `type_converter.to_boolean(...)` заменены на `type_converter.to_python_bool(...)`.
+        *   **Статус:** Исправлено.
+    *   `CompileError: No parameter named "is_fatal"` в `self.error_handler.runtime_error`.
+        *   **Причина:** Метод `runtime_error` в `ErrorHandler` (в `utils.py`) не принимает параметр `is_fatal`.
+        *   **Действие:** Параметр `is_fatal` удален из вызова `self.error_handler.runtime_error(...)` в `visitStopStatement` в `statement_handlers.py`.
+        *   **Статус:** Исправлено.
+
+**Текущие задачи и план:**
+
+1.  **Продолжить реализацию и верификацию `statement_handlers.py`**:
+    *   Тщательно протестировать все типы циклов (`ПОКА`, `ДЛЯ`, `N РАЗ`, `НЦ...КЦ ПОКА`, простой `НЦ...КЦ`).
+    *   Тщательно протестировать `ВЫХОД`, `ВОЗВРАТ`, `СТОП`, `УТВ` (утверждение), `ПАУЗА`.
+    *   Разобраться с закомментированными `visitBreakStatement` и `visitContinueStatement`. Определить, есть ли в Кумире отдельные ключевые слова/правила парсера для них, или достаточно `BreakSignal` / `ContinueSignal`, возбуждаемых из логики циклов.
+    *   Убедиться, что `visitExitStatement` корректно различает выход из программы, возврат из функции/процедуры и прерывание цикла.
+
+2.  **Решить проблемы в `expression_evaluator.py`**:
+    *   Проверить и исправить `visitQualifiedIdentifier` и `visitLiteral`.
+
+3.  Обновить `AI_notes.md` с прогрессом.
+
+**Состояние кода (ключевые файлы):**
+*   `c:\Users\Bormotoon\VSCodeProjects\PyRobot\pyrobot\backend\kumir_interpreter\utils.py` (Прочитан, Изменен)
+*   `c:\Users\Bormotoon\VSCodeProjects\PyRobot\pyrobot\backend\kumir_interpreter\statement_handlers.py` (Множественные попытки изменения, последняя успешна после исправлений `to_boolean` и `is_fatal`)
+*   `c:\Users\Bormotoon\VSCodeProjects\PyRobot\pyrobot\backend\kumir_interpreter\expression_evaluator.py` (Просмотрен, ожидаются изменения)
+*   `c:\Users\Bormotoon\VSCodeProjects\PyRobot\pyrobot\backend\kumir_interpreter\kumir_exceptions.py` (Прочитан, Изменен)
+*   `c:\Users\Bormotoon\VSCodeProjects\PyRobot\pyrobot\backend\kumir_interpreter\generated\KumirParser.py` (Прочитан для справки)
+*   `c:\Users\Bormotoon\VSCodeProjects\PyRobot\pyrobot\backend\kumir_interpreter\generated\KumirParserVisitor.py` (Существование подтверждено)
+*   `c:\Users\Bormotoon\VSCodeProjects\PyRobot\pyrobot\backend\kumir_interpreter\kumir_datatypes.py` (Прочитан)
+*   `c:\Users\Bormotoon\VSCodeProjects\PyRobot\AI_notes.md` (Обновляется)
+
+**Последние изменения (24 мая 2025, вечер):**
+*   **В `statement_handlers.py`**:
+    *   Исправлены вызовы `type_converter.to_boolean` на `type_converter.to_python_bool`.
+    *   Удален параметр `is_fatal` из вызова `error_handler.runtime_error` в `visitStopStatement`.
+*   **В `AI_notes.md`**:
+    *   Обновление от 2025-05-24: Файл AI_notes.md успешно создан/обновлен в корне проекта.
 
 ---
 
-## План на 24.05.2025 (продолжение)
+## Рефакторинг ExpressionEvaluator (ExpressionEvaluator.py)
 
-1.  **Исправить несоответствия имен контекстов ANTLR (Приоритет!):**
-    *   Исправить тип `KumirParser.VariableDeclarationStatementContext` на `KumirParser.VariableDeclarationItemContext` в `pyrobot/backend/kumir_interpreter/statement_handlers.py`.
-    *   Систематически проверить и исправить все остальные аннотации типов контекстов ANTLR (например, `WhileLoopContext`, `ForLoopContext`, `AssignmentStatementContext`, `IoStatementContext`, `IfStatementContext`, `ExpressionContext`, `ProcedureCallStatementContext`, `FunctionCallStatementContext`, `ReturnStatementContext`, `BlockContext`, `SubAlgorithmContext`) в `statement_handlers.py` и других затронутых файлах компонентов. Для этого потребуется сравнить имена из `kumir_lang/KumirParser.g4` и сгенерированного `pyrobot/backend/kumir_interpreter/generated/KumirParser.py` с используемыми аннотациями.
-2.  **Решить `ImportError: cannot import name 'StopExecutionException'`:** Эта ошибка была отмечена ранее и может снова проявиться или быть замаскирована текущими ошибками контекста ANTLR.
-3.  **Устранить `ModuleNotFoundError` в `statement_handlers.py` для относительного импорта:** (например, `.kumir_variable`, `.kumir_scope`, `.utils`). Это требует расследования, возможно, связано с `PYTHONPATH` или контекстом выполнения тестов.
-4.  **Продолжить рефакторинг `ExpressionEvaluator`:** Систематически переносить и адаптировать логику из старого `expression_evaluator.py` в новый, расположенный в `interpreter_components`.
-5.  **Систематическая отладка функциональных тестов:** После решения критических ошибок импорта и атрибутов, запустить функциональные тесты (`python -m pytest -v c:/Users/Bormotoon/VSCodeProjects/PyRobot/tests/test_functional.py > test_log.txt`) и методично исправлять сбои, указанные в `test_log.txt`.
-6.  **Очистка кода:** Удалить все временные диагностические операторы `print` и неиспользуемые/временные импорты после того, как их цель будет достигнута.
+**Начало рефакторинга `expression_evaluator.py`:**
 
-**Выполненные шаги (24.05.2025):**
-*   Записан текущий план в `AI_notes.md`.
-*   Внесено исправление `VariableDeclarationStatementContext` -> `VariableDeclarationItemContext` в `statement_handlers.py`.
+*   **Цель:** Исправить доступ к атрибутам ANTLR, реализовать методы посещения для всех типов выражений, корректно обрабатывать доступ к таблицам и вызовы функций, интегрироваться с новыми компонентами интерпретатора (`ScopeManager`, `ProcedureManager`, `ErrorHandler`, `TypeConverter`, `OperationsHandler`).
+*   **Основные изменения (первая часть):**
+    *   Обновлены импорты.
+    *   Скорректирован метод `_get_error_info` для правильного извлечения информации об ошибках из различных типов узлов ANTLR (контексты, терминальные узлы, токены).
+    *   Методы `_perform_binary_operation` и `_perform_unary_operation` теперь делегируют выполнение операций гипотетическому `self.visitor.operations_handler` (его нужно будет создать или интегрировать существующую логику). Они также улучшают обработку ошибок, используя `_get_error_info` и `ErrorHandler`.
+    *   Реализован `visitLiteral` для обработки всех типов литералов Кумира (целые, вещественные, строковые, символьные, логические).
+    *   Начата реализация `visitPrimaryExpression` для обработки идентификаторов (переменных), ключевого слова `результат` и выражений в скобках. Доступ к переменным теперь осуществляется через `self.visitor.scope_manager.find_variable()`.
+    *   Начата реализация `visitPostfixExpression` для обработки доступа к элементам таблиц и вызовов функций/процедур.
+        *   **Доступ к таблицам:** Проверяется тип базового значения (должен быть `KumirTableVar`), вычисляются индексы, выполняется проверка типов индексов и границ.
+        *   **Вызовы функций/процедур:** Извлекается имя функции, вычисляются аргументы. Вызовы маршрутизируются через `self.visitor.procedure_manager.call_procedure` или `self.visitor.builtin_function_handler.call_builtin_function`.
+    *   Скорректирован `visitUnaryExpression` для правильной рекурсивной обработки цепочек унарных операций и вызова `_perform_unary_operation`.
+    *   Скорректированы `visitPowerExpression`, `visitMultiplicativeExpression`, `visitAdditiveExpression`, `visitRelationalExpression`, `visitEqualityExpression` для рекурсивного спуска по дереву выражения и вызова `_perform_binary_operation` с правильными операндами и оператором.
+    *   Реализованы `visitLogicalAndExpression` и `visitLogicalOrExpression` с поддержкой сокращённого вычисления (short-circuiting).
+    *   Добавлен `visitExpression` как общая точка входа для вычисления выражений.
+    *   Общий метод `visit(tree)` теперь вызывает `tree.accept(self)`.
+    *   Старые методы для работы с lvalue (`_get_lvalue_structure_for_arg`, `_get_lvalue_for_assignment`, `_get_lvalue_for_read`) пока закомментированы, так как их логика, вероятно, будет перенесена или упрощена.
 
----
-
-## План по VariableDeclaration:
-
-1.  **`statement_handlers.py`**:
-    *   Удалить метод `handle_variable_declaration`.
-    *   Изменить `visitVariableDeclarationStatement` для вызова `self.interpreter.visitVariableDeclaration(ctx)` с типом `ctx: KumirParser.VariableDeclarationContext`.
-    *   Проверить импорт `KumirParser`.
-2.  **`interpreter_components/main_visitor.py` (и `declaration_visitors.py`)**:
-    *   Проверить, что `visitVariableDeclaration` (из миксина) корректно вызывается при обходе дерева разбора для узла `variableDeclaration`.
-    *   Убедиться, что `scope_manager.declare_variable` вызывается с корректными аргументами из `DeclarationVisitorMixin.visitVariableDeclaration`.
-3.  **`interpreter_components/scope_manager.py`**:
-    *   Метод `declare_variable` используется вместо `create_variable`. Проверить его использование.
-
-## Текущие задачи (после VariableDeclaration):
-
-1.  **Проверить `ScopeManager.declare_variable`**: Убедиться, что он корректно обрабатывает все случаи (скаляры, таблицы, инициализация).
-2.  **Систематический обзор контекстов ANTLR**: Проверить все остальные обработчики операторов и выражений на корректное использование контекстов ANTLR.
-3.  **Решить `ImportError: cannot import name 'StopExecutionException'`**: Если ошибка снова появится.
-4.  **Решить `ModuleNotFoundError` для относительных импортов в `statement_handlers.py`**.
-5.  **Продолжить рефакторинг `ExpressionEvaluator`**.
-6.  **Систематическая отладка функциональных тестов**.
-7.  **Очистка кода**: Удалить временные `print` и неиспользуемые импорты.
+**Следующие шаги для `ExpressionEvaluator`:**
+1.  Разбить код на части и отправить для применения в файл.
+2.  Создать или доработать `OperationsHandler` для выполнения бинарных и унарных операций с учётом типов Кумира.
+3.  Завершить и тщательно протестировать `visitPostfixExpression`, особенно для сложных случаев (например, вызов функции, возвращающей таблицу, с последующим доступом по индексу).
+4.  Проверить корректность обработки всех операторов и их приоритетов.
+5.  Убедиться, что все пути кода возвращают `KumirValue` или вызывают исключение, обрабатываемое `ErrorHandler`.
+6.  Разобраться с обработкой lvalue: решить, где и как будет происходить определение и обновление значений переменных и элементов таблиц (например, в `StatementHandler` при обработке присваивания или ввода).
