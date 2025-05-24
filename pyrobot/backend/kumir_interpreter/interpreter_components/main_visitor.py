@@ -11,15 +11,15 @@ from ..generated.KumirParserVisitor import KumirParserVisitor # Базовый �
 from ..kumir_exceptions import KumirSemanticError, KumirRuntimeError, KumirSyntaxError, ProcedureExitCalled, LoopExitException, StopExecutionSignal, KumirNameError, KumirTypeError # Добавлены KumirNameError, KumirTypeError
 from ..kumir_datatypes import KumirTableVar, KumirReturnValue 
 
-# Импорты компонентов интерпретатора
-from .scope_manager import ScopeManager, get_default_value
+# Импорты компонентов интерпретатора из __init__.py текущего пакета
+from .scope_manager import ScopeManager
 from .procedure_manager import ProcedureManager
-from .expression_evaluator import ExpressionEvaluator 
-from .declaration_visitors import DeclarationVisitorMixin 
-from .statement_visitors import StatementVisitorMixin # Заглушка существует
-from .control_flow_visitors import ControlFlowVisitorMixin # Заглушка существует
-from .io_handler import IOHandler # Заглушка существует
-from .builtin_handlers import BuiltinFunctionHandler, BuiltinProcedureHandler # Предполагаем, что эти классы будут созданы или уже существуют
+from .expression_evaluator import ExpressionEvaluator
+from .declaration_visitors import DeclarationVisitorMixin
+from .statement_visitors import StatementVisitorMixin
+from .control_flow_visitors import ControlFlowVisitorMixin
+from .io_handler import IOHandler
+from .builtin_handlers import BuiltinFunctionHandler, BuiltinProcedureHandler
 from .constants import VOID_TYPE, DEFAULT_PRECISION 
 from .type_utils import get_type_info_from_specifier # <--- ИМПОРТ УЖЕ БЫЛ, ПРОВЕРЯЕМ
 
@@ -45,7 +45,7 @@ class DiagnosticErrorListener(ErrorListener):
         if self.error_stream_writer:
             # Проверяем, есть ли у error_stream_writer метод write
             if hasattr(self.error_stream_writer, 'write') and callable(self.error_stream_writer.write):
-                self.error_stream_writer.write(f"Ошибка в строке {line}, позиция {column}: {msg}\\n")
+                self.error_stream_writer.write(f"Ошибка в строке {line}, позиция {column}: {msg}\\\\n")
             else:
                 # Если нет, используем print или другой механизм
                 print(f"Ошибка в строке {line}, позиция {column}: {msg}", file=__import__('sys').stderr) 
@@ -78,11 +78,50 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementVisitorMixin, Co
         self.current_algorithm_is_function: bool = False
         self.current_algorithm_result_type: Optional[str] = None
         self.return_value: Optional[KumirReturnValue] = None 
-        self.stop_execution_flag = False 
+        self.stop_execution_flag = False
+        self.function_call_active: bool = False # ДОБАВЛЕНО
 
         if global_vars:
             for name, value_info in global_vars.items():
                 self.scope_manager.scopes[0][name.lower()] = {'value': value_info, 'type': 'глоб_неизв', 'is_table': False, 'dimensions': None, 'initialized': True}
+
+    def _validate_and_convert_value_for_assignment(self, value: Any, target_kumir_type: str, var_name: str, is_target_table: bool, element_type: Optional[str] = None) -> Any:
+        # TODO: Implement actual validation and conversion logic based on the original interpreter.
+        # This is a placeholder.
+        # Basic type checking and conversion can be added here.
+        # For now, just return the value as is.
+        # print(f"[DEBUG VALIDATE] var: {var_name}, value: {value} ({type(value)}), target_type: {target_kumir_type}, is_table: {is_target_table}, element_type: {element_type}")
+        
+        # Placeholder logic:
+        # if target_kumir_type == "цел":
+        #     if not isinstance(value, int):
+        #         try:
+        #             return int(value)
+        #         except ValueError:
+        #             raise KumirTypeError(f"Невозможно преобразовать значение '{value}' к типу ЦЕЛ для переменной '{var_name}'.")
+        # elif target_kumir_type == "вещ":
+        #     if not isinstance(value, (int, float)):
+        #         try:
+        #             return float(value)
+        #         except ValueError:
+        #             raise KumirTypeError(f"Невозможно преобразовать значение '{value}' к типу ВЕЩ для переменной '{var_name}'.")
+        # elif target_kumir_type == "лог":
+        #     if not isinstance(value, bool):
+        #         raise KumirTypeError(f"Значение для переменной '{var_name}' (ЛОГ) должно быть логическим, получено: {value}.")
+        # elif target_kumir_type == "сим":
+        #     if not isinstance(value, str) or len(value) != 1:
+        #         # Allow conversion from int 0-255 or other types if appropriate for Kumir
+        #         pass # For now, no strict check
+        # elif target_kumir_type == "лит":
+        #     if not isinstance(value, str):
+        #         try:
+        #             return str(value)
+        #         except:
+        #             raise KumirTypeError(f"Невозможно преобразовать значение '{value}' к типу ЛИТ для переменной '{var_name}'.")
+        
+        # If it's a table, the 'value' might be a KumirTableVar or a list of values.
+        # The 'element_type' would be relevant here if we were initializing/assigning individual elements.
+        return value
 
     def get_line_content_from_ctx(self, ctx: Optional[ParserRuleContext]) -> Optional[str]:
         if ctx and hasattr(ctx, 'start') and self.program_lines:
@@ -90,6 +129,18 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementVisitorMixin, Co
             if 0 <= line_num_0_indexed < len(self.program_lines):
                 return self.program_lines[line_num_0_indexed]
         return None
+
+    # ДОБАВЛЕНО: Методы для связи с IOHandler
+    def get_input_line(self, prompt: str) -> str:
+        if not self.io_handler: # pragma: no cover
+            raise KumirRuntimeError("IOHandler не инициализирован.")
+        return self.io_handler.get_input_line(prompt)
+
+    def write_output(self, text: str) -> None:
+        if not self.io_handler: # pragma: no cover
+            raise KumirRuntimeError("IOHandler не инициализирован.")
+        self.io_handler.write_output(text)
+    # КОНЕЦ ДОБАВЛЕННЫХ МЕТОДОВ
 
     # Основной метод для запуска интерпретации с корневого узла (program)
     def visitProgram(self, ctx: KumirParser.ProgramContext):

@@ -1,13 +1,5 @@
 import pytest
 import os
-import sys # Добавляем импорт sys
-
-# Убираем модификацию sys.path, так как пакет pyrobot установлен в режиме -e
-# project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-# sys.path.insert(0, project_root)
-
-# Убираем отладочную печать
-# print("DEBUG sys.path:", sys.path)
 
 from antlr4 import InputStream, CommonTokenStream
 from antlr4.error.ErrorListener import ErrorListener
@@ -89,4 +81,4 @@ def test_kumir_file_parsing(kumir_file_path):
     tree, errors = parse_kumir_code(code)
 
     assert not errors, f"Ошибки парсинга в файле {os.path.basename(kumir_file_path)}:\n" + "\n".join(errors)
-    assert tree is not None, f"Парсер вернул None для файла {os.path.basename(kumir_file_path)}" 
+    assert tree is not None, f"Парсер вернул None для файла {os.path.basename(kumir_file_path)}"

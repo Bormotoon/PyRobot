@@ -141,3 +141,65 @@
 *   Обсуждение с пользователем сложности рефакторинга.
 *   Зафиксирован план по дальнейшей работе над `ExpressionEvaluator`.
 *   Предложение пользователю начать с реализации `visitUnaryExpression`.
+
+# Протокол Рефакторинга Interpreter.py
+
+Этот файл отслеживает процесс разделения `interpreter.py` на более мелкие модули.
+
+## 2024-08-18
+
+### Начало рефакторинга (старая запись, сохранена для истории)
+*   Обсуждение первоначальной идеи выделения `ExpressionEvaluator`.
+*   Предложение пользователю начать с реализации `visitUnaryExpression` в новом модуле.
+
+## 2025-05-23 (Возобновление активного рефакторинга)
+
+**Контекст:** Продолжение рефакторинга `interpreter.py` с выделением `ExpressionEvaluator` и других компонентов. Пользователь выразил понимание сложности процесса и готов продолжать.
+
+**План на текущий момент (до начала активной отладки):**
+1.  Завершить реализацию методов в `pyrobot/backend/kumir_interpreter/interpreter_components/expression_evaluator.py`.
+    *   Реализовать `visitUnaryExpression`.
+    *   Реализовать `visitPowerExpression`.
+    *   Заполнить операционную логику в `visitMultiplicativeExpression`.
+    *   Заполнить операционную логику в `visitAdditiveExpression`.
+2.  Интегрировать и тщательно протестировать `ExpressionEvaluator`.
+
+**Предпринятые действия (в этой сессии):**
+*   Обсуждение с пользователем сложности рефакторинга.
+*   Зафиксирован план по дальнейшей работе над `ExpressionEvaluator`.
+
+## 2025-05-24: Интеграция компонентов и отладка
+
+**Контекст:** Начата интеграция выделенных компонентов (`ExpressionEvaluator`, `ScopeManager`, `ProcedureManager`, `StatementHandler`, `DeclarationVisitorMixin` и др.) с основным классом `KumirInterpreterVisitor` (который теперь находится в `pyrobot/backend/kumir_interpreter/interpreter_components/main_visitor.py`, а старый `interpreter.py` постепенно выводится из эксплуатации или служит источником логики). Запущены функциональные тесты для выявления проблем.
+
+**Основные этапы и проблемы:**
+
+1.  **Первоначальная настройка `ExpressionEvaluator`:**
+    *   В `interpreter_components/expression_evaluator.py` добавлены заглушки для большинства методов `visit<Type>Expression` и общий метод `visitExpression` для делегирования.
+    *   Реализован `visitLiteral` и `visitQualifiedIdentifier` (частично, без доступа к полям записи).
+
+2.  **Создание и настройка `KumirInterpreterVisitor` (в `main_visitor.py`):**
+    *   `KumirInterpreterVisitor` теперь наследуется от `KumirParserVisitor` и всех необходимых миксинов.
+    *   В `__init__` создаются экземпляры всех компонентов.
+    *   Методы `visit` для основных узлов программы делегируют работу соответствующим компонентам или миксинам.
+
+3.  **Устранение ошибок импорта и зависимостей:**
+    *   **`TabError`**: Исправлены проблемы с отступами в `kumir_exceptions.py`.
+    *   **Отсутствующие классы исключений**: Добавлен `KumirRuntimeError` в `kumir_exceptions.py`.
+    *   **Проблемы с f-string**: Исправлена синтаксическая ошибка в `expression_evaluator.py`.
+    *   **Отсутствующие компоненты/миксины**: Созданы файлы-заглушки для миксинов и компонентов. Скорректирован `interpreter_components/__init__.py` для их экспорта.
+    *   **Циклические импорты**: Разрешен цикл между `main_visitor.py` и `interpreter_components/__init__.py`.
+
+4.  **Устранение ошибок `AttributeError` (отсутствующие методы):**
+    *   **`_validate_and_convert_value_for_assignment`**: Добавлена заглушка в `KumirInterpreterVisitor`.
+    *   **`_get_type_info_from_specifier`**: Вызов в `DeclarationVisitorMixin` заменен на использование собственного метода.
+    *   **`_create_variable_in_scope`**: Вызовы в `DeclarationVisitorMixin` заменены на `self.visitor.scope_manager.declare_variable`.
+
+5.  **Текущая проблема (на 2025-05-24, вечер):**
+    *   Сохраняется `ImportError: cannot import name 'StopExecutionException' from 'pyrobot.backend.kumir_interpreter.kumir_exceptions'` при запуске тестов.
+    *   Предприняты попытки решения: очистка `__pycache__`, изолированный тест импорта, изменение способа импорта в `statement_handlers.py` на `from .. import kumir_exceptions as ke` с отладочной печатью. **Ожидается результат запуска тестов для дальнейшего анализа.**
+
+**Общее состояние рефакторинга:**
+*   Структура компонентов в `interpreter_components` в основном сформирована.
+*   `KumirInterpreterVisitor` в `main_visitor.py` выступает как координатор.
+*   Продолжается активная отладка интеграции через функциональные тесты.

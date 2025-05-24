@@ -209,6 +209,3 @@ def handle_position(visitor: 'KumirInterpreterVisitor', sub_string: str, main_st
         return find_result + 1
     else:
         return 0
-
-
-</rewritten_file> 

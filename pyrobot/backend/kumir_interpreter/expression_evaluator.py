@@ -143,13 +143,15 @@ class ExpressionEvaluator:
         checked_left_val = self._check_numeric(left_val, op_text, expression_node_ctx) 
         checked_right_val = self._check_numeric(right_val, op_text, expression_node_ctx)
         operation_func = ARITHMETIC_OPS.get(op_type)
+        # ... предыдущий код ...
         print(f"[DEBUG][PBO_OP_DETAILSEE] op_text='{op_text}', op_type_val={op_type}, operation_func_found={bool(operation_func)}", file=sys.stderr)
         if not operation_func:
-                 print(f"[DEBUG][PBO_OP_DETAILSEE] Keyword '{op_text}' was not found in ARITHMETIC_OPS. Raising error as expected.", file=sys.stderr)
+            print(f"[DEBUG][PBO_OP_DETAILSEE] Keyword '{op_text}' was not found in ARITHMETIC_OPS. Raising error as expected.", file=sys.stderr)
             # raise KumirEvalError(f"Строка ~{expression_node_ctx.start.line}: Неизвестный или неподдерживаемый арифметический оператор: {op_text} в выражении '{expression_node_ctx.getText()}'") # СТАРЫЙ КОД
             line_idx, col_idx, lc = self._get_error_info(op_token) # Ошибка в самом токене операции
             raise KumirEvalError(f"Неизвестный или неподдерживаемый арифметический оператор: {op_text}", # НОВЫЙ КОД
                                  line_index=line_idx, column_index=col_idx, line_content=lc)
+        # ... последующий код ...
         if op_type == KumirLexer.DIV:
             if checked_right_val == 0:
                 # raise KumirEvalError(f"Строка ~{expression_node_ctx.start.line}: Деление на ноль в выражении '{expression_node_ctx.getText()}'") # СТАРЫЙ КОД
@@ -289,7 +291,7 @@ class ExpressionEvaluator:
                 line_idx, col_idx, lc = self._get_error_info(ctx.RETURN_VALUE())
                 raise KumirEvalError("Попытка использования неинициализированного возвращаемого значения",
                                      line_index=line_idx, column_index=col_idx, line_content=lc)
-                    result = var_info['value'] 
+            result = var_info['value'] 
 
         elif ctx.LPAREN() and ctx.RPAREN() and ctx.expression():
             print(f"[DEBUG][visitPrimaryExpressionEE] Parenthesized expression found: {ctx.expression().getText()}", file=sys.stderr)
