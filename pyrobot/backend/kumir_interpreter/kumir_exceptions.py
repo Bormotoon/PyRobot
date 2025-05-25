@@ -82,6 +82,10 @@ class KumirArgumentError(KumirValueError):
     """Ошибка в аргументах функции или процедуры."""
     pass
 
+# Ошибка имени (например, использование необъявленной переменной)
+class KumirNameError(KumirExecutionError): # ДОБАВЛЕНО
+    def __init__(self, message, line_index=None, column_index=None, line_content=None):
+        super().__init__(message, line_index, column_index, line_content)
 
 # Ошибка индексации (например, выход за границы массива)
 class KumirIndexError(KumirExecutionError):
