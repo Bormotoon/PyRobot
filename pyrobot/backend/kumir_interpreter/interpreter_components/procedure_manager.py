@@ -1,11 +1,11 @@
 # Functions for managing user-defined procedures and functions (algorithms) 
-from typing import Dict, Any, List, Optional, TYPE_CHECKING, Union # <--- ДОБАВЛЕН Union
+from typing import Dict, Any, List, Optional, TYPE_CHECKING, Union, Tuple # <--- ДОБАВЛЕН Tuple, List, Optional (List, Optional уже были, Tuple добавлен)
 from antlr4 import ParserRuleContext # Убрана TerminalNode, она импортируется ниже, если нужна
 from antlr4.tree.Tree import TerminalNode # Импорт TerminalNode
 
 # Локальные импорты КуМир (относительные)
 from ..generated.KumirParser import KumirParser # Исправленный импорт KumirParser
-from ..kumir_exceptions import DeclarationError, KumirArgumentError, KumirNameError, KumirTypeError, ProcedureExitCalled, AssignmentError, KumirEvalError, LoopExitException
+from ..kumir_exceptions import DeclarationError, KumirArgumentError, KumirNameError, KumirTypeError, ExitSignal, AssignmentError, KumirEvalError, BreakSignal # Заменены ProcedureExitCalled на ExitSignal и LoopExitException на BreakSignal
 from ..kumir_datatypes import KumirTableVar, KumirFunction, KumirValue, KumirType # <--- ДОБАВЛЕН KumirType
 from .constants import VOID_TYPE, INTEGER_TYPE, FLOAT_TYPE, STRING_TYPE, BOOLEAN_TYPE 
 from .scope_manager import get_default_value # <--- Import get_default_value
@@ -18,6 +18,38 @@ class ProcedureManager:
     def __init__(self, visitor: 'KumirInterpreterVisitor'): # ИСПРАВЛЕНО: Убраны лишние \\'
         self.visitor = visitor
         self.procedures: Dict[str, Dict[str, Any]] = {} # {name_lower: {name, ctx, params, is_func, result_type}}
+        self._current_procedure_return_value: Optional[KumirValue] = None # Для хранения значения из "знач"
+
+    def set_return_value(self, value_to_assign: KumirValue) -> None:
+        """
+        Устанавливает возвращаемое значение для текущей выполняемой функции.
+        Используется оператором 'знач'.
+        """
+        # TODO: Проверить, что мы находимся внутри вызова функции, а не процедуры.
+        # TODO: Проверить тип value_to_assign с ожидаемым типом возврата функции.
+        self._current_procedure_return_value = value_to_assign
+
+    def call_procedure(self, proc_name: str, actual_args: List[Dict[str, Any]], 
+                       line_index: int, column_index: int) -> None:
+        """
+        Вызывает процедуру (не функцию) по имени.
+        actual_args - список словарей {'name': Optional[str], 'value': KumirValue, 'is_expression': bool, 'var_name_for_update': Optional[str]}
+        """
+        # TODO: Реализовать логику вызова процедуры, включая:
+        # 1. Поиск определения процедуры.
+        # 2. Проверку количества и типов аргументов.
+        # 3. Обработку параметров 'арг', 'рез', 'арг рез'.
+        # 4. Создание новой области видимости.
+        # 5. Объявление параметров в новой области.
+        # 6. Выполнение тела процедуры.
+        # 7. Обработку 'арг рез' и 'рез' параметров после выполнения.
+        # 8. Выход из области видимости.
+        # 9. Обработку ошибок (KumirNameError, KumirArgumentError, KumirTypeError).
+        
+        # Заглушка
+        print(f"[INFO][ProcedureManager] Заглушка: вызов процедуры {proc_name} с аргументами: {actual_args} на строке {line_index+1}, колонке {column_index+1}")
+        # pass
+        raise NotImplementedError(f"Вызов процедуры '{proc_name}' еще не реализован.")
 
     def is_function_defined(self, name: str) -> bool:
         """Проверяет, определена ли функция с таким именем."""
@@ -371,7 +403,7 @@ class ProcedureManager:
                 original_decl_line = self.procedures[name_lower]['header_ctx'].start.line # Используем header_ctx для более точной строки
                 new_decl_line = header_ctx.start.line
                 lc = self.visitor.get_line_content_from_ctx(header_ctx)
-                raise DeclarationError(f\"Строка {new_decl_line}: Алгоритм с именем \'{name}\' уже определен ранее на строке {original_decl_line}.\", line_index=new_decl_line-1, column_index=header_ctx.start.column, line_content=lc)
+                raise DeclarationError(f"Строка {new_decl_line}: Алгоритм с именем '{name}' уже определен ранее на строке {original_decl_line}.", line_index=new_decl_line-1, column_index=header_ctx.start.column, line_content=lc)
 
             params_info = self._extract_parameters(header_ctx)
             
@@ -516,9 +548,9 @@ class ProcedureManager:
 
         try:
             self.visitor.visit(body_ctx)
-        except ProcedureExitCalled: 
+        except ExitSignal: 
             pass 
-        except LoopExitException as lee: 
+        except BreakSignal as lee: 
             pass 
 
         if proc_def['is_function']:
@@ -627,7 +659,7 @@ class ProcedureManager:
                                     arg_expr_ctx_for_error = expressions[i]
                         
                         lc_arg_mode = self.visitor.get_line_content_from_ctx(arg_expr_ctx_for_error)
-                        err_line = arg_expr_ctx_for_error.start.line if arg_expr_ctx_for_error and hasattr(arg_expr_ctx_for_error,
+                        err_line = arg_expr_ctx_for_error.start.line if arg_expr_ctx_for_error and hasattr(arg_expr_ctx_for_error, 'start') else None
                         err_col = arg_expr_ctx_for_error.start.column if arg_expr_ctx_for_error and hasattr(arg_expr_ctx_for_error, 'start') else None
                         raise KumirArgumentError(
                             f"Строка {err_line or '??'}: Для параметра '{param_name_local_original_case}' (режим '{param_mode_for_evaluator}') процедуры '{proc_name}' передан аргумент неподдерживаемого типа для обратного копирования ({type(original_arg_spec).__name__}).",
@@ -641,23 +673,13 @@ class ProcedureManager:
         # print(f"[DEBUG][ProcManager] Exiting {proc_name}. Return value: {execution_result}", file=sys.stderr)
         return execution_result
 
-    def _get_type_info_from_specifier(self, type_spec_ctx: KumirParser.TypeSpecifierContext) -> tuple[str, bool]:
-        """Вспомогательный метод для извлечения информации о типе из TypeSpecifierContext."""
-        # Этот метод был бы дублированием type_utils.get_type_info_from_specifier
-        # Рекомендуется использовать существующий get_type_info_from_specifier из type_utils.py
-        # Если он здесь нужен для локального использования без доступа к self.visitor, его можно было бы сделать статическим
-        # или перенести сюда его логику. Но лучше использовать импортированный.
-        # Для примера, если бы мы его реализовывали здесь:
-        # if type_spec_ctx.KW_INT(): return INTEGER_TYPE, False
-        # if type_spec_ctx.KW_FLOAT(): return FLOAT_TYPE, False
-        # ... и т.д. для всех типов и таблиц
-        # Но так как он уже есть в type_utils, просто вызовем его.
+    def _get_type_info_from_specifier(self, type_spec_ctx: KumirParser.TypeSpecifierContext) -> Tuple[str, Optional[List[Tuple[Optional[int], Optional[int]]]]]:
+        if not self.visitor:
+            # Это критическая ошибка конфигурации, если visitor не установлен к моменту вызова
+            raise Exception("ProcedureManager.visitor не инициализирован, но требуется для _get_type_info_from_specifier")
         
-        # Убедимся, что visitor доступен, если get_type_info_from_specifier его требует
-        if not hasattr(self, 'visitor') or not self.visitor: # pragma: no cover
-            raise Exception "ProcedureManager.visitor не инициализирован, но требуется для _get_type_info_from_specifier"
-
-        return get_type_info_from_specifier(self.visitor, type_spec_ctx)
+        # Делегируем вызов методу из TypeUtilsMixin (или где он там будет) через visitor
+        return self.visitor.get_type_info_from_specifier(type_spec_ctx)
 
 
 # ... остальной код класса ...

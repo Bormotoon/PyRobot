@@ -1,5 +1,5 @@
 from typing import Any, Dict, List, Optional, Union
-from .kumir_exceptions import KumirEvalError
+from .kumir_exceptions import KumirEvalError, KumirTypeError 
 from enum import Enum
 
 class KumirType(Enum):
@@ -7,7 +7,9 @@ class KumirType(Enum):
     REAL = "ВЕЩ"
     BOOL = "ЛОГ"
     STR = "ЛИТ"
+    CHAR = "СИМ"  # Добавлен тип CHAR
     TABLE = "ТАБ"
+    COLOR = "ЦВЕТ" # Добавлен тип COLOR
     VOID = "VOID" # For procedures that don't return a value
     FUNC_ID = "FUNC_ID" # For identifying a function name before call
     UNKNOWN = "UNKNOWN"
@@ -28,6 +30,10 @@ class KumirType(Enum):
             return KumirType.BOOL
         if normalized_type_str == "ЛИТЕРА": # Кумир использует "лит" для типа и "сим" для символа в строке
             return KumirType.STR
+        if normalized_type_str == "СИМВОЛ": # Добавлена обработка для "СИМВОЛ"
+            return KumirType.CHAR
+        if normalized_type_str == "ЦВЕТ": # Добавлена обработка для "ЦВЕТ"
+            return KumirType.COLOR
         
         # Handle enum values (ЦЕЛ, ВЕЩ, etc.)
         for kumir_type in KumirType:
@@ -51,21 +57,37 @@ class KumirValue:
     Represents a value in the Kumir language, encapsulating both the
     Python-level value and its Kumir type.
     """
-    def __init__(self, value: Any, kumir_type: str):
+    def __init__(self, value: Any, kumir_type: str): # kumir_type должен быть строкой, например, KumirType.INT.value
         self.value: Any = value
-        self.kumir_type: str = kumir_type # "ЦЕЛ", "ВЕЩ", "ЛОГ", "СИМ", "ТАБ"
+        self.kumir_type: str = kumir_type 
 
     def __repr__(self) -> str:
         return f"KumirValue(value={self.value!r}, kumir_type='{self.kumir_type}')"
 
     def __str__(self) -> str:
         # For practical purposes, often we just need the string representation of the value
-        if self.kumir_type == "ЛОГ":
+        if self.kumir_type == KumirType.BOOL.value: # Сравнение с .value для строки "ЛОГ"
             return "да" if self.value else "нет"
         return str(self.value)
 
+    def to_kumir_string_representation(self) -> str:
+        """
+        Returns the string representation of the value as it would appear in Kumir.
+        e.g., True -> "да", False -> "нет"
+        """
+        if self.kumir_type == KumirType.BOOL.value:
+            return "да" if self.value else "нет"
+        elif self.kumir_type == KumirType.STR.value:
+            # В Кумире строки обычно выводятся без дополнительных кавычек, если это значение переменной.
+            # Литералы строк в коде имеют кавычки. Для вывода значения - просто содержимое.
+            return str(self.value)
+        # Для INT и REAL, стандартное преобразование в строку подходит.
+        # Кумир может иметь специфичное форматирование для ВЕЩ (например, запятая как разделитель),
+        # но пока что просто str(). Это может потребовать доработки для точного соответствия.
+        return str(self.value)
+
 class KumirTableVar:
-    def __init__(self, element_kumir_type: str, dimension_bounds_list: List[tuple[int, int]], ctx: Any): # ИЗМЕНЕНО: base_kumir_type_name -> element_kumir_type, добавлены type hints
+    def __init__(self, element_kumir_type: str, dimension_bounds_list: List[tuple[int, int]], ctx: Any):
         # element_kumir_type: 'ЦЕЛ', 'ВЕЩ', 'ЛИТ', 'ЛОГ' (нормализованный)
         # dimension_bounds_list: список кортежей, например, [(-5, 5), (1, 10)] для 2D
         # ctx: контекст объявления для информации об ошибках (строка, столбец)
@@ -116,24 +138,67 @@ class KumirTableVar:
                 )
         return True
 
-    def get_value(self, indices_tuple, access_ctx):
+    def get_value(self, indices_tuple, access_ctx) -> KumirValue: # Добавляем type hint для возвращаемого значения
         self._validate_indices(indices_tuple, access_ctx)
         
         if indices_tuple not in self.data:
+            # Элемент не инициализирован. В Кумире это ошибка при чтении.
+            # В некоторых реализациях может быть значение по умолчанию, но стандарт требует инициализации.
+            pos = (access_ctx.start.line, access_ctx.start.column) if access_ctx and hasattr(access_ctx, 'start') else (None, None)
             raise KumirEvalError(
                 f"Попытка чтения неинициализированного элемента таблицы по индексам {indices_tuple}.",
-                access_ctx.start.line, access_ctx.start.column
+                line_index=pos[0], column_index=pos[1]
             )
+        # Ожидаем, что в self.data уже хранится KumirValue благодаря set_value
         return self.data[indices_tuple]
 
-    def set_value(self, indices_tuple, value, access_ctx):
+    def set_value(self, indices_tuple, value: Any, access_ctx: Any):
         self._validate_indices(indices_tuple, access_ctx)
         
-        # TODO: Здесь должна быть проверка типа \\\'value\\\' на совместимость с self.element_kumir_type
-        # KumirValueType.get_kumir_type(value) поможет определить тип Python-значения.
-        # Затем сравнить с self.element_kumir_type.
+        final_value_to_store: KumirValue
+        pos_line = access_ctx.start.line if access_ctx and hasattr(access_ctx, 'start') else None
+        pos_col = access_ctx.start.column if access_ctx and hasattr(access_ctx, 'start') else None
 
-        self.data[indices_tuple] = value
+        if isinstance(value, KumirValue):
+            # Значение уже KumirValue
+            if value.kumir_type == self.element_kumir_type:
+                final_value_to_store = value
+            elif self.element_kumir_type == KumirType.REAL.value and value.kumir_type == KumirType.INT.value:
+                # Неявное преобразование ЦЕЛ -> ВЕЩ при присваивании в ячейку ВЕЩ
+                final_value_to_store = KumirValue(float(value.value), KumirType.REAL.value)
+            else:
+                raise KumirTypeError(
+                    f"Несовместимый тип для элемента таблицы. Ожидается '{self.element_kumir_type}', получен '{value.kumir_type}'.",
+                    line_index=pos_line, column_index=pos_col
+                )
+        else:
+            # Значение - это Python-значение. Проверяем и оборачиваем.
+            py_value = value
+            target_kumir_type_str = self.element_kumir_type
+
+            if target_kumir_type_str == KumirType.INT.value:
+                if not isinstance(py_value, int):
+                    raise KumirTypeError(f"Значение для ячейки таблицы типа '{target_kumir_type_str}' должно быть целым числом (int), получено {type(py_value).__name__}.", line_index=pos_line, column_index=pos_col)
+                final_value_to_store = KumirValue(py_value, target_kumir_type_str)
+            elif target_kumir_type_str == KumirType.REAL.value:
+                if not isinstance(py_value, (int, float)):
+                    raise KumirTypeError(f"Значение для ячейки таблицы типа '{target_kumir_type_str}' должно быть числом (int, float), получено {type(py_value).__name__}.", line_index=pos_line, column_index=pos_col)
+                # Если Python int присваивается в ВЕЩ ячейку, преобразуем в float
+                final_value_to_store = KumirValue(float(py_value), target_kumir_type_str)
+            elif target_kumir_type_str == KumirType.BOOL.value:
+                if not isinstance(py_value, bool):
+                    raise KumirTypeError(f"Значение для ячейки таблицы типа '{target_kumir_type_str}' должно быть логическим (bool), получено {type(py_value).__name__}.", line_index=pos_line, column_index=pos_col)
+                final_value_to_store = KumirValue(py_value, target_kumir_type_str)
+            elif target_kumir_type_str == KumirType.STR.value:
+                if not isinstance(py_value, str):
+                    raise KumirTypeError(f"Значение для ячейки таблицы типа '{target_kumir_type_str}' должно быть строкой (str), получено {type(py_value).__name__}.", line_index=pos_line, column_index=pos_col)
+                final_value_to_store = KumirValue(py_value, target_kumir_type_str)
+            else:
+                # Для неизвестных или не базовых типов element_kumir_type (маловероятно для типизированных таблиц)
+                # TODO: Рассмотреть, как обрабатывать более сложные типы, если они появятся для элементов таблиц
+                raise KumirTypeError(f"Неподдерживаемый тип элемента таблицы для присваивания Python-значения: '{target_kumir_type_str}'.", line_index=pos_line, column_index=pos_col)
+
+        self.data[indices_tuple] = final_value_to_store
 
 class KumirVariable:
     """

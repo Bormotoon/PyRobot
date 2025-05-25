@@ -350,7 +350,7 @@ class ExpressionEvaluator:
                         raise KumirEvalError(f"Внутренняя ошибка: переменная '{base_var_name}' типа 'лит', но ее значение не строка ({type(string_to_index).__name__}).", primary_expr_ctx.start.line, primary_expr_ctx.start.column)
 
                     if len(indices) == 1: # Доступ к символу
-                    kumir_idx = indices[0]
+                        kumir_idx = indices[0]
                         if not isinstance(kumir_idx, int):
                             err_line, err_col, err_content = self._get_error_info(index_list_ctx.expression(0) if index_list_ctx.expression() else index_list_ctx) # Более безопасный доступ к ctx для ошибки
                             raise KumirTypeError(
@@ -364,11 +364,11 @@ class ExpressionEvaluator:
                             if not (0 <= py_idx < len(string_to_index)):
                                 err_line, err_col, err_content = self._get_error_info(index_list_ctx.expression(0) if index_list_ctx.expression() else index_list_ctx) # Более безопасный доступ к ctx для ошибки
                                 raise KumirIndexError(
-                                    f"Индекс символа {kumir_idx} вне допустимого диапазона [1..{len(string_to_index)}] для строки '{base_var_name}' (длина {len(string_to_index)}).",
+                                    f"Индекс символа {kumir_idx} вне допустимого диапазона [1..{len(string_to_index)}] для строки \'{base_var_name}\' (длина {len(string_to_index)}).",
                                     line_index=err_line, column_index=err_col, line_content=err_content
                                 )
-                        current_eval_value = string_to_index[py_idx]
-                        print(f"[DEBUG][PostfixEE] Доступ к символу строки '{base_var_name}'[{kumir_idx}] -> '{current_eval_value}'", file=sys.stderr)
+                            current_eval_value = string_to_index[py_idx]
+                            print(f"[DEBUG][PostfixEE] Доступ к символу строки \'{base_var_name}\'[{kumir_idx}] -> \'{current_eval_value}\'", file=sys.stderr)
                         except IndexError: 
                             raise KumirIndexError(
                                 f"Попытка доступа к символу строки '{base_var_name}' по индексу {kumir_idx} (Python: {py_idx}), который выходит за границы (длина строки: {len(string_to_index)}).",
@@ -393,7 +393,7 @@ class ExpressionEvaluator:
                                 line_index=err_line, column_index=err_col, line_content=err_content
                             )
 
-                        # Логика среза и проверка KumirIndexError
+                        # Логика среза и проверка КумирIndexError
                         s_len = len(string_to_index) # Получаем длину строки здесь
                         if k_idx1 < 1 or k_idx2 < k_idx1: # В КуМире конечный индекс может быть меньше начального (пустая строка), но оба должны быть >=1
                                                         # Однако, для согласованности с копировать(S,I,N), где N>=0, и для упрощения,
@@ -409,7 +409,7 @@ class ExpressionEvaluator:
                         
                         if k_idx1 > s_len: # Начало среза за пределами строки
                             current_eval_value = "" # Пустая строка, как в КуМир
-                    else:
+                        else:
                             # Преобразуем КуМир 1-based индексы в Python 0-based
                             py_start_idx = k_idx1 - 1
                             # Рассчитываем, сколько символов реально можно взять
@@ -420,7 +420,7 @@ class ExpressionEvaluator:
                             else:
                                 current_eval_value = string_to_index[py_start_idx : py_start_idx + actual_num_chars_to_take]
                     
-                    else: # Не 1 и не 2 индекса
+                    else:
                         err_line, err_col, err_content = self._get_error_info(index_list_ctx)
                         raise KumirIndexError(
                             f"Для операций со строкой '{base_var_name}' ожидается 1 индекс (доступ к символу) или 2 индекса (срез). Получено {len(indices)}.",
@@ -483,7 +483,7 @@ class ExpressionEvaluator:
                     is_var_info_found = "найдена" if var_info_for_base else "не найдена"
                     var_type_if_found = var_info_for_base.get('type') if var_info_for_base else "N/A"
                     is_table_if_found = var_info_for_base.get('is_table') if var_info_for_base else "N/A"
-                    print(f"[DEBUG][PostfixEE] Не удалось обработать индексацию: base_var_name='{base_var_name}', var_info_for_base {is_var_info_found} (type='{var_type_if_found}', is_table='{is_table_if_found}'), current_eval_value (от primary)='{repr(current_eval_value)}' (type='{type_of_val}')", file=sys.stderr)
+                    print(f"[DEBUG][PostfixEE] Не удалось обработать индексацию: base_var_name='{base_var_name}', var_info_for_base {is_var_info_found} (type='{var_type_if_found}', is_table='{is_table_ifound}'), current_eval_value (от primary)='{repr(current_eval_value)}' (type='{type_of_val}')", file=sys.stderr)
                     raise KumirEvalError(f"Строка {primary_expr_ctx.start.line}: Попытка доступа по индексу к выражению ('{base_var_name}'), которое не является ни строкой (для чтения символа), ни таблицей (тип значения от primary: {type_of_val}).", primary_expr_ctx.start.line, primary_expr_ctx.start.column)
 
             elif isinstance(first_op_token_node, TerminalNode) and first_op_token_node.getSymbol().type == KumirLexer.LPAREN:
@@ -799,7 +799,7 @@ class ExpressionEvaluator:
             if op_token.type in ARITHMETIC_OPS: # Только для +, -, *, /, ^. div/mod как функции тут не будут.
                 result = self._perform_binary_operation(result, right_operand, op_token, ctx)
             else:
-                # Этот блок не должен достигаться для Ключевых слов DIV/MOD, так как они обрабатываются как функции через Postfix.
+                # Этот блок не должен достигать для Ключевых слов DIV/MOD, так как они обрабатываются как функции через Postfix.
                 # Если грамматика допускает другие операторы здесь, их нужно обработать или выдать ошибку.
                 print(f"[WARN][visitMultiplicativeExpressionEE] Operator '{op_text}' (type {op_token.type}) not in ARITHMETIC_OPS and not handled as function. Behavior undefined.", file=sys.stderr)
                 # Пока что будем считать это ошибкой, если это не стандартный арифметический оператор
@@ -810,7 +810,7 @@ class ExpressionEvaluator:
         print(f"[Exit] visitMultiplicativeExpressionEE for '{ctx.getText()}' -> returns {result} (type: {type(result)})", file=sys.stderr)
         return result
 
-    def visitAdditiveExpression(self, ctx): # KumirParser.AdditiveExpressionContext
+    def visitAdditiveExpression(self, ctx: KumirParser.AdditiveExpressionContext): # KumirParser.AdditiveExpressionContext
         # visitor = self.visitor
         print(f"[DEBUG][visitAdditiveExpressionEE] Called for ctx: {ctx.getText()}", file=sys.stderr)
         result = self.visitMultiplicativeExpression(ctx.multiplicativeExpression(0)) # self.visitMultiplicativeExpression
@@ -869,7 +869,7 @@ class ExpressionEvaluator:
         print(f"[Exit] visitAdditiveExpressionEE for '{ctx.getText()}' -> returns {result} (type: {type(result)})", file=sys.stderr)
         return result
 
-    def visitRelationalExpression(self, ctx): # KumirParser.RelationalExpressionContext
+    def visitRelationalExpression(self, ctx: KumirParser.RelationalExpressionContext):
         # visitor = self.visitor
         print(f"[DEBUG][visitRelationalExpressionEE] Called for ctx: {ctx.getText()}", file=sys.stderr)
         result = self.visitAdditiveExpression(ctx.additiveExpression(0)) # self.visitAdditiveExpression
@@ -897,7 +897,7 @@ class ExpressionEvaluator:
         print(f"[DEBUG][visitRelationalExpressionEE] Returning: {result} (type: {type(result)})", file=sys.stderr)
         return result
 
-    def visitEqualityExpression(self, ctx): # KumirParser.EqualityExpressionContext
+    def visitEqualityExpression(self, ctx: KumirParser.EqualityExpressionContext):
         # visitor = self.visitor
         print(f"[DEBUG][visitEqualityExpressionEE] Called for ctx: {ctx.getText()}", file=sys.stderr)
         result = self.visitRelationalExpression(ctx.relationalExpression(0)) # self.visitRelationalExpression
@@ -923,7 +923,7 @@ class ExpressionEvaluator:
         print(f"[DEBUG][visitEqualityExpressionEE] Returning: {result} (type: {type(result)})", file=sys.stderr)
         return result
 
-    def visitLogicalAndExpression(self, ctx): # KumirParser.LogicalAndExpressionContext
+    def visitLogicalAndExpression(self, ctx: KumirParser.LogicalAndExpressionContext):
         # visitor = self.visitor
         print(f"[DEBUG][visitLogicalAndExpressionEE] Called for ctx: {ctx.getText()}", file=sys.stderr)
         result = self.visitEqualityExpression(ctx.equalityExpression(0)) # self.visitEqualityExpression
@@ -969,7 +969,7 @@ class ExpressionEvaluator:
         print(f"[DEBUG][visitLogicalAndExpressionEE] Returning: {result} (type: {type(result)})", file=sys.stderr)
         return result
 
-    def visitLogicalOrExpression(self, ctx): # KumirParser.LogicalOrExpressionContext
+    def visitLogicalOrExpression(self, ctx: KumirParser.LogicalOrExpressionContext): # KumirParser.LogicalOrExpressionContext
         # visitor = self.visitor
         print(f"[DEBUG][visitLogicalOrExpressionEE] Called for ctx: {ctx.getText()}", file=sys.stderr)
         result = self.visitLogicalAndExpression(ctx.logicalAndExpression(0)) # self.visitLogicalAndExpression
@@ -1024,7 +1024,10 @@ class ExpressionEvaluator:
         # Спуск по дереву выражения до UnaryExpressionContext
         # Этот путь должен соответствовать грамматике и порядку разбора в visitXExpression методах
         if hasattr(current_ctx, 'logicalOrExpression') and current_ctx.logicalOrExpression():
-            current_ctx = current_ctx.logicalOrExpression()
+
+
+
+            current_ctx = current_ctx
             if hasattr(current_ctx, 'logicalAndExpression') and current_ctx.logicalAndExpression() and len(current_ctx.logicalAndExpression()) > 0:
                 current_ctx = current_ctx.logicalAndExpression(0)
                 if hasattr(current_ctx, 'equalityExpression') and current_ctx.equalityExpression() and len(current_ctx.equalityExpression()) > 0:

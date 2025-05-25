@@ -237,7 +237,7 @@
         *   `visitProcedureCallStatement`: `ctx.procedureIdentifier()` на `ctx.qualifiedIdentifier()`.
         *   `visitExitStatement`: `ctx.KW_EXIT()` на `ctx.EXIT()`.
         *   `visitPauseStatement`: `ctx.KW_PAUSE()` на `ctx.PAUSE()`.
-        *   Добавлены `visitStopStatement` и `visitAssertionStatement` на основе правил из `KumirParser.py`.
+        *   Добавлены `visitStopStatement` и `visitAssertionStatement` на основе правил из `KumirP\arser.py`.
         *   Вызовы `self.visit(child_ctx)` заменены на `self.interpreter.visit(child_ctx)` для корректной диспетчеризации через главный визитор.
     *   **Статус:** В основном исправлено, но требует тщательной проверки всех методов.
 
@@ -357,3 +357,190 @@
 **Контекст:** Продолжается работа над корректной обработкой вызовов функций и возвращаемых значений. Основное внимание уделяется `ProcedureManager` и связанным с ним типам данных в `KumirDatatypes`.
 
 **Выполненные действия:**
+
+1.  **Исправлена ошибка синтаксиса f-строки в `procedure_manager.py`:**
+    *   **Место:** Блок `except Exception as e:` в методе `call_function`.
+    *   **Проблема:** Неправильное экранирование внутри f-строки (`f\"...\"`).
+    *   **Действие:** Исправлено на стандартный синтаксис `f"..."`.
+    *   **Статус:** Исправлено.
+
+2.  **Повторно применены изменения в `call_function` в `procedure_manager.py`:**
+    *   **Логика:**
+        *   Использование `KumirType.from_string(return_type_str)` для получения enum-значения ожидаемого типа возврата.
+        *   Проверка на `KumirType.UNKNOWN` для объявленного типа возврата.
+        *   Использование `kumir_func_obj.type_converter.is_python_type_compatible_with_kumir_type()` для проверки совместимости фактического возвращенного Python-типа с ожидаемым КуМир-типом.
+        *   Улучшены сообщения об ошибках `KumirTypeError` с использованием `kumir_func_obj.error_handler.format_value_for_error()` или `kumir_func_obj.type_converter.to_string_for_error()` для отображения фактического значения.
+    *   **Статус:** Успешно применено после исправления синтаксической ошибки.
+
+3.  **Проверены и исправлены f-строки в `procedure_manager.py`:**
+    *   **Метод `get_function_definition`**: Убраны лишние обратные слеши перед одинарными кавычями (`\'` заменено на `'`).
+    *   **Метод `call_function`**: Убраны лишние обратные слеши. Исправлено экранирование для вложенных f-строк (хотя в данном случае оказалось некритичным из-за порядка вычисления).
+    *   **Метод `_collect_procedure_definitions`**: Убраны лишние обратные слеши.
+    *   **Статус:** Исправлено.
+
+**Текущее состояние файлов:**
+*   `c:\Users\Bormotoon\VSCodeProjects\PyRobot\pyrobot\backend\kumir_interpreter\interpreter_components\procedure_manager.py` (Прочитан, Изменен)
+*   `c:\Users\Bormotoon\VSCodeProjects\PyRobot\pyrobot\backend\kumir_interpreter\kumir_datatypes.py` (Прочитан, Изменен ранее)
+*   `c:\Users\Bormotoon\VSCodeProjects\PyRobot\AI_notes.md` (Обновлен)
+
+**Следующие шаги:**
+1.  Провести тщательное тестирование вызовов функций с различными типами возвращаемых значений и сценариями ошибок (неправильный тип возврата, возврат значения из процедуры, невозврат значения из функции и т.д.).
+2.  Продолжить работу над `ExpressionEvaluator`, особенно над `visitPostfixExpression` для корректной обработки вызовов функций в выражениях.
+
+---
+
+## План исправлений expression_evaluator.py (25.05.2025)
+
+1.  **Систематическое исправление ошибок в `expression_evaluator.py` после последней попытки рефакторинга:**
+    *   Исправить синтаксические ошибки Python (отступы, переносы строк).
+    *   Проверить и исправить доступ к атрибутам контекста ANTLR (например, `ctx.IDENTIFIER()`, `ctx.expression()`, `ctx.literal()`, `ctx.postfixPart()` и т.д.), сверяясь с `KumirParser.py`.
+    *   Убедиться, что возвращаемый тип `scope_manager.find_variable` обрабатывается корректно, и объекты `KumirValue` используются последовательно.
+    *   Убедиться, что все методы посетителя в `ExpressionEvaluator` корректно возвращают объекты `KumirValue` (а не `None` или другие типы), где это ожидается.
+    *   Решить проблемы с атрибутами `KumirValue` (например, `kumir_type`, `value`) и методами для операций с таблицами/массивами.
+    *   Удалить дублирующиеся определения методов.
+    *   Реализовать или правильно импоровать `get_kumir_type_name_from_py_value`.
+2.  **Запустить функциональный тест `2+2.kum`** и итеративно вносить исправления.
+3.  **Тщательно протестировать вызовы функций**, затрагивающие `procedure_manager.py` и `expression_evaluator.py`.
+4.  Усовершенствовать `visitPostfixExpression` в `expression_evaluator.py` для надежной обработки вызовов функций.
+
+---
+
+## 2024-07-20: Исправление статических ошибок в statement_handlers.py
+
+**Проблема:** После исправления импортов в `statement_handlers.py` (замена `StopSignal` на `StopExecutionSignal`, удаление `ArrayBounds`, `ArrayValue`, коррекция сравнений `KumirType` с `.value`) возникли статические ошибки анализатора кода.
+
+**Ошибки:**
+- `ScopeManager`:
+    - Отсутствует метод `declare_array`.
+    - Отсутствует метод `update_table_element`.
+    - Отсутствует метод `get_variable_info`.
+    - Методы `update_variable`, `declare_variable` не принимают параметры `line_index`, `column_index`.
+- `ProcedureManager`:
+    - Отсутствует метод `set_return_value`.
+    - Отсутствует метод `call_procedure`.
+- ANTLR контекст:
+    - `ExitStatementContext` не имеет атрибутов `LOOP_EXIT`, `PROCEDURE_EXIT`.
+    - `AssertionStatementContext` не имеет атрибута `stringLiteral`.
+
+**План:**
+1.  Проверить грамматику `KumirParser.g4` для `exitStatement` и `assertionStatement`, чтобы понять, как правильно определять тип выхода и получать строковый литерал.
+2.  Исправить доступ к атрибутам ANTLR в `statement_handlers.py` на основе грамматики.
+3.  Реализовать заглушки (stubs) для недостающих методов в `scope_manager.py` и `procedure_manager.py`.
+4.  Добавить параметры `line_index`, `column_index` в существующие методы `scope_manager.py`, где это необходимо.
+5.  Запустить тесты (`1-empty.kum`) для проверки.
+
+---
+## 2024-07-21: Реализация заглушек и подготовка к тесту
+
+**Контекст:** После анализа `statement_handlers.py` и проверки грамматики, было подтверждено, что доступ к `ctx.LOOP_EXIT()`, `ctx.PROCEDURE_EXIT()` (для `ExitStatementContext`) и `ctx.stringLiteral()` (для `AssertionStatementContext`) должен работать, если соответствующие элементы присутствуют в разбираемой конструкции согласно грамматике, использованной для генерации парсера.
+
+**План:**
+1.  **Реализовать заглушки в `ScopeManager` (`scope_manager.py`):**
+    *   Добавить метод `declare_array(self, var_name, kumir_type, dimensions, line_index, column_index)`.
+    *   Добавить метод `update_table_element(self, var_name, indices, value_to_assign, line_index, column_index)`.
+    *   Добавить метод `get_variable_info(self, var_name)`.
+    *   Добавить параметры `line_index`, `column_index` в существующие методы `update_variable` и `declare_variable`.
+2.  **Реализовать заглушки в `ProcedureManager` (`procedure_manager.py`):**
+    *   Добавить метод `set_return_value(self, value_to_assign)`.
+    *   Добавить метод `call_procedure(self, proc_name, actual_args, line_index, column_index)`.
+3.  **Запустить тест `1-empty.kum`:** `python -m pytest -v tests/test_functional.py -k "1-empty.kum" > test_log.txt`.
+4.  **Проанализировать `test_log.txt`** на предмет новых ошибок или успешного выполнения.
+
+**Изменения выполнены:**
+*   AI_notes.md: Зафиксирован текущий план.
+
+## Этап 3: Исправление `scope_manager.py` и добавление заглушек в `procedure_manager.py`
+
+**Статус:** Выполнено.
+
+**Изменения:**
+- `scope_manager.py`:
+    - Исправлена синтаксическая ошибка в многострочном условии `if` в методе `update_variable` (касалось проверки размерностей таблиц).
+- `procedure_manager.py`:
+    - Добавлена заглушка метода `set_return_value(self, value_to_assign: KumirValue)`. Инициализирует `self._current_procedure_return_value`.
+    - Добавлена заглушка метода `call_procedure(self, proc_name: str, actual_args: List[Dict[str, Any]], line_index: int, column_index: int)`. Вызывает `NotImplementedError`.
+
+**Следующий шаг:**
+- Запустить тест `1-empty.kum`.
+- Проанализировать `test_log.txt`.
+
+---
+## Этап 4: Исправление `expression_evaluator.py` (вручную) и повторный тест
+
+**Статус:** Ожидание результатов теста.
+
+**Изменения:**
+- `expression_evaluator.py`:
+    - Вручную исправлена ошибка `SyntaxError: expected 'except' or 'finally' block` пользователем. Проблема была в некорректных отступах строк `current_eval_value = string_to_index[py_idx]` и `print(...)` внутри блока `try` (строки ~369-370).
+
+**Следующий шаг:**
+- Запустить тест `1-empty.kum`.
+- Проанализировать `test_log.txt`.
+
+---
+## Этап 5: Исправление `expression_evaluator.py` (вручную, комментарий) и повторный тест
+
+**Статус:** Ожидание результатов теста.
+
+**Изменения:**
+- `expression_evaluator.py`:
+    - Вручную исправлена ошибка `SyntaxError: invalid syntax` пользователем на строке 423. Проблема была в некорректном комментарии `# ═х 1 ш эх 2 шэфхъёр` после `else:`. Пользователь исправил комментарий.
+
+**Следующий шаг:**
+- Запустить тест `1-empty.kum`.
+- Проанализировать `test_log.txt`.
+
+---
+## Этап 6: Исправление `expression_evaluator.py` (вручную, отступ else) и повторный тест
+
+**Статус:** Ожидание результатов теста.
+
+**Изменения:**
+- `expression_evaluator.py`:
+    - Пользователем вручную исправлен отступ у блока `else` (или связанного с ним `if/elif`) внутри обработки строковых операций с двумя индексами, который мог вызывать `SyntaxError` на строке 423.
+
+**Следующий шаг:**
+- Запустить тест `1-empty.kum`.
+- Проанализировать `test_log.txt`.
+
+---
+## Этап 7: Исправление `ImportError` (DEFAULT_PRECISION) и повторный тест
+
+**Статус:** Ожидание результатов теста.
+
+**Изменения:**
+- `pyrobot/backend/kumir_interpreter/interpreter_components/constants.py`:
+    - Добавлена константа `DEFAULT_PRECISION = 10`.
+
+**Следующий шаг:**
+- Запустить тест `1-empty.kum`.
+- Проанализировать `test_log.txt`.
+
+---
+## Этап 8: Тестирование `1-primes.kum` (согласно `TEST_CASES`)
+
+**Статус:** Ожидание результатов теста.
+
+**План:**
+1. Запустить тест `1-primes.kum` с входными данными `'100\n'` и сравнить с ожидаемым выводом из `test_functional.py`.
+2. Проанализировать `test_log.txt`.
+
+**Изменения:**
+- (нет изменений в коде, только в плане)
+
+**Предыдущий успешный тест:** `1-empty.kum`
+
+---
+
+## Планы
+
+План изменений:
+1.  Исправить обработку оператора ВВОД/ВЫВОД в `statement_handlers.py` (метод `visitIoStatement`) для корректного использования контекстных методов ANTLR (например, `ioArgumentList()`, `outputItem()`, `variableReference()`).
+2.  Проверить и исправить использование контекстных методов во всех остальных `visit` методах в `statement_handlers.py`.
+3.  Добавить реализацию методов `to_python_bool` и `to_python_number` в класс `KumirTypeConverter` в файле `utils.py`.
+4.  Добавить импорт `Union` из `typing` в `utils.py`.
+
+Изменения выполнены 21.07.2024:
+- `utils.py`:
+    - Добавлен `Union` в импорты `typing`.
+    - Реализованы методы `to_python_bool` и `to_python_number` в классе `KumirTypeConverter`.

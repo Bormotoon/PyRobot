@@ -8,7 +8,7 @@ from typing import Any, List, Dict, Optional, Callable, Tuple, cast
 from ..generated.KumirLexer import KumirLexer
 from ..generated.KumirParser import KumirParser
 from ..generated.KumirParserVisitor import KumirParserVisitor # Базовый визитор ANTLR
-from ..kumir_exceptions import KumirSemanticError, KumirRuntimeError, KumirSyntaxError, ProcedureExitCalled, LoopExitException, StopExecutionSignal, KumirNameError, KumirTypeError # Добавлены KumirNameError, KumirTypeError
+from ..kumir_exceptions import KumirSemanticError, KumirRuntimeError, KumirSyntaxError, ExitSignal, BreakSignal, StopExecutionSignal, KumirNameError, KumirTypeError # Изменения: ProcedureExitCalled -> ExitSignal, LoopExitException -> BreakSignal
 from ..kumir_datatypes import KumirTableVar, KumirReturnValue 
 
 # Импорты компонентов интерпретатора из __init__.py текущего пакета
@@ -67,7 +67,8 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementVisitorMixin, Co
 
         self.scope_manager = ScopeManager(self)
         self.procedure_manager = ProcedureManager(self)
-        self.expression_evaluator = ExpressionEvaluator(self) 
+        # Исправленный вызов конструктора ExpressionEvaluator
+        self.expression_evaluator = ExpressionEvaluator(self.scope_manager, self.procedure_manager) 
         self.io_handler = IOHandler(self, input_stream, output_stream) # IOHandler теперь существует (как заглушка)
         self.builtin_function_handler = BuiltinFunctionHandler(self) # Предполагаем наличие
         self.builtin_procedure_handler = BuiltinProcedureHandler(self) # Предполагаем наличие
@@ -332,7 +333,7 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementVisitorMixin, Co
             else: # Процедура
                 return None # Процедуры ничего не возвращают (кроме как через параметры 'рез')
 
-        except ProcedureExitCalled: # Перехватываем ВЫХОД из процедуры/функции
+        except ExitSignal: # Перехватываем ВЫХОД из процедуры/функции
             # print(f"[DEBUG] ProcedureExitCalled caught in execute_algorithm_node for {self.current_algorithm_name}")
             if self.current_algorithm_is_function:
                 # Если это функция, и она должна была вернуть значение, но был ВЫХОД

@@ -21,6 +21,8 @@ CHAR_TYPE = 'сим' # Corrected from "лит"
 STRING_TYPE = 'лит' # Corrected from "текст"
 VOID_TYPE = "пусто" # For procedures or functions that don't return a value explicitly
 
+DEFAULT_PRECISION = 10 # Точность по умолчанию для вещественных чисел (количество знаков после запятой)
+
 # Новые константы для операций и типов
 ALLOWED_OPERATIONS = {
     # Арифметические операции

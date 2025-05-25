@@ -104,6 +104,11 @@ class KumirReturnError(KumirExecutionError):
     def __init__(self, message, line_index=None, column_index=None, line_content=None):
         super().__init__(message, line_index, column_index, line_content)
 
+# Семантическая ошибка (например, несоответствие типов при вызове функции, неправильное использование конструкций)
+class KumirSemanticError(KumirExecutionError):
+    def __init__(self, message, line_index=None, column_index=None, line_content=None):
+        super().__init__(message, line_index, column_index, line_content)
+
 # Синтаксическая ошибка (добавлено)
 class KumirSyntaxError(KumirExecutionError):
     def __init__(self, message, line_index=None, column_index=None, line_content=None):
@@ -133,8 +138,8 @@ class ExitSignal(Exception):
     """Сигнал для оператора ВЫХОД (из процедуры/алгоритма)."""
     pass
 
-class StopExecutionException(Exception): # Уже было, но на всякий случай проверяем
-    """Исключение для полной остановки выполнения программы."""
+class StopExecutionSignal(Exception): # Переименовано из StopExecutionException
+    """Сигнал для полной остановки выполнения программы."""
     pass
 
 # Убедимся, что LoopBreakException и LoopContinueException, если они использовались ранее,
