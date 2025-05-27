@@ -1,4 +1,4 @@
-# Generated from c:/Users/Bormotoon/VSCodeProjects/PyRobot/kumir_lang/KumirParser.g4 by ANTLR 4.13.2
+# Generated from ./kumir_lang/KumirParser.g4 by ANTLR 4.13.2
 # encoding: utf-8
 from antlr4 import *
 from io import StringIO
@@ -507,14 +507,6 @@ class KumirParser ( Parser ):
         def getRuleIndex(self):
             return KumirParser.RULE_qualifiedIdentifier
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterQualifiedIdentifier" ):
-                listener.enterQualifiedIdentifier(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitQualifiedIdentifier" ):
-                listener.exitQualifiedIdentifier(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitQualifiedIdentifier" ):
                 return visitor.visitQualifiedIdentifier(self)
@@ -575,14 +567,6 @@ class KumirParser ( Parser ):
 
         def getRuleIndex(self):
             return KumirParser.RULE_literal
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterLiteral" ):
-                listener.enterLiteral(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitLiteral" ):
-                listener.exitLiteral(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitLiteral" ):
@@ -696,14 +680,6 @@ class KumirParser ( Parser ):
         def getRuleIndex(self):
             return KumirParser.RULE_colorLiteral
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterColorLiteral" ):
-                listener.enterColorLiteral(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitColorLiteral" ):
-                listener.exitColorLiteral(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitColorLiteral" ):
                 return visitor.visitColorLiteral(self)
@@ -758,14 +734,6 @@ class KumirParser ( Parser ):
 
         def getRuleIndex(self):
             return KumirParser.RULE_expressionList
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterExpressionList" ):
-                listener.enterExpressionList(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitExpressionList" ):
-                listener.exitExpressionList(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitExpressionList" ):
@@ -825,14 +793,6 @@ class KumirParser ( Parser ):
 
         def getRuleIndex(self):
             return KumirParser.RULE_arrayLiteral
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterArrayLiteral" ):
-                listener.enterArrayLiteral(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitArrayLiteral" ):
-                listener.exitArrayLiteral(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitArrayLiteral" ):
@@ -905,14 +865,6 @@ class KumirParser ( Parser ):
 
         def getRuleIndex(self):
             return KumirParser.RULE_primaryExpression
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterPrimaryExpression" ):
-                listener.enterPrimaryExpression(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitPrimaryExpression" ):
-                listener.exitPrimaryExpression(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitPrimaryExpression" ):
@@ -995,14 +947,6 @@ class KumirParser ( Parser ):
         def getRuleIndex(self):
             return KumirParser.RULE_argumentList
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterArgumentList" ):
-                listener.enterArgumentList(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitArgumentList" ):
-                listener.exitArgumentList(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitArgumentList" ):
                 return visitor.visitArgumentList(self)
@@ -1064,14 +1008,6 @@ class KumirParser ( Parser ):
 
         def getRuleIndex(self):
             return KumirParser.RULE_indexList
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterIndexList" ):
-                listener.enterIndexList(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitIndexList" ):
-                listener.exitIndexList(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitIndexList" ):
@@ -1179,14 +1115,6 @@ class KumirParser ( Parser ):
         def getRuleIndex(self):
             return KumirParser.RULE_postfixExpression
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterPostfixExpression" ):
-                listener.enterPostfixExpression(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitPostfixExpression" ):
-                listener.exitPostfixExpression(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitPostfixExpression" ):
                 return visitor.visitPostfixExpression(self)
@@ -1278,14 +1206,6 @@ class KumirParser ( Parser ):
         def getRuleIndex(self):
             return KumirParser.RULE_unaryExpression
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterUnaryExpression" ):
-                listener.enterUnaryExpression(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitUnaryExpression" ):
-                listener.exitUnaryExpression(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitUnaryExpression" ):
                 return visitor.visitUnaryExpression(self)
@@ -1354,14 +1274,6 @@ class KumirParser ( Parser ):
         def getRuleIndex(self):
             return KumirParser.RULE_powerExpression
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterPowerExpression" ):
-                listener.enterPowerExpression(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitPowerExpression" ):
-                listener.exitPowerExpression(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitPowerExpression" ):
                 return visitor.visitPowerExpression(self)
@@ -1427,14 +1339,6 @@ class KumirParser ( Parser ):
 
         def getRuleIndex(self):
             return KumirParser.RULE_multiplicativeExpression
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterMultiplicativeExpression" ):
-                listener.enterMultiplicativeExpression(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitMultiplicativeExpression" ):
-                listener.exitMultiplicativeExpression(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitMultiplicativeExpression" ):
@@ -1508,14 +1412,6 @@ class KumirParser ( Parser ):
 
         def getRuleIndex(self):
             return KumirParser.RULE_additiveExpression
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterAdditiveExpression" ):
-                listener.enterAdditiveExpression(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitAdditiveExpression" ):
-                listener.exitAdditiveExpression(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitAdditiveExpression" ):
@@ -1603,14 +1499,6 @@ class KumirParser ( Parser ):
         def getRuleIndex(self):
             return KumirParser.RULE_relationalExpression
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterRelationalExpression" ):
-                listener.enterRelationalExpression(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitRelationalExpression" ):
-                listener.exitRelationalExpression(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitRelationalExpression" ):
                 return visitor.visitRelationalExpression(self)
@@ -1684,14 +1572,6 @@ class KumirParser ( Parser ):
         def getRuleIndex(self):
             return KumirParser.RULE_equalityExpression
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterEqualityExpression" ):
-                listener.enterEqualityExpression(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitEqualityExpression" ):
-                listener.exitEqualityExpression(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitEqualityExpression" ):
                 return visitor.visitEqualityExpression(self)
@@ -1759,14 +1639,6 @@ class KumirParser ( Parser ):
         def getRuleIndex(self):
             return KumirParser.RULE_logicalAndExpression
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterLogicalAndExpression" ):
-                listener.enterLogicalAndExpression(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitLogicalAndExpression" ):
-                listener.exitLogicalAndExpression(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitLogicalAndExpression" ):
                 return visitor.visitLogicalAndExpression(self)
@@ -1829,14 +1701,6 @@ class KumirParser ( Parser ):
         def getRuleIndex(self):
             return KumirParser.RULE_logicalOrExpression
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterLogicalOrExpression" ):
-                listener.enterLogicalOrExpression(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitLogicalOrExpression" ):
-                listener.exitLogicalOrExpression(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitLogicalOrExpression" ):
                 return visitor.visitLogicalOrExpression(self)
@@ -1890,14 +1754,6 @@ class KumirParser ( Parser ):
         def getRuleIndex(self):
             return KumirParser.RULE_expression
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterExpression" ):
-                listener.enterExpression(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitExpression" ):
-                listener.exitExpression(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitExpression" ):
                 return visitor.visitExpression(self)
@@ -1948,14 +1804,6 @@ class KumirParser ( Parser ):
 
         def getRuleIndex(self):
             return KumirParser.RULE_typeSpecifier
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterTypeSpecifier" ):
-                listener.enterTypeSpecifier(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitTypeSpecifier" ):
-                listener.exitTypeSpecifier(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitTypeSpecifier" ):
@@ -2034,14 +1882,6 @@ class KumirParser ( Parser ):
         def getRuleIndex(self):
             return KumirParser.RULE_basicType
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterBasicType" ):
-                listener.enterBasicType(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitBasicType" ):
-                listener.exitBasicType(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitBasicType" ):
                 return visitor.visitBasicType(self)
@@ -2095,14 +1935,6 @@ class KumirParser ( Parser ):
 
         def getRuleIndex(self):
             return KumirParser.RULE_actorType
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterActorType" ):
-                listener.enterActorType(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitActorType" ):
-                listener.exitActorType(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitActorType" ):
@@ -2161,14 +1993,6 @@ class KumirParser ( Parser ):
         def getRuleIndex(self):
             return KumirParser.RULE_arrayType
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterArrayType" ):
-                listener.enterArrayType(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitArrayType" ):
-                listener.exitArrayType(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitArrayType" ):
                 return visitor.visitArrayType(self)
@@ -2220,14 +2044,6 @@ class KumirParser ( Parser ):
 
         def getRuleIndex(self):
             return KumirParser.RULE_arrayBounds
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterArrayBounds" ):
-                listener.enterArrayBounds(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitArrayBounds" ):
-                listener.exitArrayBounds(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitArrayBounds" ):
@@ -2297,14 +2113,6 @@ class KumirParser ( Parser ):
 
         def getRuleIndex(self):
             return KumirParser.RULE_variableDeclarationItem
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterVariableDeclarationItem" ):
-                listener.enterVariableDeclarationItem(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitVariableDeclarationItem" ):
-                listener.exitVariableDeclarationItem(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitVariableDeclarationItem" ):
@@ -2390,14 +2198,6 @@ class KumirParser ( Parser ):
         def getRuleIndex(self):
             return KumirParser.RULE_variableList
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterVariableList" ):
-                listener.enterVariableList(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitVariableList" ):
-                listener.exitVariableList(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitVariableList" ):
                 return visitor.visitVariableList(self)
@@ -2455,14 +2255,6 @@ class KumirParser ( Parser ):
         def getRuleIndex(self):
             return KumirParser.RULE_variableDeclaration
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterVariableDeclaration" ):
-                listener.enterVariableDeclaration(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitVariableDeclaration" ):
-                listener.exitVariableDeclaration(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitVariableDeclaration" ):
                 return visitor.visitVariableDeclaration(self)
@@ -2511,14 +2303,6 @@ class KumirParser ( Parser ):
 
         def getRuleIndex(self):
             return KumirParser.RULE_globalDeclaration
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterGlobalDeclaration" ):
-                listener.enterGlobalDeclaration(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitGlobalDeclaration" ):
-                listener.exitGlobalDeclaration(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitGlobalDeclaration" ):
@@ -2588,14 +2372,6 @@ class KumirParser ( Parser ):
 
         def getRuleIndex(self):
             return KumirParser.RULE_globalAssignment
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterGlobalAssignment" ):
-                listener.enterGlobalAssignment(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitGlobalAssignment" ):
-                listener.exitGlobalAssignment(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitGlobalAssignment" ):
@@ -2680,14 +2456,6 @@ class KumirParser ( Parser ):
         def getRuleIndex(self):
             return KumirParser.RULE_parameterDeclaration
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterParameterDeclaration" ):
-                listener.enterParameterDeclaration(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitParameterDeclaration" ):
-                listener.exitParameterDeclaration(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitParameterDeclaration" ):
                 return visitor.visitParameterDeclaration(self)
@@ -2752,14 +2520,6 @@ class KumirParser ( Parser ):
 
         def getRuleIndex(self):
             return KumirParser.RULE_parameterList
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterParameterList" ):
-                listener.enterParameterList(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitParameterList" ):
-                listener.exitParameterList(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitParameterList" ):
@@ -2846,14 +2606,6 @@ class KumirParser ( Parser ):
         def getRuleIndex(self):
             return KumirParser.RULE_algorithmNameTokens
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterAlgorithmNameTokens" ):
-                listener.enterAlgorithmNameTokens(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitAlgorithmNameTokens" ):
-                listener.exitAlgorithmNameTokens(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitAlgorithmNameTokens" ):
                 return visitor.visitAlgorithmNameTokens(self)
@@ -2913,14 +2665,6 @@ class KumirParser ( Parser ):
 
         def getRuleIndex(self):
             return KumirParser.RULE_algorithmName
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterAlgorithmName" ):
-                listener.enterAlgorithmName(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitAlgorithmName" ):
-                listener.exitAlgorithmName(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitAlgorithmName" ):
@@ -2993,14 +2737,6 @@ class KumirParser ( Parser ):
 
         def getRuleIndex(self):
             return KumirParser.RULE_algorithmHeader
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterAlgorithmHeader" ):
-                listener.enterAlgorithmHeader(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitAlgorithmHeader" ):
-                listener.exitAlgorithmHeader(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitAlgorithmHeader" ):
@@ -3085,14 +2821,6 @@ class KumirParser ( Parser ):
         def getRuleIndex(self):
             return KumirParser.RULE_preCondition
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterPreCondition" ):
-                listener.enterPreCondition(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitPreCondition" ):
-                listener.exitPreCondition(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitPreCondition" ):
                 return visitor.visitPreCondition(self)
@@ -3150,14 +2878,6 @@ class KumirParser ( Parser ):
         def getRuleIndex(self):
             return KumirParser.RULE_postCondition
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterPostCondition" ):
-                listener.enterPostCondition(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitPostCondition" ):
-                listener.exitPostCondition(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitPostCondition" ):
                 return visitor.visitPostCondition(self)
@@ -3209,14 +2929,6 @@ class KumirParser ( Parser ):
         def getRuleIndex(self):
             return KumirParser.RULE_algorithmBody
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterAlgorithmBody" ):
-                listener.enterAlgorithmBody(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitAlgorithmBody" ):
-                listener.exitAlgorithmBody(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitAlgorithmBody" ):
                 return visitor.visitAlgorithmBody(self)
@@ -3259,14 +2971,6 @@ class KumirParser ( Parser ):
 
         def getRuleIndex(self):
             return KumirParser.RULE_statementSequence
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterStatementSequence" ):
-                listener.enterStatementSequence(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitStatementSequence" ):
-                listener.exitStatementSequence(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitStatementSequence" ):
@@ -3329,14 +3033,6 @@ class KumirParser ( Parser ):
 
         def getRuleIndex(self):
             return KumirParser.RULE_lvalue
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterLvalue" ):
-                listener.enterLvalue(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitLvalue" ):
-                listener.exitLvalue(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitLvalue" ):
@@ -3411,14 +3107,6 @@ class KumirParser ( Parser ):
         def getRuleIndex(self):
             return KumirParser.RULE_assignmentStatement
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterAssignmentStatement" ):
-                listener.enterAssignmentStatement(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitAssignmentStatement" ):
-                listener.exitAssignmentStatement(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitAssignmentStatement" ):
                 return visitor.visitAssignmentStatement(self)
@@ -3487,14 +3175,6 @@ class KumirParser ( Parser ):
 
         def getRuleIndex(self):
             return KumirParser.RULE_ioArgument
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterIoArgument" ):
-                listener.enterIoArgument(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitIoArgument" ):
-                listener.exitIoArgument(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitIoArgument" ):
@@ -3579,14 +3259,6 @@ class KumirParser ( Parser ):
         def getRuleIndex(self):
             return KumirParser.RULE_ioArgumentList
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterIoArgumentList" ):
-                listener.enterIoArgumentList(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitIoArgumentList" ):
-                listener.exitIoArgumentList(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitIoArgumentList" ):
                 return visitor.visitIoArgumentList(self)
@@ -3645,14 +3317,6 @@ class KumirParser ( Parser ):
 
         def getRuleIndex(self):
             return KumirParser.RULE_ioStatement
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterIoStatement" ):
-                listener.enterIoStatement(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitIoStatement" ):
-                listener.exitIoStatement(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitIoStatement" ):
@@ -3720,14 +3384,6 @@ class KumirParser ( Parser ):
 
         def getRuleIndex(self):
             return KumirParser.RULE_ifStatement
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterIfStatement" ):
-                listener.enterIfStatement(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitIfStatement" ):
-                listener.exitIfStatement(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitIfStatement" ):
@@ -3798,14 +3454,6 @@ class KumirParser ( Parser ):
         def getRuleIndex(self):
             return KumirParser.RULE_caseBlock
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterCaseBlock" ):
-                listener.enterCaseBlock(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitCaseBlock" ):
-                listener.exitCaseBlock(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitCaseBlock" ):
                 return visitor.visitCaseBlock(self)
@@ -3867,14 +3515,6 @@ class KumirParser ( Parser ):
 
         def getRuleIndex(self):
             return KumirParser.RULE_switchStatement
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterSwitchStatement" ):
-                listener.enterSwitchStatement(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitSwitchStatement" ):
-                listener.exitSwitchStatement(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitSwitchStatement" ):
@@ -3944,14 +3584,6 @@ class KumirParser ( Parser ):
         def getRuleIndex(self):
             return KumirParser.RULE_endLoopCondition
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterEndLoopCondition" ):
-                listener.enterEndLoopCondition(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitEndLoopCondition" ):
-                listener.exitEndLoopCondition(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitEndLoopCondition" ):
                 return visitor.visitEndLoopCondition(self)
@@ -4017,14 +3649,6 @@ class KumirParser ( Parser ):
 
         def getRuleIndex(self):
             return KumirParser.RULE_loopSpecifier
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterLoopSpecifier" ):
-                listener.enterLoopSpecifier(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitLoopSpecifier" ):
-                listener.exitLoopSpecifier(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitLoopSpecifier" ):
@@ -4123,14 +3747,6 @@ class KumirParser ( Parser ):
         def getRuleIndex(self):
             return KumirParser.RULE_loopStatement
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterLoopStatement" ):
-                listener.enterLoopStatement(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitLoopStatement" ):
-                listener.exitLoopStatement(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitLoopStatement" ):
                 return visitor.visitLoopStatement(self)
@@ -4194,14 +3810,6 @@ class KumirParser ( Parser ):
         def getRuleIndex(self):
             return KumirParser.RULE_exitStatement
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterExitStatement" ):
-                listener.enterExitStatement(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitExitStatement" ):
-                listener.exitExitStatement(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitExitStatement" ):
                 return visitor.visitExitStatement(self)
@@ -4241,14 +3849,6 @@ class KumirParser ( Parser ):
         def getRuleIndex(self):
             return KumirParser.RULE_pauseStatement
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterPauseStatement" ):
-                listener.enterPauseStatement(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitPauseStatement" ):
-                listener.exitPauseStatement(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitPauseStatement" ):
                 return visitor.visitPauseStatement(self)
@@ -4287,14 +3887,6 @@ class KumirParser ( Parser ):
 
         def getRuleIndex(self):
             return KumirParser.RULE_stopStatement
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterStopStatement" ):
-                listener.enterStopStatement(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitStopStatement" ):
-                listener.exitStopStatement(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitStopStatement" ):
@@ -4338,14 +3930,6 @@ class KumirParser ( Parser ):
 
         def getRuleIndex(self):
             return KumirParser.RULE_assertionStatement
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterAssertionStatement" ):
-                listener.enterAssertionStatement(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitAssertionStatement" ):
-                listener.exitAssertionStatement(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitAssertionStatement" ):
@@ -4398,14 +3982,6 @@ class KumirParser ( Parser ):
 
         def getRuleIndex(self):
             return KumirParser.RULE_procedureCallStatement
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterProcedureCallStatement" ):
-                listener.enterProcedureCallStatement(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitProcedureCallStatement" ):
-                listener.exitProcedureCallStatement(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitProcedureCallStatement" ):
@@ -4504,14 +4080,6 @@ class KumirParser ( Parser ):
 
         def getRuleIndex(self):
             return KumirParser.RULE_statement
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterStatement" ):
-                listener.enterStatement(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitStatement" ):
-                listener.exitStatement(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitStatement" ):
@@ -4729,14 +4297,6 @@ class KumirParser ( Parser ):
         def getRuleIndex(self):
             return KumirParser.RULE_algorithmDefinition
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterAlgorithmDefinition" ):
-                listener.enterAlgorithmDefinition(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitAlgorithmDefinition" ):
-                listener.exitAlgorithmDefinition(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitAlgorithmDefinition" ):
                 return visitor.visitAlgorithmDefinition(self)
@@ -4829,14 +4389,6 @@ class KumirParser ( Parser ):
         def getRuleIndex(self):
             return KumirParser.RULE_moduleName
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterModuleName" ):
-                listener.enterModuleName(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitModuleName" ):
-                listener.exitModuleName(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitModuleName" ):
                 return visitor.visitModuleName(self)
@@ -4896,14 +4448,6 @@ class KumirParser ( Parser ):
         def getRuleIndex(self):
             return KumirParser.RULE_importStatement
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterImportStatement" ):
-                listener.enterImportStatement(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitImportStatement" ):
-                listener.exitImportStatement(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitImportStatement" ):
                 return visitor.visitImportStatement(self)
@@ -4962,14 +4506,6 @@ class KumirParser ( Parser ):
 
         def getRuleIndex(self):
             return KumirParser.RULE_programItem
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterProgramItem" ):
-                listener.enterProgramItem(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitProgramItem" ):
-                listener.exitProgramItem(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitProgramItem" ):
@@ -5035,14 +4571,6 @@ class KumirParser ( Parser ):
         def getRuleIndex(self):
             return KumirParser.RULE_moduleHeader
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterModuleHeader" ):
-                listener.enterModuleHeader(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitModuleHeader" ):
-                listener.exitModuleHeader(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitModuleHeader" ):
                 return visitor.visitModuleHeader(self)
@@ -5103,14 +4631,6 @@ class KumirParser ( Parser ):
 
         def getRuleIndex(self):
             return KumirParser.RULE_moduleBody
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterModuleBody" ):
-                listener.enterModuleBody(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitModuleBody" ):
-                listener.exitModuleBody(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitModuleBody" ):
@@ -5182,14 +4702,6 @@ class KumirParser ( Parser ):
 
         def getRuleIndex(self):
             return KumirParser.RULE_implicitModuleBody
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterImplicitModuleBody" ):
-                listener.enterImplicitModuleBody(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitImplicitModuleBody" ):
-                listener.exitImplicitModuleBody(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitImplicitModuleBody" ):
@@ -5272,14 +4784,6 @@ class KumirParser ( Parser ):
 
         def getRuleIndex(self):
             return KumirParser.RULE_moduleDefinition
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterModuleDefinition" ):
-                listener.enterModuleDefinition(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitModuleDefinition" ):
-                listener.exitModuleDefinition(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitModuleDefinition" ):
@@ -5367,14 +4871,6 @@ class KumirParser ( Parser ):
 
         def getRuleIndex(self):
             return KumirParser.RULE_program
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterProgram" ):
-                listener.enterProgram(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitProgram" ):
-                listener.exitProgram(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitProgram" ):

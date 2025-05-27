@@ -1,4 +1,4 @@
-# Generated from c:/Users/Bormotoon/VSCodeProjects/PyRobot/kumir_lang/KumirParser.g4 by ANTLR 4.13.2
+# Generated from ./kumir_lang/KumirParser.g4 by ANTLR 4.13.2
 from antlr4 import *
 if "." in __name__:
     from .KumirParser import KumirParser

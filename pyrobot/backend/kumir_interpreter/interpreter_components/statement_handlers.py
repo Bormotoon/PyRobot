@@ -251,8 +251,65 @@ class StatementHandlerMixin(KumirParserVisitor):
         #             # print(value_to_print.value, end='') # Печать значения
         #             pass
         #     # print() # Обычно вывод заканчивается переводом строки, если не было 'нс' в конце
-        pass
+        if ctx.OUTPUT():
+            # Обработка аргументов вывода
+            current_output = ""
+            for i, arg_ctx in enumerate(ctx.ioArgument()):
+                if arg_ctx.expression(): # Вывод выражения
+                    value_to_print = self.expression_evaluator.visit(arg_ctx.expression())
+                    if value_to_print is None:
+                        raise KumirRuntimeError(
+                            f"Не удалось вычислить значение для вывода аргумента {i+1} процедуры ВЫВОД.",
+                            line_index=arg_ctx.start.line -1,
+                            column_index=arg_ctx.start.column
+                        )
+                    
+                    # Преобразование значения к строке с учетом типа
+                    if value_to_print.kumir_type == KumirType.INT:
+                        current_output += str(value_to_print.value)
+                    elif value_to_print.kumir_type == KumirType.REAL:
+                        current_output += str(value_to_print.value)
+                    elif value_to_print.kumir_type == KumirType.BOOL:
+                        current_output += "истина" if value_to_print.value else "ложь"
+                    elif value_to_print.kumir_type == KumirType.CHAR:
+                        current_output += value_to_print.value # Символы выводим как есть
+                    elif value_to_print.kumir_type == KumirType.STR:
+                        # Строки обрабатываем отдельно (возможно, с кавычками)
+                        current_output += f'"{value_to_print.value}"'
+                    else:
+                        raise KumirTypeError(
+                            f"Неизвестный тип значения для вывода: {value_to_print.kumir_type}",
+                            line_index=arg_ctx.start.line -1,
+                            column_index=arg_ctx.start.column
+                        )
+                else:
+                    # Это литерал (например, строка) или управляющая команда (нс и др.)
+                    io_val = arg_ctx.getText()
+                    if io_val.startswith('"') and io_val.endswith('"'):
+                        # Литерал строки, убираем кавычки
+                        current_output += io_val[1:-1]
+                    # Это команда 'нс' (новая строка) или другие управляющие символы
+                    if io_val.lower() == "нс":
+                        # Ничего не делаем, просто отменяем будущий перенос строки
+                        # Фактически, это означает, что end для print будет '',
+                        # но мы управляем этим через current_output
+                        pass # Мы не добавляем \n в current_output
+                    elif io_val.lower() == "переход": # Пример другой команды
+                        current_output += "\\n" 
+                    # Можно добавить другие команды
+                else:
+                    # Это значение для вывода
+                    # ...existing code...
 
+            # После обработки всех аргументов, если последний не был 'нс', добавляем перенос строки
+            if not (ctx.ioArgument() and ctx.ioArgument()[-1].getText().lower() == 'нс'):
+                current_output += '\\n'
+            
+            print(f"[DEBUG statement_handlers.visitIoStatement] About to call io_handler.write_output. current_output length: {len(current_output)}. current_output: >>>{current_output}<<<", file=sys.stderr)
+            self.io_handler.write_output(current_output)
+
+        elif ctx.INPUT_KW():
+            # ...existing code...
     def visitIfStatement(self, ctx: KumirParser.IfStatementContext) -> None:
         # print(f"If Statement: {ctx.expression().getText()}")
         condition_val = self.expression_evaluator.visit(ctx.expression())
