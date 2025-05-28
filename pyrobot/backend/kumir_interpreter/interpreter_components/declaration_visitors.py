@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Union, cast
 from ..generated.KumirParser import KumirParser
 from ..kumir_exceptions import (KumirEvalError, KumirNotImplementedError,
                                 DeclarationError, AssignmentError)
+from ..kumir_datatypes import KumirType
 from .type_utils import get_type_info_from_specifier
 
 if TYPE_CHECKING:
@@ -130,11 +131,15 @@ class DeclarationVisitorMixin:
                         line_index=var_decl_item_ctx.ID().getSymbol().line -1, 
                         column_index=var_decl_item_ctx.ID().getSymbol().column,
                         line_content=kiv_self.get_line_content_from_ctx(var_decl_item_ctx))
-
+                
                 try:
-                    kiv_self.scope_manager.declare_variable(var_name, base_kumir_type + 'таб', 
-                                          is_table=True, dimensions=dimension_bounds_list, 
-                                          ctx_declaration_item=var_decl_item_ctx)
+                    kiv_self.scope_manager.declare_array(
+                        var_name=var_name,
+                        element_kumir_type=KumirType.from_string(base_kumir_type),
+                        dimensions=dimension_bounds_list,
+                        line_index=var_decl_item_ctx.ID().getSymbol().line - 1,
+                        column_index=var_decl_item_ctx.ID().getSymbol().column
+                    )
                     print(
                         f"[DEBUG][VisitVarDecl_Mixin] Объявлена таблица '{var_name}' тип {base_kumir_type}таб, границы: {dimension_bounds_list}",
                         file=sys.stderr)
@@ -159,18 +164,23 @@ class DeclarationVisitorMixin:
                     raise DeclarationError(
                         f"Строка {var_decl_item_ctx.LBRACK().getSymbol().line}: Скалярная переменная '{var_name}' (тип {base_kumir_type}) не может иметь указания границ массива.",
                         line_index=var_decl_item_ctx.LBRACK().getSymbol().line -1, 
-                        column_index=var_decl_item_ctx.LBRACK().getSymbol().column,
-                        line_content=kiv_self.get_line_content_from_ctx(var_decl_item_ctx))
+                        column_index=var_decl_item_ctx.LBRACK().getSymbol().column,                        line_content=kiv_self.get_line_content_from_ctx(var_decl_item_ctx))
                 
-                kiv_self.scope_manager.declare_variable(var_name, base_kumir_type, False, None, ctx_declaration_item=var_decl_item_ctx)
+                kiv_self.scope_manager.declare_variable(
+                    name=var_name, 
+                    kumir_type=KumirType.from_string(base_kumir_type),
+                    initial_value=None,
+                    line_index=var_decl_item_ctx.ID().getSymbol().line - 1,
+                    column_index=var_decl_item_ctx.ID().getSymbol().column
+                )
 
                 if var_decl_item_ctx.expression():
-                    value_to_assign = kiv_self.evaluator.visitExpression(var_decl_item_ctx.expression())
-
+                    value_to_assign = kiv_self.expression_evaluator.visitExpression(var_decl_item_ctx.expression())
+                    
                     try:
                         # Используем метод self._validate_and_convert_value_for_assignment из основного класса Visitor
-                        validated_value = kiv_self._validate_and_convert_value_for_assignment(value_to_assign, base_kumir_type, var_name)
-                        kiv_self.scope_manager.update_variable(var_name, validated_value, ctx_for_error=var_decl_item_ctx.expression())
+                        validated_value = kiv_self._validate_and_convert_value_for_assignment(value_to_assign, base_kumir_type, var_name, is_target_table=False)
+                        kiv_self.scope_manager.update_variable(var_name, validated_value, line_index=var_decl_item_ctx.expression().start.line - 1, column_index=var_decl_item_ctx.expression().start.column)
                         print(
                             f"[DEBUG][VisitVarDecl_Mixin] Переменной '{var_name}' присвоено значение при инициализации: {validated_value}",
                             file=sys.stderr)

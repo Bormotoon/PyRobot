@@ -22,7 +22,10 @@ from .statement_visitors import StatementVisitorMixin
 from .control_flow_visitors import ControlFlowVisitorMixin
 from .io_handler import IOHandler
 from .builtin_handlers import BuiltinFunctionHandler, BuiltinProcedureHandler
-from .constants import VOID_TYPE, DEFAULT_PRECISION 
+from .constants import (
+    VOID_TYPE, DEFAULT_PRECISION, TYPE_MAP, 
+    INTEGER_TYPE, FLOAT_TYPE, BOOLEAN_TYPE, CHAR_TYPE, STRING_TYPE
+) 
 from .type_utils import get_type_info_from_specifier # <--- ИМПОРТ УЖЕ БЫЛ, ПРОВЕРЯЕМ
 
 class DiagnosticErrorListener(ErrorListener):
@@ -61,8 +64,17 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementVisitorMixin, Co
                  error_stream: Optional[Callable[[str], None]] = None, # Callable, а не SupportsWrite
                  program_lines: Optional[List[str]] = None,
                  global_vars: Optional[Dict[str, Any]] = None,
-                 precision: int = DEFAULT_PRECISION):
+                 precision: int = DEFAULT_PRECISION,
+                 echo_input: bool = True):
         super().__init__() 
+        
+        # Добавляем константы типов как атрибуты для использования в type_utils
+        self.TYPE_MAP = TYPE_MAP
+        self.INTEGER_TYPE = INTEGER_TYPE
+        self.FLOAT_TYPE = FLOAT_TYPE
+        self.BOOLEAN_TYPE = BOOLEAN_TYPE
+        self.CHAR_TYPE = CHAR_TYPE
+        self.STRING_TYPE = STRING_TYPE
         
         self.program_lines = program_lines if program_lines is not None else []
         self.precision = precision
@@ -70,7 +82,7 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementVisitorMixin, Co
 
         self.scope_manager = ScopeManager(self)
         self.procedure_manager = ProcedureManager(self)
-        self.expression_evaluator = ExpressionEvaluator(self.scope_manager, self.procedure_manager) 
+        self.expression_evaluator = ExpressionEvaluator(self, self.scope_manager, self.procedure_manager) # Передаем self (main_visitor)
         
         # Создаем IOHandler, передавая модуль исключений и потоки. Visitor будет None сначала.
         self.io_handler = IOHandler(
@@ -83,9 +95,10 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementVisitorMixin, Co
         self.io_handler.set_visitor(self) # Устанавливаем visitor в IOHandler
 
         self.builtin_function_handler = BuiltinFunctionHandler(self) # Предполагаем наличие
-        self.builtin_procedure_handler = BuiltinProcedureHandler(self) # Предполагаем наличие
-
-        self.error_stream_out = error_stream if error_stream else lambda x: print(x, file=__import__('sys').stderr) # Используем правильные кавычки
+        self.builtin_procedure_handler = BuiltinProcedureHandler(self) # Предполагаем наличие        self.error_stream_out = error_stream if error_stream else lambda x: print(x, file=__import__('sys').stderr) # Используем правильные кавычки
+        
+        # Настройка эхо ввода (автоматический вывод введённых значений)
+        self.echo_input = echo_input
         
         self.current_algorithm_name: Optional[str] = None
         self.current_algorithm_is_function: bool = False
@@ -735,14 +748,14 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementVisitorMixin, Co
         # Вызываем процедуру (или функцию)
         # Для этого используем общую логику вызова, которая была в старом интерпретаторе
         # Но без явного указания контекста, полагаемся на текущий
-        # Если процедура не найдена, будет вызвано исключение KumirRuntimeError
-        return self.procedure_manager._execute_procedure_call(
+        # Если процедура не найдена, будет вызвано исключение KumirRuntimeError        return self.procedure_manager._execute_procedure_call(
             proc_name, 
             actual_args,
             ctx.qualifiedIdentifier() # Для контекста ошибок
         )
 
-    # KumirParser.AssignmentStatementContext    def visitAssignmentStatement(self, ctx: KumirParser.AssignmentStatementContext):
+    # KumirParser.AssignmentStatementContext
+    def visitAssignmentStatement(self, ctx: KumirParser.AssignmentStatementContext):
         print(f"\n!!! [DEBUG main_visitor.visitAssignmentStatement] CALLED! Context: {ctx.getText()} !!!", file=sys.stderr)
         # print(f"[DEBUG VISIT] AssignmentStatement: {ctx.getText()}")
         # assignmentStatement : qualifiedIdentifier ASSIGN expression SEMI ;

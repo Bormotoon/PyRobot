@@ -226,90 +226,246 @@ class StatementHandlerMixin(KumirParserVisitor):
         return None
 
     def visitIoStatement(self, ctx: KumirParser.IoStatementContext) -> None:
-        # TODO: Реализовать логику для ВВОД и ВЫВОД
-        # Нужно будет обращаться к self.expression_evaluator для вычисления выражений
-        # и к какому-то механизму I/O (например, передаваемому в конструктор).
-        # print(f"IO Statement: {ctx.getText()}")
-        # if ctx.INPUT():
-        #     # Логика для ВВОД
-        #     for arg_ctx in ctx.ioArgumentList().ioArgument():
-        #         if arg_ctx.expression(): # Ввод в переменную
-        #             lvalue_expr = arg_ctx.expression() # Должно быть lvalue
-        #             # ... получить имя переменной, возможно, индексы ...
-        #             # ... прочитать значение от пользователя ...
-        #             # ... обновить переменную через scope_manager ...
-        #             pass
-        # elif ctx.OUTPUT():
-        #     # Логика для ВЫВОД
-        #     for arg_ctx in ctx.ioArgumentList().ioArgument():
-        #         if arg_ctx.NEWLINE_CONST():
-        #             # print() # Вывод новой строки
-        #             pass
-        #         elif arg_ctx.expression():
-        #             value_to_print = self.expression_evaluator.visit(arg_ctx.expression())
-        #             # ... форматирование с учетом COLON ...
-        #             # print(value_to_print.value, end='') # Печать значения
-        #             pass
-        #     # print() # Обычно вывод заканчивается переводом строки, если не было 'нс' в конце
-        if ctx.OUTPUT():
-            # Обработка аргументов вывода
+        if ctx.OUTPUT_KW(): # Проверяем, что это команда ВЫВОД (OUTPUT_KW из грамматики)
             current_output = ""
+            # print(f"[DEBUG visitIoStatement] OUTPUT statement found. Args count: {len(ctx.ioArgument())}", file=sys.stderr)
+
             for i, arg_ctx in enumerate(ctx.ioArgument()):
-                if arg_ctx.expression(): # Вывод выражения
+                # print(f"[DEBUG visitIoStatement] Processing arg {i+1}: {arg_ctx.getText()}", file=sys.stderr)
+                if arg_ctx.expression(): # Все аргументы вывода должны быть выражениями
                     value_to_print = self.expression_evaluator.visit(arg_ctx.expression())
+                    
                     if value_to_print is None:
                         raise KumirRuntimeError(
                             f"Не удалось вычислить значение для вывода аргумента {i+1} процедуры ВЫВОД.",
                             line_index=arg_ctx.start.line -1,
                             column_index=arg_ctx.start.column
                         )
-                    
+
+                    # print(f"[DEBUG visitIoStatement] Arg {i+1} evaluated to: {value_to_print}, type: {value_to_print.kumir_type}", file=sys.stderr)
+
                     # Преобразование значения к строке с учетом типа
                     if value_to_print.kumir_type == KumirType.INT:
                         current_output += str(value_to_print.value)
                     elif value_to_print.kumir_type == KumirType.REAL:
-                        current_output += str(value_to_print.value)
+                        # TODO: Форматирование ВЕЩ чисел по правилам КуМира (например, точность)
+                        current_output += str(value_to_print.value) 
                     elif value_to_print.kumir_type == KumirType.BOOL:
                         current_output += "истина" if value_to_print.value else "ложь"
                     elif value_to_print.kumir_type == KumirType.CHAR:
                         current_output += value_to_print.value # Символы выводим как есть
                     elif value_to_print.kumir_type == KumirType.STR:
-                        # Строки обрабатываем отдельно (возможно, с кавычками)
-                        current_output += f'"{value_to_print.value}"'
+                        # Если это нс, который ExpressionEvaluator вернул как KumirValue("\\n", KumirType.STR)
+                        # то просто добавляем его значение.
+                        # Если это обычная строка, также добавляем ее значение.
+                        current_output += value_to_print.value
+                    # elif value_to_print.kumir_type == KumirType.TABLE: # Вывод таблиц пока не реализован
+                    #     raise KumirNotImplementedError("Вывод таблиц пока не реализован.",
+                    #                                   line_index=arg_ctx.start.line -1,
+                    #                                   column_index=arg_ctx.start.column)
                     else:
                         raise KumirTypeError(
-                            f"Неизвестный тип значения для вывода: {value_to_print.kumir_type}",
+                            f"Неизвестный или неподдерживаемый тип значения для вывода: {value_to_print.kumir_type}",
                             line_index=arg_ctx.start.line -1,
                             column_index=arg_ctx.start.column
                         )
-                else:
-                    # Это литерал (например, строка) или управляющая команда (нс и др.)
-                    io_val = arg_ctx.getText()
-                    if io_val.startswith('"') and io_val.endswith('"'):
-                        # Литерал строки, убираем кавычки
-                        current_output += io_val[1:-1]
-                    # Это команда 'нс' (новая строка) или другие управляющие символы
-                    if io_val.lower() == "нс":
-                        # Ничего не делаем, просто отменяем будущий перенос строки
-                        # Фактически, это означает, что end для print будет '',
-                        # но мы управляем этим через current_output
-                        pass # Мы не добавляем \n в current_output
-                    elif io_val.lower() == "переход": # Пример другой команды
-                        current_output += "\\n" 
-                    # Можно добавить другие команды
-                else:
-                    # Это значение для вывода
-                    # ...existing code...
+                # else:
+                    # Эта ветка по идее не должна срабатывать, если грамматика корректно парсит все аргументы вывода как expression.
+                    # Старая логика для NEWLINE_CONST и литералов напрямую здесь больше не нужна.
+                    # print(f"[DEBUG visitIoStatement] Arg {i+1} is NOT an expression: {arg_ctx.getText()}", file=sys.stderr)
+                    # pass # Ничего не делаем, если это не выражение. Или бросаем ошибку?
 
-            # После обработки всех аргументов, если последний не был 'нс', добавляем перенос строки
-            if not (ctx.ioArgument() and ctx.ioArgument()[-1].getText().lower() == 'нс'):
-                current_output += '\\n'
-            
-            print(f"[DEBUG statement_handlers.visitIoStatement] About to call io_handler.write_output. current_output length: {len(current_output)}. current_output: >>>{current_output}<<<", file=sys.stderr)
-            self.io_handler.write_output(current_output)
+            # print(f"[DEBUG statement_handlers.visitIoStatement] About to call io_handler.write_output. current_output length: {len(current_output)}. current_output: >>>{current_output}<<<", file=sys.stderr)
+            if hasattr(self, 'io_handler') and self.io_handler is not None:
+                self.io_handler.write_output(current_output)
+            else:
+                # Этого не должно происходить в нормальном потоке, io_handler должен быть инициализирован
+                print(f"WARNING: io_handler is not available in StatementHandler. Output: {current_output}", file=sys.stderr)
 
-        elif ctx.INPUT_KW():
-            # ...existing code...
+
+        elif ctx.INPUT_KW(): # Проверяем, что это команда ВВОД (INPUT_KW из грамматики)
+            # print(f"[DEBUG visitIoStatement] INPUT statement found.", file=sys.stderr)
+            if not hasattr(self, 'io_handler') or self.io_handler is None:
+                raise KumirRuntimeError("Обработчик ввода-вывода (io_handler) не инициализирован.",
+                                        line_index=ctx.start.line -1,
+                                        column_index=ctx.start.column)
+
+            for i, arg_ctx in enumerate(ctx.ioArgument()):
+                # print(f"[DEBUG visitIoStatement] Processing INPUT arg {i+1}: {arg_ctx.getText()}", file=sys.stderr)
+                if arg_ctx.expression(): # Аргумент ввода должен быть lvalue (переменная или элемент массива)
+                    lvalue_ctx = arg_ctx.expression().getChild(0) # Предполагаем, что expression содержит lvalue
+                                                                  # Это упрощение, нужно будет проверить структуру AST для lvalue
+                    
+                    # print(f"[DEBUG visitIoStatement] lvalue_ctx type: {type(lvalue_ctx)}", file=sys.stderr)
+                    # print(f"[DEBUG visitIoStatement] lvalue_ctx text: {lvalue_ctx.getText()}", file=sys.stderr)
+
+
+                    # Получаем информацию о переменной, чтобы знать, какой тип ожидать
+                    var_name_node = None
+                    is_array_element = False
+
+                    # Пытаемся определить, это просто переменная или элемент массива
+                    # Это очень упрощенная логика, нужно будет улучшить на основе структуры lvalue из грамматики
+                    if isinstance(lvalue_ctx, KumirParser.QualifiedIdentifierContext):
+                        var_name_node = lvalue_ctx
+                    elif hasattr(lvalue_ctx, 'qualifiedIdentifier') and callable(lvalue_ctx.qualifiedIdentifier):
+                         q_id_ctx = lvalue_ctx.qualifiedIdentifier()
+                         if q_id_ctx:
+                             var_name_node = q_id_ctx
+                             if hasattr(lvalue_ctx, 'indexList') and lvalue_ctx.indexList():
+                                 is_array_element = True
+                    
+                    if not var_name_node:
+                        # Если это не qualifiedIdentifier, возможно, это что-то вроде RETURN_VALUE() или сложная структура.
+                        # Для ввода нам нужен простой идентификатор или элемент массива.
+                        # Пока что будем считать, что это ошибка, если не можем извлечь имя переменной.
+                        # Однако, грамматика должна гарантировать, что в ioArgument для INPUT будет lvalue.
+                        # Нужно будет посмотреть, как KumirParser.ExpressionContext выглядит для lvalue.
+                        # Возможно, arg_ctx.expression() уже является LvalueContext или содержит его.
+                        
+                        # Проверим, является ли arg_ctx.expression() сам по себе LvalueContext
+                        # (если грамматика позволяет expression : lvalue;)
+                        # Или если expression содержит primary, а primary содержит lvalue
+                        
+                        # Временная заглушка - пытаемся получить текст как имя переменной
+                        # Это НЕПРАВИЛЬНО для элементов массива и требует доработки
+                        target_var_name = lvalue_ctx.getText() 
+                        # print(f"[DEBUG visitIoStatement] Assuming target_var_name (fallback): {target_var_name}", file=sys.stderr)
+
+                        # Эта логика ниже для var_info и target_type не будет работать корректно без правильного var_name
+                        # и понимания, является ли это элементом массива.
+
+                        # raise KumirSyntaxError(
+                        #     f"Аргумент {i+1} для ВВОД должен быть переменной или элементом массива, но получен {lvalue_ctx.getText()}.",
+                        #     line_index=arg_ctx.start.line -1,
+                        #     column_index=arg_ctx.start.column
+                        # )
+
+                    if var_name_node:
+                        target_var_name = var_name_node.getText()
+                        # print(f"[DEBUG visitIoStatement] Target variable name: {target_var_name}", file=sys.stderr)
+                    # else: # Если var_name_node все еще None после проверок
+                        # Это должно быть обработано выше, но на всякий случай
+                        # raise KumirSyntaxError(...)
+
+                    try:
+                        # TODO: Для элементов массива нужно будет получить тип элемента, а не тип самого массива.
+                        # Пока что, если это массив, будем ожидать строку и пытаться ее распарсить,
+                        # но это неверно для ввода отдельных элементов.
+                        var_info = self.scope_manager.get_variable_info(target_var_name)
+                        target_type = var_info.kumir_type
+                        is_array = var_info.is_array
+                        # print(f"[DEBUG visitIoStatement] Variable '{target_var_name}' info: type={target_type}, is_array={is_array}", file=sys.stderr)
+
+                    except KumirNameError:
+                        raise KumirNameError(f"Переменная '{target_var_name}' не объявлена.",
+                                             line_index=arg_ctx.start.line -1,
+                                             column_index=arg_ctx.start.column)
+
+                    # Читаем строку ввода
+                    # print(f"[DEBUG visitIoStatement] Calling io_handler.get_input_line()", file=sys.stderr)
+                    input_str = self.io_handler.get_input_line("") # Пустой prompt, т.к. КуМир не выводит prompt для ввода
+                    # print(f"[DEBUG visitIoStatement] Received input: >>>{input_str}<<<", file=sys.stderr)
+
+
+                    # Преобразуем введенную строку в нужный тип
+                    try:
+                        if is_array_element: # Ввод в элемент массива
+                            # print(f"[DEBUG visitIoStatement] Inputting into array element: {target_var_name}{lvalue_ctx.indexList().getText()}", file=sys.stderr)
+                            # Нужно вычислить индексы
+                            indices = []
+                            index_list_ctx = lvalue_ctx.indexList()
+                            if index_list_ctx.expression():
+                                for idx_expr_ctx in index_list_ctx.expression():
+                                    idx_kv = self.expression_evaluator.visit(idx_expr_ctx)
+                                    if idx_kv is None or idx_kv.kumir_type != KumirType.INT:
+                                        raise KumirTypeError(
+                                            f"Индекс для '{target_var_name}' должен быть целым числом.",
+                                            line_index=idx_expr_ctx.start.line -1,
+                                            column_index=idx_expr_ctx.start.column
+                                        )
+                                    indices.append(idx_kv.value)
+                            
+                            # Определяем тип элемента массива (должен быть базовый тип массива)
+                            # var_info.kumir_type здесь - это тип массива (например, TABLE),
+                            # а нам нужен тип элементов. ScopeManager должен предоставлять эту информацию.
+                            # Пока что будем использовать var_info.base_type, если он есть, или выводить ошибку.
+                            element_type = self.scope_manager.get_array_element_type(target_var_name)
+                            # print(f"[DEBUG visitIoStatement] Array element type for '{target_var_name}': {element_type}", file=sys.stderr)
+
+
+                            if element_type == KumirType.INT:
+                                converted_value = KumirValue(int(input_str), KumirType.INT)
+                            elif element_type == KumirType.REAL:
+                                converted_value = KumirValue(float(input_str.replace(',', '.')), KumirType.REAL)
+                            elif element_type == KumirType.BOOL:
+                                if input_str.lower() in ["истина", "true", "1"]:
+                                    converted_value = KumirValue(True, KumirType.BOOL)
+                                elif input_str.lower() in ["ложь", "false", "0"]:
+                                    converted_value = KumirValue(False, KumirType.BOOL)
+                                else:
+                                    raise ValueError("Для лог типа ожидалось 'истина' или 'ложь'.")
+                            elif element_type == KumirType.CHAR:
+                                if len(input_str) == 1:
+                                    converted_value = KumirValue(input_str, KumirType.CHAR)
+                                else:
+                                    raise ValueError("Для лит типа ожидался один символ.")
+                            elif element_type == KumirType.STR:
+                                converted_value = KumirValue(input_str, KumirType.STR)
+                            else:
+                                raise KumirTypeError(f"Ввод для элементов типа {element_type} не поддерживается.")
+                            
+                            self.scope_manager.update_table_element(target_var_name, indices, converted_value,
+                                                                    line_index=arg_ctx.start.line -1,
+                                                                    column_index=arg_ctx.start.column)
+                            # print(f"[DEBUG visitIoStatement] Updated array element {target_var_name}{indices} to {converted_value}", file=sys.stderr)
+
+
+                        else: # Ввод в простую переменную
+                            # print(f"[DEBUG visitIoStatement] Inputting into simple variable: {target_var_name}", file=sys.stderr)
+                            if target_type == KumirType.INT:
+                                converted_value = KumirValue(int(input_str), KumirType.INT)
+                            elif target_type == KumirType.REAL:
+                                converted_value = KumirValue(float(input_str.replace(',', '.')), KumirType.REAL) # Замена запятой на точку для float
+                            elif target_type == KumirType.BOOL:
+                                if input_str.lower() in ["истина", "true", "1"]: # КуМир использует "истина" / "ложь"
+                                    converted_value = KumirValue(True, KumirType.BOOL)
+                                elif input_str.lower() in ["ложь", "false", "0"]:
+                                    converted_value = KumirValue(False, KumirType.BOOL)
+                                else:
+                                    raise ValueError("Для лог типа ожидалось 'истина' или 'ложь'.")
+                            elif target_type == KumirType.CHAR:
+                                if len(input_str) == 1:
+                                    converted_value = KumirValue(input_str, KumirType.CHAR)
+                                else:
+                                    raise ValueError("Для лит типа ожидался один символ.")
+                            elif target_type == KumirType.STR:
+                                converted_value = KumirValue(input_str, KumirType.STR)
+                            # elif target_type == KumirType.TABLE:
+                            #     # Ввод целой таблицы одной строкой? Это требует специального парсинга.
+                            #     # Пока не поддерживаем.
+                            #     raise KumirNotImplementedError(f"Ввод целой таблицы '{target_var_name}' одной строкой не поддерживается.",
+                            #                                   line_index=arg_ctx.start.line -1,
+                            #                                   column_index=arg_ctx.start.column)
+                            else:
+                                raise KumirTypeError(f"Ввод для переменной типа {target_type} не поддерживается.")
+                            
+                            self.scope_manager.update_variable(target_var_name, converted_value,
+                                                               line_index=arg_ctx.start.line -1,
+                                                               column_index=arg_ctx.start.column)
+                            # print(f"[DEBUG visitIoStatement] Updated variable '{target_var_name}' to {converted_value}", file=sys.stderr)
+
+                    except ValueError as e:
+                        raise KumirTypeError(f"Ошибка преобразования ввода для '{target_var_name}': {input_str}. {e}",
+                                             line_index=arg_ctx.start.line -1,
+                                             column_index=arg_ctx.start.column)
+                else:
+                    raise KumirSyntaxError("Аргумент для ВВОД должен быть переменной или элементом массива.",
+                                           line_index=arg_ctx.start.line -1,
+                                           column_index=arg_ctx.start.column)
+        
+        return None
+
     def visitIfStatement(self, ctx: KumirParser.IfStatementContext) -> None:
         # print(f"If Statement: {ctx.expression().getText()}")
         condition_val = self.expression_evaluator.visit(ctx.expression())

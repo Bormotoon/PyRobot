@@ -115,7 +115,7 @@ def run_kumir_program(program_path: str, input_data: str | None = None) -> str:
         # interpret_kumir сам захватывает stdout и возвращает его.
         # Внешнее перенаправление через redirect_stdout(output_buffer) не нужно
         # и приводило к тому, что output_buffer оставался пустым.
-        actual_output_value = interpret_kumir(code)
+        actual_output_value = interpret_kumir(code, input_data)
             
         # DEBUG PRINT ПОСЛЕ ВЫЗОВА INTERPRET_KUMIR
         print(f"[DEBUG_RUN_KUMIR_PROGRAM] interpret_kumir returned:\n>>>\n{actual_output_value}\n<<<", file=original_stderr)
