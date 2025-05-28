@@ -1,5 +1,6 @@
 \
 # filepath: c:\\Users\\Bormotoon\\VSCodeProjects\\PyRobot\\pyrobot\\backend\\kumir_interpreter\\interpreter_components\\main_visitor.py
+import sys
 from antlr4.error.ErrorListener import ErrorListener
 from antlr4 import ParserRuleContext, TerminalNode, Token # Для ctx.toStringTree() и проверки типа узла
 from typing import Any, List, Dict, Optional, Callable, Tuple, cast
@@ -154,10 +155,19 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementVisitorMixin, Co
         self.io_handler.write_output(text)
     # КОНЕЦ ДОБАВЛЕННЫХ МЕТОДОВ
 
-    # Основной метод для запуска интерпретации с корневого узла (program)
+    # Основной метод для запуска интерпретации с корневого узла (program)    
     def visitProgram(self, ctx: KumirParser.ProgramContext):
-        # print("[DEBUG] Visiting Program")
-        # self.procedure_manager._collect_procedure_definitions(ctx) # TODO: Implement or move
+        print(f"\n!!! [DEBUG main_visitor.visitProgram] CALLED! Context: {ctx.getText()[:100]}... !!!", file=sys.stderr)
+        
+        # DEBUG: расширенная отладка
+        with open("debug_interpret.log", "a", encoding="utf-8") as f:
+            f.write(f"visitProgram: ctx has {len(ctx.children) if ctx.children else 0} children\n")
+            if ctx.children:
+                for i, child in enumerate(ctx.children):
+                    f.write(f"  Child {i}: {type(child).__name__} = {child.getText()[:50]}\n")
+            
+            f.write(f"ctx.programItem() count: {len(ctx.programItem()) if ctx.programItem() else 0}\n")
+            f.write(f"ctx.moduleDefinition() count: {len(ctx.moduleDefinition()) if ctx.moduleDefinition() else 0}\n")
         
         # Обработка глобальных объявлений и присваиваний (programItem*)
         if ctx.programItem():
@@ -173,13 +183,29 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementVisitorMixin, Co
         # Это важно, чтобы процедуры были известны до их вызова
         if ctx.moduleDefinition():
             for mod_def_ctx in ctx.moduleDefinition():
+                # DEBUG: 
+                with open("debug_interpret.log", "a", encoding="utf-8") as f:
+                    f.write(f"Processing moduleDefinition: {mod_def_ctx.getText()[:100]}\n")
+                    f.write(f"  has implicitModuleBody: {mod_def_ctx.implicitModuleBody() is not None}\n")
+                    f.write(f"  has moduleBody: {mod_def_ctx.moduleBody() is not None}\n")
+                
                 if mod_def_ctx.implicitModuleBody():
+                    with open("debug_interpret.log", "a", encoding="utf-8") as f:
+                        f.write(f"  Processing implicitModuleBody\n")
+                        f.write(f"    algorithmDefinition count: {len(mod_def_ctx.implicitModuleBody().algorithmDefinition()) if mod_def_ctx.implicitModuleBody().algorithmDefinition() else 0}\n")
+                    
                     if mod_def_ctx.implicitModuleBody().algorithmDefinition():
                         for alg_def_ctx in mod_def_ctx.implicitModuleBody().algorithmDefinition():
+                            with open("debug_interpret.log", "a", encoding="utf-8") as f:
+                                f.write(f"      Calling visitAlgorithmDefinition for: {alg_def_ctx.getText()[:50]}\n")
                             self.visitAlgorithmDefinition(alg_def_ctx) # Собираем информацию
                 elif mod_def_ctx.moduleBody(): # Явный модуль
+                    with open("debug_interpret.log", "a", encoding="utf-8") as f:
+                        f.write(f"  Processing explicit moduleBody\n")
                     if mod_def_ctx.moduleBody().algorithmDefinition():
                         for alg_def_ctx in mod_def_ctx.moduleBody().algorithmDefinition():
+                            with open("debug_interpret.log", "a", encoding="utf-8") as f:
+                                f.write(f"      Calling visitAlgorithmDefinition for: {alg_def_ctx.getText()[:50]}\n")
                             self.visitAlgorithmDefinition(alg_def_ctx) # Собираем информацию
         
         # Ищем "главный" алгоритм для выполнения или первый попавшийся, если "главного" нет
@@ -690,8 +716,8 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementVisitorMixin, Co
         
         return None # Глобальные объявления не возвращают значения для выражений
 
-    # KumirParser.ProcedureCallStatementContext
-    def visitProcedureCallStatement(self, ctx: KumirParser.ProcedureCallStatementContext):
+    # KumirParser.ProcedureCallStatementContext    def visitProcedureCallStatement(self, ctx: KumirParser.ProcedureCallStatementContext):
+        print(f"\n!!! [DEBUG main_visitor.visitProcedureCallStatement] CALLED! Context: {ctx.getText()} !!!", file=sys.stderr)
         # print(f"[DEBUG VISIT] ProcedureCallStatement: {ctx.getText()}")
         # procedureCallStatement : qualifiedIdentifier LPAREN (expression (COMMA expression)*)? RPAREN SEMI ;
         proc_name = ctx.qualifiedIdentifier().getText().lower()
@@ -716,8 +742,8 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementVisitorMixin, Co
             ctx.qualifiedIdentifier() # Для контекста ошибок
         )
 
-    # KumirParser.AssignmentStatementContext
-    def visitAssignmentStatement(self, ctx: KumirParser.AssignmentStatementContext):
+    # KumirParser.AssignmentStatementContext    def visitAssignmentStatement(self, ctx: KumirParser.AssignmentStatementContext):
+        print(f"\n!!! [DEBUG main_visitor.visitAssignmentStatement] CALLED! Context: {ctx.getText()} !!!", file=sys.stderr)
         # print(f"[DEBUG VISIT] AssignmentStatement: {ctx.getText()}")
         # assignmentStatement : qualifiedIdentifier ASSIGN expression SEMI ;
         var_name = ctx.qualifiedIdentifier().getText()
@@ -746,30 +772,10 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementVisitorMixin, Co
             var_info['is_table'] = True
             var_info['type'] += 'таб' # Добавляем 'таб' к типу
 
-        validated_value = cast(KumirInterpreterVisitor, self)._validate_and_convert_value_for_assignment(
-            value_to_assign, 
+        validated_value = cast(KumirInterpreterVisitor, self)._validate_and_convert_value_for_assignment(            value_to_assign, 
             var_info['type'], 
             var_name,
             var_info['is_table']
         )
         self.scope_manager.update_variable(var_name, validated_value, ctx.qualifiedIdentifier())
         return None
-
-    # KumirParser.ReturnStatementContext
-    def visitReturnStatement(self, ctx: KumirParser.ReturnStatementContext):
-        # print(f"[DEBUG VISIT] ReturnStatement: {ctx.getText()}")
-        # returnStatement : KW_ВОЗВРАТ (expression)? SEMI ;
-        return_value = None
-        if ctx.expression():
-            return_value = self.visit(ctx.expression())
-        
-        # Обработка специального случая с 'знач'
-        if return_value is None:
-            # Если ничего не возвращается, но функция должна вернуть значение
-            # Проверяем, было ли присвоено 'знач'
-            znach_val_info = self.scope_manager.lookup_variable('знач', ctx)
-            if znach_val_info:
-                return_value = znach_val_info['value']
-        
-        # Генерируем сигнал выхода с возвращаемым значением
-        raise ExitSignal(return_value)

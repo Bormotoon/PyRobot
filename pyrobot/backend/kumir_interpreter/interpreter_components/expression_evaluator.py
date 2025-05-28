@@ -85,28 +85,37 @@ class ExpressionEvaluator(KumirParserVisitor):
         pass # Обычно не используется в ExpressionEvaluator
 
     def visitLiteral(self, ctx: KumirParser.LiteralContext) -> KumirValue:
+        print(f"!!! [DEBUG ExpressionEvaluator.visitLiteral] CALLED! Context: {ctx.getText()} !!!", file=sys.stderr)
         text = ctx.getText()
-        if ctx.INTEGER(): # Исправлено
+        print(f"!!! [DEBUG ExpressionEvaluator.visitLiteral] text = '{text}' !!!", file=sys.stderr)
+        print(f"!!! [DEBUG ExpressionEvaluator.visitLiteral] ctx.INTEGER() = {ctx.INTEGER()} !!!", file=sys.stderr)
+        print(f"!!! [DEBUG ExpressionEvaluator.visitLiteral] ctx.REAL() = {ctx.REAL()} !!!", file=sys.stderr)
+        print(f"!!! [DEBUG ExpressionEvaluator.visitLiteral] ctx.STRING() = {ctx.STRING()} !!!", file=sys.stderr)
+        print(f"!!! [DEBUG ExpressionEvaluator.visitLiteral] ctx.TRUE() = {ctx.TRUE()} !!!", file=sys.stderr)
+        print(f"!!! [DEBUG ExpressionEvaluator.visitLiteral] ctx.FALSE() = {ctx.FALSE()} !!!", file=sys.stderr)
+        print(f"!!! [DEBUG ExpressionEvaluator.visitLiteral] ctx.NEWLINE_CONST() = {ctx.NEWLINE_CONST()} !!!", file=sys.stderr)
+        
+        if ctx.INTEGER():
             return KumirValue(value=int(text), kumir_type=KumirType.INT.value)
-        elif ctx.REAL(): # Исправлено
+        elif ctx.REAL():
             # Кумир использует запятую как десятичный разделитель
-            return KumirValue(value=float(text.replace(',', '.')), kumir_type=KumirType.REAL.value) # Убедимся, что экранирование корректно
-        elif ctx.STRING(): # Исправлено
+            return KumirValue(value=float(text.replace(',', '.')), kumir_type=KumirType.REAL.value)
+        elif ctx.STRING():
             # Удаляем кавычки в начале и в конце
             return KumirValue(value=text[1:-1], kumir_type=KumirType.STR.value)
-        elif ctx.TRUE(): # Исправлено
+        elif ctx.TRUE():
             return KumirValue(value=True, kumir_type=KumirType.BOOL.value)
-        elif ctx.FALSE(): # Исправлено
+        elif ctx.FALSE():
             return KumirValue(value=False, kumir_type=KumirType.BOOL.value)
-        # TODO: Добавить обработку CHAR_LITERAL, colorLiteral, NEWLINE_CONST из грамматики
+        elif ctx.NEWLINE_CONST():
+            # 'нс' - специальная константа для подавления автоматического перевода строки
+            return KumirValue(value="", kumir_type=KumirType.STR.value)
+        # TODO: Добавить обработку CHAR_LITERAL, colorLiteral из грамматики
         # elif ctx.CHAR_LITERAL():
         #     # ... логика для символьных литералов ...
         #     pass
         # elif ctx.colorLiteral():
         #     # ... логика для цветовых литералов ...
-        #     pass
-        # elif ctx.NEWLINE_CONST():
-        #     # ... логика для нс ...
         #     pass
         else:
             pos = self._position_from_token(self._get_token_for_position(ctx))
@@ -332,7 +341,98 @@ class ExpressionEvaluator(KumirParserVisitor):
         else:
             # Эта ветка по идее не должна достигаться
             raise KumirEvalError(f"Неизвестный аддитивный оператор: {op_token.text}", line_index=op_token.line - 1, column_index=op_token.column)
-    # ... existing code ...
+
+    def visitLogicalOrExpression(self, ctx: KumirParser.LogicalOrExpressionContext) -> KumirValue:
+        """Обрабатывает логическое ИЛИ выражение"""
+        print(f"!!! [DEBUG ExpressionEvaluator.visitLogicalOrExpression] CALLED! Context: {ctx.getText()} !!!", file=sys.stderr)
+        # Пока просто делегируем к следующему уровню
+        return self.visit(ctx.logicalAndExpression(0))  # Берем первый элемент
+
+    def visitLogicalAndExpression(self, ctx: KumirParser.LogicalAndExpressionContext) -> KumirValue:
+        """Обрабатывает логическое И выражение"""
+        print(f"!!! [DEBUG ExpressionEvaluator.visitLogicalAndExpression] CALLED! Context: {ctx.getText()} !!!", file=sys.stderr)
+        # Пока просто делегируем к следующему уровню
+        return self.visit(ctx.equalityExpression(0))  # Берем первый элемент
+
+    def visitEqualityExpression(self, ctx: KumirParser.EqualityExpressionContext) -> KumirValue:
+        """Обрабатывает выражения равенства"""
+        print(f"!!! [DEBUG ExpressionEvaluator.visitEqualityExpression] CALLED! Context: {ctx.getText()} !!!", file=sys.stderr)
+        # Пока просто делегируем к следующему уровню
+        return self.visit(ctx.relationalExpression(0))  # Берем первый элемент
+
+    def visitRelationalExpression(self, ctx: KumirParser.RelationalExpressionContext) -> KumirValue:
+        """Обрабатывает реляционные выражения"""
+        print(f"!!! [DEBUG ExpressionEvaluator.visitRelationalExpression] CALLED! Context: {ctx.getText()} !!!", file=sys.stderr)
+        # Пока просто делегируем к следующему уровню
+        return self.visit(ctx.additiveExpression(0))  # Берем первый элемент
+
+    def visitAdditiveExpression(self, ctx: KumirParser.AdditiveExpressionContext) -> KumirValue:
+        """Обрабатывает аддитивные выражения"""
+        print(f"!!! [DEBUG ExpressionEvaluator.visitAdditiveExpression] CALLED! Context: {ctx.getText()} !!!", file=sys.stderr)
+        # Пока просто делегируем к следующему уровню
+        return self.visit(ctx.multiplicativeExpression(0))  # Берем первый элемент
+
+    def visitMultiplicativeExpression(self, ctx: KumirParser.MultiplicativeExpressionContext) -> KumirValue:
+        """Обрабатывает мультипликативные выражения"""
+        print(f"!!! [DEBUG ExpressionEvaluator.visitMultiplicativeExpression] CALLED! Context: {ctx.getText()} !!!", file=sys.stderr)
+        # Пока просто делегируем к следующему уровню
+        return self.visit(ctx.powerExpression(0))  # Берем первый элемент
+
+    def visitPowerExpression(self, ctx: KumirParser.PowerExpressionContext) -> KumirValue:
+        """Обрабатывает выражения возведения в степень"""
+        print(f"!!! [DEBUG ExpressionEvaluator.visitPowerExpression] CALLED! Context: {ctx.getText()} !!!", file=sys.stderr)
+        # Пока просто делегируем к следующему уровню
+        return self.visit(ctx.unaryExpression())
+
+    def visitUnaryExpression(self, ctx: KumirParser.UnaryExpressionContext) -> KumirValue:
+        """Обрабатывает унарные выражения"""
+        print(f"!!! [DEBUG ExpressionEvaluator.visitUnaryExpression] CALLED! Context: {ctx.getText()} !!!", file=sys.stderr)
+        # Пока просто делегируем к следующему уровню
+        return self.visit(ctx.postfixExpression())
+
+    def visitPostfixExpression(self, ctx: KumirParser.PostfixExpressionContext) -> KumirValue:
+        """Обрабатывает постфиксные выражения"""
+        print(f"!!! [DEBUG ExpressionEvaluator.visitPostfixExpression] CALLED! Context: {ctx.getText()} !!!", file=sys.stderr)
+        # Пока просто делегируем к следующему уровню
+        return self.visit(ctx.primaryExpression())
+
+    def visitPrimaryExpression(self, ctx: KumirParser.PrimaryExpressionContext) -> KumirValue:
+        """Обрабатывает базовые выражения"""
+        print(f"!!! [DEBUG ExpressionEvaluator.visitPrimaryExpression] CALLED! Context: {ctx.getText()} !!!", file=sys.stderr)
+        print(f"!!! [DEBUG ExpressionEvaluator.visitPrimaryExpression] ctx.literal(): {ctx.literal()} !!!", file=sys.stderr)
+        print(f"!!! [DEBUG ExpressionEvaluator.visitPrimaryExpression] ctx.qualifiedIdentifier(): {ctx.qualifiedIdentifier()} !!!", file=sys.stderr)
+        print(f"!!! [DEBUG ExpressionEvaluator.visitPrimaryExpression] ctx.RETURN_VALUE(): {ctx.RETURN_VALUE()} !!!", file=sys.stderr)
+        print(f"!!! [DEBUG ExpressionEvaluator.visitPrimaryExpression] ctx.expression(): {ctx.expression()} !!!", file=sys.stderr)
+        print(f"!!! [DEBUG ExpressionEvaluator.visitPrimaryExpression] ctx.arrayLiteral(): {ctx.arrayLiteral()} !!!", file=sys.stderr)
+          # Проверяем, что это за тип базового выражения
+        if ctx.literal():
+            print(f"!!! [DEBUG ExpressionEvaluator.visitPrimaryExpression] Delegating to literal !!!", file=sys.stderr)
+            print(f"!!! [DEBUG ExpressionEvaluator.visitPrimaryExpression] ctx.literal() type: {type(ctx.literal())} !!!", file=sys.stderr)
+            literal_ctx = ctx.literal()
+            if isinstance(literal_ctx, list) and len(literal_ctx) > 0:
+                return self.visit(literal_ctx[0])
+            else:
+                return self.visit(literal_ctx)
+        elif ctx.qualifiedIdentifier():
+            # TODO: обработка переменных
+            raise KumirNotImplementedError("Переменные пока не поддерживаются", 
+                                          line_index=ctx.start.line, column_index=ctx.start.column)
+        elif ctx.RETURN_VALUE():
+            # TODO: обработка 'знач'
+            raise KumirNotImplementedError("RETURN_VALUE пока не поддерживается", 
+                                          line_index=ctx.start.line, column_index=ctx.start.column)
+        elif ctx.expression():
+            # Скобочное выражение
+            return self.visit(ctx.expression())
+        elif ctx.arrayLiteral():
+            # TODO: обработка массивов
+            raise KumirNotImplementedError("Литералы массивов пока не поддерживаются", 
+                                          line_index=ctx.start.line, column_index=ctx.start.column)
+        else:
+            print(f"!!! [DEBUG ExpressionEvaluator.visitPrimaryExpression] NO MATCH! !!!", file=sys.stderr)
+            raise KumirNotImplementedError(f"Неизвестный тип primaryExpression: {ctx.getText()}", 
+                                          line_index=ctx.start.line, column_index=ctx.start.column)
+
     def visitSimpleAssignmentExpression(self, ctx: KumirParser.SimpleAssignmentExpressionContext) -> KumirValue:
         lvalue_node = ctx.lvalue() 
         var_name_node: Optional[Token] = None # Указываем, что это может быть токен или None
@@ -465,3 +565,17 @@ class ExpressionEvaluator(KumirParserVisitor):
         
         # Выражение присваивания в КуМир (если оно разрешено как выражение) должно возвращать присвоенное значение.
         return value_to_assign
+
+    def visitExpression(self, ctx: KumirParser.ExpressionContext) -> KumirValue:
+        """Обрабатывает Expression узел, делегируя обработку дальше по дереву"""
+        print(f"!!! [DEBUG ExpressionEvaluator.visitExpression] CALLED! Context: {ctx.getText()} !!!", file=sys.stderr)
+        # Expression -> logicalOrExpression, делегируем обработку
+        return self.visit(ctx.logicalOrExpression())
+
+    def visit(self, tree) -> KumirValue:
+        """Общий метод visit для обхода AST дерева"""
+        print(f"!!! [DEBUG ExpressionEvaluator.visit] CALLED! Tree: {tree.getText() if hasattr(tree, 'getText') else str(tree)} !!!", file=sys.stderr)
+        print(f"!!! [DEBUG ExpressionEvaluator.visit] Tree type: {type(tree).__name__} !!!", file=sys.stderr)
+        result = super().visit(tree)
+        print(f"!!! [DEBUG ExpressionEvaluator.visit] RESULT: {result} !!!", file=sys.stderr)
+        return result

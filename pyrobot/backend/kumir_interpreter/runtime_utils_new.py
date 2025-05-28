@@ -113,33 +113,6 @@ def interpret_kumir(code: str, input_data: Optional[str] = None) -> str:
         with open("debug_interpret.log", "a", encoding="utf-8") as debug_f:
             debug_f.write(f"visitor.visitProgram(tree) completed successfully\n")
             
-        # После сбора определений алгоритмов, нужно найти и запустить главный алгоритм
-        # В КуМире обычно есть один алгоритм без параметров, который запускается автоматически
-        with open("debug_interpret.log", "a", encoding="utf-8") as debug_f:
-            debug_f.write(f"Available procedures: {list(visitor.procedure_manager.procedures.keys())}\n")
-            
-        # Ищем алгоритм для запуска
-        # Может быть "главный" или единственный алгоритм
-        algorithm_to_run = None
-        
-        if visitor.procedure_manager.procedures:
-            # Сначала ищем алгоритм с именем "главный"
-            if "главный" in visitor.procedure_manager.procedures:
-                algorithm_to_run = "главный"
-            else:
-                # Если нет "главного", берем первый попавшийся алгоритм
-                algorithm_to_run = list(visitor.procedure_manager.procedures.keys())[0]
-        
-        if algorithm_to_run:
-            with open("debug_interpret.log", "a", encoding="utf-8") as debug_f:
-                debug_f.write(f"Executing algorithm: {algorithm_to_run}\n")
-            visitor.execute_algorithm_node(algorithm_to_run)
-            with open("debug_interpret.log", "a", encoding="utf-8") as debug_f:
-                debug_f.write(f"Algorithm {algorithm_to_run} executed successfully\n")
-        else:
-            with open("debug_interpret.log", "a", encoding="utf-8") as debug_f:
-                debug_f.write(f"No algorithms found to execute\n")
-            
     except KumirInputRequiredError:
         pass 
     except KumirSyntaxError as e: 

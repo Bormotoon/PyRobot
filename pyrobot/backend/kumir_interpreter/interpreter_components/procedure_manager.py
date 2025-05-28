@@ -1,4 +1,5 @@
 # Functions for managing user-defined procedures and functions (algorithms) 
+import sys
 from typing import Dict, Any, List, Optional, TYPE_CHECKING, Union, Tuple # <--- ДОБАВЛЕН Tuple, List, Optional (List, Optional уже были, Tuple добавлен)
 from antlr4 import ParserRuleContext # Убрана TerminalNode, она импортируется ниже, если нужна
 from antlr4.tree.Tree import TerminalNode # Импорт TerminalNode
@@ -15,11 +16,10 @@ if TYPE_CHECKING:
     from ..interpreter import KumirInterpreterVisitor # Для тайп-хинтинга родительского визитора
 
 class ProcedureManager:
-    def __init__(self, visitor: 'KumirInterpreterVisitor'): # ИСПРАВЛЕНО: Убраны лишние \\'
-        self.visitor = visitor
+    def __init__(self, visitor: 'KumirInterpreterVisitor'): # ИСПРАВЛЕНО: Убраны лишние \\'        self.visitor = visitor
         self.procedures: Dict[str, Dict[str, Any]] = {} # {name_lower: {name, ctx, params, is_func, result_type}}
         self._current_procedure_return_value: Optional[KumirValue] = None # Для хранения значения из "знач"
-
+        
     def set_return_value(self, value_to_assign: KumirValue) -> None:
         """
         Устанавливает возвращаемое значение для текущей выполняемой функции.
@@ -28,6 +28,26 @@ class ProcedureManager:
         # TODO: Проверить, что мы находимся внутри вызова функции, а не процедуры.
         # TODO: Проверить тип value_to_assign с ожидаемым типом возврата функции.
         self._current_procedure_return_value = value_to_assign
+
+    def register_procedure(self, name: str, ctx: KumirParser.AlgorithmDefinitionContext, 
+                          is_function: bool = False, result_type: str = VOID_TYPE) -> None:
+        """
+        Регистрирует процедуру или функцию в менеджере процедур.
+        """
+        name_lower = name.lower()
+        
+        if name_lower in self.procedures:
+            raise DeclarationError(f"Алгоритм с именем '{name}' уже определен.")
+        
+        self.procedures[name_lower] = {
+            'name': name,
+            'ctx': ctx,
+            'params': {},  # TODO: извлечь параметры
+            'is_func': is_function,
+            'result_type': result_type
+        }
+        
+        print(f"[DEBUG][ProcedureManager] Зарегистрирован алгоритм '{name}' (функция: {is_function})", file=sys.stderr)
 
     def call_procedure(self, proc_name: str, actual_args: List[Dict[str, Any]], 
                        line_index: int, column_index: int) -> None:

@@ -369,3 +369,35 @@
 
 8.  **Документация:**
     *   Обновлять `AI_notes.md` с прогрессом, обнаруженными проблемами и их решениями.
+
+---
+
+### 23. ТЕКУЩАЯ ПРОБЛЕМА: visitLiteral не вызывается (28.05.2025)
+
+**ОБНАРУЖЕННАЯ ПРОБЛЕМА:** Visitor pattern не маршрутизирует вызовы к `visitLiteral`, хотя контекст имеет правильный тип `LiteralContext`.
+
+**ДЕТАЛЬНАЯ ДИАГНОСТИКА:**
+- ✓ Цепочка visitor методов работает: `visitExpression` → `visitLogicalOrExpression` → ... → `visitPrimaryExpression` 
+- ✓ `visitPrimaryExpression` правильно определяет, что это литерал: `ctx.literal()` возвращает объект типа `LiteralContext`
+- ✓ Вызывается `self.visit(ctx.literal())` с правильным контекстом
+- ✗ **ПРОБЛЕМА:** Метод `visitLiteral` не вызывается, хотя контекст типа `LiteralContext` передается в `visit()`
+
+**ЛОГИ ОТЛАДКИ:**
+```
+!!! [DEBUG ExpressionEvaluator.visitPrimaryExpression] ctx.literal() type: <class 'pyrobot.backend.kumir_interpreter.generated.KumirParser.KumirParser.LiteralContext'> !!!
+!!! [DEBUG ExpressionEvaluator.visit] CALLED! Tree: '2+' !!!
+!!! [DEBUG ExpressionEvaluator.visit] Tree type: LiteralContext !!!
+!!! [DEBUG ExpressionEvaluator.visit] RESULT: None !!!
+```
+
+**ГИПОТЕЗЫ:**
+1. **Имя метода:** Возможно, правило в грамматике называется не `literal`, а по-другому
+2. **Базовый класс:** Возможно, проблема с наследованием или переопределением метода
+3. **Сгенерированный visitor:** Возможно, ANTLR сгенерировал visitor с другими именами методов
+
+**СЛЕДУЮЩИЕ ШАГИ:** 
+- Проверить сгенерированный KumirParserVisitor на предмет правильных имен методов
+- Возможно, попробовать переименовать `visitLiteral` в другое имя
+- Или добавить метод с правильным именем из сгенерированной грамматики
+
+**КОД В РАБОТЕ:** ExpressionEvaluator.visitLiteral(), visitPrimaryExpression() с подробной отладкой

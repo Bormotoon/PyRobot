@@ -203,49 +203,36 @@ class DeclarationVisitorMixin:
 
     # Based on KumirParser.g4, 'variableDeclaration' seems to be the main rule for declarations
     # within a statement context. Other specific declaration-like rules might be for global scope
-    # or specific algorithm parts. For now, focusing on visitVariableDeclaration.
-
-    # Placeholder for procedure/function declaration (handled by visitAlgorithmDefinition)
+    # or specific algorithm parts. For now, focusing on visitVariableDeclaration.    # Placeholder for procedure/function declaration (handled by visitAlgorithmDefinition)
     def visitAlgorithmDefinition(self, ctx: KumirParser.AlgorithmDefinitionContext):
         kiv_self = cast('KumirInterpreterVisitor', self)
-        # Logic for registering procedures/functions using kiv_self.procedure_manager
-        # This will involve extracting name, parameters, body, etc.
-        # For example:
         algo_header_ctx = ctx.algorithmHeader()
-        algo_name_tokens = algo_header_ctx.algorithmNameTokens().getText() # Simplified
+        algo_name_tokens = algo_header_ctx.algorithmNameTokens().getText().strip()
         is_func = algo_header_ctx.typeSpecifier() is not None
         
         print(f"[DEBUG][DeclVisitor] Visiting Algorithm Definition for: {algo_name_tokens}, Is function: {is_func}", file=sys.stderr)
 
-        # Detailed implementation would go here to extract params, return type, body context
-        # and then register with procedure_manager
-        # kiv_self.procedure_manager.register_procedure(...) or register_function(...)
-        
-        # After registration, if it's the main algorithm to be executed immediately (not just declared),
-        # the visitor might proceed to visit the body. Otherwise, it just registers.
-        # For now, we assume this visitor is part of a full interpretation pass.
-        
-        # If procedures/functions are only declared and then called, actual execution of their body
-        # happens when visitProcedureCallStatement or similar is invoked.
-        # However, the main algorithm block is typically executed after parsing.
+        # Определяем тип возвращаемого значения для функций
+        result_type = "void"
+        if is_func:
+            try:
+                result_type, _ = get_type_info_from_specifier(kiv_self, algo_header_ctx.typeSpecifier())
+            except Exception as e:
+                print(f"[ERROR][DeclVisitor] Failed to get return type for function {algo_name_tokens}: {e}", file=sys.stderr)
+                result_type = "вещ"  # Fallback to float type
 
-        # Let's assume for now that if we are visiting an AlgorithmDefinition,
-        # we should try to execute its body if it's the main 'алг' block.
-        # This needs careful handling of scopes and execution flow.
-
-        # For simplicity in this refactoring step, we will assume that the actual execution
-        # of the main algorithm or called procedures/functions is handled by other parts
-        # of the KumirInterpreterVisitor (e.g., a top-level interpret method or specific
-        # call visitors).
-        # This mixin method primarily ensures they are *declared* (registered).
-
-        # Example of how it might be structured if this visitor also handles execution:
-        # if kiv_self.is_main_algorithm(algo_name_tokens): # Some logic to identify the entry point
-        #     kiv_self.scope_manager.enter_scope(f"algo_{algo_name_tokens}")
-        #     # Process parameters if any
-        #     self.visit(ctx.algorithmBody()) # Execute body
-        #     # Handle return value for functions
-        #     kiv_self.scope_manager.exit_scope()
+        # Регистрируем процедуру/функцию
+        try:
+            kiv_self.procedure_manager.register_procedure(
+                name=algo_name_tokens,
+                ctx=ctx,
+                is_function=is_func,
+                result_type=result_type
+            )
+            print(f"[DEBUG][DeclVisitor] Successfully registered {'function' if is_func else 'procedure'}: {algo_name_tokens}", file=sys.stderr)
+        except Exception as e:
+            print(f"[ERROR][DeclVisitor] Failed to register {algo_name_tokens}: {e}", file=sys.stderr)
+            raise
 
         return None # Algorithm definition is a declaration, not an expression with a value
 

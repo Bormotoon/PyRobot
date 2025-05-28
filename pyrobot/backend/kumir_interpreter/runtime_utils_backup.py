@@ -40,8 +40,6 @@ def interpret_kumir(code: str, input_data: Optional[str] = None) -> str:
     
     print(f"\n!!! [DEBUG runtime_utils.interpret_kumir] CALLED! Code first 100 chars: {code[:100]!r} !!!", file=sys.stderr)
     logger.debug(f"interpret_kumir called with code:\\n{code}") # Лог входного кода
-    
-    # Создаем лексер и парсер
     input_stream_antl = InputStream(code)
     lexer = KumirLexer(input_stream_antl)
     lexer.removeErrorListeners()
@@ -53,31 +51,19 @@ def interpret_kumir(code: str, input_data: Optional[str] = None) -> str:
     parser.removeErrorListeners()
     parser.addErrorListener(error_listener)
 
-    # Парсим код
     tree = None
     try:
-        with open("debug_interpret.log", "a", encoding="utf-8") as f:
-            f.write("About to parse code with parser.program()\n")
         tree = parser.program()
-        with open("debug_interpret.log", "a", encoding="utf-8") as f:
-            f.write(f"Parsing successful! Tree type: {type(tree)}\n")
-            f.write(f"Tree text first 100 chars: {tree.getText()[:100]}\n")
     except KumirSyntaxError as e:
-        line_info = f"строка {e.line_index + 1}" if hasattr(e, 'line_index') and e.line_index is not None else "N/A"
-        col_info = f", столбец {e.column_index}" if hasattr(e, 'column_index') and e.column_index is not None else ""
+        line_info = f"строка {e.line_index + 1}" if e.line_index is not None else "N/A"
+        col_info = f", столбец {e.column_index}" if e.column_index is not None else ""
         return f"SYNTAX_ERROR: {e.args[0]} ({line_info}{col_info})"
     except Exception as e:
         error_info = f"UNEXPECTED_PARSING_ERROR: {type(e).__name__}: {e}"
-        with open("debug_interpret.log", "a", encoding="utf-8") as f:
-            f.write(f"PARSING ERROR: {error_info}\n")
-        return error_info
-
-    # Настраиваем захват вывода
-    original_stdout = sys.stdout
+        return error_info    original_stdout = sys.stdout
     captured_output = StringIO()
     sys.stdout = captured_output
 
-    # Настраиваем входные данные
     input_buffer = StringIO(input_data if input_data else "")
     program_lines_list = code.splitlines()
 
@@ -88,13 +74,12 @@ def interpret_kumir(code: str, input_data: Optional[str] = None) -> str:
     def output_fn(text: str):
         logger.debug(f"output_fn called with text: '{text}'") # Лог вызова output_fn
         captured_output.write(text)
-        with open("debug_interpret.log", "a", encoding="utf-8") as f:
-            f.write(f"output_fn called with: {text!r}\n")
+        # captured_output.flush() # Для StringIO обычно не нужен, но можно добавить для консистентности
         
     def error_fn(text: str):
         sys.stderr.write(text)
+        # sys.stderr.flush() # Для stderr может быть полезно
 
-    # Создаем visitor
     visitor = KumirInterpreterVisitor(
         input_stream=input_fn,
         output_stream=output_fn, 
@@ -102,49 +87,24 @@ def interpret_kumir(code: str, input_data: Optional[str] = None) -> str:
         program_lines=program_lines_list
     )
     
-    # DEBUG: проверяем что visitor создался
+    # DEBUG: записываем в файл для отладки
     with open("debug_interpret.log", "a", encoding="utf-8") as f:
-        f.write(f"Visitor created successfully. Type: {type(visitor)}\n")
-        f.write(f"About to call visitor.visitProgram(tree)\n")
+        f.write(f"About to call visitor.visitProgram(tree). Tree type: {type(tree)}\n")
+        if tree is None:
+            f.write("CRITICAL: tree is None!\n")
+        else:
+            f.write(f"Tree text first 100 chars: {tree.getText()[:100]}\n")
         
-    # Выполняем программу
     try:
         visitor.visitProgram(tree)
         with open("debug_interpret.log", "a", encoding="utf-8") as debug_f:
             debug_f.write(f"visitor.visitProgram(tree) completed successfully\n")
             
-        # После сбора определений алгоритмов, нужно найти и запустить главный алгоритм
-        # В КуМире обычно есть один алгоритм без параметров, который запускается автоматически
-        with open("debug_interpret.log", "a", encoding="utf-8") as debug_f:
-            debug_f.write(f"Available procedures: {list(visitor.procedure_manager.procedures.keys())}\n")
-            
-        # Ищем алгоритм для запуска
-        # Может быть "главный" или единственный алгоритм
-        algorithm_to_run = None
-        
-        if visitor.procedure_manager.procedures:
-            # Сначала ищем алгоритм с именем "главный"
-            if "главный" in visitor.procedure_manager.procedures:
-                algorithm_to_run = "главный"
-            else:
-                # Если нет "главного", берем первый попавшийся алгоритм
-                algorithm_to_run = list(visitor.procedure_manager.procedures.keys())[0]
-        
-        if algorithm_to_run:
-            with open("debug_interpret.log", "a", encoding="utf-8") as debug_f:
-                debug_f.write(f"Executing algorithm: {algorithm_to_run}\n")
-            visitor.execute_algorithm_node(algorithm_to_run)
-            with open("debug_interpret.log", "a", encoding="utf-8") as debug_f:
-                debug_f.write(f"Algorithm {algorithm_to_run} executed successfully\n")
-        else:
-            with open("debug_interpret.log", "a", encoding="utf-8") as debug_f:
-                debug_f.write(f"No algorithms found to execute\n")
-            
     except KumirInputRequiredError:
         pass 
     except KumirSyntaxError as e: 
-        line_info = f"строка {e.line_index + 1}" if hasattr(e, 'line_index') and e.line_index is not None else "N/A"
-        col_info = f", столбец {e.column_index}" if hasattr(e, 'column_index') and e.column_index is not None else ""
+        line_info = f"строка {e.line_index + 1}" if e.line_index is not None else "N/A"
+        col_info = f", столбец {e.column_index}" if e.column_index is not None else ""
         captured_output.write(f"\\nRUNTIME_SYNTAX_ERROR: {e.args[0]} ({line_info}{col_info})")
     except KumirRuntimeError as e:
         line_info = f"строка {e.line_index + 1}" if hasattr(e, 'line_index') and e.line_index is not None else "N/A"
@@ -159,7 +119,6 @@ def interpret_kumir(code: str, input_data: Optional[str] = None) -> str:
     finally:
         sys.stdout = original_stdout
 
-    # Получаем результат
     final_output = captured_output.getvalue()
     logger.debug(f"interpret_kumir returning output:\\n{final_output}") # Лог возвращаемого значения
     
