@@ -1,8 +1,10 @@
+import sys
 from typing import TYPE_CHECKING, cast, Optional, Any
 
 from ..generated.KumirParser import KumirParser
 from ..kumir_exceptions import BreakSignal, KumirTypeError, KumirRuntimeError, KumirNameError, KumirNotImplementedError, StopExecutionSignal
 from ..kumir_datatypes import KumirValue, KumirType # Для проверки типов результатов выражений, KumirType для объявления переменной цикла
+from ..utils import KumirTypeConverter
 
 if TYPE_CHECKING:
     from .main_visitor import KumirInterpreterVisitor
@@ -10,8 +12,34 @@ if TYPE_CHECKING:
 
 class ControlFlowVisitorMixin:
 
+    def _evaluate_condition(self, condition_val: KumirValue, context_name: str, expr_ctx) -> bool:
+        """
+        Evaluates a KumirValue as a boolean condition following Kumir semantics.
+        For integers: 0 = False, non-zero = True
+        For booleans: direct evaluation
+        For other types: raises KumirTypeError
+        """
+        if condition_val is None:
+            raise KumirTypeError(
+                f"Условие в {context_name} не может быть неопределенным значением",
+                line_index=expr_ctx.start.line -1,
+                column_index=expr_ctx.start.column
+            )
+        
+        try:
+            converter = KumirTypeConverter()
+            return converter.to_python_bool(condition_val)
+        except KumirTypeError as e:
+            # Re-raise with more specific context
+            raise KumirTypeError(
+                f"Условие в {context_name} должно быть логического или целого типа, получено: {condition_val.kumir_type}",
+                line_index=expr_ctx.start.line -1,
+                column_index=expr_ctx.start.column
+            )
+
     def visitLoopStatement(self, ctx: KumirParser.LoopStatementContext):
-        kiv_self = cast(KumirInterpreterVisitor, self)
+        # Избегаем циклического импорта - используем cast
+        kiv_self = cast('KumirInterpreterVisitor', self)
 
         loop_specifier_ctx = ctx.loopSpecifier()
         statement_sequence_ctx = ctx.statementSequence()
@@ -176,17 +204,19 @@ class ControlFlowVisitorMixin:
     def visitIfStatement(self, ctx: KumirParser.IfStatementContext):
         kiv_self = cast(KumirInterpreterVisitor, self)
         condition_expr_ctx = ctx.expression()
-        condition_value = None
         
         if condition_expr_ctx:
             condition_value_node = kiv_self.visit(condition_expr_ctx)
-            condition_value = condition_value_node.value if isinstance(condition_value_node, KumirValue) else condition_value_node
-            if not isinstance(condition_value, bool):
-                err_line = condition_expr_ctx.start.line
-                err_col = condition_expr_ctx.start.column
-                lc = kiv_self.get_line_content_from_ctx(condition_expr_ctx)
-                raise KumirTypeError(f"Строка {err_line}, поз. {err_col}: условие в операторе ЕСЛИ должно быть логического типа, а не {type(condition_value).__name__}.",
-                                     line_index=err_line-1, column_index=err_col, line_content=lc)
+            
+            # Convert to KumirValue if needed
+            if isinstance(condition_value_node, KumirValue):
+                condition_val = condition_value_node
+            else:
+                # Handle case where the expression evaluator returns raw Python values
+                condition_val = KumirValue(condition_value_node, KumirType.BOOL.value)
+            
+            # Use the helper method for proper boolean evaluation
+            condition_result = self._evaluate_condition(condition_val, "операторе ЕСЛИ", condition_expr_ctx)
         else: # pragma: no cover
             err_line = ctx.start.line
             err_col = ctx.start.column
@@ -194,7 +224,7 @@ class ControlFlowVisitorMixin:
             raise KumirRuntimeError(f"Строка {err_line}, поз. {err_col}: отсутствует условие в операторе ЕСЛИ.",
                                  line_index=err_line-1, column_index=err_col, line_content=lc)
 
-        if condition_value:
+        if condition_result:
             if ctx.statementSequence(0):
                 kiv_self.visit(ctx.statementSequence(0))
         elif ctx.ELSE() and ctx.statementSequence(1):
@@ -237,7 +267,7 @@ class ControlFlowVisitorMixin:
                      kiv_self.visit(else_body_sequence)
         return None
 
-    def visitExitStatement(self, ctx: KumirParser.ExitStatementContext):
+    def visitExitStatement(self, ctx: KumirParser.ExitStatementContext) -> None:
         # exitStatement: EXIT
         # В КуМире ВЫХОД используется для выхода из цикла или процедуры/функции.
         # Мы генерируем BreakSignal для циклов.
@@ -249,10 +279,10 @@ class ControlFlowVisitorMixin:
         # Более сложная логика потребовала бы отслеживания, находимся ли мы в цикле.
         raise BreakSignal()
 
-    def visitStopStatement(self, ctx: KumirParser.StopStatementContext):
+    def visitStopStatement(self, ctx: KumirParser.StopStatementContext) -> None:
         # stopStatement: STOP
-        kiv_self = cast(KumirInterpreterVisitor, self)
-        kiv_self.error_stream_out("Выполнение программы остановлено оператором СТОП.\\n") # Используем error_stream_out
+        kiv_self = cast('KumirInterpreterVisitor', self)
+        print("Выполнение программы остановлено оператором СТОП.\n", file=sys.stderr)
         raise StopExecutionSignal()
 
     def visitAssertionStatement(self, ctx: KumirParser.AssertionStatementContext):
@@ -274,7 +304,7 @@ class ControlFlowVisitorMixin:
             err_col = ctx.start.column
             lc = kiv_self.get_line_content_from_ctx(ctx)
             # В КуМире сообщение об ошибке УТВ обычно стандартное
-            kiv_self.error_stream_out(f"Ошибка времени выполнения: Утверждение (утв) ложно в строке {err_line}, поз. {err_col}.\\n") # Используем error_stream_out
+            print(f"Ошибка времени выполнения: Утверждение (утв) ложно в строке {err_line}, поз. {err_col}.\n", file=sys.stderr)
             # Стандартный КуМир обычно прерывает выполнение здесь.
             raise KumirRuntimeError(f"Утверждение (утв) ложно.", line_index=err_line-1, column_index=err_col, line_content=lc)
         return None
@@ -284,7 +314,7 @@ class ControlFlowVisitorMixin:
         # pauseStatement: PAUSE
         # В интерактивной среде это была бы пауза. В пакетном режиме можно проигнорировать или вывести сообщение.
         # print("[INFO] Оператор ПАУЗА выполнен.") # Или использовать error_stream_out, если это считается "выводом"
-        kiv_self.error_stream_out("Оператор ПАУЗА выполнен.\n") # Сообщение в поток ошибок/информации
+        print("Оператор ПАУЗА выполнен.\n", file=sys.stderr) # Сообщение в поток ошибок/информации
         # Можно добавить реальную паузу, если нужно для тестов, но обычно это не требуется для функциональных тестов.
         # import time
         # time.sleep(1) # Пауза на 1 секунду

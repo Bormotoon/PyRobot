@@ -8,7 +8,6 @@ from pyrobot.backend.kumir_interpreter.kumir_exceptions import (
 from ..generated.KumirParser import KumirParser
 from ..generated.KumirParserVisitor import KumirParserVisitor
 from ..kumir_datatypes import KumirType, KumirValue
-from ..utils import KumirTypeConverter
 
 if TYPE_CHECKING:
     from .scope_manager import ScopeManager
@@ -21,31 +20,6 @@ class StatementHandlerMixin(KumirParserVisitor):
     # self.scope_manager: ScopeManager
     # self.expression_evaluator: ExpressionEvaluator
     # self.procedure_manager: ProcedureManager
-
-    def _evaluate_condition(self, condition_val: KumirValue, context_name: str, expr_ctx) -> bool:
-        """
-        Evaluates a KumirValue as a boolean condition following Kumir semantics.
-        For integers: 0 = False, non-zero = True
-        For booleans: direct evaluation
-        For other types: raises KumirTypeError
-        """
-        if condition_val is None:
-            raise KumirTypeError(
-                f"Условие в {context_name} не может быть неопределенным значением",
-                line_index=expr_ctx.start.line -1,
-                column_index=expr_ctx.start.column
-            )
-        
-        try:
-            converter = KumirTypeConverter()
-            return converter.to_python_bool(condition_val)
-        except KumirTypeError as e:
-            # Re-raise with more specific context
-            raise KumirTypeError(
-                f"Условие в {context_name} должно быть логического или целого типа, получено: {condition_val.kumir_type}",
-                line_index=expr_ctx.start.line -1,
-                column_index=expr_ctx.start.column
-            )
 
     def _determine_kumir_type_and_array_status(self, type_spec_ctx: KumirParser.TypeSpecifierContext) -> tuple[KumirType, bool]:
         """
@@ -246,19 +220,14 @@ class StatementHandlerMixin(KumirParserVisitor):
 
             for i, arg_ctx in enumerate(ctx.ioArgumentList().ioArgument()):
                 if arg_ctx.expression():
-                    # arg_ctx.expression() возвращает список выражений
-                    expressions = arg_ctx.expression()
-                    if expressions:
-                        # Берём первое выражение (основное значение для вывода)
-                        main_expr = expressions[0]
-                        value_to_print = kiv_self.expression_evaluator.visit(main_expr)
-                        
-                        if value_to_print is None:
-                            raise KumirRuntimeError(
-                                f"Не удалось вычислить значение для вывода аргумента {i+1} процедуры ВЫВОД.",
-                                line_index=main_expr.start.line -1,
-                                column_index=main_expr.start.column
-                            )
+                    value_to_print = kiv_self.expression_evaluator.visit(arg_ctx.expression())
+                    
+                    if value_to_print is None:
+                        raise KumirRuntimeError(
+                            f"Не удалось вычислить значение для вывода аргумента {i+1} процедуры ВЫВОД.",
+                            line_index=arg_ctx.start.line -1,
+                            column_index=arg_ctx.start.column
+                        )
 
                     # Преобразование значения к строке с учетом типа
                     if value_to_print.kumir_type == KumirType.INT.value:
@@ -289,34 +258,32 @@ class StatementHandlerMixin(KumirParserVisitor):
                                         line_index=ctx.start.line -1,
                                         column_index=ctx.start.column)
 
-            echo_values = []  # Собираем эхо всех введенных значений
-
             for i, arg_ctx in enumerate(ctx.ioArgumentList().ioArgument()):
                 if arg_ctx.expression():
-                    # For INPUT, we need to get the lvalue to assign to
-                    # This is a bit tricky since we're expecting the expression to be an lvalue
-                    expressions = arg_ctx.expression()
-                    if expressions:
-                        # Берём первое выражение (основное значение для ввода)
-                        expr_ctx = expressions[0]
-                        
-                        # Try to extract variable info from the expression
-                        target_var_name = ""
-                        is_array_element = False
-                        
-                        # For now, handle simple cases - ID and postfix with array access
-                        if hasattr(expr_ctx, 'getText'):
-                            target_var_name = expr_ctx.getText()
-                            # Extract just the variable name if it has array notation
-                            if '[' in target_var_name and ']' in target_var_name:
-                                target_var_name = target_var_name.split('[')[0]
-                                is_array_element = True
-                            # Otherwise it's a simple variable, keep is_array_element = False
+                    lvalue_ctx = arg_ctx.expression().getChild(0)
+                    
+                    var_name_node = None
+                    is_array_element = False
+
+                    if isinstance(lvalue_ctx, KumirParser.QualifiedIdentifierContext):
+                        var_name_node = lvalue_ctx
+                    elif hasattr(lvalue_ctx, 'qualifiedIdentifier') and callable(lvalue_ctx.qualifiedIdentifier):
+                         q_id_ctx = lvalue_ctx.qualifiedIdentifier()
+                         if q_id_ctx:
+                             var_name_node = q_id_ctx
+                             if hasattr(lvalue_ctx, 'indexList') and lvalue_ctx.indexList():
+                                 is_array_element = True
+                    
+                    if not var_name_node:
+                        target_var_name = lvalue_ctx.getText() 
+
+                    if var_name_node:
+                        target_var_name = var_name_node.getText()
 
                     try:
                         var_info = kiv_self.scope_manager.get_variable_info(target_var_name)
-                        target_type = var_info['kumir_type']
-                        is_array = var_info['is_table']
+                        target_type = var_info.kumir_type
+                        is_array = var_info.is_array
 
                     except KumirNameError:
                         raise KumirNameError(f"Переменная '{target_var_name}' не объявлена.",
@@ -327,13 +294,46 @@ class StatementHandlerMixin(KumirParserVisitor):
 
                     try:
                         if is_array_element:
-                            # For array elements, we'll use the expression evaluator to handle the assignment
-                            # This is a simplified approach for now
-                            raise KumirNotImplementedError(
-                                "Ввод в элементы массива пока не поддерживается полностью.",
-                                line_index=arg_ctx.start.line -1,
-                                column_index=arg_ctx.start.column
-                            )
+                            indices = []
+                            index_list_ctx = lvalue_ctx.indexList()
+                            if index_list_ctx.expression():
+                                for idx_expr_ctx in index_list_ctx.expression():
+                                    idx_kv = kiv_self.expression_evaluator.visit(idx_expr_ctx)
+                                    if idx_kv is None or idx_kv.kumir_type != KumirType.INT.value:
+                                        raise KumirTypeError(
+                                            f"Индекс для '{target_var_name}' должен быть целым числом.",
+                                            line_index=idx_expr_ctx.start.line -1,
+                                            column_index=idx_expr_ctx.start.column
+                                        )
+                                    indices.append(idx_kv.value)
+                            
+                            element_type = kiv_self.scope_manager.get_array_element_type(target_var_name)
+
+                            if element_type == KumirType.INT:
+                                converted_value = KumirValue(int(input_str), KumirType.INT.value)
+                            elif element_type == KumirType.REAL:
+                                converted_value = KumirValue(float(input_str.replace(',', '.')), KumirType.REAL.value)
+                            elif element_type == KumirType.BOOL:
+                                if input_str.lower() in ["истина", "true", "1"]:
+                                    converted_value = KumirValue(True, KumirType.BOOL.value)
+                                elif input_str.lower() in ["ложь", "false", "0"]:
+                                    converted_value = KumirValue(False, KumirType.BOOL.value)
+                                else:
+                                    raise ValueError("Для лог типа ожидалось 'истина' или 'ложь'.")
+                            elif element_type == KumirType.CHAR:
+                                if len(input_str) == 1:
+                                    converted_value = KumirValue(input_str, KumirType.CHAR.value)
+                                else:
+                                    raise ValueError("Для лит типа ожидался один символ.")
+                            elif element_type == KumirType.STR:
+                                converted_value = KumirValue(input_str, KumirType.STR.value)
+                            else:
+                                raise KumirTypeError(f"Ввод для элементов типа {element_type} не поддерживается.")
+                            
+                            kiv_self.scope_manager.update_table_element(target_var_name, indices, converted_value,
+                                                                    line_index=arg_ctx.start.line -1,
+                                                                    column_index=arg_ctx.start.column)
+
                         else: # Ввод в простую переменную
                             if target_type == KumirType.INT:
                                 converted_value = KumirValue(int(input_str), KumirType.INT.value)
@@ -359,22 +359,6 @@ class StatementHandlerMixin(KumirParserVisitor):
                             kiv_self.scope_manager.update_variable(target_var_name, converted_value,
                                                                line_index=arg_ctx.start.line -1,
                                                                column_index=arg_ctx.start.column)
-                            
-                            # Формируем эхо для этого значения
-                            if converted_value.kumir_type == KumirType.INT.value:
-                                echo_text = str(converted_value.value)
-                            elif converted_value.kumir_type == KumirType.REAL.value:
-                                echo_text = str(converted_value.value)
-                            elif converted_value.kumir_type == KumirType.BOOL.value:
-                                echo_text = "истина" if converted_value.value else "ложь"
-                            elif converted_value.kumir_type == KumirType.CHAR.value:
-                                echo_text = converted_value.value
-                            elif converted_value.kumir_type == KumirType.STR.value:
-                                echo_text = converted_value.value
-                            else:
-                                echo_text = str(converted_value.value)
-                            
-                            echo_values.append(echo_text)
 
                     except ValueError as e:
                         raise KumirTypeError(f"Ошибка преобразования ввода для '{target_var_name}': {input_str}. {e}",
@@ -384,22 +368,20 @@ class StatementHandlerMixin(KumirParserVisitor):
                     raise KumirSyntaxError("Аргумент для ВВОД должен быть переменной или элементом массива.",
                                            line_index=arg_ctx.start.line -1,
                                            column_index=arg_ctx.start.column)
-            
-            # Выводим эхо всех введенных значений одной строкой через пробел
-            if echo_values:
-                echo_line = ' '.join(echo_values) + '\n'
-                kiv_self.io_handler.write_output(echo_line)
         
         return None
 
     def visitIfStatement(self, ctx: KumirParser.IfStatementContext) -> None:
         kiv_self = cast('KumirInterpreterVisitor', self)
         condition_val = kiv_self.expression_evaluator.visit(ctx.expression())
-        
-        # Use the helper method for proper boolean evaluation
-        condition_result = self._evaluate_condition(condition_val, "операторе ЕСЛИ", ctx.expression())
+        if condition_val is None or condition_val.kumir_type != KumirType.BOOL.value:
+            raise KumirTypeError(
+                f"Условие в операторе ЕСЛИ должно быть логического типа, получено: {condition_val}",
+                line_index=ctx.expression().start.line -1,
+                column_index=ctx.expression().start.column
+            )
 
-        if condition_result: # значение True
+        if condition_val.value: # значение True
             self.visit(ctx.statementSequence(0)) # Блок ТО
         elif ctx.ELSE(): # Есть блок ИНАЧЕ
             self.visit(ctx.statementSequence(1)) # Блок ИНАЧЕ
@@ -418,10 +400,13 @@ class StatementHandlerMixin(KumirParserVisitor):
                 while True:
                     condition_expr = specifier.expression()
                     condition_val = kiv_self.expression_evaluator.visit(condition_expr)
-                    
-                    # Use the helper method for proper boolean evaluation
-                    condition_result = self._evaluate_condition(condition_val, "цикле ПОКА", condition_expr)
-                    if not condition_result:
+                    if condition_val is None or condition_val.kumir_type != KumirType.BOOL.value:
+                        raise KumirTypeError(
+                            f"Условие в цикле ПОКА должно быть логического типа, получено: {condition_val}",
+                            line_index=condition_expr.start.line -1,
+                            column_index=condition_expr.start.column
+                        )
+                    if not condition_val.value:
                         break
                     
                     try:
@@ -469,7 +454,7 @@ class StatementHandlerMixin(KumirParserVisitor):
                 
                 try:
                     var_info = kiv_self.scope_manager.get_variable_info(var_name)
-                    if var_info['kumir_type'] != KumirType.INT and var_info['kumir_type'] != KumirType.REAL:
+                    if var_info.kumir_type != KumirType.INT and var_info.kumir_type != KumirType.REAL:
                          raise KumirTypeError(
                             f"Переменная цикла '{var_name}' должна быть числового типа (цел или вещ).",
                             line_index=specifier.ID().getSymbol().line -1,
@@ -541,37 +526,17 @@ class StatementHandlerMixin(KumirParserVisitor):
         return None
 
     def visitExitStatement(self, ctx: KumirParser.ExitStatementContext) -> None:
-        # Improved exit statement handling
-        # Check the context to determine the appropriate exit type
-        exit_text = ctx.getText().lower()
-        
-        # Check if we're in a loop context by examining parent nodes
-        current = ctx.parentCtx
-        is_in_loop = False
-        
-        # Walk up the parse tree to find loop context
-        while current is not None:
-            # Check if we're inside a loop statement (НЦ...КЦ)
-            if isinstance(current, KumirParser.LoopStatementContext):
-                is_in_loop = True
-                break
-            current = current.parentCtx if hasattr(current, 'parentCtx') else None
-        
-        # Determine the type of exit based on context and text
-        if ("цикла" in exit_text or "loop" in exit_text or is_in_loop):
-            # Exit from loop
+        # Check grammar methods - we need to fix these
+        if hasattr(ctx, 'LOOP_EXIT') and ctx.LOOP_EXIT():
             raise BreakSignal()
-        elif ("процедуры" in exit_text or "procedure" in exit_text):
-            # Exit from procedure
+        elif hasattr(ctx, 'PROCEDURE_EXIT') and ctx.PROCEDURE_EXIT():
             raise ReturnSignal()
         else:
-            # Default behavior - if ambiguous, prefer loop exit if we're in a loop
-            if is_in_loop:
+            # Default behavior if we can't determine the type
+            if "ЦИКЛА" in ctx.getText():
                 raise BreakSignal()
             else:
-                # Otherwise, stop execution entirely
-                raise StopExecutionSignal()
-        
+                raise ReturnSignal()
         return None
 
     def visitProcedureCallStatement(self, ctx: KumirParser.ProcedureCallStatementContext) -> None:
@@ -607,12 +572,26 @@ class StatementHandlerMixin(KumirParserVisitor):
     def visitAssertionStatement(self, ctx: KumirParser.AssertionStatementContext) -> None:
         kiv_self = cast('KumirInterpreterVisitor', self)
         condition_val = kiv_self.expression_evaluator.visit(ctx.expression())
-        
-        # Use the helper method for proper boolean evaluation
-        condition_result = self._evaluate_condition(condition_val, "УТВЕРЖДЕНИИ", ctx.expression())
+        message_val = None
+        if hasattr(ctx, 'stringLiteral') and ctx.stringLiteral():
+            raw_text = ctx.stringLiteral().getText()
+            if len(raw_text) >= 2 and raw_text.startswith('"') and raw_text.endswith('"'):
+                message_text = raw_text[1:-1]
+            else:
+                message_text = raw_text 
+            message_val = KumirValue(message_text, KumirType.STR.value)
 
-        if not condition_result:
+        if condition_val is None or condition_val.kumir_type != KumirType.BOOL.value:
+            raise KumirTypeError(
+                f"Условие в УТВЕРЖДЕНИЕ должно быть логического типа, получено: {condition_val}",
+                line_index=ctx.expression().start.line -1,
+                column_index=ctx.expression().start.column
+            )
+
+        if not condition_val.value:
             error_message = "Утверждение не выполнено"
+            if message_val:
+                error_message += f": {message_val.value}"
             
             raise KumirRuntimeError(
                 error_message,

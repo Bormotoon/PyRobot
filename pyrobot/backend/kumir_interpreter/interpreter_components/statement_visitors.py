@@ -52,9 +52,6 @@ class StatementVisitorMixin:
                     elif value_to_print.kumir_type == KumirType.STR.value:
                         # Строки выводим без кавычек (в отличие от старой реализации)
                         current_output += value_to_print.value
-                    elif value_to_print.kumir_type == "NEWLINE_CONST":
-                        # 'нс' - добавляем перенос строки
-                        current_output += "\n"
                     elif value_to_print.kumir_type == "ЛИТ":  # Дополнительная проверка на русский тип
                         current_output += value_to_print.value
                     else:                        raise KumirTypeError(

@@ -109,7 +109,7 @@ class ExpressionEvaluator(KumirParserVisitor):
             return KumirValue(value=False, kumir_type=KumirType.BOOL.value)
         elif ctx.NEWLINE_CONST(): # константа нс
             # self.main_visitor.error_stream_out(f"DEBUG: ExpressionEvaluator.visitLiteral NEWLINE_CONST detected. Type: {type(ctx.NEWLINE_CONST())}, Text: {ctx.NEWLINE_CONST().getText()}\\n")
-            return KumirValue("\n", "NEWLINE_CONST") # Настоящий символ перевода строки с особым типом
+            return KumirValue("\n", KumirType.STR.value) # Настоящий символ перевода строки как строка
         else:
             pos = self._position_from_token(self._get_token_for_position(ctx))
             raise KumirNotImplementedError(f"Тип литерала '{text}' (контекст: {type(ctx).__name__}) пока не поддерживается или является неизвестным.", line_index=pos[0], column_index=pos[1])

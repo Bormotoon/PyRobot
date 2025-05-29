@@ -11,13 +11,14 @@ from ..generated.KumirParser import KumirParser
 from ..generated.KumirParserVisitor import KumirParserVisitor # Базовый визитор ANTLR
 from .. import kumir_exceptions # <--- Добавляем импорт модуля исключений
 from ..kumir_exceptions import KumirSemanticError, KumirRuntimeError, KumirSyntaxError, ExitSignal, BreakSignal, StopExecutionSignal, KumirNameError, KumirTypeError # Изменения: ProcedureExitCalled -> ExitSignal, LoopExitException -> BreakSignal
-from ..kumir_datatypes import KumirTableVar, KumirReturnValue 
+from ..kumir_datatypes import KumirTableVar, KumirReturnValue, KumirValue, KumirType 
 
 # Импорты компонентов интерпретатора из __init__.py текущего пакета
 from .scope_manager import ScopeManager
 from .procedure_manager import ProcedureManager
 from .expression_evaluator import ExpressionEvaluator
 from .declaration_visitors import DeclarationVisitorMixin
+from .statement_handlers import StatementHandlerMixin
 from .statement_visitors import StatementVisitorMixin
 from .control_flow_visitors import ControlFlowVisitorMixin
 from .io_handler import IOHandler
@@ -58,7 +59,7 @@ class DiagnosticErrorListener(ErrorListener):
     def get_errors(self) -> List[KumirSyntaxError]:
         return self.errors
 
-class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementVisitorMixin, ControlFlowVisitorMixin, KumirParserVisitor): 
+class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementHandlerMixin, StatementVisitorMixin, ControlFlowVisitorMixin, KumirParserVisitor): 
     def __init__(self, input_stream: Optional[Callable[[], str]] = None, 
                  output_stream: Optional[Callable[[str], None]] = None,
                  error_stream: Optional[Callable[[str], None]] = None, # Callable, а не SupportsWrite
@@ -320,9 +321,10 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementVisitorMixin, Co
                     
                     self.scope_manager.declare_variable(
                         name='знач',
-                        kumir_type=self.current_algorithm_result_type, # current_algorithm_result_type здесь гарантированно str
-                        is_table= is_table_check, 
-                        ctx_declaration_item=alg_ctx.algorithmHeader()
+                        kumir_type=KumirType.from_string(self.current_algorithm_result_type), # Convert string to KumirType
+                        initial_value=None,
+                        line_index=alg_ctx.algorithmHeader().start.line - 1,
+                        column_index=alg_ctx.algorithmHeader().start.column
                     )
                 except KumirNameError: 
                     pass 
@@ -513,37 +515,48 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementVisitorMixin, Co
             initial_value_ctx = None
 
             if var_item_ctx.LBRACK(): 
-                self.error_stream(f"Предупреждение: Парсинг границ для глобальных таблиц ('{var_name}') пока не полностью реализован в visitGlobalDeclaration и будет пропущен.\n")
+                print(f"Предупреждение: Парсинг границ для глобальных таблиц ('{var_name}') пока не полностью реализован в visitGlobalDeclaration и будет пропущен.\n", file=sys.stderr)
                 pass 
 
             if var_item_ctx.EQ(): 
                 initial_value_ctx = var_item_ctx.expression()
             
-            final_kumir_type = base_kumir_type
-            actual_is_table = is_table_type
-            if dimensions: 
-                final_kumir_type += 'таб' # Убедимся, что 'таб' есть, если is_table_type истинно и есть границы
-                actual_is_table = True
-            elif is_table_type and not dimensions: 
-                final_kumir_type += 'таб'
-
-            self.scope_manager.declare_variable(
-                name=var_name,
-                kumir_type=final_kumir_type, 
-                is_table=actual_is_table,
-                dimensions=dimensions,
-                ctx_declaration_item=var_item_ctx
-            )
+            # Determine final type based on whether it's a table type
+            if is_table_type:
+                # For table types, declare as array
+                if dimensions is None:
+                    dimensions = []  # Empty dimensions for dynamic arrays
+                self.scope_manager.declare_array(
+                    var_name=var_name,
+                    element_kumir_type=KumirType.from_string(base_kumir_type),
+                    dimensions=dimensions,
+                    line_index=var_item_ctx.ID().getSymbol().line - 1,
+                    column_index=var_item_ctx.ID().getSymbol().column
+                )
+            else:
+                # For simple types, declare as variable
+                self.scope_manager.declare_variable(
+                    name=var_name,
+                    kumir_type=KumirType.from_string(base_kumir_type),
+                    initial_value=None,
+                    line_index=var_item_ctx.ID().getSymbol().line - 1,
+                    column_index=var_item_ctx.ID().getSymbol().column
+                )
 
             if initial_value_ctx:
                 value_to_assign = self.visit(initial_value_ctx)
                 validated_value = cast(KumirInterpreterVisitor, self)._validate_and_convert_value_for_assignment(
                     value_to_assign, 
-                    final_kumir_type, 
+                    base_kumir_type, 
                     var_name,
-                    actual_is_table
+                    is_table_type
                 )
-                self.scope_manager.update_variable(var_name, validated_value, var_item_ctx)
+                self.scope_manager.update_variable(
+                    var_name, 
+                    validated_value, 
+                    line_index=var_item_ctx.expression().start.line - 1,
+                    column_index=var_item_ctx.expression().start.column
+                )
         return None
 
     def visitGlobalAssignment(self, ctx: KumirParser.GlobalAssignmentContext):
@@ -563,8 +576,8 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementVisitorMixin, Co
         value_to_assign = self.visit(value_expr_ctx)
         
         # Получаем информацию о переменной (тип, является ли таблицей)
-        # Исправляем вызов find_variable - он принимает ctx как второй аргумент
-        var_info, _ = self.scope_manager.find_variable(var_name, ctx=ctx.qualifiedIdentifier())
+        # find_variable принимает только var_name
+        var_info, _ = self.scope_manager.find_variable(var_name)
         if not var_info: # pragma: no cover - find_variable должен кинуть исключение
             raise KumirNameError(f"Переменная '{var_name}' не объявлена.", 
                                  line_index=ctx.qualifiedIdentifier().start.line-1,
@@ -573,11 +586,16 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementVisitorMixin, Co
 
         validated_value = cast(KumirInterpreterVisitor, self)._validate_and_convert_value_for_assignment(
             value_to_assign, 
-            var_info['type'], 
+            var_info['kumir_type'], 
             var_name,
             var_info['is_table']
         )
-        self.scope_manager.update_variable(var_name, validated_value, ctx.qualifiedIdentifier())
+        self.scope_manager.update_variable(
+            var_name, 
+            validated_value, 
+            line_index=ctx.qualifiedIdentifier().start.line - 1,
+            column_index=ctx.qualifiedIdentifier().start.column
+        )
         return None
 
     def visitImportStatement(self, ctx: KumirParser.ImportStatementContext): 
@@ -589,8 +607,7 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementVisitorMixin, Co
 
         if module_name_node is None:
             # Эта ситуация не должна возникать при корректном дереве разбора для данного правила.
-            if self.error_stream:
-                self.error_stream("Ошибка: Не удалось извлечь узел имени модуля в import.\\n")
+            print("Ошибка: Не удалось извлечь узел имени модуля в import.", file=sys.stderr)
             # TODO: Рассмотреть возможность выброса исключения или более строгой обработки ошибки
             return None
 
@@ -605,8 +622,7 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementVisitorMixin, Co
             # и дополнительная обработка не требуется.
             # pass
 
-        if self.error_stream:
-            self.error_stream(f"Предупреждение: Импорт модуля '{module_name}' пока не поддерживается и будет проигнорирован.\\n")
+        print(f"Предупреждение: Импорт модуля '{module_name}' пока не поддерживается и будет проигнорирован.", file=sys.stderr)
         return None
 
     def visit(self, tree):
@@ -614,120 +630,7 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementVisitorMixin, Co
             return None 
         return super().visit(tree)
 
-    # KumirParser.GlobalDeclarationContext
-    def visitGlobalDeclaration(self, ctx: KumirParser.GlobalDeclarationContext):
-        # print(f"[DEBUG VISIT] GlobalDeclaration: {ctx.getText()}")
-        # globalDeclaration: KW_АЛГ qualifiedIdentifier algorithmHeader SEMI algorithmBody KW_КОН SEMI
-        #                 | KW_ИСПОЛЬЗОВАТЬ qualifiedIdentifier SEMI
-        #                 | varDeclaration SEMI
-        #                 ;
-        if ctx.KW_АЛГ():
-            # Это определение алгоритма (процедуры или функции)
-            # Собираем информацию и регистрируем в ProcedureManager
-            alg_name_ctx = ctx.qualifiedIdentifier()
-            alg_name = alg_name_ctx.getText().lower()
-            
-            # Проверяем, не является ли имя зарезервированным (например, имя встроенной функции/процедуры)
-            # TODO: Добавить проверку на конфликт с встроенными именами
-            
-            header_ctx = ctx.algorithmHeader()
-            is_function = header_ctx.KW_ТИПА() is not None
-            result_type_spec = header_ctx.typeSpecifier() if is_function else None
-            result_kumir_type: Optional[str] = None
-            result_element_type: Optional[str] = None # Для табличных функций
-
-            if is_function and result_type_spec:
-                type_info = get_type_info_from_specifier(result_type_spec)
-                result_kumir_type = type_info['kumir_type']
-                if type_info['is_table']:
-                    result_element_type = type_info['element_type']
-                    # Дополнительно можно сохранить информацию о размерностях, если это нужно ProcedureManager
-            
-            # Собираем параметры
-            params_list = []
-            if header_ctx.formalParameters():
-                for formal_param_ctx in header_ctx.formalParameters().formalParameter():
-                    param_info = self.procedure_manager.extract_parameter_info(formal_param_ctx)
-                    params_list.append(param_info)
-
-            self.procedure_manager.register_procedure(
-                name=alg_name,
-                ctx_node=ctx.algorithmBody(), # Тело алгоритма
-                params_info=params_list,
-                is_function=is_function,
-                result_kumir_type=result_kumir_type,
-                result_element_type=result_element_type, # Передаем тип элемента для табличных функций
-                declaration_ctx=header_ctx # Для сообщений об ошибках
-            )
-            # print(f"[DEBUG PROC_REG] Зарегистрирован {'функция' if is_function else 'алгоритм'} {alg_name} с параметрами: {params_list}, тип результата: {result_kumir_type}")
-
-        elif ctx.KW_ИСПОЛЬЗОВАТЬ():
-            module_name_node = ctx.qualifiedIdentifier()
-            if module_name_node:
-                module_name = module_name_node.getText()
-                # print(f"[DEBUG VISIT] Используется модуль: {module_name}")
-                # TODO: Реализовать логику импорта модулей. 
-                # Сейчас просто выводим предупреждение, если есть куда.
-                if self.error_stream_out:
-                    self.error_stream_out(f"Предупреждение: Импорт модуля '{module_name}' пока не поддерживается и будет проигнорирован.\n")
-            else: # pragma: no cover
-                if self.error_stream_out:
-                    self.error_stream_out("Ошибка: Не удалось извлечь узел имени модуля в import.\n")
-
-        elif ctx.varDeclaration():
-            # Это глобальное объявление переменной
-            # print(f"[DEBUG VISIT] Глобальное varDeclaration: {ctx.varDeclaration().getText()}")
-            # varDeclaration : typeSpecifier varList
-            type_spec_ctx = ctx.varDeclaration().typeSpecifier()
-            var_list_ctx = ctx.varDeclaration().varList()
-            
-            type_info = get_type_info_from_specifier(type_spec_ctx)
-            base_kumir_type = type_info['kumir_type']
-            is_table = type_info['is_table']
-            element_type = type_info['element_type'] # Будет None, если не таблица
-            # print(f"[DEBUG GLOBAL VAR_DECL] Base type: {base_kumir_type}, is_table: {is_table}, element_type: {element_type}")
-
-            for var_item_ctx in var_list_ctx.varItem():
-                var_name_node = var_item_ctx.qualifiedIdentifier()
-                var_name = var_name_node.getText().lower()
-                
-                # print(f"[DEBUG GLOBAL VAR_DECL] Processing var: {var_name}")
-
-                dimensions: Optional[List[Tuple[KumirValue, KumirValue]]] = None
-                actual_is_table = is_table # Используем тип из typeSpecifier как основной
-
-                # Если в varItem есть свои tableBounds, они переопределяют табличность из typeSpecifier
-                # (хотя по грамматике это не должно происходить для глобальных переменных,
-                # tableBounds обычно внутри АЛГ/НАЧ)
-                # Но если грамматика ANTLR это позволяет, обработаем.
-                # В стандартном КуМире размеры таблиц для глобальных переменных не указываются при объявлении.
-                # Они либо динамические, либо их размер определяется при первом присваивании/использовании.
-                # Для статических глобальных массивов (если бы они были как в C), размеры были бы нужны.
-                # Пока будем считать, что tableBounds здесь не должно быть для глобальных.
-                if var_item_ctx.tableBounds(): # pragma: no cover
-                    if self.error_stream_out:
-                         self.error_stream_out(f"Предупреждение: Парсинг границ для глобальных таблиц ('{var_name}') пока не полностью реализован в visitGlobalDeclaration и будет пропущен.\n")
-                    # Если бы мы их парсили:
-                    # dimensions_info = self.expression_evaluator.visitTableBounds(var_item_ctx.tableBounds())
-                    # dimensions = dimensions_info['dimensions_values']
-                    # actual_is_table = True # Явно указаны границы, значит это таблица
-
-                # print(f"[DEBUG GLOBAL VAR_DECL] Declaring global var: {var_name}, type: {base_kumir_type}, is_table: {actual_is_table}, element_type (if table): {element_type if actual_is_table else None}")
-                self.scope_manager.declare_variable(
-                    var_name=var_name,
-                    kumir_type_str=base_kumir_type if not actual_is_table else element_type, # Для таблицы передаем тип элемента
-                    is_table=actual_is_table,
-                    dimensions_values=dimensions, # Будет None для глобальных, пока не реализуем парсинг границ. Имя параметра изменено на dimensions_values
-                    line_index=var_name_node.start.line -1, # 0-based
-                    column_index=var_name_node.start.column, # 0-based
-                    ctx_node=var_item_ctx # Для более точных сообщений об ошибках. Имя параметра изменено на ctx_node
-                )
-        else: # pragma: no cover
-            # Этого не должно случиться, если грамматика верна
-            if self.error_stream_out:
-                self.error_stream_out(f"Неизвестный тип globalDeclaration: {ctx.getText()}\n")
-        
-        return None # Глобальные объявления не возвращают значения для выражений
+    # Duplicate visitGlobalDeclaration method removed - keeping only the correct one above
 
     # KumirParser.ProcedureCallStatementContext    def visitProcedureCallStatement(self, ctx: KumirParser.ProcedureCallStatementContext):
         print(f"\n!!! [DEBUG main_visitor.visitProcedureCallStatement] CALLED! Context: {ctx.getText()} !!!", file=sys.stderr)
@@ -748,47 +651,11 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementVisitorMixin, Co
         # Вызываем процедуру (или функцию)
         # Для этого используем общую логику вызова, которая была в старом интерпретаторе
         # Но без явного указания контекста, полагаемся на текущий
-        # Если процедура не найдена, будет вызвано исключение KumirRuntimeError        return self.procedure_manager._execute_procedure_call(
+        # Если процедура не найдена, будет вызвано исключение KumirRuntimeError
+        return self.procedure_manager._execute_procedure_call(
             proc_name, 
             actual_args,
             ctx.qualifiedIdentifier() # Для контекста ошибок
         )
 
-    # KumirParser.AssignmentStatementContext
-    def visitAssignmentStatement(self, ctx: KumirParser.AssignmentStatementContext):
-        print(f"\n!!! [DEBUG main_visitor.visitAssignmentStatement] CALLED! Context: {ctx.getText()} !!!", file=sys.stderr)
-        # print(f"[DEBUG VISIT] AssignmentStatement: {ctx.getText()}")
-        # assignmentStatement : qualifiedIdentifier ASSIGN expression SEMI ;
-        var_name = ctx.qualifiedIdentifier().getText()
-        value_expr_ctx = ctx.expression()
-        
-        if not value_expr_ctx: 
-            raise KumirSyntaxError("Отсутствует выражение для присваивания.",
-                                   line_index=ctx.start.line-1, column_index=ctx.start.column,
-                                   line_content=self.get_line_content_from_ctx(ctx))
 
-        value_to_assign = self.visit(value_expr_ctx)
-        
-        # Получаем информацию о переменной (тип, является ли таблицей)
-        # Исправляем вызов find_variable - он принимает ctx как второй аргумент
-        var_info, var_ctx = self.scope_manager.find_variable(var_name, ctx=ctx.qualifiedIdentifier())
-        if not var_info: # pragma: no cover - find_variable должен кинуть исключение
-            raise KumirNameError(f"Переменная '{var_name}' не объявлена.", 
-                                 line_index=ctx.qualifiedIdentifier().start.line-1,
-                                 column_index=ctx.qualifiedIdentifier().start.column,
-                                 line_content=self.get_line_content_from_ctx(ctx.qualifiedIdentifier()))
-
-        # Специальная обработка для 'рез' - это выходной параметр процедуры
-        if var_name == 'рез' and not var_info['is_table']:
-            # 'рез' должен быть табличным, если это выходной параметр
-            # Принудительно делаем его табличным, если это возможно по грамматике
-            var_info['is_table'] = True
-            var_info['type'] += 'таб' # Добавляем 'таб' к типу
-
-        validated_value = cast(KumirInterpreterVisitor, self)._validate_and_convert_value_for_assignment(            value_to_assign, 
-            var_info['type'], 
-            var_name,
-            var_info['is_table']
-        )
-        self.scope_manager.update_variable(var_name, validated_value, ctx.qualifiedIdentifier())
-        return None

@@ -105,10 +105,12 @@ class DeclarationVisitorMixin:
                             column_index=bounds_ctx.start.column,
                             line_content=kiv_self.get_line_content_from_ctx(bounds_ctx))
 
-                    min_idx_val = kiv_self.evaluator.visitExpression(bounds_ctx.expression(0))
-                    max_idx_val = kiv_self.evaluator.visitExpression(bounds_ctx.expression(1))
-                    min_idx = min_idx_val
-                    max_idx = max_idx_val
+                    min_idx_val = kiv_self.expression_evaluator.visitExpression(bounds_ctx.expression(0))
+                    max_idx_val = kiv_self.expression_evaluator.visitExpression(bounds_ctx.expression(1))
+                    
+                    # Извлекаем значения из KumirValue
+                    min_idx = min_idx_val.value if hasattr(min_idx_val, 'value') else min_idx_val
+                    max_idx = max_idx_val.value if hasattr(max_idx_val, 'value') else max_idx_val
 
                     if not isinstance(min_idx, int):
                         raise KumirEvalError(
