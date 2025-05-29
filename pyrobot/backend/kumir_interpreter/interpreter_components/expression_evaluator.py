@@ -364,9 +364,61 @@ class ExpressionEvaluator(KumirParserVisitor):
 
     def visitEqualityExpression(self, ctx: KumirParser.EqualityExpressionContext) -> KumirValue:
         """Обрабатывает выражения равенства"""
-        print(f"!!! [DEBUG ExpressionEvaluator.visitEqualityExpression] CALLED! Context: {ctx.getText()} !!!", file=sys.stderr)
-        # Пока просто делегируем к следующему уровню
-        return self.visit(ctx.relationalExpression(0))  # Берем первый элемент
+        # print(f"!!! [DEBUG ExpressionEvaluator.visitEqualityExpression] CALLED! Context: {ctx.getText()} !!!", file=sys.stderr)
+        
+        # Проверяем, есть ли бинарная операция равенства
+        relational_expressions = ctx.relationalExpression()
+        
+        if len(relational_expressions) == 1:
+            # Простой случай: нет операции, просто делегируем дальше
+            return self.visit(relational_expressions[0])
+        
+        # Есть операции равенства: вычисляем слева направо
+        result = self.visit(relational_expressions[0])
+        
+        for i in range(1, len(relational_expressions)):
+            op_token = ctx.getChild(2*i - 1)  # Операторы находятся между выражениями
+            right = self.visit(relational_expressions[i])
+            
+            if not (isinstance(result, KumirValue) and isinstance(right, KumirValue)):
+                pos_err = self._position_from_token(op_token)
+                raise KumirRuntimeError(
+                    f"Внутренняя ошибка: операнды не являются KumirValue (типы: {type(result).__name__}, {type(right).__name__}).",
+                    line_index=pos_err[0], 
+                    column_index=pos_err[1]
+                )
+
+            op_text = op_token.getText()
+            
+            # Получаем тип токена для операции равенства
+            if hasattr(op_token, 'symbol'):
+                op_token_type = op_token.symbol.type
+            else:
+                op_token_type = op_token.type
+            
+            # Приводим типы для сравнения (берем значения из KumirValue)
+            left_val = result.value
+            right_val = right.value
+            
+            # Простое приведение типов для сравнения
+            if isinstance(left_val, int) and isinstance(right_val, float):
+                left_val = float(left_val)
+            elif isinstance(left_val, float) and isinstance(right_val, int):
+                right_val = float(right_val)
+            
+            # Используем COMPARISON_OPS (который содержит и операции равенства)
+            op_func = COMPARISON_OPS.get(op_token_type)
+            if op_func:
+                bool_result = op_func(left_val, right_val)
+                result = KumirValue(value=bool_result, kumir_type=KumirType.BOOL.value)
+                # print(f"[DEBUG][visitEqualityExpression] Result after '{op_text}': {result.value}", file=sys.stderr)
+            else:
+                # Этого не должно произойти, если грамматика верна
+                pos = self._position_from_token(op_token)
+                raise KumirRuntimeError(f"Неизвестный оператор равенства: {op_text}", 
+                                      line_index=pos[0], column_index=pos[1])
+        
+        return result
 
     def visitRelationalExpression(self, ctx: KumirParser.RelationalExpressionContext) -> KumirValue:
         """Обрабатывает реляционные выражения"""
