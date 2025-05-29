@@ -91,6 +91,7 @@ class ExpressionEvaluator(KumirParserVisitor):
         print(f"!!! [DEBUG ExpressionEvaluator.visitLiteral] ctx.INTEGER() = {ctx.INTEGER()} !!!", file=sys.stderr)
         print(f"!!! [DEBUG ExpressionEvaluator.visitLiteral] ctx.REAL() = {ctx.REAL()} !!!", file=sys.stderr)
         print(f"!!! [DEBUG ExpressionEvaluator.visitLiteral] ctx.STRING() = {ctx.STRING()} !!!", file=sys.stderr)
+        print(f"!!! [DEBUG ExpressionEvaluator.visitLiteral] ctx.CHAR_LITERAL() = {ctx.CHAR_LITERAL()} !!!", file=sys.stderr)
         print(f"!!! [DEBUG ExpressionEvaluator.visitLiteral] ctx.TRUE() = {ctx.TRUE()} !!!", file=sys.stderr)
         print(f"!!! [DEBUG ExpressionEvaluator.visitLiteral] ctx.FALSE() = {ctx.FALSE()} !!!", file=sys.stderr)
         print(f"!!! [DEBUG ExpressionEvaluator.visitLiteral] ctx.NEWLINE_CONST() = {ctx.NEWLINE_CONST()} !!!", file=sys.stderr)
@@ -103,6 +104,9 @@ class ExpressionEvaluator(KumirParserVisitor):
         elif ctx.STRING():
             # Удаляем кавычки в начале и в конце
             return KumirValue(value=text[1:-1], kumir_type=KumirType.STR.value)
+        elif ctx.CHAR_LITERAL():
+            # Удаляем апострофы в начале и в конце для символьного литерала
+            return KumirValue(value=text[1:-1], kumir_type=KumirType.CHAR.value)
         elif ctx.TRUE():
             return KumirValue(value=True, kumir_type=KumirType.BOOL.value)
         elif ctx.FALSE():
