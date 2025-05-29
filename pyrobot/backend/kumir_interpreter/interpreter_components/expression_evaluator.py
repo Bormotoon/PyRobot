@@ -39,6 +39,18 @@ class ExpressionEvaluator(KumirParserVisitor):
         """Извлекает номер строки и столбца из токена ANTLR."""
         return token.line, token.column
 
+    @staticmethod
+    def _get_token_from_node(node) -> Token:
+        """
+        Получает токен из узла AST (обрабатывает как TerminalNodeImpl, так и обычные токены).
+        """
+        if hasattr(node, 'symbol'):
+            return node.symbol  # TerminalNodeImpl
+        elif hasattr(node, 'start'):
+            return node.start   # ParserRuleContext
+        else:
+            return node         # Предполагаем что это уже токен
+
     def _get_token_for_position(self, ctx: ParserRuleContext) -> Token:
         """Возвращает первый токен из контекста для определения позиции ошибки."""
         return ctx.start # start это токен
@@ -372,8 +384,7 @@ class ExpressionEvaluator(KumirParserVisitor):
         if len(relational_expressions) == 1:
             # Простой случай: нет операции, просто делегируем дальше
             return self.visit(relational_expressions[0])
-        
-        # Есть операции равенства: вычисляем слева направо
+          # Есть операции равенства: вычисляем слева направо
         result = self.visit(relational_expressions[0])
         
         for i in range(1, len(relational_expressions)):
@@ -381,7 +392,8 @@ class ExpressionEvaluator(KumirParserVisitor):
             right = self.visit(relational_expressions[i])
             
             if not (isinstance(result, KumirValue) and isinstance(right, KumirValue)):
-                pos_err = self._position_from_token(op_token)
+                # Для TerminalNodeImpl используем .symbol для получения токена
+                pos_err = self._position_from_token(op_token.symbol if hasattr(op_token, 'symbol') else ctx.start)
                 raise KumirRuntimeError(
                     f"Внутренняя ошибка: операнды не являются KumirValue (типы: {type(result).__name__}, {type(right).__name__}).",
                     line_index=pos_err[0], 
@@ -399,8 +411,7 @@ class ExpressionEvaluator(KumirParserVisitor):
             # Приводим типы для сравнения (берем значения из KumirValue)
             left_val = result.value
             right_val = right.value
-            
-            # Простое приведение типов для сравнения
+              # Простое приведение типов для сравнения
             if isinstance(left_val, int) and isinstance(right_val, float):
                 left_val = float(left_val)
             elif isinstance(left_val, float) and isinstance(right_val, int):
@@ -414,7 +425,8 @@ class ExpressionEvaluator(KumirParserVisitor):
                 # print(f"[DEBUG][visitEqualityExpression] Result after '{op_text}': {result.value}", file=sys.stderr)
             else:
                 # Этого не должно произойти, если грамматика верна
-                pos = self._position_from_token(op_token)
+                # Для TerminalNodeImpl используем .symbol для получения токена
+                pos = self._position_from_token(op_token.symbol if hasattr(op_token, 'symbol') else ctx.start)
                 raise KumirRuntimeError(f"Неизвестный оператор равенства: {op_text}", 
                                       line_index=pos[0], column_index=pos[1])
         
@@ -422,7 +434,7 @@ class ExpressionEvaluator(KumirParserVisitor):
 
     def visitRelationalExpression(self, ctx: KumirParser.RelationalExpressionContext) -> KumirValue:
         """Обрабатывает реляционные выражения"""
-        # print(f"!!! [DEBUG ExpressionEvaluator.visitRelationalExpression] CALLED! Context: {ctx.getText()} !!!", file=sys.stderr)
+        print(f"!!! [DEBUG ExpressionEvaluator.visitRelationalExpression] CALLED! Context: {ctx.getText()} !!!", file=sys.stderr)
         
         # Проверяем, есть ли бинарная операция сравнения
         additive_expressions = ctx.additiveExpression()
@@ -430,8 +442,7 @@ class ExpressionEvaluator(KumirParserVisitor):
         if len(additive_expressions) == 1:
             # Простой случай: нет операции, просто делегируем дальше
             return self.visit(additive_expressions[0])
-        
-        # Есть операции сравнения: вычисляем слева направо
+          # Есть операции сравнения: вычисляем слева направо
         result = self.visit(additive_expressions[0])
         
         for i in range(1, len(additive_expressions)):
@@ -439,8 +450,10 @@ class ExpressionEvaluator(KumirParserVisitor):
             right = self.visit(additive_expressions[i])
             
             if not (isinstance(result, KumirValue) and isinstance(right, KumirValue)):
-                pos_err = self._position_from_token(op_token)
-                raise KumirRuntimeError(                    f"Внутренняя ошибка: операнды не являются KumirValue (типы: {type(result).__name__}, {type(right).__name__}).",
+                # Для TerminalNodeImpl используем .symbol для получения токена
+                pos_err = self._position_from_token(op_token.symbol if hasattr(op_token, 'symbol') else ctx.start)
+                raise KumirRuntimeError(
+                    f"Внутренняя ошибка: операнды не являются KumirValue (типы: {type(result).__name__}, {type(right).__name__}).",
                     line_index=pos_err[0], 
                     column_index=pos_err[1]
                 )
@@ -471,7 +484,8 @@ class ExpressionEvaluator(KumirParserVisitor):
                 print(f"[DEBUG][visitRelationalExpression] Result after '{op_text}': {result.value}", file=sys.stderr)
             else:
                 # Этого не должно произойти, если грамматика верна
-                pos = self._position_from_token(op_token)
+                # Для TerminalNodeImpl используем .symbol для получения токена
+                pos = self._position_from_token(op_token.symbol if hasattr(op_token, 'symbol') else ctx.start)
                 raise KumirRuntimeError(f"Неизвестный оператор отношения: {op_text}", 
                                       line_index=pos[0], column_index=pos[1])
         

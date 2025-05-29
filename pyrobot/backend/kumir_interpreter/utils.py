@@ -26,6 +26,12 @@ def to_output_string(value: Any) -> str:
     if isinstance(value, KumirValue):
         if value.kumir_type == "ЛОГ": # Сравнение со строкой
             return "ДА" if value.value else "НЕТ"
+        elif value.kumir_type == "ВЕЩ" and isinstance(value.value, float):
+            # Для вещественных чисел: если это целое число (7.0), выводим как целое (7)
+            if value.value == float(int(value.value)):
+                return str(int(value.value))
+            else:
+                return str(value.value)
         return str(value.value) 
     return str(value)
 

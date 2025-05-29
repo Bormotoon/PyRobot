@@ -433,11 +433,7 @@ class StatementHandlerMixin(KumirParserVisitor):
             self.visit(ctx.statementSequence(0)) # Блок ТО
         elif ctx.ELSE(): # Есть блок ИНАЧЕ
             self.visit(ctx.statementSequence(1)) # Блок ИНАЧЕ
-        return None
-
-    def visitSwitchStatement(self, ctx: KumirParser.SwitchStatementContext) -> None:
-        # TODO: Реализовать оператор ВЫБОР (switch)
-        pass
+        return None    # visitSwitchStatement реализован в ControlFlowVisitorMixin
 
     def visitLoopStatement(self, ctx: KumirParser.LoopStatementContext) -> None:
         kiv_self = cast('KumirInterpreterVisitor', self)

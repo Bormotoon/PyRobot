@@ -232,30 +232,41 @@ class ControlFlowVisitorMixin:
         return None
 
     def visitSwitchStatement(self, ctx: KumirParser.SwitchStatementContext):
-        kiv_self = cast(KumirInterpreterVisitor, self)
+        kiv_self = cast('KumirInterpreterVisitor', self)
         # switchStatement: SWITCH caseBlock+ (ELSE statementSequence)? FI
         # caseBlock: CASE expression COLON statementSequence
+        
+        print(f"!!! [DEBUG] visitSwitchStatement called, caseBlocks: {len(ctx.caseBlock())} !!!", file=sys.stderr)
         
         executed_case = False
         for case_block_ctx in ctx.caseBlock():
             condition_expr_ctx = case_block_ctx.expression()
-            condition_val_node = kiv_self.visit(condition_expr_ctx)
-            condition_val = condition_val_node.value if isinstance(condition_val_node, KumirValue) else condition_val_node
-
-            if not isinstance(condition_val, bool):
+            print(f"!!! [DEBUG] Evaluating case condition: {condition_expr_ctx.getText()} !!!", file=sys.stderr)
+            
+            # Вычисляем выражение как логическое (например, m = 1, m = 2, etc.)
+            condition_val_node = kiv_self.expression_evaluator.visit(condition_expr_ctx)
+            
+            if not isinstance(condition_val_node, KumirValue):
                 err_line = condition_expr_ctx.start.line
                 err_col = condition_expr_ctx.start.column
                 lc = kiv_self.get_line_content_from_ctx(condition_expr_ctx)
-                raise KumirTypeError(f"Строка {err_line}, поз. {err_col}: условие в ПРИ оператора ВЫБОР должно быть логического типа, а не {type(condition_val).__name__}.",
+                raise KumirRuntimeError(f"Строка {err_line}, поз. {err_col}: не удалось вычислить условие в ПРИ оператора ВЫБОР.",
                                      line_index=err_line-1, column_index=err_col, line_content=lc)
             
-            if condition_val:
+            # Преобразуем результат в boolean согласно семантике КУМИРа
+            condition_bool = self._evaluate_condition(condition_val_node, "оператора ВЫБОР (ПРИ)", condition_expr_ctx)
+            print(f"!!! [DEBUG] Case condition result: {condition_bool} !!!", file=sys.stderr)
+            
+            if condition_bool:
+                print(f"!!! [DEBUG] Executing case block !!!", file=sys.stderr)
                 if case_block_ctx.statementSequence():
                     kiv_self.visit(case_block_ctx.statementSequence())
                 executed_case = True
-                break 
+                break  # Выходим после выполнения первого истинного условия
         
+        # Если ни одно условие не выполнилось, выполняем блок ИНАЧЕ (если есть)
         if not executed_case and ctx.ELSE():
+            print(f"!!! [DEBUG] Executing ELSE block !!!", file=sys.stderr)
             # The statementSequence for ELSE will be at index len(ctx.caseBlock())
             # in the list of all statementSequences of the switchStatement.
             else_clause_stm_seq_index = len(ctx.caseBlock())
@@ -265,6 +276,7 @@ class ControlFlowVisitorMixin:
                 else_body_sequence = all_stm_sequences[else_clause_stm_seq_index]
                 if else_body_sequence: 
                      kiv_self.visit(else_body_sequence)
+        
         return None
 
     def visitExitStatement(self, ctx: KumirParser.ExitStatementContext) -> None:

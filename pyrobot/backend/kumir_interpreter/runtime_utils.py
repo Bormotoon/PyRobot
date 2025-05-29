@@ -75,15 +75,15 @@ def interpret_kumir(code: str, input_data: Optional[str] = None) -> str:
     # Настраиваем захват вывода
     original_stdout = sys.stdout
     captured_output = StringIO()
-    sys.stdout = captured_output
-
-    # Настраиваем входные данные
+    sys.stdout = captured_output    # Настраиваем входные данные
     input_buffer = StringIO(input_data if input_data else "")
     program_lines_list = code.splitlines()
 
     def input_fn():
         line = input_buffer.readline()
-        return line.rstrip('\\r\\n')
+        result = line.rstrip('\\r\\n')
+        print(f"[DEBUG INPUT_FN] readline(): {line!r}, after rstrip: {result!r}", file=sys.stderr)
+        return result
     
     def output_fn(text: str):
         logger.debug(f"output_fn called with text: '{text}'") # Лог вызова output_fn
@@ -157,10 +157,14 @@ def interpret_kumir(code: str, input_data: Optional[str] = None) -> str:
         with open("debug_interpret.log", "a", encoding="utf-8") as debug_f:
             debug_f.write(f"EXCEPTION in visitor.visitProgram: {type(e).__name__}: {e}\n{tb_str}\n")
     finally:
-        sys.stdout = original_stdout
-
-    # Получаем результат
+        sys.stdout = original_stdout    # Получаем результат
     final_output = captured_output.getvalue()
+    
+    # Добавляем перевод строки в конец, если его нет (как в старом интерпретаторе)
+    if final_output and not final_output.endswith('\n'):
+        final_output += '\n'
+        logger.debug("Added final newline to output") # Лог добавления перевода строки
+    
     logger.debug(f"interpret_kumir returning output:\\n{final_output}") # Лог возвращаемого значения
     
     # DEBUG: записываем в файл для отладки  
