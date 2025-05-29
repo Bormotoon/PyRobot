@@ -260,23 +260,53 @@ class StatementHandlerMixin(KumirParserVisitor):
                                 column_index=main_expr.start.column
                             )
 
-                    # Преобразование значения к строке с учетом типа
+                        # Обработка форматных спецификаторов
+                        field_width = None
+                        precision = None
+                        
+                        # Проверяем наличие форматных спецификаторов
+                        if len(expressions) > 1:
+                            # Второе выражение - ширина поля
+                            width_expr = expressions[1]
+                            width_value = kiv_self.expression_evaluator.visit(width_expr)
+                            if width_value and width_value.kumir_type == KumirType.INT.value:
+                                field_width = width_value.value
+                                
+                        if len(expressions) > 2:
+                            # Третье выражение - точность (для вещественных чисел)
+                            precision_expr = expressions[2]
+                            precision_value = kiv_self.expression_evaluator.visit(precision_expr)
+                            if precision_value and precision_value.kumir_type == KumirType.INT.value:
+                                precision = precision_value.value
+
+                    # Преобразование значения к строке с учетом типа и форматирования
+                    formatted_str = ""
                     if value_to_print.kumir_type == KumirType.INT.value:
-                        current_output += str(value_to_print.value)
+                        formatted_str = str(value_to_print.value)
                     elif value_to_print.kumir_type == KumirType.REAL.value:
-                        current_output += str(value_to_print.value) 
+                        if precision is not None:
+                            # Форматируем с заданной точностью
+                            formatted_str = f"{value_to_print.value:.{precision}f}"
+                        else:
+                            formatted_str = str(value_to_print.value) 
                     elif value_to_print.kumir_type == KumirType.BOOL.value:
-                        current_output += "истина" if value_to_print.value else "ложь"
+                        formatted_str = "истина" if value_to_print.value else "ложь"
                     elif value_to_print.kumir_type == KumirType.CHAR.value:
-                        current_output += value_to_print.value
+                        formatted_str = value_to_print.value
                     elif value_to_print.kumir_type == KumirType.STR.value:
-                        current_output += value_to_print.value
+                        formatted_str = value_to_print.value
                     else:
                         raise KumirTypeError(
                             f"Неизвестный или неподдерживаемый тип значения для вывода: {value_to_print.kumir_type}",
                             line_index=arg_ctx.start.line -1,
                             column_index=arg_ctx.start.column
                         )
+                    
+                    # Применяем форматирование ширины поля
+                    if field_width is not None:
+                        formatted_str = formatted_str.rjust(field_width)
+                    
+                    current_output += formatted_str
 
             if hasattr(kiv_self, 'io_handler') and kiv_self.io_handler is not None:
                 kiv_self.io_handler.write_output(current_output)
