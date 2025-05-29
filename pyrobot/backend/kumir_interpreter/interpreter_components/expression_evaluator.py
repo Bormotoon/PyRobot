@@ -14,6 +14,18 @@ from .scope_manager import ScopeManager # Исправленный импорт 
 from ..kumir_datatypes import KumirValue, KumirType # Добавлено
 from ..kumir_exceptions import KumirEvalError, KumirTypeError, KumirNameError, KumirRuntimeError, KumirNotImplementedError # Добавлены KumirRuntimeError, KumirNotImplementedError
 import sys # Добавлено
+import operator # Добавлено для реляционных операций
+from ..generated.KumirLexer import KumirLexer # Добавлено для констант токенов
+
+# Словарь операций сравнения для реляционных выражений
+COMPARISON_OPS = {
+    KumirLexer.EQ: operator.eq,
+    KumirLexer.NE: operator.ne,
+    KumirLexer.LT: operator.lt,
+    KumirLexer.GT: operator.gt,
+    KumirLexer.LE: operator.le,
+    KumirLexer.GE: operator.ge,
+}
 
 
 class ExpressionEvaluator(KumirParserVisitor):
@@ -354,9 +366,11 @@ class ExpressionEvaluator(KumirParserVisitor):
         """Обрабатывает выражения равенства"""
         print(f"!!! [DEBUG ExpressionEvaluator.visitEqualityExpression] CALLED! Context: {ctx.getText()} !!!", file=sys.stderr)
         # Пока просто делегируем к следующему уровню
-        return self.visit(ctx.relationalExpression(0))  # Берем первый элемент    def visitRelationalExpression(self, ctx: KumirParser.RelationalExpressionContext) -> KumirValue:
+        return self.visit(ctx.relationalExpression(0))  # Берем первый элемент
+
+    def visitRelationalExpression(self, ctx: KumirParser.RelationalExpressionContext) -> KumirValue:
         """Обрабатывает реляционные выражения"""
-        print(f"!!! [DEBUG ExpressionEvaluator.visitRelationalExpression] CALLED! Context: {ctx.getText()} !!!", file=sys.stderr)
+        # print(f"!!! [DEBUG ExpressionEvaluator.visitRelationalExpression] CALLED! Context: {ctx.getText()} !!!", file=sys.stderr)
         
         # Проверяем, есть ли бинарная операция сравнения
         additive_expressions = ctx.additiveExpression()
@@ -374,19 +388,40 @@ class ExpressionEvaluator(KumirParserVisitor):
             
             if not (isinstance(result, KumirValue) and isinstance(right, KumirValue)):
                 pos_err = self._position_from_token(op_token)
-                raise KumirRuntimeError(
-                    f"Внутренняя ошибка: операнды не являются KumirValue (типы: {type(result).__name__}, {type(right).__name__}).",
+                raise KumirRuntimeError(                    f"Внутренняя ошибка: операнды не являются KumirValue (типы: {type(result).__name__}, {type(right).__name__}).",
                     line_index=pos_err[0], 
                     column_index=pos_err[1]
                 )
 
             op_text = op_token.getText()
             
-            # TODO: Реализовать операции сравнения <, >, <=, >=
-            # Пока просто делегируем дальше без операций
-            pos = self._position_from_token(op_token)
-            raise KumirNotImplementedError(f"Реляционная операция '{op_text}' пока не реализована.", 
-                                         line_index=pos[0], column_index=pos[1])
+            # Получаем тип токена для операции сравнения
+            if hasattr(op_token, 'symbol'):
+                op_token_type = op_token.symbol.type
+            else:
+                op_token_type = op_token.type
+            
+            # Приводим типы для сравнения (берем значения из KumirValue)
+            left_val = result.value
+            right_val = right.value
+            
+            # Простое приведение типов для сравнения
+            if isinstance(left_val, int) and isinstance(right_val, float):
+                left_val = float(left_val)
+            elif isinstance(left_val, float) and isinstance(right_val, int):
+                right_val = float(right_val)
+            
+            # Используем COMPARISON_OPS
+            op_func = COMPARISON_OPS.get(op_token_type)
+            if op_func:
+                bool_result = op_func(left_val, right_val)
+                result = KumirValue(value=bool_result, kumir_type=KumirType.BOOL.value)
+                print(f"[DEBUG][visitRelationalExpression] Result after '{op_text}': {result.value}", file=sys.stderr)
+            else:
+                # Этого не должно произойти, если грамматика верна
+                pos = self._position_from_token(op_token)
+                raise KumirRuntimeError(f"Неизвестный оператор отношения: {op_text}", 
+                                      line_index=pos[0], column_index=pos[1])
         
         return result
     def visitAdditiveExpression(self, ctx: KumirParser.AdditiveExpressionContext) -> KumirValue:
@@ -608,8 +643,8 @@ class ExpressionEvaluator(KumirParserVisitor):
 
     def visit(self, tree) -> KumirValue:
         """Общий метод visit для обхода AST дерева"""
-        print(f"!!! [DEBUG ExpressionEvaluator.visit] CALLED! Tree: {tree.getText() if hasattr(tree, 'getText') else str(tree)} !!!", file=sys.stderr)
-        print(f"!!! [DEBUG ExpressionEvaluator.visit] Tree type: {type(tree).__name__} !!!", file=sys.stderr)
+        # print(f"!!! [DEBUG ExpressionEvaluator.visit] CALLED! Tree: {tree.getText() if hasattr(tree, 'getText') else str(tree)} !!!", file=sys.stderr)
+        # print(f"!!! [DEBUG ExpressionEvaluator.visit] Tree type: {type(tree).__name__} !!!", file=sys.stderr)
         result = super().visit(tree)
-        print(f"!!! [DEBUG ExpressionEvaluator.visit] RESULT: {result} !!!", file=sys.stderr)
+        # print(f"!!! [DEBUG ExpressionEvaluator.visit] RESULT: {result} !!!", file=sys.stderr)
         return result
