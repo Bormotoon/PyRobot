@@ -288,7 +288,10 @@ class StatementHandlerMixin(KumirParserVisitor):
                             # Форматируем с заданной точностью
                             formatted_str = f"{value_to_print.value:.{precision}f}"
                         else:
-                            formatted_str = str(value_to_print.value) 
+                            # Используем правильное форматирование для вещественных чисел КуМира
+                            # Если это целое число (7.0), выводим как целое (7)
+                            from ..utils import to_output_string
+                            formatted_str = to_output_string(value_to_print)
                     elif value_to_print.kumir_type == KumirType.BOOL.value:
                         formatted_str = "истина" if value_to_print.value else "ложь"
                     elif value_to_print.kumir_type == KumirType.CHAR.value:
@@ -394,7 +397,9 @@ class StatementHandlerMixin(KumirParserVisitor):
                             if converted_value.kumir_type == KumirType.INT.value:
                                 echo_text = str(converted_value.value)
                             elif converted_value.kumir_type == KumirType.REAL.value:
-                                echo_text = str(converted_value.value)
+                                # Используем правильное форматирование для вещественных чисел КуМира
+                                from ..utils import to_output_string
+                                echo_text = to_output_string(converted_value)
                             elif converted_value.kumir_type == KumirType.BOOL.value:
                                 echo_text = "истина" if converted_value.value else "ложь"
                             elif converted_value.kumir_type == KumirType.CHAR.value:
