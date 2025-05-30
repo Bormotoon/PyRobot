@@ -447,7 +447,7 @@ class StatementHandlerMixin(KumirParserVisitor):
             specifier = ctx.loopSpecifier()
             if specifier.WHILE(): # НЦ ПОКА условие ... КЦ
                 while True:
-                    condition_expr = specifier.expression()
+                    condition_expr = specifier.expression(0)  # Получаем первое выражение
                     condition_val = kiv_self.expression_evaluator.visit(condition_expr)
                     
                     # Use the helper method for proper boolean evaluation
