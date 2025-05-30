@@ -176,3 +176,4 @@ antlr4-4.6/
 test_log.txt
 .vscode/settings.json
 .github/copilot-instructions.md
+.vscode/copilot-instructions.md
