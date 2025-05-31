@@ -620,13 +620,19 @@ class ExpressionEvaluator(KumirParserVisitor):
     def visitPowerExpression(self, ctx: KumirParser.PowerExpressionContext) -> KumirValue:
         # PowerExpression: unaryExpression (POWER powerExpression)?
         unary_expr = self.visit(ctx.unaryExpression())
-        
-        # Если есть оператор степени
         if ctx.POWER():
             power_expr = self.visit(ctx.powerExpression())
-            # TODO: Реализовать возведение в степень
-            # Пока что возвращаем первый операнд
-            return unary_expr
+            # Реализуем возведение в степень (правоассоциативно)
+            base = unary_expr.value
+            exponent = power_expr.value
+            # Если оба int — результат int, иначе float
+            if unary_expr.kumir_type == KumirType.INT.value and power_expr.kumir_type == KumirType.INT.value:
+                result_value = int(base ** exponent)
+                result_type = KumirType.INT.value
+            else:
+                result_value = float(base) ** float(exponent)
+                result_type = KumirType.REAL.value
+            return KumirValue(result_value, result_type)
         else:
             return unary_expr
 
