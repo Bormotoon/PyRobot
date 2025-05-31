@@ -109,16 +109,7 @@ class ExpressionEvaluator(KumirParserVisitor):
         pass # Обычно не используется в ExpressionEvaluator
 
     def visitLiteral(self, ctx: KumirParser.LiteralContext) -> KumirValue:
-        print(f"!!! [DEBUG ExpressionEvaluator.visitLiteral] CALLED! Context: {ctx.getText()} !!!", file=sys.stderr)
         text = ctx.getText()
-        print(f"!!! [DEBUG ExpressionEvaluator.visitLiteral] text = '{text}' !!!", file=sys.stderr)
-        print(f"!!! [DEBUG ExpressionEvaluator.visitLiteral] ctx.INTEGER() = {ctx.INTEGER()} !!!", file=sys.stderr)
-        print(f"!!! [DEBUG ExpressionEvaluator.visitLiteral] ctx.REAL() = {ctx.REAL()} !!!", file=sys.stderr)
-        print(f"!!! [DEBUG ExpressionEvaluator.visitLiteral] ctx.STRING() = {ctx.STRING()} !!!", file=sys.stderr)
-        print(f"!!! [DEBUG ExpressionEvaluator.visitLiteral] ctx.CHAR_LITERAL() = {ctx.CHAR_LITERAL()} !!!", file=sys.stderr)
-        print(f"!!! [DEBUG ExpressionEvaluator.visitLiteral] ctx.TRUE() = {ctx.TRUE()} !!!", file=sys.stderr)
-        print(f"!!! [DEBUG ExpressionEvaluator.visitLiteral] ctx.FALSE() = {ctx.FALSE()} !!!", file=sys.stderr)
-        print(f"!!! [DEBUG ExpressionEvaluator.visitLiteral] ctx.NEWLINE_CONST() = {ctx.NEWLINE_CONST()} !!!", file=sys.stderr)
         
         if ctx.INTEGER():
             return KumirValue(value=int(text), kumir_type=KumirType.INT.value)
@@ -364,19 +355,16 @@ class ExpressionEvaluator(KumirParserVisitor):
 
     def visitLogicalOrExpression(self, ctx: KumirParser.LogicalOrExpressionContext) -> KumirValue:
         """Обрабатывает логическое ИЛИ выражение"""
-        print(f"!!! [DEBUG ExpressionEvaluator.visitLogicalOrExpression] CALLED! Context: {ctx.getText()} !!!", file=sys.stderr)
         # Пока просто делегируем к следующему уровню
         return self.visit(ctx.logicalAndExpression(0))  # Берем первый элемент
 
     def visitLogicalAndExpression(self, ctx: KumirParser.LogicalAndExpressionContext) -> KumirValue:
         """Обрабатывает логическое И выражение"""
-        print(f"!!! [DEBUG ExpressionEvaluator.visitLogicalAndExpression] CALLED! Context: {ctx.getText()} !!!", file=sys.stderr)
         # Пока просто делегируем к следующему уровню
         return self.visit(ctx.equalityExpression(0))  # Берем первый элемент
 
     def visitEqualityExpression(self, ctx: KumirParser.EqualityExpressionContext) -> KumirValue:
         """Обрабатывает выражения равенства"""
-        # print(f"!!! [DEBUG ExpressionEvaluator.visitEqualityExpression] CALLED! Context: {ctx.getText()} !!!", file=sys.stderr)
         
         # Проверяем, есть ли бинарная операция равенства
         relational_expressions = ctx.relationalExpression()
@@ -422,7 +410,6 @@ class ExpressionEvaluator(KumirParserVisitor):
             if op_func:
                 bool_result = op_func(left_val, right_val)
                 result = KumirValue(value=bool_result, kumir_type=KumirType.BOOL.value)
-                # print(f"[DEBUG][visitEqualityExpression] Result after '{op_text}': {result.value}", file=sys.stderr)
             else:
                 # Этого не должно произойти, если грамматика верна
                 # Для TerminalNodeImpl используем .symbol для получения токена
@@ -434,7 +421,6 @@ class ExpressionEvaluator(KumirParserVisitor):
 
     def visitRelationalExpression(self, ctx: KumirParser.RelationalExpressionContext) -> KumirValue:
         """Обрабатывает реляционные выражения"""
-        print(f"!!! [DEBUG ExpressionEvaluator.visitRelationalExpression] CALLED! Context: {ctx.getText()} !!!", file=sys.stderr)
         
         # Проверяем, есть ли бинарная операция сравнения
         additive_expressions = ctx.additiveExpression()
@@ -481,7 +467,6 @@ class ExpressionEvaluator(KumirParserVisitor):
             if op_func:
                 bool_result = op_func(left_val, right_val)
                 result = KumirValue(value=bool_result, kumir_type=KumirType.BOOL.value)
-                print(f"[DEBUG][visitRelationalExpression] Result after '{op_text}': {result.value}", file=sys.stderr)
             else:
                 # Этого не должно произойти, если грамматика верна
                 # Для TerminalNodeImpl используем .symbol для получения токена
@@ -492,7 +477,6 @@ class ExpressionEvaluator(KumirParserVisitor):
         return result
     def visitAdditiveExpression(self, ctx: KumirParser.AdditiveExpressionContext) -> KumirValue:
         """Обрабатывает аддитивные выражения (например, expr + expr или expr - expr)"""
-        print(f"!!! [DEBUG ExpressionEvaluator.visitAdditiveExpression] CALLED! Context: {ctx.getText()} !!!", file=sys.stderr)
 
         # Проверяем, есть ли бинарная операция (число элементов в контексте)
         multiplicative_expressions = ctx.multiplicativeExpression()
@@ -554,7 +538,6 @@ class ExpressionEvaluator(KumirParserVisitor):
 
     def visitMultiplicativeExpression(self, ctx: KumirParser.MultiplicativeExpressionContext) -> KumirValue:
         """Обрабатывает мультипликативные выражения"""
-        print(f"!!! [DEBUG ExpressionEvaluator.visitMultiplicativeExpression] CALLED! Context: {ctx.getText()} !!!", file=sys.stderr)
         
         # Проверяем, есть ли бинарная операция
         power_expressions = ctx.powerExpression()
@@ -647,57 +630,67 @@ class ExpressionEvaluator(KumirParserVisitor):
         else:
             return unary_expr
 
-    # Метод для обработки унарных выражений  
+    # Метод для обработки унарных выражений
     def visitUnaryExpression(self, ctx: KumirParser.UnaryExpressionContext) -> KumirValue:
         # UnaryExpression: postfixExpression | unaryPlusMinusExpr | unaryNotExpr
-        # Базовый visitChildren должен вызвать правильный подметод
-        print(f"!!! [DEBUG visitUnaryExpression] CALLED! Context: {ctx.getText()}, child count: {ctx.getChildCount()} !!!", file=sys.stderr)
-        for i in range(ctx.getChildCount()):
-            child = ctx.getChild(i)
-            print(f"!!! [DEBUG visitUnaryExpression] Child {i}: {child}, type: {type(child)} !!!", file=sys.stderr)
+        
+        # Проверяем, является ли это унарной операцией с плюсом или минусом
+        if ctx.getChildCount() == 2:
+            # Это унарная операция: оператор + выражение
+            operator_child = ctx.getChild(0)
+            operand_ctx = ctx.getChild(1)
+            
+            if hasattr(operator_child, 'getText'):
+                operator_text = operator_child.getText()
+                
+                if operator_text == '-':
+                    # Унарный минус
+                    operand_val = self.visit(operand_ctx)
+                    
+                    if operand_val.kumir_type == KumirType.INT.value:
+                        return KumirValue(value=-operand_val.value, kumir_type=KumirType.INT.value)
+                    elif operand_val.kumir_type == KumirType.REAL.value:
+                        return KumirValue(value=-operand_val.value, kumir_type=KumirType.REAL.value)
+                elif operator_text == '+':
+                    # Унарный плюс
+                    operand_val = self.visit(operand_ctx)
+                    return operand_val
+        
+        # Если это не унарная операция, используем стандартную обработку
         return self.visitChildren(ctx)
     
     # Метод для обработки постфиксных выражений
     def visitPostfixExpression(self, ctx: KumirParser.PostfixExpressionContext) -> KumirValue:
         # PostfixExpression: primaryExpression (postfixOperator)*
-        print(f"!!! [DEBUG visitPostfixExpression] CALLED! Context: {ctx.getText()}, child count: {ctx.getChildCount()} !!!", file=sys.stderr)
         
         # Сначала получаем primary expression
         primary_expr = self.visit(ctx.primaryExpression())
-        print(f"!!! [DEBUG visitPostfixExpression] Primary expr: {primary_expr} !!!", file=sys.stderr)
         
         # Проверяем, есть ли дочерние элементы (постфиксные операторы)
         if ctx.getChildCount() == 1:
             # Только primaryExpression, без постфиксов
-            print(f"!!! [DEBUG visitPostfixExpression] No postfix operators, returning primary !!!", file=sys.stderr)
             return primary_expr
         
         # Обрабатываем постфиксные операторы
-        print(f"!!! [DEBUG visitPostfixExpression] Processing postfix operators !!!", file=sys.stderr)
         for i in range(1, ctx.getChildCount()):
             child = ctx.getChild(i)
-            print(f"!!! [DEBUG visitPostfixExpression] Child {i}: {child}, type: {type(child)} !!!", file=sys.stderr)
             
             # Если это LPAREN - значит вызов функции
             if hasattr(child, 'symbol') and child.symbol.type == KumirParser.LPAREN:
-                print(f"!!! [DEBUG visitPostfixExpression] Found LPAREN - function call! !!!", file=sys.stderr)
                 # Это вызов функции - обрабатываем аргументы
                 # Следующий элемент должен быть argumentList или RPAREN
                 args = []
                 arg_list_idx = i + 1
                 if arg_list_idx < ctx.getChildCount():
                     next_child = ctx.getChild(arg_list_idx)
-                    print(f"!!! [DEBUG visitPostfixExpression] Next child: {next_child}, type: {type(next_child)} !!!", file=sys.stderr)
                     # Если есть argumentList, обрабатываем аргументы
                     if hasattr(next_child, 'expression') and callable(getattr(next_child, 'expression')):
                         # Это argumentList
-                        print(f"!!! [DEBUG visitPostfixExpression] Processing argumentList !!!", file=sys.stderr)
                         args = self._evaluate_argument_list(next_child)
                 
                 # primary_expr должно содержать имя функции
                 if hasattr(primary_expr, 'value') and isinstance(primary_expr.value, str):
                     func_name = primary_expr.value
-                    print(f"!!! [DEBUG visitPostfixExpression] Calling function {func_name} with args {args} !!!", file=sys.stderr)
                     return self._call_function(func_name, args, ctx)
                 else:
                     pos = self._position_from_token(self._get_token_for_position(ctx))
@@ -705,7 +698,6 @@ class ExpressionEvaluator(KumirParserVisitor):
             
             # TODO: Обработка массивов (LBRACK ... RBRACK)
         
-        print(f"!!! [DEBUG visitPostfixExpression] Returning primary expr: {primary_expr} !!!", file=sys.stderr)
         return primary_expr# Метод для обработки первичных выражений
     def visitPrimaryExpression(self, ctx: KumirParser.PrimaryExpressionContext) -> KumirValue:
         # PrimaryExpression может быть literal, identifier, parenthesizedExpr и т.д.
@@ -781,7 +773,6 @@ class ExpressionEvaluator(KumirParserVisitor):
     
     def _call_function(self, func_name: str, args: list, ctx) -> KumirValue:
         """Вызывает встроенную функцию с аргументами"""
-        print(f"!!! [DEBUG] Вызов функции {func_name} с аргументами {args} !!!", file=sys.stderr)
         
         # Обрабатываем арифметические встроенные функции
         if func_name == 'div':
@@ -838,8 +829,5 @@ class ExpressionEvaluator(KumirParserVisitor):
 
     def visit(self, tree) -> KumirValue:
         """Общий метод visit для обхода AST дерева"""
-        # print(f"!!! [DEBUG ExpressionEvaluator.visit] CALLED! Tree: {tree.getText() if hasattr(tree, 'getText') else str(tree)} !!!", file=sys.stderr)
-        # print(f"!!! [DEBUG ExpressionEvaluator.visit] Tree type: {type(tree).__name__} !!!", file=sys.stderr)
         result = super().visit(tree)
-        # print(f"!!! [DEBUG ExpressionEvaluator.visit] RESULT: {result} !!!", file=sys.stderr)
         return result

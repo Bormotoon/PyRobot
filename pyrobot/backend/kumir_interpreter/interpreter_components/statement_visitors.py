@@ -22,7 +22,6 @@ class StatementVisitorMixin:
                     expressions = arg_ctx.expression()
                     # expression() может вернуть список выражений, берем первое
                     first_expression = expressions[0] if isinstance(expressions, list) else expressions
-                    print(f"!!! [DEBUG] About to evaluate expression: {first_expression.getText()} !!!", file=sys.stderr)
                     value_to_print = kiv_self.expression_evaluator.visit(first_expression)
                     if value_to_print is None:
                         raise KumirRuntimeError(
@@ -31,16 +30,8 @@ class StatementVisitorMixin:
                             column_index=arg_ctx.start.column
                         )
                       # Отладочный вывод для диагностики
-                    print(f"!!! [DEBUG] value_to_print.kumir_type = {value_to_print.kumir_type}, type = {type(value_to_print.kumir_type)} !!!", file=sys.stderr)
-                    print(f"!!! [DEBUG] value_to_print.value = {repr(value_to_print.value)} !!!", file=sys.stderr)
-                    print(f"!!! [DEBUG] value_to_print object = {value_to_print} !!!", file=sys.stderr)
                     
                     # Дополнительная отладка для сравнения типов
-                    print(f"!!! [DEBUG] Comparing: value_to_print.kumir_type ('{value_to_print.kumir_type}') with KumirType.STR.value ('{KumirType.STR.value}') !!!", file=sys.stderr)
-                    print(f"!!! [DEBUG] Types: type(value_to_print.kumir_type) is {type(value_to_print.kumir_type)}, type(KumirType.STR.value) is {type(KumirType.STR.value)} !!!", file=sys.stderr)
-                    print(f"!!! [DEBUG] Equality check (value_to_print.kumir_type == KumirType.STR.value): {value_to_print.kumir_type == KumirType.STR.value} !!!", file=sys.stderr)
-                    print(f"!!! [DEBUG] Equality check (repr(value_to_print.kumir_type) == repr(KumirType.STR.value)): {repr(value_to_print.kumir_type) == repr(KumirType.STR.value)} !!!", file=sys.stderr)
-                    print(f"!!! [DEBUG] KumirType.INT.value: '{KumirType.INT.value}', KumirType.REAL.value: '{KumirType.REAL.value}', KumirType.BOOL.value: '{KumirType.BOOL.value}', KumirType.CHAR.value: '{KumirType.CHAR.value}' !!!", file=sys.stderr)                    # Преобразование значения к строке с учетом типа
                     if value_to_print.kumir_type == KumirType.INT.value:
                         current_output += str(value_to_print.value)
                     elif value_to_print.kumir_type == KumirType.REAL.value:
@@ -75,12 +66,10 @@ class StatementVisitorMixin:
             # В КУМИР команда вывод НЕ добавляет автоматический перевод строки
             # Переводы строк добавляются только явно через 'нс'
             
-            print(f"[DEBUG statement_visitors.visitIoStatement] About to call io_handler.write_output. current_output length: {len(current_output)}. current_output: >>>{current_output}<<<", file=sys.stderr)
             kiv_self.io_handler.write_output(current_output)
 
         elif ctx.INPUT():
             # Реализация операции ВВОД
-            print(f"[DEBUG statement_visitors.visitIoStatement] Обработка оператора ВВОД", file=sys.stderr)
             
             # Получаем список аргументов (переменных для ввода)
             input_variables = []
@@ -95,7 +84,6 @@ class StatementVisitorMixin:
                     if hasattr(first_expression, 'getText'):
                         var_name = first_expression.getText().strip()
                         input_variables.append(var_name)
-                        print(f"[DEBUG] Переменная для ввода: {var_name}", file=sys.stderr)
                     else:
                         raise KumirRuntimeError(
                             f"Неверный аргумент для ВВОД. Ожидается имя переменной.",
@@ -118,7 +106,6 @@ class StatementVisitorMixin:
                     value = input_str.strip()
                     if value:
                         values.append(value)
-                        print(f"[DEBUG] Прочитано значение {i+1}: '{value}'", file=sys.stderr)
                         
                         # Логика эхо-ввода (как в старом интерпретаторе)
                         if kiv_self.echo_input:
@@ -145,7 +132,6 @@ class StatementVisitorMixin:
             
             # Выводим эхо введённых значений (если включено)
             if kiv_self.echo_input and echo_output:
-                print(f"[DEBUG] Вывод эхо ввода: '{echo_output.rstrip()}'", file=sys.stderr)
                 kiv_self.io_handler.write_output(echo_output)
             
             # Присваиваем значения переменным
@@ -191,7 +177,6 @@ class StatementVisitorMixin:
                         line_index=ctx.start.line - 1,
                         column_index=ctx.start.column
                     )
-                    print(f"[DEBUG] Присвоено {var_name} = {kumir_value.value} (тип: {kumir_value.kumir_type})", file=sys.stderr)
                     
                 except ValueError as e:
                     raise KumirRuntimeError(

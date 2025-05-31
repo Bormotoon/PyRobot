@@ -438,9 +438,7 @@ class StatementHandlerMixin(KumirParserVisitor):
             self.visit(ctx.statementSequence(0)) # Блок ТО
         elif ctx.ELSE(): # Есть блок ИНАЧЕ
             self.visit(ctx.statementSequence(1)) # Блок ИНАЧЕ
-        return None    # visitSwitchStatement реализован в ControlFlowVisitorMixin
-
-    def visitLoopStatement(self, ctx: KumirParser.LoopStatementContext) -> None:
+        return None    # visitSwitchStatement реализован в ControlFlowVisitorMixin    def visitLoopStatement(self, ctx: KumirParser.LoopStatementContext) -> None:
         kiv_self = cast('KumirInterpreterVisitor', self)
 
         if ctx.loopSpecifier():
@@ -453,8 +451,7 @@ class StatementHandlerMixin(KumirParserVisitor):
                     # Use the helper method for proper boolean evaluation
                     condition_result = self._evaluate_condition(condition_val, "цикле ПОКА", condition_expr)
                     if not condition_result:
-                        break
-                    
+                        break                    
                     try:
                         self.visit(ctx.statementSequence())
                     except ContinueSignal:

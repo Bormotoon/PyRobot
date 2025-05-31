@@ -81,8 +81,7 @@ class ControlFlowVisitorMixin:
                     try:
                         # Объявляем переменную цикла как ЦЕЛ
                         loop_var_id_token = loop_specifier_ctx.ID().symbol
-                        kiv_self.scope_manager.declare_variable(
-                            loop_var_name, 
+                        kiv_self.scope_manager.declare_variable(                            loop_var_name, 
                             KumirType.INT, # В КуМире переменная цикла ДЛЯ всегда целая
                             None, # Начальное значение присваивается ниже
                             line_index=loop_var_id_token.line - 1, 
