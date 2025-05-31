@@ -12,7 +12,7 @@ from ..generated.KumirParserVisitor import KumirParserVisitor
 from ..generated.KumirParser import KumirParser
 from .scope_manager import ScopeManager # Исправленный импорт ScopeManager
 from ..kumir_datatypes import KumirValue, KumirType # Добавлено
-from ..kumir_exceptions import KumirEvalError, KumirTypeError, KumirNameError, KumirRuntimeError, KumirNotImplementedError # Добавлены KumirRuntimeError, KumirNotImplementedError
+from ..kumir_exceptions import KumirEvalError, KumirTypeError, KumirNameError, KumirRuntimeError, KumirNotImplementedError, KumirArgumentError # Добавлены KumirRuntimeError, KumirNotImplementedError, KumirArgumentError
 import sys # Добавлено
 import operator # Добавлено для реляционных операций
 from ..generated.KumirLexer import KumirLexer # Добавлено для констант токенов
@@ -651,16 +651,62 @@ class ExpressionEvaluator(KumirParserVisitor):
     def visitUnaryExpression(self, ctx: KumirParser.UnaryExpressionContext) -> KumirValue:
         # UnaryExpression: postfixExpression | unaryPlusMinusExpr | unaryNotExpr
         # Базовый visitChildren должен вызвать правильный подметод
+        print(f"!!! [DEBUG visitUnaryExpression] CALLED! Context: {ctx.getText()}, child count: {ctx.getChildCount()} !!!", file=sys.stderr)
+        for i in range(ctx.getChildCount()):
+            child = ctx.getChild(i)
+            print(f"!!! [DEBUG visitUnaryExpression] Child {i}: {child}, type: {type(child)} !!!", file=sys.stderr)
         return self.visitChildren(ctx)
-
+    
     # Метод для обработки постфиксных выражений
     def visitPostfixExpression(self, ctx: KumirParser.PostfixExpressionContext) -> KumirValue:
         # PostfixExpression: primaryExpression (postfixOperator)*
-        primary_expr = self.visit(ctx.primaryExpression())
+        print(f"!!! [DEBUG visitPostfixExpression] CALLED! Context: {ctx.getText()}, child count: {ctx.getChildCount()} !!!", file=sys.stderr)
         
-        # TODO: Обработка постфиксных операторов (массивы, вызовы функций)
-        # Пока что возвращаем только первичное выражение
-        return primary_expr    # Метод для обработки первичных выражений
+        # Сначала получаем primary expression
+        primary_expr = self.visit(ctx.primaryExpression())
+        print(f"!!! [DEBUG visitPostfixExpression] Primary expr: {primary_expr} !!!", file=sys.stderr)
+        
+        # Проверяем, есть ли дочерние элементы (постфиксные операторы)
+        if ctx.getChildCount() == 1:
+            # Только primaryExpression, без постфиксов
+            print(f"!!! [DEBUG visitPostfixExpression] No postfix operators, returning primary !!!", file=sys.stderr)
+            return primary_expr
+        
+        # Обрабатываем постфиксные операторы
+        print(f"!!! [DEBUG visitPostfixExpression] Processing postfix operators !!!", file=sys.stderr)
+        for i in range(1, ctx.getChildCount()):
+            child = ctx.getChild(i)
+            print(f"!!! [DEBUG visitPostfixExpression] Child {i}: {child}, type: {type(child)} !!!", file=sys.stderr)
+            
+            # Если это LPAREN - значит вызов функции
+            if hasattr(child, 'symbol') and child.symbol.type == KumirParser.LPAREN:
+                print(f"!!! [DEBUG visitPostfixExpression] Found LPAREN - function call! !!!", file=sys.stderr)
+                # Это вызов функции - обрабатываем аргументы
+                # Следующий элемент должен быть argumentList или RPAREN
+                args = []
+                arg_list_idx = i + 1
+                if arg_list_idx < ctx.getChildCount():
+                    next_child = ctx.getChild(arg_list_idx)
+                    print(f"!!! [DEBUG visitPostfixExpression] Next child: {next_child}, type: {type(next_child)} !!!", file=sys.stderr)
+                    # Если есть argumentList, обрабатываем аргументы
+                    if hasattr(next_child, 'expression') and callable(getattr(next_child, 'expression')):
+                        # Это argumentList
+                        print(f"!!! [DEBUG visitPostfixExpression] Processing argumentList !!!", file=sys.stderr)
+                        args = self._evaluate_argument_list(next_child)
+                
+                # primary_expr должно содержать имя функции
+                if hasattr(primary_expr, 'value') and isinstance(primary_expr.value, str):
+                    func_name = primary_expr.value
+                    print(f"!!! [DEBUG visitPostfixExpression] Calling function {func_name} with args {args} !!!", file=sys.stderr)
+                    return self._call_function(func_name, args, ctx)
+                else:
+                    pos = self._position_from_token(self._get_token_for_position(ctx))
+                    raise KumirEvalError(f"Невозможно вызвать функцию: {primary_expr}", line_index=pos[0], column_index=pos[1])
+            
+            # TODO: Обработка массивов (LBRACK ... RBRACK)
+        
+        print(f"!!! [DEBUG visitPostfixExpression] Returning primary expr: {primary_expr} !!!", file=sys.stderr)
+        return primary_expr# Метод для обработки первичных выражений
     def visitPrimaryExpression(self, ctx: KumirParser.PrimaryExpressionContext) -> KumirValue:
         # PrimaryExpression может быть literal, identifier, parenthesizedExpr и т.д.
         if ctx.literal():
@@ -684,10 +730,14 @@ class ExpressionEvaluator(KumirParserVisitor):
             raise KumirNotImplementedError(f"Неизвестный тип первичного выражения: {ctx.getText()}", line_index=pos[0], column_index=pos[1])
 
     def visitQualifiedIdentifier(self, ctx: KumirParser.QualifiedIdentifierContext) -> KumirValue:
-        """Обрабатывает идентификатор (имя переменной) и возвращает её значение"""
+        """Обрабатывает идентификатор (имя переменной или функции) и возвращает её значение"""
         # qualifiedIdentifier: ID
         var_name = ctx.ID().getText()
-        print(f"!!! [DEBUG ExpressionEvaluator.visitQualifiedIdentifier] Поиск переменной: {var_name} !!!", file=sys.stderr)
+        
+        # Сначала проверяем, это встроенная функция
+        if self._is_builtin_function(var_name):
+            # Возвращаем имя функции как строковое значение для дальнейшей обработки в postfixExpression
+            return KumirValue(var_name, KumirType.STR.value)
         
         # Ищем переменную в scope_manager (возвращает кортеж (var_info, scope))
         var_info, scope = self.scope_manager.find_variable(var_name)
@@ -697,15 +747,94 @@ class ExpressionEvaluator(KumirParserVisitor):
         
         # var_info это словарь с ключами 'value', 'kumir_type', etc.
         value = var_info['value']
-        print(f"!!! [DEBUG ExpressionEvaluator.visitQualifiedIdentifier] Найдена переменная {var_name} = {value} !!!", file=sys.stderr)
         
         return value
 
     def visitExpression(self, ctx: KumirParser.ExpressionContext) -> KumirValue:
         """Обрабатывает Expression узел, делегируя обработку дальше по дереву"""
-        print(f"!!! [DEBUG ExpressionEvaluator.visitExpression] CALLED! Context: {ctx.getText()} !!!", file=sys.stderr)
         # Expression -> logicalOrExpression, делегируем обработку
         return self.visit(ctx.logicalOrExpression())
+
+    # ====== МЕТОДЫ ДЛЯ ОБРАБОТКИ ВСТРОЕННЫХ ФУНКЦИЙ ======
+    
+    def _is_builtin_function(self, name: str) -> bool:
+        """Проверяет, является ли имя встроенной функцией"""
+        builtin_functions = {
+            'div', 'mod', 'abs', 'sqrt', 'sin', 'cos', 'tan', 'arctan', 'sign',
+            'irand', 'rand', 'цел', 'вещ', 'длина', 'позиция'
+        }
+        return name in builtin_functions
+    
+    def _evaluate_argument_list(self, arg_list_ctx) -> list:
+        """Вычисляет список аргументов функции"""
+        args = []
+        if hasattr(arg_list_ctx, 'expression') and callable(getattr(arg_list_ctx, 'expression')):
+            # argumentList: expression (COMMA expression)*
+            expressions = arg_list_ctx.expression()
+            if isinstance(expressions, list):
+                for expr in expressions:
+                    args.append(self.visit(expr))
+            else:
+                # Только один аргумент
+                args.append(self.visit(expressions))
+        return args
+    
+    def _call_function(self, func_name: str, args: list, ctx) -> KumirValue:
+        """Вызывает встроенную функцию с аргументами"""
+        print(f"!!! [DEBUG] Вызов функции {func_name} с аргументами {args} !!!", file=sys.stderr)
+        
+        # Обрабатываем арифметические встроенные функции
+        if func_name == 'div':
+            if len(args) != 2:
+                pos = self._position_from_token(self._get_token_for_position(ctx))
+                raise KumirArgumentError(f"Функция 'div' ожидает 2 аргумента, получено {len(args)}", line_index=pos[0], column_index=pos[1])
+            
+            a = args[0]
+            b = args[1]
+              # Проверяем типы
+            if not isinstance(a.value, int) or not isinstance(b.value, int):
+                pos = self._position_from_token(self._get_token_for_position(ctx))
+                raise KumirArgumentError(f"Функция 'div' применима только к целым числам", line_index=pos[0], column_index=pos[1])
+            
+            if b.value == 0:
+                pos = self._position_from_token(self._get_token_for_position(ctx))
+                raise KumirEvalError("Деление на ноль (div)", line_index=pos[0], column_index=pos[1])
+            
+            result = a.value // b.value
+            return KumirValue(result, KumirType.INT.value)
+        
+        elif func_name == 'mod':
+            if len(args) != 2:
+                pos = self._position_from_token(self._get_token_for_position(ctx))
+                raise KumirArgumentError(f"Функция 'mod' ожидает 2 аргумента, получено {len(args)}", line_index=pos[0], column_index=pos[1])
+            
+            a = args[0]
+            b = args[1]
+              # Проверяем типы
+            if not isinstance(a.value, int) or not isinstance(b.value, int):
+                pos = self._position_from_token(self._get_token_for_position(ctx))
+                raise KumirArgumentError(f"Функция 'mod' применима только к целым числам", line_index=pos[0], column_index=pos[1])
+            
+            if b.value == 0:
+                pos = self._position_from_token(self._get_token_for_position(ctx))
+                raise KumirEvalError("Деление на ноль (mod)", line_index=pos[0], column_index=pos[1])
+            
+            result = a.value % b.value
+            return KumirValue(result, KumirType.INT.value)
+        
+        elif func_name == 'abs':
+            if len(args) != 1:
+                pos = self._position_from_token(self._get_token_for_position(ctx))
+                raise KumirArgumentError(f"Функция 'abs' ожидает 1 аргумент, получено {len(args)}", line_index=pos[0], column_index=pos[1])
+            
+            a = args[0]
+            result = abs(a.value)
+            return KumirValue(result, a.kumir_type)
+        
+        # TODO: Добавить остальные встроенные функции при необходимости
+        else:
+            pos = self._position_from_token(self._get_token_for_position(ctx))
+            raise KumirNotImplementedError(f"Встроенная функция '{func_name}' пока не реализована", line_index=pos[0], column_index=pos[1])
 
     def visit(self, tree) -> KumirValue:
         """Общий метод visit для обхода AST дерева"""
