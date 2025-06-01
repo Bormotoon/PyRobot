@@ -665,8 +665,7 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementHandlerMixin, St
             for expr_ctx in ctx.expression():
                 arg_value = self.visit(expr_ctx)
                 actual_args.append(arg_value)
-        
-        # Вызываем процедуру (или функцию)
+          # Вызываем процедуру (или функцию)
         # Для этого используем общую логику вызова, которая была в старом интерпретаторе
         # Но без явного указания контекста, полагаемся на текущий
         # Если процедура не найдена, будет вызвано исключение KumirRuntimeError
@@ -675,5 +674,58 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementHandlerMixin, St
             actual_args,
             ctx.qualifiedIdentifier() # Для контекста ошибок
         )
+    
+    def _call_user_function(self, func_name: str, args: List[Any], ctx: ParserRuleContext) -> 'KumirValue':
+        """Вызывает пользовательскую функцию с заданными аргументами"""
+        from ..kumir_datatypes import KumirValue, KumirType
+        from ..kumir_exceptions import KumirRuntimeError, KumirArgumentError
+        
+        # Получаем определение функции
+        algorithm_def = self.algorithm_manager.get_algorithm(func_name)
+        
+        if algorithm_def is None:
+            raise KumirRuntimeError(f"Функция '{func_name}' не найдена")
+        
+        if not algorithm_def.is_function:
+            raise KumirRuntimeError(f"'{func_name}' является процедурой, а не функцией")
+        
+        # Проверяем количество аргументов
+        if len(args) != len(algorithm_def.parameters):
+            raise KumirArgumentError(f"Функция '{func_name}' ожидает {len(algorithm_def.parameters)} аргументов, получено {len(args)}")
+          # TODO: Полная реализация вызова функции
+        # 1. Создать новую область видимости
+        # 2. Объявить параметры в области видимости
+        # 3. Присвоить значения параметрам
+        # 4. Выполнить тело функции
+        # 5. Обработать возврат значения через FunctionReturnException
+        # 6. Восстановить область видимости
+        
+        # Сохраняем текущую область видимости
+        self.scope_manager.push_scope(f"function_{func_name}")
+        
+        try:
+            # Объявляем и присваиваем параметры
+            for i, param in enumerate(algorithm_def.parameters):
+                param_value = args[i]
+                # Объявляем переменную в области видимости функции
+                self.scope_manager.declare_variable(param.name, param_value.kumir_type)
+                # Присваиваем значение
+                self.scope_manager.set_variable(param.name, param_value)
+            
+            # Выполняем тело функции
+            try:
+                self.visit(algorithm_def.context.algorithmBody())
+                # Если дошли до сюда без FunctionReturnException, значит функция не вернула значение
+                raise KumirRuntimeError(f"Функция '{func_name}' не вернула значение")
+            except FunctionReturnException as return_exc:
+                # Функция вернула значение через 'знач := выражение'
+                return return_exc.value
+            
+        finally:
+            # Восстанавливаем предыдущую область видимости
+            self.scope_manager.pop_scope()
+        
+        # Этот код никогда не должен выполниться, но на всякий случай
+        raise KumirRuntimeError(f"Неожиданная ошибка при выполнении функции '{func_name}'")
 
 

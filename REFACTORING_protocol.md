@@ -208,3 +208,49 @@
 3. **Корректное обращение к методам ANTLR грамматики**
 4. **Словарный доступ к данным** вместо атрибутов объектов
 5. **Упрощение логики parse tree** для избежания сложных ANTLR контекстов
+
+---
+
+## 3. Реализация Пользовательских Функций и Процедур (01.06.2025)
+
+### 3.1. КРИТИЧЕСКИЙ ПРОРЫВ: Базовая Работа Функций ✅
+
+**ДОСТИГНУТ ЭТАП:** Функции пользователя успешно распознаются, вызываются и возвращают значения!
+
+#### 3.1.1. Архитектурные Компоненты (созданы)
+
+**Новые классы в `definitions.py`:**
+```python
+@dataclass
+class Parameter:
+    name: str
+    param_type: str  # тип КуМира: "цел", "вещ", etc.
+    mode: str        # "арг", "рез", "аргрез"
+
+@dataclass  
+class AlgorithmDefinition:
+    name: str
+    is_function: bool
+    return_type: Optional[str]
+    parameters: List[Parameter] 
+    context: Any  # ParserRuleContext с телом алгоритма
+
+class AlgorithmManager:
+    def __init__(self):
+        self.algorithms: Dict[str, AlgorithmDefinition] = {}
+    
+    def register_algorithm(self, algorithm_def: AlgorithmDefinition):
+        self.algorithms[algorithm_def.name] = algorithm_def
+    
+    def get_algorithm(self, name: str) -> Optional[AlgorithmDefinition]:
+        return self.algorithms.get(name)
+    
+    def has_algorithm(self, name: str) -> bool:
+        return name in self.algorithms
+
+class FunctionReturnException(Exception):
+    """Исключение для обработки 'знач := выражение' в функциях"""
+    def __init__(self, value):
+        self.value = value
+        super().__init__(f"Function return: {value}")
+```

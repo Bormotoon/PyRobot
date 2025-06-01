@@ -735,6 +735,9 @@ class ExpressionEvaluator(KumirParserVisitor):
         # Сначала проверяем, это встроенная функция
         if self._is_builtin_function(var_name):
             # Возвращаем имя функции как строковое значение для дальнейшей обработки в postfixExpression
+            return KumirValue(var_name, KumirType.STR.value)        # ДОБАВЛЕНО: Проверяем, это пользовательская функция в AlgorithmManager
+        if hasattr(self.main_visitor, 'algorithm_manager') and self.main_visitor.algorithm_manager.has_algorithm(var_name):
+            # Возвращаем имя функции как строковое значение для дальнейшей обработки в postfixExpression
             return KumirValue(var_name, KumirType.STR.value)
         
         # Ищем переменную в scope_manager (возвращает кортеж (var_info, scope))
@@ -827,8 +830,20 @@ class ExpressionEvaluator(KumirParserVisitor):
             a = args[0]
             result = abs(a.value)
             return KumirValue(result, a.kumir_type)
+          # TODO: Добавить остальные встроенные функции при необходимости
         
-        # TODO: Добавить остальные встроенные функции при необходимости
+        # ДОБАВЛЕНО: Проверяем пользовательские функции в AlgorithmManager
+        if hasattr(self.main_visitor, 'algorithm_manager') and self.main_visitor.algorithm_manager.has_algorithm(func_name):
+            algorithm_def = self.main_visitor.algorithm_manager.get_algorithm(func_name)
+            if algorithm_def.is_function:
+                # Это пользовательская функция - вызываем её через main visitor
+                return self.main_visitor._call_user_function(func_name, args, ctx)
+            else:
+                # Это процедура, а не функция - ошибка
+                pos = self._position_from_token(self._get_token_for_position(ctx))
+                raise KumirTypeError(f"'{func_name}' является процедурой, а не функцией, и не может использоваться в выражении", line_index=pos[0], column_index=pos[1])
+        
+        # Если дошли до сюда - неизвестная функция
         else:
             pos = self._position_from_token(self._get_token_for_position(ctx))
             raise KumirNotImplementedError(f"Встроенная функция '{func_name}' пока не реализована", line_index=pos[0], column_index=pos[1])
