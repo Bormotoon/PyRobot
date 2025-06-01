@@ -6,6 +6,7 @@ from ..generated.KumirParser import KumirParser
 from ..kumir_exceptions import (KumirEvalError, KumirNotImplementedError,
                                 DeclarationError, AssignmentError)
 from ..kumir_datatypes import KumirType
+from ..definitions import Parameter, AlgorithmDefinition  # Импорт наших новых классов
 from .type_utils import get_type_info_from_specifier
 
 if TYPE_CHECKING:
@@ -211,11 +212,11 @@ class DeclarationVisitorMixin:
     # that then calls visitVariableDeclaration. If these are direct children of 'statement',
     # they might not be needed if visitVariableDeclaration covers all var decls.
     # However, if grammar has distinct rules like 'var_declare_assign_statement',
-    # then dedicated visitors are appropriate.
-
-    # Based on KumirParser.g4, 'variableDeclaration' seems to be the main rule for declarations
+    # then dedicated visitors are appropriate.    # Based on KumirParser.g4, 'variableDeclaration' seems to be the main rule for declarations
     # within a statement context. Other specific declaration-like rules might be for global scope
-    # or specific algorithm parts. For now, focusing on visitVariableDeclaration.    # Placeholder for procedure/function declaration (handled by visitAlgorithmDefinition)
+    # or specific algorithm parts. For now, focusing on visitVariableDeclaration.
+    
+    # Placeholder for procedure/function declaration (handled by visitAlgorithmDefinition)
     def visitAlgorithmDefinition(self, ctx: KumirParser.AlgorithmDefinitionContext):
         kiv_self = cast('KumirInterpreterVisitor', self)
         algo_header_ctx = ctx.algorithmHeader()
@@ -231,9 +232,57 @@ class DeclarationVisitorMixin:
                 result_type, _ = get_type_info_from_specifier(kiv_self, algo_header_ctx.typeSpecifier())
             except Exception as e:
                 print(f"[ERROR][DeclVisitor] Failed to get return type for function {algo_name_tokens}: {e}", file=sys.stderr)
-                result_type = "вещ"  # Fallback to float type
+                result_type = "вещ"  # Fallback to float type        # Извлекаем параметры из контекста
+        parameters = []
+        param_list_ctx = algo_header_ctx.parameterList()
+        if param_list_ctx:
+            for param_decl_ctx in param_list_ctx.parameterDeclaration():
+                # Извлечение информации о параметре
+                param_names = []
+                var_list_ctx = param_decl_ctx.variableList()
+                if var_list_ctx:
+                    for var_decl_item_ctx in var_list_ctx.variableDeclarationItem():
+                        param_names.append(var_decl_item_ctx.ID().getText().strip())
+                
+                # Определение типа параметра
+                param_type = "цел"  # По умолчанию
+                is_table = False
+                if param_decl_ctx.typeSpecifier():
+                    try:
+                        param_type, is_table = get_type_info_from_specifier(kiv_self, param_decl_ctx.typeSpecifier())
+                    except Exception as e:
+                        print(f"[ERROR][DeclVisitor] Failed to get parameter type: {e}", file=sys.stderr)
+                
+                # Определение режима параметра (арг, рез, аргрез)
+                param_mode = "арг"  # По умолчанию
+                if param_decl_ctx.IN_PARAM():
+                    param_mode = "арг"
+                elif param_decl_ctx.OUT_PARAM():
+                    param_mode = "рез"  
+                elif param_decl_ctx.INOUT_PARAM():
+                    param_mode = "аргрез"# Создаем объекты Parameter для каждого имени
+                for param_name in param_names:
+                    param = Parameter(
+                        name=param_name,
+                        param_type=param_type,
+                        mode=param_mode,
+                        is_table=is_table
+                    )
+                    parameters.append(param)        # Создаем объект AlgorithmDefinition  
+        algorithm_def = AlgorithmDefinition(
+            name=algo_name_tokens,
+            parameters=parameters,
+            return_type=result_type if is_func else None,
+            body_context=ctx.algorithmBody() if ctx.algorithmBody() else None,
+            local_declarations=[]  # Пока пустой список, заполним позже при необходимости
+        )
 
-        # Регистрируем процедуру/функцию
+        # Регистрируем в новом AlgorithmManager
+        try:
+            kiv_self.algorithm_manager.register_algorithm(algorithm_def)
+            print(f"[DEBUG][DeclVisitor] Successfully registered algorithm in AlgorithmManager: {algo_name_tokens}", file=sys.stderr)
+        except Exception as e:
+            print(f"[ERROR][DeclVisitor] Failed to register algorithm in AlgorithmManager {algo_name_tokens}: {e}", file=sys.stderr)        # Также регистрируем в старом ProcedureManager для обратной совместимости
         try:
             kiv_self.procedure_manager.register_procedure(
                 name=algo_name_tokens,
@@ -246,6 +295,15 @@ class DeclarationVisitorMixin:
             print(f"[ERROR][DeclVisitor] Failed to register {algo_name_tokens}: {e}", file=sys.stderr)
             raise
 
+        # ВАЖНО: Проверяем режим сбора определений
+        # Если включен режим "только сбор определений", НЕ выполняем тело алгоритма
+        if kiv_self.is_definition_collection_mode():
+            print(f"[DEBUG][DeclVisitor] Definition collection mode: skipping algorithm body for {algo_name_tokens}", file=sys.stderr)
+            return None  # Завершаем обработку, не позволяя ANTLR обходить дочерние узлы
+            
+        # В обычном режиме позволяем ANTLR обойти дочерние узлы (включая algorithmBody)
+        # Это поведение по умолчанию, так что возвращаем результат по умолчанию
+        print(f"[DEBUG][DeclVisitor] Normal mode: allowing algorithm body execution for {algo_name_tokens}", file=sys.stderr)
         return None # Algorithm definition is a declaration, not an expression with a value
 
     # Removed duplicated/placeholder visit methods for specific var/arr/proc/func declare statements

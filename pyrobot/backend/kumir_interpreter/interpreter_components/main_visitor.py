@@ -12,6 +12,7 @@ from ..generated.KumirParserVisitor import KumirParserVisitor # Базовый �
 from .. import kumir_exceptions # <--- Добавляем импорт модуля исключений
 from ..kumir_exceptions import KumirSemanticError, KumirRuntimeError, KumirSyntaxError, ExitSignal, BreakSignal, StopExecutionSignal, KumirNameError, KumirTypeError # Изменения: ProcedureExitCalled -> ExitSignal, LoopExitException -> BreakSignal
 from ..kumir_datatypes import KumirTableVar, KumirReturnValue, KumirValue, KumirType 
+from ..definitions import AlgorithmManager, AlgorithmDefinition, Parameter, FunctionCallFrame, FunctionReturnException  # Импорт наших новых классов
 
 # Импорты компонентов интерпретатора из __init__.py текущего пакета
 from .scope_manager import ScopeManager
@@ -83,6 +84,7 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementHandlerMixin, St
 
         self.scope_manager = ScopeManager(self)
         self.procedure_manager = ProcedureManager(self)
+        self.algorithm_manager = AlgorithmManager()  # Новый менеджер алгоритмов
         self.expression_evaluator = ExpressionEvaluator(self, self.scope_manager, self.procedure_manager) # Передаем self (main_visitor)
         
         # Создаем IOHandler, передавая модуль исключений и потоки. Visitor будет None сначала.
@@ -96,8 +98,7 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementHandlerMixin, St
         self.io_handler.set_visitor(self) # Устанавливаем visitor в IOHandler
 
         self.builtin_function_handler = BuiltinFunctionHandler(self) # Предполагаем наличие
-        self.builtin_procedure_handler = BuiltinProcedureHandler(self) # Предполагаем наличие        self.error_stream_out = error_stream if error_stream else lambda x: print(x, file=__import__('sys').stderr) # Используем правильные кавычки
-        
+        self.builtin_procedure_handler = BuiltinProcedureHandler(self) # Предполагаем наличие        self.error_stream_out = error_stream if error_stream else lambda x: print(x, file=__import__('sys').stderr) # Используем правильные кавычки        
         # Настройка эхо ввода (автоматический вывод введённых значений)
         self.echo_input = echo_input
         
@@ -107,6 +108,9 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementHandlerMixin, St
         self.return_value: Optional[KumirReturnValue] = None 
         self.stop_execution_flag = False
         self.function_call_active: bool = False # ДОБАВЛЕНО
+        
+        # Флаг для режима "только сбор определений" (не выполнять тела алгоритмов)
+        self.definition_collection_mode: bool = False
 
         if global_vars:
             for name, value_info in global_vars.items():
@@ -155,9 +159,7 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementHandlerMixin, St
             line_num_0_indexed = ctx.start.line - 1
             if 0 <= line_num_0_indexed < len(self.program_lines):
                 return self.program_lines[line_num_0_indexed]
-        return None
-
-    # ДОБАВЛЕНО: Методы для связи с IOHandler
+        return None    # ДОБАВЛЕНО: Методы для связи с IOHandler
     def get_input_line(self, prompt: str) -> str:
         if not self.io_handler: # pragma: no cover
             raise KumirRuntimeError("IOHandler не инициализирован.")
@@ -167,6 +169,22 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementHandlerMixin, St
         if not self.io_handler: # pragma: no cover
             raise KumirRuntimeError("IOHandler не инициализирован.")
         self.io_handler.write_output(text)
+    # КОНЕЦ ДОБАВЛЕННЫХ МЕТОДОВ    # ДОБАВЛЕНО: Методы для управления режимом сбора определений
+    def set_definition_collection_mode(self, mode: bool) -> None:
+        """Устанавливает режим сбора определений (не выполнять тела алгоритмов)"""
+        self.definition_collection_mode = mode
+        
+    def is_definition_collection_mode(self) -> bool:
+        """Возвращает True, если включен режим сбора определений"""
+        return self.definition_collection_mode
+        
+    def collect_definitions_only(self, tree: ParserRuleContext) -> None:
+        """Первый проход: собирает только определения функций и процедур"""
+        self.set_definition_collection_mode(True)
+        try:
+            self.visit(tree)
+        finally:
+            self.set_definition_collection_mode(False)
     # КОНЕЦ ДОБАВЛЕННЫХ МЕТОДОВ
 
     # Основной метод для запуска интерпретации с корневого узла (program)    

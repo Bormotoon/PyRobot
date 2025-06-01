@@ -49,3 +49,75 @@ class KumirNotImplementedError(KumirExecutionError):
 # classOutOfBoundsError(KumirExecutionError):
 #     def __init__(self, message="Выход за границы массива", line_number=None, column_number=None):
 #         super().__init__(message, line_number, column_number)
+
+
+# ============================================================================
+# Исключения для работы с пользовательскими функциями и процедурами
+# ============================================================================
+
+class AlgorithmRedefinitionError(KumirExecutionError):
+    """Ошибка повторного определения алгоритма с тем же именем."""
+    def __init__(self, algorithm_name, line_number=None, column_number=None):
+        message = f"Алгоритм '{algorithm_name}' уже определён"
+        super().__init__(message, line_number, column_number)
+
+
+class ArgumentMismatchError(KumirExecutionError):
+    """Ошибка несоответствия аргументов при вызове алгоритма."""
+    def __init__(self, algorithm_name, expected_count, actual_count, line_number=None, column_number=None):
+        message = f"Алгоритм '{algorithm_name}' ожидает {expected_count} аргументов, передано {actual_count}"
+        super().__init__(message, line_number, column_number)
+
+
+class AlgorithmNotFoundError(KumirExecutionError):
+    """Ошибка вызова неопределённого алгоритма."""
+    def __init__(self, algorithm_name, line_number=None, column_number=None):
+        message = f"Алгоритм '{algorithm_name}' не определён"
+        super().__init__(message, line_number, column_number)
+
+
+class ReturnValueError(KumirExecutionError):
+    """Ошибки, связанные с возвратом значений из функций."""
+    def __init__(self, message, line_number=None, column_number=None):
+        super().__init__(message, line_number, column_number)
+
+
+class MissingReturnValueError(ReturnValueError):
+    """Ошибка отсутствия возвращаемого значения в функции."""
+    def __init__(self, function_name, line_number=None, column_number=None):
+        message = f"Функция '{function_name}' должна возвращать значение через 'знач'"
+        super().__init__(message, line_number, column_number)
+
+
+class InvalidReturnValueError(ReturnValueError):
+    """Ошибка использования 'знач' в процедуре."""
+    def __init__(self, procedure_name, line_number=None, column_number=None):
+        message = f"Процедура '{procedure_name}' не может возвращать значение через 'знач'"
+        super().__init__(message, line_number, column_number)
+
+
+class ParameterModificationError(KumirExecutionError):
+    """Ошибка попытки изменения параметра-аргумента."""
+    def __init__(self, parameter_name, line_number=None, column_number=None):
+        message = f"Нельзя изменять значение параметра-аргумента '{parameter_name}'"
+        super().__init__(message, line_number, column_number)
+
+
+class ParameterTypeError(KumirExecutionError):
+    """Ошибка несоответствия типа аргумента типу параметра."""
+    def __init__(self, parameter_name, expected_type, actual_type, line_number=None, column_number=None):
+        message = f"Параметр '{parameter_name}' ожидает тип '{expected_type}', получен '{actual_type}'"
+        super().__init__(message, line_number, column_number)
+
+
+class FunctionReturnException(Exception):
+    """
+    Исключение для реализации немедленного возврата из функции при выполнении 'знач := выражение'.
+    
+    Это исключение используется для прерывания выполнения тела функции и передачи
+    возвращаемого значения обратно в место вызова.
+    """
+    
+    def __init__(self, return_value):
+        self.return_value = return_value
+        super().__init__(f"Function returned value: {return_value}")

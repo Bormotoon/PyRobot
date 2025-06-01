@@ -2,73 +2,34 @@
 
 Этот документ описывает шаги по добавлению поддержки пользовательских функций и процедур в интерпретатор языка КуМир проекта PyRobot.
 
-## Фаза 1: Расширение Грамматики и Парсинг Определений
+## Фаза 1: Расширение Грамматики и Парсинг Определений ✅ ГОТОВО!
 
-1.  **Модификация `kumir_lang/KumirLexer.g4`:**
-    *   **Действие:** Добавить новые токены, если необходимо.
-    *   **Токены:**
-        *   `ALG_KW: 'алг';` (если еще нет общего для начала программы)
-        *   `PROC_KW: 'проц';` (если решим использовать отдельное слово для процедур, хотя КуМир обычно использует `алг` для всего)
-        *   `FUNC_KW: 'функ';` (аналогично, если решим разделять)
-        *   `ARG: 'арг';`
-        *   `RES: 'рез';`
-        *   `ARGRES: 'аргрез';`
-        *   `VAL_KW: 'знач';`
-        *   `TYPE_INT: 'цел';` (и другие типы, если они определяются как ключевые слова, а не идентификаторы)
-        *   `TYPE_REAL: 'вещ';`
-        *   `TYPE_BOOL: 'лог';`
-        *   `TYPE_CHAR: 'сим';`
-        *   `TYPE_STRING: 'лит';`
-    *   **Примечание:** Убедиться, что `НАЧ` и `КОН` уже есть и корректно обрабатываются.
+**ВСЁ УЖЕ РЕАЛИЗОВАНО В ТЕКУЩЕЙ ГРАММАТИКЕ!**
 
-2.  **Модификация `kumir_lang/KumirParser.g4`:**
-    *   **Действие:** Добавить и обновить правила для описания и вызова алгоритмов.
-    *   **Новые/Обновленные Правила:**
-        *   `program`: Должен позволять последовательность `algorithmDefinition` перед основным `mainAlgorithm` или как часть `preamble`.
-            ```antlr
-            program: preamble? (algorithmDefinition | useStatement)* mainAlgorithm EOF;
-            preamble: (declaration | assignment | comment)*; // Пример
-            mainAlgorithm: (ALG_KW ID?)? block; // Основной алгоритм может быть анонимным
-            ```
-        *   `algorithmDefinition`:
-            ```antlr
-            algorithmDefinition:
-                ALG_KW (dataType)? ID LPAREN parameterList? RPAREN
-                (localDeclarations)? // Описания локальных переменных
-                block
-                ;
-            ```
-        *   `parameterList`:
-            ```antlr
-            parameterList: parameterGroup (COMMA parameterGroup)*;
-            parameterGroup:
-                (ARG | RES | ARGRES) dataType ID (COMMA ID)*;
-            ```
-        *   `localDeclarations`: Похоже на `preamble` или часть `block`, где объявляются переменные, локальные для функции.
-            ```antlr
-            block: BEGIN statement* END; // BEGIN = нач, END = кон
-            statement: ... | assignment | outputStatement | inputStatement | ifStatement | forLoop | whileLoop | procedureCallStatement | valueAssignment | ... ;
-            ```
-        *   `valueAssignment` (для `знач`):
-            ```antlr
-            valueAssignment: VAL_KW ASSIGNMENT expression SEMI?;
-            ```
-        *   `expression`: Должно включать `functionCall`.
-            ```antlr
-            expression:
-                ...
-                | ID LPAREN argumentList? RPAREN # functionCallExpression
-                ...
-                ;
-            argumentList: expression (COMMA expression)*;
-            ```
-        *   `procedureCallStatement`: Для вызова процедур как отдельных команд.
-            ```antlr
-            procedureCallStatement: ID LPAREN argumentList? RPAREN SEMI?;
-            ```
-    *   **Примечание:** После изменения грамматики нужно будет перегенерировать парсер и лексер с помощью ANTLR.
+1.  **✅ `kumir_lang/KumirLexer.g4` - ВСЁ ЕСТЬ:**
+    *   `ALG_HEADER: 'алг';` (строка 13)
+    *   `IN_PARAM: 'арг';` (строка 44)
+    *   `OUT_PARAM: 'рез';` (строка 43)
+    *   `INOUT_PARAM: ('аргрез' | 'арг' WS 'рез' | 'арг_рез');` (строка 45)
+    *   `RETURN_VALUE: 'знач';` (строка 46)
+    *   `ALG_BEGIN: 'нач';` и `ALG_END: 'кон';` (строки 14-15)
+    *   Все типы данных: `INTEGER_TYPE: 'цел';`, `REAL_TYPE: 'вещ';`, `BOOLEAN_TYPE: 'лог';`, `CHAR_TYPE: 'сим';`, `STRING_TYPE: 'лит';` (строки 48-52)
 
-3.  **Создание Структур для Хранения Алгоритмов (например, в `pyrobot/backend/kumir_interpreter/definitions.py` или внутри `ast_evaluator.py`):**
+2.  **✅ `kumir_lang/KumirParser.g4` - ВСЁ ЕСТЬ:**
+    *   **✅ `algorithmDefinition`** (строки 326-330): Полное определение алгоритма с заголовком, пред-/пост-условиями, телом
+    *   **✅ `algorithmHeader`** (строки 195-197): `ALG_HEADER typeSpecifier? algorithmNameTokens (LPAREN parameterList? RPAREN)?`
+    *   **✅ `parameterList`** (строки 161-163): `parameterDeclaration (COMMA parameterDeclaration)*`
+    *   **✅ `parameterDeclaration`** (строки 158-160): `(IN_PARAM | OUT_PARAM | INOUT_PARAM)? typeSpecifier variableList`
+    *   **✅ Поддержка `знач := выражение`** (строки 226-229): `lvalue` включает `RETURN_VALUE`, `assignmentStatement` поддерживает `lvalue ASSIGN expression`
+    *   **✅ Вызовы функций в выражениях** (строка 59): `postfixExpression` включает `LPAREN argumentList? RPAREN`
+    *   **✅ Вызовы процедур как команды** (строка 234): `assignmentStatement` включает `expression`
+    *   **✅ Поддержка нескольких алгоритмов** (строка 363): `implicitModuleBody` содержит `(programItem | algorithmDefinition)+`
+
+## Фаза 2: Создание Структур для Хранения Алгоритмов и Реализация Вызовов
+
+**ТЕКУЩАЯ ЗАДАЧА - НАЧИНАЕМ ЗДЕСЬ!**
+
+1.  **Создание классов данных (в `pyrobot/backend/kumir_interpreter/definitions.py`):**
     *   **Действие:** Определить Python классы для представления функций/процедур.
     *   **Класс `AlgorithmDefinition`:**
         *   `name: str`
