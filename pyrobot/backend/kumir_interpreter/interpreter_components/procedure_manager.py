@@ -20,7 +20,7 @@ class ProcedureManager:
         self.procedures: Dict[str, Dict[str, Any]] = {} # {name_lower: {name, ctx, params, is_func, result_type}}
         self._current_procedure_return_value: Optional[KumirValue] = None # Для хранения значения из "знач"
         
-    def set_return_value(self, value_to_assign: KumirValue) -> None:
+    def set_return_value(self, value_to_assign: Optional[KumirValue]) -> None:
         """
         Устанавливает возвращаемое значение для текущей выполняемой функции.
         Используется оператором 'знач'.

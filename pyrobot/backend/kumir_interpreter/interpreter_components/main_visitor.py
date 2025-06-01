@@ -646,11 +646,9 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementHandlerMixin, St
     def visit(self, tree):
         if self.stop_execution_flag: 
             return None 
-        return super().visit(tree)
+        return super().visit(tree)    # Duplicate visitGlobalDeclaration method removed - keeping only the correct one above
 
-    # Duplicate visitGlobalDeclaration method removed - keeping only the correct one above
-
-    # KumirParser.ProcedureCallStatementContext    def visitProcedureCallStatement(self, ctx: KumirParser.ProcedureCallStatementContext):
+    def visitProcedureCallStatement(self, ctx: KumirParser.ProcedureCallStatementContext):
         print(f"\n!!! [DEBUG main_visitor.visitProcedureCallStatement] CALLED! Context: {ctx.getText()} !!!", file=sys.stderr)
         # print(f"[DEBUG VISIT] ProcedureCallStatement: {ctx.getText()}")
         # procedureCallStatement : qualifiedIdentifier LPAREN (expression (COMMA expression)*)? RPAREN SEMI ;
@@ -665,20 +663,21 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementHandlerMixin, St
             for expr_ctx in ctx.expression():
                 arg_value = self.visit(expr_ctx)
                 actual_args.append(arg_value)
-          # Вызываем процедуру (или функцию)
+        
+        # Вызываем процедуру (или функцию)
         # Для этого используем общую логику вызова, которая была в старом интерпретаторе
         # Но без явного указания контекста, полагаемся на текущий
         # Если процедура не найдена, будет вызвано исключение KumirRuntimeError
         return self.procedure_manager._execute_procedure_call(
             proc_name, 
-            actual_args,
-            ctx.qualifiedIdentifier() # Для контекста ошибок
+            actual_args,            ctx.qualifiedIdentifier()  # Для контекста ошибок
         )
-    
+
     def _call_user_function(self, func_name: str, args: List[Any], ctx: ParserRuleContext) -> 'KumirValue':
         """Вызывает пользовательскую функцию с заданными аргументами"""
         from ..kumir_datatypes import KumirValue, KumirType
         from ..kumir_exceptions import KumirRuntimeError, KumirArgumentError
+        from ..definitions import FunctionReturnException
         
         # Получаем определение функции
         algorithm_def = self.algorithm_manager.get_algorithm(func_name)
@@ -692,40 +691,61 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementHandlerMixin, St
         # Проверяем количество аргументов
         if len(args) != len(algorithm_def.parameters):
             raise KumirArgumentError(f"Функция '{func_name}' ожидает {len(algorithm_def.parameters)} аргументов, получено {len(args)}")
-          # TODO: Полная реализация вызова функции
-        # 1. Создать новую область видимости
-        # 2. Объявить параметры в области видимости
-        # 3. Присвоить значения параметрам
-        # 4. Выполнить тело функции
-        # 5. Обработать возврат значения через FunctionReturnException
-        # 6. Восстановить область видимости
         
-        # Сохраняем текущую область видимости
-        self.scope_manager.push_scope(f"function_{func_name}")
+        # Создаем новую область видимости для функции
+        self.scope_manager.push_scope()
         
         try:
-            # Объявляем и присваиваем параметры
+            # Объявляем параметры в новой области видимости
             for i, param in enumerate(algorithm_def.parameters):
                 param_value = args[i]
-                # Объявляем переменную в области видимости функции
-                self.scope_manager.declare_variable(param.name, param_value.kumir_type)
-                # Присваиваем значение
-                self.scope_manager.set_variable(param.name, param_value)
+                
+                # Преобразуем аргумент в KumirValue, если это еще не KumirValue
+                if not isinstance(param_value, KumirValue):
+                    # Попытка автоматического преобразования типа
+                    if isinstance(param_value, int):
+                        param_value = KumirValue(param_value, KumirType.INT.value)
+                    elif isinstance(param_value, float):
+                        param_value = KumirValue(param_value, KumirType.REAL.value)
+                    elif isinstance(param_value, bool):
+                        param_value = KumirValue(param_value, KumirType.BOOL.value)
+                    elif isinstance(param_value, str):
+                        if len(param_value) == 1:
+                            param_value = KumirValue(param_value, KumirType.CHAR.value)
+                        else:
+                            param_value = KumirValue(param_value, KumirType.STR.value)
+                    else:
+                        raise KumirRuntimeError(f"Неподдерживаемый тип аргумента: {type(param_value)}")
+                
+                # Получаем KumirType из строкового представления типа параметра
+                param_kumir_type = KumirType.from_string(param.param_type)
+                
+                # Объявляем параметр как переменную в области видимости функции
+                self.scope_manager.declare_variable(
+                    param.name,
+                    param_kumir_type,
+                    param_value,
+                    ctx.start.line,
+                    ctx.start.column
+                )
+            
+            # Сброс возвращаемого значения процедуры/функции
+            self.procedure_manager.set_return_value(None)
             
             # Выполняем тело функции
             try:
-                self.visit(algorithm_def.context.algorithmBody())
-                # Если дошли до сюда без FunctionReturnException, значит функция не вернула значение
-                raise KumirRuntimeError(f"Функция '{func_name}' не вернула значение")
+                self.visit(algorithm_def.body_context)
+                
+                # Если мы дошли до конца без исключения FunctionReturnException,
+                # значит функция не вернула значение явно через 'знач := выражение'
+                raise KumirRuntimeError(f"Функция '{func_name}' должна вернуть значение через 'знач := выражение'")
+                
             except FunctionReturnException as return_exc:
-                # Функция вернула значение через 'знач := выражение'
-                return return_exc.value
-            
+                # Это нормальный возврат из функции
+                return return_exc.return_value
+                
         finally:
-            # Восстанавливаем предыдущую область видимости
+            # Всегда восстанавливаем предыдущую область видимости
             self.scope_manager.pop_scope()
-        
-        # Этот код никогда не должен выполниться, но на всякий случай
-        raise KumirRuntimeError(f"Неожиданная ошибка при выполнении функции '{func_name}'")
 
 

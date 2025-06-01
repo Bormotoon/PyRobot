@@ -181,7 +181,10 @@ class StatementHandlerMixin(KumirParserVisitor):
                 )
 
             if lvalue_ctx.RETURN_VALUE(): # Присваивание в 'знач' (возврат из функции)
+                from ..definitions import FunctionReturnException
                 kiv_self.procedure_manager.set_return_value(value_to_assign)
+                # Генерируем исключение для немедленного возврата из функции
+                raise FunctionReturnException(value_to_assign)
 
             elif var_name_node:
                 var_name = var_name_node.getText()
