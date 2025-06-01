@@ -2,7 +2,6 @@ import pytest  # type: ignore
 import os
 import sys
 from io import StringIO
-from contextlib import redirect_stdout, redirect_stderr
 
 from pyrobot.backend.kumir_interpreter.runtime_utils import interpret_kumir
 from pyrobot.backend.kumir_interpreter.kumir_exceptions import KumirSyntaxError, KumirEvalError
@@ -12,7 +11,9 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 # Исправляем путь на tests/polyakov_kum
 PROGRAMS_DIR = os.path.join(current_dir, "polyakov_kum")
 
-TEST_CASES = [
+from typing import List, Tuple, Optional
+
+TEST_CASES: List[Tuple[str, Optional[str], Optional[str]]] = [
     ('1-empty.kum', None, ''),
     ('2-2+2.kum', None, '2+2=?\nОтвет: 4\n'),
     ('3-a+b.kum', '2\n3\n', '2 3\n5\n'),
@@ -81,6 +82,7 @@ TEST_CASES = [
     ('cf_exit_from_func_no_val.kum', None, 'До вызова функции Внутри функции до выхода Функция вернула: 0 После вызова функции\n'),
 ]
 
+
 def run_kumir_program(program_path: str, input_data: str | None = None) -> str:
     """
     Запускает программу КуМир и возвращает её стандартный вывод.
@@ -94,7 +96,7 @@ def run_kumir_program(program_path: str, input_data: str | None = None) -> str:
     """
     original_stdin = sys.stdin
     original_stdout = sys.stdout
-    original_stderr = sys.stderr # Сохраняем оригинальный stderr
+    original_stderr = sys.stderr  # Сохраняем оригинальный stderr
 
     input_buffer = StringIO(input_data if input_data else "")
     # output_buffer больше не нужен здесь для redirect_stdout
@@ -102,24 +104,19 @@ def run_kumir_program(program_path: str, input_data: str | None = None) -> str:
 
     # print(f"[DEBUG_RUN_KUMIR_PROGRAM] BEFORE (no redirect). output_buffer concept removed", file=original_stderr)
 
-    actual_output_value = "" # Переименуем, чтобы не путать с переменной теста
+    actual_output_value = ""  # Переименуем, чтобы не путать с переменной теста
 
     try:
         with open(program_path, 'r', encoding='utf-8') as f:
             code = f.read()
-            code = code.replace('\r\n', '\n').replace('\r', '\n')
-
-        # Устанавливаем stdin
+            code = code.replace('\r\n', '\n').replace('\r', '\n')        # Устанавливаем stdin
         sys.stdin = input_buffer
-        
+
         # interpret_kumir сам захватывает stdout и возвращает его.
         # Внешнее перенаправление через redirect_stdout(output_buffer) не нужно
         # и приводило к тому, что output_buffer оставался пустым.
-        actual_output_value = interpret_kumir(code, input_data)
-            
-        # DEBUG PRINT ПОСЛЕ ВЫЗОВА INTERPRET_KUMIR
+        actual_output_value = interpret_kumir(code, input_data)        # DEBUG PRINT ПОСЛЕ ВЫЗОВА INTERPRET_KUMIR
         print(f"[DEBUG_RUN_KUMIR_PROGRAM] interpret_kumir returned:\n>>>\n{actual_output_value}\n<<<", file=original_stderr)
-            
     except KumirSyntaxError as e:
         pytest.fail(f"KumirSyntaxError for {program_path}: {e}")
     except KumirEvalError as e:
@@ -137,10 +134,10 @@ def run_kumir_program(program_path: str, input_data: str | None = None) -> str:
 
     # --- DEBUG PRINT ПОСЛЕ try/finally ---
     # print(f"[DEBUG_RUN_KUMIR_PROGRAM] AFTER try/finally. actual_output_value is: ({len(actual_output_value)} chars)\n>>>\n{actual_output_value}\n<<<", file=original_stderr)
-    
+
     # actual_output теперь это то, что вернул interpret_kumir
     # actual_output = output_buffer.getvalue() # Эта строка больше не нужна
-    
+
     # DEBUG PRINT ДЛЯ ACTUAL_OUTPUT (который теперь actual_output_value)
     # print(f"[DEBUG_RUN_KUMIR_PROGRAM] actual_output (from interpret_kumir) is ({len(actual_output_value)} chars):\n>>>\n{actual_output_value}\n<<<", file=original_stderr)
 
@@ -149,11 +146,16 @@ def run_kumir_program(program_path: str, input_data: str | None = None) -> str:
         actual_output_value += '\n'
     return actual_output_value
 
+
 @pytest.mark.parametrize("program,input_data,expected_output", TEST_CASES)
-def test_kumir_program(program, input_data, expected_output):
+def test_kumir_program(
+    program: str,
+    input_data: str | None,
+    expected_output: str | None
+) -> None:
     """
     Тестирует выполнение программы на КуМире.
-    
+
     Args:
         program (str): Имя файла программы
         input_data (str): Входные данные (если нужны)
@@ -161,8 +163,8 @@ def test_kumir_program(program, input_data, expected_output):
     """
     program_path = os.path.join(PROGRAMS_DIR, program)
     assert os.path.exists(program_path), f"Файл программы не найден: {program}"
-    
-    actual_output = "" # Инициализируем actual_output
+
+    actual_output = ""  # Инициализируем actual_output
     try:
         actual_output = run_kumir_program(program_path, input_data)
         if expected_output is not None:
@@ -174,7 +176,6 @@ def test_kumir_program(program, input_data, expected_output):
         pytest.fail(f"KumirEvalError for {program_path}: {e}")
     except Exception as e:
         pytest.fail(f"Unexpected exception for {program_path}: {e}")
-
     if expected_output is not None and "ОШИБКА ВЫПОЛНЕНИЯ" not in actual_output:
         assert actual_output == expected_output, \
             f"Неверный вывод для {program}:\nОжидалось:\n{expected_output}\nПолучено:\n{actual_output}"

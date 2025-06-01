@@ -18,6 +18,7 @@ kumir_files = [
     if f.endswith('.kum') and os.path.isfile(os.path.join(KUMIR_EXAMPLES_DIR, f))
 ]
 
+
 # Класс для сбора ошибок парсинга
 class SyntaxErrorListener(ErrorListener):
     def __init__(self):
@@ -28,9 +29,10 @@ class SyntaxErrorListener(ErrorListener):
         # Возвращаем простой формат ошибки
         self.errors.append(f"line {line}:{column} {msg}")
 
-        # offending_symbol_text = repr(offendingSymbol.text) if offendingSymbol else 'None'
-        # exception_type = type(e).__name__ if e else 'None'
-        # self.errors.append(f"line {line}:{column} MSG: {msg} | OFFENDING_SYMBOL: {offending_symbol_text} | EXCEPTION: {exception_type}")
+        # offending_symbol_text = repr(offendingSymbol.text) if offendingSymbol else 'None'  # noqa
+        # exception_type = type(e).__name__ if e else 'None'  # noqa
+        # self.errors.append(f"line {line}:{column} MSG: {msg} | OFFENDING_SYMBOL: {offending_symbol_text} | EXCEPTION: {exception_type}")  # noqa
+
 
 # Функция для парсинга кода
 def parse_kumir_code(code: str):
@@ -47,16 +49,17 @@ def parse_kumir_code(code: str):
     parser.addErrorListener(error_listener)
 
     # === Включаем трассировку парсера ===
-    # parser.setTrace(True) # Отключаем трассировку
+    # parser.setTrace(True)  # Отключаем трассировку
     # =====================================
 
     # Запускаем парсинг со стартового правила 'program'
     try:
-        tree = parser.program() # Используем стартовое правило из грамматики
+        tree = parser.program()  # Используем стартовое правило из грамматики
         return tree, error_listener.errors
     except Exception as e:
         # Ловим другие возможные исключения при парсинге
         return None, [str(e)]
+
 
 # Параметризованный тест для каждого .kum файла
 @pytest.mark.parametrize("kumir_file_path", kumir_files)
@@ -68,11 +71,11 @@ def test_kumir_file_parsing(kumir_file_path):
         with open(kumir_file_path, 'r', encoding='utf-8') as f:
             code = f.read()
     except UnicodeDecodeError:
-         with open(kumir_file_path, 'r', encoding='cp1251') as f: # Пробуем другую кодировку
+        with open(kumir_file_path, 'r', encoding='cp1251') as f:  # Пробуем другую кодировку
             code = f.read()
     except Exception as e:
         pytest.fail(f"Не удалось прочитать файл {kumir_file_path}: {e}")
-        return # Добавлено для ясности, хотя pytest.fail прервет выполнение
+        return  # Добавлено для ясности, хотя pytest.fail прервет выполнение
 
     # Убираем BOM, если он есть (часто встречается в Windows)
     if code.startswith('\ufeff'):

@@ -1,6 +1,6 @@
 import pytest
 from pyrobot.backend.kumir_interpreter.runtime_utils import interpret_kumir
-from pyrobot.backend.kumir_interpreter.kumir_exceptions import KumirEvalError, KumirSyntaxError
+
 
 def test_simple_1d_table_declaration_assignment_output():
     """
@@ -21,7 +21,7 @@ def test_simple_1d_table_declaration_assignment_output():
     # from io import StringIO
     # old_stderr = sys.stderr
     # sys.stderr = captured_stderr = StringIO()
-    
+
     try:
         output = interpret_kumir(code)
         assert output == expected_output
@@ -32,6 +32,7 @@ def test_simple_1d_table_declaration_assignment_output():
     # finally:
         # sys.stderr = old_stderr # Восстанавливаем stderr в любом случае
         # pass # Убрали вывод captured_stderr, если тест прошел
+
 
 def test_2d_table_operations():
     """
@@ -50,11 +51,14 @@ def test_2d_table_operations():
       вывод Т[2,0], " ", Т[2,1], нс
     кон
     """
-    expected_output = "10 11\n20 21\n" # Важно: КуМир обычно не добавляет \n в конце, если нет явного нс. Но наш interpret_kumir может добавлять.
-                                      # Однако, команды вывод с нс должны каждая завершаться \n.
-                                      # И последняя команда вывод с нс тоже должна дать \n.
-                                      # Исходя из AI_notes.md (09.08.2024) по финальному \n, interpret_kumir больше не должен добавлять лишний \n.
-                                      # Значит, "10 11\n20 21\n" - это верный ожидаемый вывод.
+    # Важно: КуМир обычно не добавляет \n в конце, если нет явного нс.
+    # Но наш interpret_kumir может добавлять.
+    # Однако, команды вывод с нс должны каждая завершаться \n.
+    # И последняя команда вывод с нс тоже должна дать \n.
+    # Исходя из AI_notes.md (09.08.2024) по финальному \n,
+    # interpret_kumir больше не должен добавлять лишний \n.
+    # Значит, "10 11\n20 21\n" - это верный ожидаемый вывод.
+    expected_output = "10 11\n20 21\n"
 
     # Захватываем stderr, чтобы видеть отладочные сообщения интерпретатора, если тест упадет
     # import sys
