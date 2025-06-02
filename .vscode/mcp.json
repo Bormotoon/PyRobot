@@ -1,0 +1,6 @@
+  "mcpServers": {
+    "filesystem": {
+      "command": "mcp-filesystem-server",
+      "args": ["/Users/bormotoon/VSCodeProjects"]
+    }
+  }

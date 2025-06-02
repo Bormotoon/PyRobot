@@ -28,6 +28,11 @@ COMPARISON_OPS = {
 }
 
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .main_visitor import KumirInterpreterVisitor
+
 class ExpressionEvaluator(KumirParserVisitor):
     def __init__(self, main_visitor: 'KumirInterpreterVisitor', scope_manager: ScopeManager, procedure_manager: ProcedureManager): # Добавлен main_visitor
         self.main_visitor = main_visitor # Сохраняем main_visitor
@@ -735,10 +740,22 @@ class ExpressionEvaluator(KumirParserVisitor):
         # Сначала проверяем, это встроенная функция
         if self._is_builtin_function(var_name):
             # Возвращаем имя функции как строковое значение для дальнейшей обработки в postfixExpression
-            return KumirValue(var_name, KumirType.STR.value)        # ДОБАВЛЕНО: Проверяем, это пользовательская функция в AlgorithmManager
-        if hasattr(self.main_visitor, 'algorithm_manager') and self.main_visitor.algorithm_manager.has_algorithm(var_name):
-            # Возвращаем имя функции как строковое значение для дальнейшей обработки в postfixExpression
             return KumirValue(var_name, KumirType.STR.value)
+        
+        # ДОБАВЛЕНО: Проверяем, это пользовательская функция в AlgorithmManager
+        if hasattr(self.main_visitor, 'algorithm_manager') and self.main_visitor.algorithm_manager.has_algorithm(var_name):
+            algorithm_def = self.main_visitor.algorithm_manager.get_algorithm(var_name)
+            if algorithm_def.is_function:
+                # Это пользовательская функция - проверяем количество параметров
+                if len(algorithm_def.parameters) == 0:
+                    # Функция без аргументов - вызываем её сразу
+                    return self.main_visitor._call_user_function(var_name, [], ctx)
+                else:
+                    # Функция с аргументами - возвращаем имя для обработки в postfixExpression
+                    return KumirValue(var_name, KumirType.STR.value)
+            else:
+                # Это процедура - возвращаем имя для обработки в postfixExpression
+                return KumirValue(var_name, KumirType.STR.value)
         
         # Ищем переменную в scope_manager (возвращает кортеж (var_info, scope))
         var_info, scope = self.scope_manager.find_variable(var_name)

@@ -1,5 +1,5 @@
 import sys
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, cast, Optional
 from pyrobot.backend.kumir_interpreter.kumir_exceptions import (
     KumirRuntimeError, KumirSyntaxError, DeclarationError, KumirNameError,
     KumirTypeError, KumirArgumentError, BreakSignal, ContinueSignal, StopExecutionSignal, ReturnSignal,
@@ -7,6 +7,7 @@ from pyrobot.backend.kumir_interpreter.kumir_exceptions import (
 )
 from ..generated.KumirParser import KumirParser
 from ..generated.KumirParserVisitor import KumirParserVisitor
+from ..generated.KumirLexer import KumirLexer
 from ..kumir_datatypes import KumirType, KumirValue
 from ..utils import KumirTypeConverter
 
@@ -163,7 +164,15 @@ class StatementHandlerMixin(KumirParserVisitor):
         
         # Если это просто expression (например, вызов процедуры без присваивания результата)
         if ctx.expression() and not ctx.ASSIGN():
-            kiv_self.expression_evaluator.visit(ctx.expression())
+            # Проверяем, является ли это вызовом процедуры
+            procedure_name = self._extract_procedure_name_from_expression(ctx.expression())
+            if procedure_name and hasattr(kiv_self, 'algorithm_manager') and kiv_self.algorithm_manager.is_procedure(procedure_name):
+                # Это вызов процедуры - обрабатываем через procedure call handler
+                self._handle_procedure_call_from_expression(ctx.expression())
+                return
+            else:
+                # Обычное выражение - в expression evaluator
+                kiv_self.expression_evaluator.visit(ctx.expression())
             return
 
         # Если это lvalue ASSIGN expression
@@ -181,10 +190,8 @@ class StatementHandlerMixin(KumirParserVisitor):
                 )
 
             if lvalue_ctx.RETURN_VALUE(): # Присваивание в 'знач' (возврат из функции)
-                from ..definitions import FunctionReturnException
                 kiv_self.procedure_manager.set_return_value(value_to_assign)
-                # Генерируем исключение для немедленного возврата из функции
-                raise FunctionReturnException(value_to_assign)
+                # Продолжаем выполнение функции после установки возвращаемого значения
 
             elif var_name_node:
                 var_name = var_name_node.getText()
@@ -331,6 +338,7 @@ class StatementHandlerMixin(KumirParserVisitor):
                 if arg_ctx.expression():
                     # For INPUT, we need to get the lvalue to assign to
                     # This is a bit tricky since we're expecting the expression to be an lvalue
+                    # Но пока просто поддержим ввод в простые переменные
                     expressions = arg_ctx.expression()
                     if expressions:
                         # Берём первое выражение (основное значение для ввода)
@@ -651,6 +659,193 @@ class StatementHandlerMixin(KumirParserVisitor):
                 column_index=ctx.start.column
             )
         return None
+
+    def _extract_procedure_name_from_expression(self, expr_ctx: 'KumirParser.ExpressionContext') -> Optional[str]:
+        """
+        Извлекает имя алгоритма из expression context для проверки, является ли это вызовом процедуры.
+        
+        Анализирует структуру AST: expression → logicalOrExpression → ... → postfixExpression → primaryExpression → qualifiedIdentifier
+        
+        Returns:
+            str: Имя алгоритма, если это вызов функции/процедуры
+            None: Если это не вызов или не удалось извлечь имя
+        """
+        try:
+            # expression → logicalOrExpression
+            log_or_expr = expr_ctx.logicalOrExpression()
+            if not log_or_expr:
+                return None
+            
+            # logicalOrExpression → logicalAndExpression (берем первую)
+            log_and_exprs = log_or_expr.logicalAndExpression()
+            if not log_and_exprs or len(log_and_exprs) == 0:
+                return None
+            log_and_expr = log_and_exprs[0]
+            
+            # logicalAndExpression → equalityExpression (берем первую)
+            eq_exprs = log_and_expr.equalityExpression()
+            if not eq_exprs or len(eq_exprs) == 0:
+                return None
+            eq_expr = eq_exprs[0]
+            
+            # equalityExpression → relationalExpression (берем первую)
+            rel_exprs = eq_expr.relationalExpression()
+            if not rel_exprs or len(rel_exprs) == 0:
+                return None
+            rel_expr = rel_exprs[0]
+            
+            # relationalExpression → additiveExpression (берем первую)
+            add_exprs = rel_expr.additiveExpression()
+            if not add_exprs or len(add_exprs) == 0:
+                return None
+            add_expr = add_exprs[0]
+            
+            # additiveExpression → multiplicativeExpression (берем первую)
+            mul_exprs = add_expr.multiplicativeExpression()
+            if not mul_exprs or len(mul_exprs) == 0:
+                return None
+            mul_expr = mul_exprs[0]
+            
+            # multiplicativeExpression → powerExpression (берем первую)
+            pow_exprs = mul_expr.powerExpression()
+            if not pow_exprs or len(pow_exprs) == 0:
+                return None
+            pow_expr = pow_exprs[0]
+            
+            # powerExpression → unaryExpression
+            unary_expr = pow_expr.unaryExpression()
+            if not unary_expr:
+                return None
+            
+            # unaryExpression → postfixExpression (если без унарных операторов)
+            postfix_expr = unary_expr.postfixExpression()
+            if not postfix_expr:
+                return None
+            
+            # postfixExpression → primaryExpression
+            primary_expr = postfix_expr.primaryExpression()
+            if not primary_expr:
+                return None
+            
+            # primaryExpression → qualifiedIdentifier
+            qualified_id = primary_expr.qualifiedIdentifier()
+            if not qualified_id:
+                return None
+            
+            # Проверяем, что у postfixExpression есть аргументы (признак вызова)
+            # Структура: primaryExpression LPAREN argumentList? RPAREN
+            if len(postfix_expr.children) > 1:
+                for i in range(1, len(postfix_expr.children)):
+                    child = postfix_expr.children[i]
+                    # Используем getattr для безопасной проверки типа токена
+                    if hasattr(child, 'getSymbol') and getattr(child.getSymbol(), 'type', None) == getattr(KumirLexer, 'LPAREN', None):
+                        # Это вызов функции/процедуры
+                        return qualified_id.getText()
+            
+            return None
+            
+        except Exception:
+            # Если что-то пошло не так при анализе AST, возвращаем None
+            return None
+
+    def _handle_procedure_call_from_expression(self, expr_ctx: 'KumirParser.ExpressionContext') -> None:
+        """
+        Обрабатывает вызов процедуры из expression context.
+        Извлекает имя процедуры и аргументы из AST и вызывает procedure_manager.
+        """
+        kiv_self = cast('KumirInterpreterVisitor', self)
+        
+        try:
+            # Извлекаем имя процедуры (мы уже знаем, что это вызов процедуры)
+            procedure_name = self._extract_procedure_name_from_expression(expr_ctx)
+            if not procedure_name:
+                raise KumirRuntimeError(
+                    f"Не удалось извлечь имя процедуры из выражения: {expr_ctx.getText()}",
+                    line_index=expr_ctx.start.line - 1,
+                    column_index=expr_ctx.start.column
+                )
+            
+            # Извлекаем аргументы из postfix expression
+            actual_args = []
+            postfix_expr = self._extract_postfix_expression(expr_ctx)
+            if postfix_expr and len(postfix_expr.children) > 2:  # name + LPAREN + ... + RPAREN
+                # Ищем argumentList между LPAREN и RPAREN
+                for i in range(1, len(postfix_expr.children) - 1):
+                    child = postfix_expr.children[i]
+                    if hasattr(child, 'expressionList'):  # Это argumentList
+                        for expr in child.expressionList().expression():
+                            arg_val = kiv_self.expression_evaluator.visit(expr)
+                            if arg_val is None:
+                                raise KumirRuntimeError(
+                                    f"Не удалось вычислить аргумент для вызова процедуры '{procedure_name}'.",
+                                    line_index=expr.start.line - 1,
+                                    column_index=expr.start.column
+                                )
+                            actual_args.append(arg_val)
+                        break
+            
+            # Вызываем процедуру через procedure_manager
+            kiv_self.procedure_manager.call_procedure(
+                procedure_name,
+                actual_args,
+                line_index=expr_ctx.start.line - 1,
+                column_index=expr_ctx.start.column
+            )
+            
+        except Exception as e:
+            if isinstance(e, (KumirRuntimeError, KumirTypeError, KumirNameError)):
+                raise
+            else:
+                raise KumirRuntimeError(
+                    f"Ошибка при вызове процедуры из выражения: {str(e)}",
+                    line_index=expr_ctx.start.line - 1,
+                    column_index=expr_ctx.start.column
+                )
+
+    def _extract_postfix_expression(self, expr_ctx: 'KumirParser.ExpressionContext'):
+        """Извлекает postfixExpression из expression context"""
+        try:
+            log_or_expr = expr_ctx.logicalOrExpression()
+            if not log_or_expr:
+                return None
+            
+            log_and_exprs = log_or_expr.logicalAndExpression()
+            if not log_and_exprs:
+                return None
+            log_and_expr = log_and_exprs[0]
+            
+            eq_exprs = log_and_expr.equalityExpression()
+            if not eq_exprs:
+                return None
+            eq_expr = eq_exprs[0]
+            
+            rel_exprs = eq_expr.relationalExpression()
+            if not rel_exprs:
+                return None
+            rel_expr = rel_exprs[0]
+            
+            add_exprs = rel_expr.additiveExpression()
+            if not add_exprs:
+                return None
+            add_expr = add_exprs[0]
+            
+            mul_exprs = add_expr.multiplicativeExpression()
+            if not mul_exprs:
+                return None
+            mul_expr = mul_exprs[0]
+            
+            pow_exprs = mul_expr.powerExpression()
+            if not pow_exprs:
+                return None
+            pow_expr = pow_exprs[0]
+            
+            unary_expr = pow_expr.unaryExpression()
+            if not unary_expr:
+                return None
+            
+            return unary_expr.postfixExpression()
+        except:
+            return None
 
 class StatementHandler(StatementHandlerMixin):
     def __init__(self, scope_manager, expression_evaluator, procedure_manager):

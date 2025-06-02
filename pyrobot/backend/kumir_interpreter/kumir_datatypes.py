@@ -92,6 +92,8 @@ class KumirTableVar:
         # dimension_bounds_list: список кортежей, например, [(-5, 5), (1, 10)] для 2D
         # ctx: контекст объявления для информации об ошибках (строка, столбец)
         self.element_kumir_type: str = element_kumir_type # ИЗМЕНЕНО
+        # Добавляем kumir_type как алиас для обратной совместимости
+        self.kumir_type: str = element_kumir_type  # ИСПРАВЛЕНИЕ AttributeError
         self.dimension_bounds_list: List[tuple[int, int]] = dimension_bounds_list # Добавлен type hint
         self.dimensions: int = len(dimension_bounds_list) # Добавлен type hint
         self.declaration_ctx = ctx # Сохраняем контекст для возможных ошибок
