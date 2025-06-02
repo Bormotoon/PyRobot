@@ -399,8 +399,9 @@ class ExpressionEvaluator(KumirParserVisitor):
                     line_index=pos_err[0], 
                     column_index=pos_err[1]
                 )
-
+            
             op_text = op_token.getText()
+            actual_token = self._get_token_from_node(op_token)
             
             if op_text == '+':
                 # Сложение: числа или строки
@@ -415,7 +416,7 @@ class ExpressionEvaluator(KumirParserVisitor):
                 else:
                     raise KumirTypeError(
                         f"Операция сложения не применима к типам '{result.kumir_type}' и '{right.kumir_type}'.",
-                        line_index=op_token.line, column_index=op_token.column
+                        line_index=actual_token.line, column_index=actual_token.column
                     )
             elif op_text == '-':
                 # Вычитание: только числа
@@ -428,11 +429,11 @@ class ExpressionEvaluator(KumirParserVisitor):
                 else:
                     raise KumirTypeError(
                         f"Операция вычитания не применима к типам '{result.kumir_type}' и '{right.kumir_type}'.",
-                        line_index=op_token.line, column_index=op_token.column
+                        line_index=actual_token.line, column_index=actual_token.column
                     )
             else:
                 raise KumirEvalError(f"Неизвестный аддитивный оператор: {op_text}", 
-                                   line_index=op_token.line, column_index=op_token.column)
+                                   line_index=actual_token.line, column_index=actual_token.column)
         
         return result
 
@@ -454,14 +455,16 @@ class ExpressionEvaluator(KumirParserVisitor):
             right = self.visit(power_expressions[i])
             
             if not (isinstance(result, KumirValue) and isinstance(right, KumirValue)):
-                pos_err = self._position_from_token(op_token)
+                # Для TerminalNodeImpl используем .symbol для получения токена
+                pos_err = self._position_from_token(op_token.symbol if hasattr(op_token, 'symbol') else ctx.start)
                 raise KumirRuntimeError(
                     f"Внутренняя ошибка: операнды не являются KumirValue (типы: {type(result).__name__}, {type(right).__name__}).",
                     line_index=pos_err[0], 
                     column_index=pos_err[1]
                 )
-
+            
             op_text = op_token.getText()
+            actual_token = self._get_token_from_node(op_token)
             
             if op_text == '*':
                 # Умножение: только числа
@@ -474,45 +477,45 @@ class ExpressionEvaluator(KumirParserVisitor):
                 else:
                     raise KumirTypeError(
                         f"Операция умножения не применима к типам '{result.kumir_type}' и '{right.kumir_type}'.",
-                        line_index=op_token.line, column_index=op_token.column
+                        line_index=actual_token.line, column_index=actual_token.column
                     )
             elif op_text == '/':
                 # Обычное деление
                 if ((result.kumir_type == KumirType.INT.value or result.kumir_type == KumirType.REAL.value) and
                     (right.kumir_type == KumirType.INT.value or right.kumir_type == KumirType.REAL.value)):
                     if float(right.value) == 0:
-                        raise KumirEvalError("Деление на ноль.", line_index=op_token.line, column_index=op_token.column)
+                        raise KumirEvalError("Деление на ноль.", line_index=actual_token.line, column_index=actual_token.column)
                     result = KumirValue(value=float(result.value) / float(right.value), kumir_type=KumirType.REAL.value)
                 else:
                     raise KumirTypeError(
                         f"Операция деления не применима к типам '{result.kumir_type}' и '{right.kumir_type}'.",
-                        line_index=op_token.line, column_index=op_token.column
+                        line_index=actual_token.line, column_index=actual_token.column
                     )
             elif op_text == 'div':
                 # Целочисленное деление
                 if (result.kumir_type == KumirType.INT.value and right.kumir_type == KumirType.INT.value):
                     if right.value == 0:
-                        raise KumirEvalError("Деление на ноль (div).", line_index=op_token.line, column_index=op_token.column)
+                        raise KumirEvalError("Деление на ноль (div).", line_index=actual_token.line, column_index=actual_token.column)
                     result = KumirValue(value=result.value // right.value, kumir_type=KumirType.INT.value)
                 else:
                     raise KumirTypeError(
                         f"Операция div применима только к целым числам, получены типы '{result.kumir_type}' и '{right.kumir_type}'.",
-                        line_index=op_token.line, column_index=op_token.column
+                        line_index=actual_token.line, column_index=actual_token.column
                     )
             elif op_text == 'mod':
                 # Остаток от деления
                 if (result.kumir_type == KumirType.INT.value and right.kumir_type == KumirType.INT.value):
                     if right.value == 0:
-                        raise KumirEvalError("Деление на ноль (mod).", line_index=op_token.line, column_index=op_token.column)
+                        raise KumirEvalError("Деление на ноль (mod).", line_index=actual_token.line, column_index=actual_token.column)
                     result = KumirValue(value=result.value % right.value, kumir_type=KumirType.INT.value)
                 else:
                     raise KumirTypeError(
                         f"Операция mod применима только к целым числам, получены типы '{result.kumir_type}' и '{right.kumir_type}'.",
-                        line_index=op_token.line, column_index=op_token.column
+                        line_index=actual_token.line, column_index=actual_token.column
                     )
             else:
                 raise KumirEvalError(f"Неизвестный мультипликативный оператор: {op_text}", 
-                                   line_index=op_token.line, column_index=op_token.column)
+                                   line_index=actual_token.line, column_index=actual_token.column)
         
         return result
 
@@ -714,13 +717,14 @@ class ExpressionEvaluator(KumirParserVisitor):
             result = abs(a.value)
             return KumirValue(result, a.kumir_type)
           # TODO: Добавить остальные встроенные функции при необходимости
-        
-        # ДОБАВЛЕНО: Проверяем пользовательские функции в AlgorithmManager
+          # ДОБАВЛЕНО: Проверяем пользовательские функции в AlgorithmManager
         if hasattr(self.main_visitor, 'algorithm_manager') and self.main_visitor.algorithm_manager.has_algorithm(func_name):
             algorithm_def = self.main_visitor.algorithm_manager.get_algorithm(func_name)
             if algorithm_def and algorithm_def.is_function:
                 # Это пользовательская функция - вызываем её через main visitor
-                return self.main_visitor._call_user_function(func_name, args, ctx)
+                result = self.main_visitor._call_user_function(func_name, args, ctx)
+                print(f"[DEBUG] expression_evaluator._call_function вызвал пользовательскую функцию '{func_name}' и получил: {result}", file=sys.stderr)
+                return result
             else:
                 # Это процедура, а не функция - ошибка
                 pos = self._position_from_token(self._get_token_for_position(ctx))

@@ -662,16 +662,19 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementHandlerMixin, St
         
         if not algorithm_def.is_function:
             raise KumirRuntimeError(f"'{func_name}' является процедурой, а не функцией")
-        
-        # Проверяем количество аргументов
+          # Проверяем количество аргументов
         if len(args) != len(algorithm_def.parameters):
             raise KumirArgumentError(f"Функция '{func_name}' ожидает {len(algorithm_def.parameters)} аргументов, получено {len(args)}")
         
         # Создаем новую область видимости для функции
-        self.scope_manager.push_scope()
+        self.scope_manager.enter_scope()
+        
+        # Добавляем новый фрейм в стек возвращаемых значений
+        self.procedure_manager.push_return_value_frame()
         
         # Отслеживаем параметры рез/аргрез для копирования обратно
         output_parameters = []
+        return_value = None  # Инициализируем return_value
         
         try:
             # Объявляем параметры в новой области видимости
@@ -797,47 +800,52 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementHandlerMixin, St
                     
                 else:
                     raise KumirRuntimeError(f"Неизвестный режим параметра: {param.mode}")
-            
-            # Сброс возвращаемого значения процедуры/функции
+              # Сброс возвращаемого значения процедуры/функции
             self.procedure_manager.set_return_value(None)
             
             # Выполняем тело функции
             try:
-                return_value = None
                 self.visit(algorithm_def.body_context)
                 
-                # Если мы дошли до конца без исключения FunctionReturnException,
-                # значит функция не вернула значение явно через 'знач := выражение'
-                raise KumirRuntimeError(f"Функция '{func_name}' должна вернуть значение через 'знач := выражение'")
+                # Проверяем, было ли установлено возвращаемое значение через 'знач := выражение'
+                if self.procedure_manager.has_return_value():
+                    return_value = self.procedure_manager.get_and_clear_return_value()
+                    print(f"[DEBUG] Функция '{func_name}' возвращает значение: {return_value}", file=sys.stderr)
+                else:
+                    print(f"[DEBUG] Функция '{func_name}' не вернула значение!", file=sys.stderr)
+                    raise KumirRuntimeError(f"Функция '{func_name}' должна вернуть значение через 'знач := выражение'")
                 
             except FunctionReturnException as return_exc:
-                # Это нормальный возврат из функции
+                # Это старый способ возврата из функции (если где-то еще используется)
                 return_value = return_exc.return_value
+            
+            # Копируем значения выходных параметров обратно в вызывающую область
+            for output_param in output_parameters:
+                param_name = output_param['param_name']
+                target_var_name = output_param['target_var_name']
                 
-                # Копируем значения выходных параметров обратно в вызывающую область
-                for output_param in output_parameters:
-                    param_name = output_param['param_name']
-                    target_var_name = output_param['target_var_name']
+                # Получаем текущее значение параметра в функции
+                param_var_info, _ = self.scope_manager.find_variable(param_name)
+                if param_var_info:
+                    param_value = param_var_info['value']
                     
-                    # Получаем текущее значение параметра в функции
-                    param_var_info, _ = self.scope_manager.find_variable(param_name)
-                    if param_var_info:
-                        param_value = param_var_info['value']
-                        
-                        # Обновляем переменную в предыдущей области видимости
-                        # Временно выходим из текущей области
-                        self.scope_manager.pop_scope()
-                        try:
-                            self.scope_manager.update_variable(target_var_name, param_value, line_index=0, column_index=0)
-                        finally:
-                            # Возвращаемся в область функции для корректной очистки
-                            self.scope_manager.push_scope()
-                
-                return return_value
+                    # Обновляем переменную в предыдущей области видимости
+                    # Временно выходим из текущей области
+                    self.scope_manager.pop_scope()
+                    try:
+                        self.scope_manager.update_variable(target_var_name, param_value, line_index=0, column_index=0)
+                    finally:
+                        # Возвращаемся в область функции для корректной очистки
+                        self.scope_manager.push_scope()
                 
         finally:
             # Всегда восстанавливаем предыдущую область видимости
             self.scope_manager.pop_scope()
+            # Всегда убираем фрейм возвращаемого значения из стека
+            self.procedure_manager.pop_return_value_frame()
+        
+        # Возвращаем значение после finally (если не было return в try)
+        return return_value
 
     def _call_user_procedure(self, proc_name: str, args: List[Any], ctx: ParserRuleContext) -> None:
         """Вызывает пользовательскую процедуру с заданными аргументами"""

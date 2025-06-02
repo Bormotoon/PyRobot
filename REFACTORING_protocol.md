@@ -2,6 +2,91 @@
 
 ---
 
+## УСПЕШНОЕ ИСПРАВЛЕНИЕ STACK-BASED RETURN VALUES (22.01.2025)
+
+### ✅ РЕШЕНА КРИТИЧЕСКАЯ ПРОБЛЕМА: Возвращаемые значения функций
+
+**Проблема:** `_call_user_function()` возвращал None вместо KumirValue из-за неправильной структуры try-finally блоков.
+
+**Корневая причина:** Преждевременный `return return_value` в except блоке выходил из функции ДО выполнения finally блока, что приводило к потере значения.
+
+**Решение:** Реструктуризация try-finally блока в main_visitor.py:
+1. **Убран преждевременный return:** Удален `return return_value` из except блока
+2. **Правильная последовательность:** Копирование output параметров происходит после try-except, но перед finally
+3. **Единый return:** Один `return return_value` в конце метода после finally блока
+
+**Изменения в main_visitor.py (строки 800-845):**
+```python
+# Выполняем тело функции
+try:
+    self.visit(algorithm_def.body_context)
+    # Проверяем возвращаемое значение
+    if self.procedure_manager.has_return_value():
+        return_value = self.procedure_manager.get_and_clear_return_value()
+    else:
+        raise KumirRuntimeError(f"Функция должна вернуть значение")
+except FunctionReturnException as return_exc:
+    return_value = return_exc.return_value
+
+# Копируем output параметры (вне try-except, но до finally)
+for output_param in output_parameters:
+    # ... копирование параметров ...
+
+finally:
+    # Всегда очищаем scope и стек
+    self.scope_manager.pop_scope()
+    self.procedure_manager.pop_return_value_frame()
+
+# Единственный return в конце
+return return_value
+```
+
+**Результаты тестирования:**
+- ✅ **Простые функции работают:** `double(5)` корректно возвращает `10`
+- ✅ **Stack management работает:** Debug логи показывают правильную передачу значений
+- ✅ **Нет потери значений:** `expression_evaluator` получает KumirValue вместо None
+
+**Обнаружена новая проблема:** Рекурсивные функции блокированы конфликтом областей видимости - параметр `n` "уже объявлен" при втором уровне рекурсии. Требует отдельного исправления scope_manager.
+
+---
+
+## STACK-BASED RETURN VALUE MANAGEMENT (22.01.2025)
+
+### Реализация стекового подхода для возвращаемых значений функций
+
+**Проблема:** Рекурсивные функции возвращали None вместо KumirValue из-за конфликтов в shared return value переменной.
+
+**Решение:** Реализован stack-based подход для управления возвращаемыми значениями.
+
+**Изменения в procedure_manager.py:**
+1. **Добавлен стек:** `self._return_value_stack: List[Optional[KumirValue]] = []`
+2. **Методы управления стеком:**
+   ```python
+   def push_return_value_frame(self) -> None:
+       self._return_value_stack.append(None)
+   
+   def pop_return_value_frame(self) -> Optional[KumirValue]:
+       return self._return_value_stack.pop() if self._return_value_stack else None
+   
+   def get_and_clear_return_value(self) -> Optional[KumirValue]:
+       value = self._return_value_stack[-1]  # Get without removing frame
+       self._return_value_stack[-1] = None   # Clear value in frame
+       return value
+   ```
+
+**Изменения в main_visitor.py:**
+- Добавлен `push_return_value_frame()` в начале `_call_user_function()`
+- Добавлен `pop_return_value_frame()` в finally блоке
+- Добавлена отладочная информация для отслеживания потока возвращаемых значений
+
+**КРИТИЧЕСКАЯ ПРОБЛЕМА (НЕ РЕШЕНА):**
+Функции правильно выполняются и логи показывают корректные значения, но `_call_user_function()` возвращает None в expression_evaluator. Проблема в try-finally блоке или return statement handling в main_visitor.py.
+
+**Тестовый случай:** `30-rec-fact.kum` - рекурсивная факториальная функция
+**Ошибка:** "операнды не являются KumirValue (типы: KumirValue, NoneType)"
+
+---
+
 ## ПОСЛЕДНИЕ ИСПРАВЛЕНИЯ КРИТИЧЕСКИХ ОШИБОК
 
 ### Исправление проблем с вызовами процедур

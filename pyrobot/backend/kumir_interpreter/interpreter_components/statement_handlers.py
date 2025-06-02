@@ -178,20 +178,21 @@ class StatementHandlerMixin(KumirParserVisitor):
         # Если это lvalue ASSIGN expression
         if ctx.lvalue() and ctx.ASSIGN() and ctx.expression():
             lvalue_ctx = ctx.lvalue()
-            var_name_node = lvalue_ctx.qualifiedIdentifier()
-            
-            # Вычисляем правую часть
+            var_name_node = lvalue_ctx.qualifiedIdentifier()            # Вычисляем правую часть
             value_to_assign = kiv_self.expression_evaluator.visit(ctx.expression())
             if value_to_assign is None:
-                 raise KumirRuntimeError(
+                raise KumirRuntimeError(
                     f"Правая часть присваивания для '{lvalue_ctx.getText()}' не может быть вычислена (None).",
                     line_index=ctx.expression().start.line -1,
                     column_index=ctx.expression().start.column
                 )
 
             if lvalue_ctx.RETURN_VALUE(): # Присваивание в 'знач' (возврат из функции)
+                # В КуМире знач := выражение НЕ прерывает выполнение функции,
+                # а только устанавливает значение для возврата.
+                # Функция продолжает выполняться до конца.
+                print(f"[DEBUG] Устанавливаю возвращаемое значение: {value_to_assign}", file=sys.stderr)
                 kiv_self.procedure_manager.set_return_value(value_to_assign)
-                # Продолжаем выполнение функции после установки возвращаемого значения
 
             elif var_name_node:
                 var_name = var_name_node.getText()

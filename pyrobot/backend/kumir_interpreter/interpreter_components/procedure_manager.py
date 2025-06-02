@@ -16,10 +16,11 @@ if TYPE_CHECKING:
     from ..interpreter import KumirInterpreterVisitor # Для тайп-хинтинга родительского визитора
 
 class ProcedureManager:
-    def __init__(self, visitor: 'KumirInterpreterVisitor'): # ИСПРАВЛЕНО: Убраны лишние \\'        self.visitor = visitor
+    def __init__(self, visitor: 'KumirInterpreterVisitor'):
+        self.visitor = visitor
         self.procedures: Dict[str, Dict[str, Any]] = {} # {name_lower: {name, ctx, params, is_func, result_type}}
-        self._current_procedure_return_value: Optional[KumirValue] = None # Для хранения значения из "знач"
-        
+        self._return_value_stack: List[Optional[KumirValue]] = [] # Стек возвращаемых значений для вложенных вызовов функций
+
     def set_return_value(self, value_to_assign: Optional[KumirValue]) -> None:
         """
         Устанавливает возвращаемое значение для текущей выполняемой функции.
@@ -27,7 +28,11 @@ class ProcedureManager:
         """
         # TODO: Проверить, что мы находимся внутри вызова функции, а не процедуры.
         # TODO: Проверить тип value_to_assign с ожидаемым типом возврата функции.
-        self._current_procedure_return_value = value_to_assign
+        print(f"[DEBUG] ProcedureManager.set_return_value() вызван с: {value_to_assign}", file=sys.stderr)
+        if self._return_value_stack:
+            self._return_value_stack[-1] = value_to_assign  # Устанавливаем значение в верхний элемент стека
+        else:
+            print(f"[DEBUG] WARNING: set_return_value вызван, но стек возвращаемых значений пуст!", file=sys.stderr)
 
     def register_procedure(self, name: str, ctx: KumirParser.AlgorithmDefinitionContext, 
                           is_function: bool = False, result_type: str = VOID_TYPE) -> None:
@@ -697,9 +702,47 @@ class ProcedureManager:
         if not self.visitor:
             # Это критическая ошибка конфигурации, если visitor не установлен к моменту вызова
             raise Exception("ProcedureManager.visitor не инициализирован, но требуется для _get_type_info_from_specifier")
-        
-        # Делегируем вызов методу из TypeUtilsMixin (или где он там будет) через visitor
+          # Делегируем вызов методу из TypeUtilsMixin (или где он там будет) через visitor
         return self.visitor.get_type_info_from_specifier(type_spec_ctx)
+
+    def get_and_clear_return_value(self) -> Optional[KumirValue]:
+        """
+        Получает возвращаемое значение функции и сбрасывает его в текущем фрейме.
+        Возвращает None, если значение не было установлено.
+        """
+        if not self._return_value_stack:
+            print(f"[DEBUG] ProcedureManager.get_and_clear_return_value() - стек пуст, возвращаем None", file=sys.stderr)
+            return None
+        
+        value = self._return_value_stack[-1]  # Получаем значение из верхнего фрейма, НЕ удаляя фрейм
+        self._return_value_stack[-1] = None   # Сбрасываем значение в фрейме
+        print(f"[DEBUG] ProcedureManager.get_and_clear_return_value() возвращает: {value}", file=sys.stderr)
+        return value
+
+    def has_return_value(self) -> bool:
+        """
+        Проверяет, было ли установлено возвращаемое значение функции.
+        """
+        return bool(self._return_value_stack and self._return_value_stack[-1] is not None)
+
+    def push_return_value_frame(self) -> None:
+        """
+        Добавляет новый фрейм в стек возвращаемых значений для нового вызова функции.
+        """
+        self._return_value_stack.append(None)
+        print(f"[DEBUG] ProcedureManager.push_return_value_frame() - стек теперь размером {len(self._return_value_stack)}", file=sys.stderr)
+
+    def pop_return_value_frame(self) -> Optional[KumirValue]:
+        """
+        Удаляет верхний фрейм из стека возвращаемых значений и возвращает его значение.
+        """
+        if not self._return_value_stack:
+            print(f"[DEBUG] ProcedureManager.pop_return_value_frame() - стек пуст!", file=sys.stderr)
+            return None
+        
+        value = self._return_value_stack.pop()
+        print(f"[DEBUG] ProcedureManager.pop_return_value_frame() возвращает: {value}, стек теперь размером {len(self._return_value_stack)}", file=sys.stderr)
+        return value
 
 
 # ... остальной код класса ...
