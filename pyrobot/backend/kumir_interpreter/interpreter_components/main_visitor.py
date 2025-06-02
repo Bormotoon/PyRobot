@@ -636,215 +636,38 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementHandlerMixin, St
             if module_name_node.type == KumirLexer.STRING:
                 module_name = module_name[1:-1] # Удаляем кавычки
         # elif isinstance(module_name_node, KumirParser.QualifiedIdentifierContext):
-            # Для QualifiedIdentifierContext .getText() уже дает правильное имя,
-            # и дополнительная обработка не требуется.
-            # pass
-
-        print(f"Предупреждение: Импорт модуля '{module_name}' пока не поддерживается и будет проигнорирован.", file=sys.stderr)
+            # Для QualifiedIdentifierContext .getText() уже дает правильное имя,            # и дополнительная обработка не требуется.
+            print(f"Предупреждение: Импорт модуля '{module_name}' пока не поддерживается и будет проигнорирован.", file=sys.stderr)
         return None
 
     def visit(self, tree):
-        if self.stop_execution_flag: 
-            return None 
-        return super().visit(tree)    # Duplicate visitGlobalDeclaration method removed - keeping only the correct one above
-
+        if self.stop_execution_flag:            return None 
+        return super().visit(tree)
+    
     def _call_user_function(self, func_name: str, args: List[Any], ctx: ParserRuleContext) -> 'KumirValue':
-        """Вызывает пользовательскую функцию с заданными аргументами"""
-        from ..kumir_datatypes import KumirValue, KumirType
-        from ..kumir_exceptions import KumirRuntimeError, KumirArgumentError
-        from ..definitions import FunctionReturnException
+        """Вызывает пользовательскую функцию с заданными аргументами через procedure_manager"""
+        from ..kumir_datatypes import KumirValue
         
-        # Получаем определение функции
-        algorithm_def = self.algorithm_manager.get_algorithm(func_name)
+        print(f"[DEBUG] _call_user_function вызвана для '{func_name}' с аргументами: {args}", file=sys.stderr)
         
-        if algorithm_def is None:
-            raise KumirRuntimeError(f"Функция '{func_name}' не найдена")
+        # Используем публичный метод execute_user_function для единообразной логики
+        print(f"[DEBUG] Вызываем execute_user_function для '{func_name}'", file=sys.stderr)
+        return_value = self.procedure_manager.execute_user_function(func_name, args, ctx)
         
-        if not algorithm_def.is_function:
-            raise KumirRuntimeError(f"'{func_name}' является процедурой, а не функцией")
-          # Проверяем количество аргументов
-        if len(args) != len(algorithm_def.parameters):
-            raise KumirArgumentError(f"Функция '{func_name}' ожидает {len(algorithm_def.parameters)} аргументов, получено {len(args)}")
+        print(f"[DEBUG] _call_user_function получил результат: {return_value}", file=sys.stderr)
         
-        # Создаем новую область видимости для функции
-        self.scope_manager.enter_scope()
+        if not isinstance(return_value, KumirValue) and return_value is not None:
+            # Попытка преобразовать в KumirValue, если нужно
+            from ..kumir_datatypes import KumirType
+            if isinstance(return_value, int):
+                return_value = KumirValue(return_value, KumirType.INT.value)
+            elif isinstance(return_value, float):
+                return_value = KumirValue(return_value, KumirType.REAL.value)
+            elif isinstance(return_value, bool):
+                return_value = KumirValue(return_value, KumirType.BOOL.value)
+            elif isinstance(return_value, str):
+                return_value = KumirValue(return_value, KumirType.STR.value)
         
-        # Добавляем новый фрейм в стек возвращаемых значений
-        self.procedure_manager.push_return_value_frame()
-        
-        # Отслеживаем параметры рез/аргрез для копирования обратно
-        output_parameters = []
-        return_value = None  # Инициализируем return_value
-        
-        try:
-            # Объявляем параметры в новой области видимости
-            for i, param in enumerate(algorithm_def.parameters):
-                param_value = args[i]
-                
-                # Обработка разных режимов параметров
-                if param.mode == 'арг':
-                    # Параметр по значению - простое копирование
-                    # Преобразуем аргумент в KumirValue, если это еще не KumirValue
-                    if not isinstance(param_value, KumirValue):
-                        # Попытка автоматического преобразования типа
-                        if isinstance(param_value, int):
-                            param_value = KumirValue(param_value, KumirType.INT.value)
-                        elif isinstance(param_value, float):
-                            param_value = KumirValue(param_value, KumirType.REAL.value)
-                        elif isinstance(param_value, bool):
-                            param_value = KumirValue(param_value, KumirType.BOOL.value)
-                        elif isinstance(param_value, str):
-                            if len(param_value) == 1:
-                                param_value = KumirValue(param_value, KumirType.CHAR.value)
-                            else:
-                                param_value = KumirValue(param_value, KumirType.STR.value)
-                        else:
-                            raise KumirRuntimeError(f"Неподдерживаемый тип аргумента: {type(param_value)}")
-                    
-                    # Получаем KumirType из строкового представления типа параметра
-                    param_kumir_type = KumirType.from_string(param.param_type)
-                    
-                    # Объявляем параметр как переменную в области видимости функции
-                    self.scope_manager.declare_variable(
-                        param.name,
-                        param_kumir_type,
-                        param_value,
-                        ctx.start.line,
-                        ctx.start.column
-                    )
-                    
-                elif param.mode == 'рез':
-                    # Параметр только для вывода - инициализируем пустым значением
-                    param_kumir_type = KumirType.from_string(param.param_type)
-                    
-                    # Создаем начальное значение по типу
-                    if param_kumir_type == KumirType.INT:
-                        initial_value = KumirValue(0, KumirType.INT.value)
-                    elif param_kumir_type == KumirType.REAL:
-                        initial_value = KumirValue(0.0, KumirType.REAL.value)
-                    elif param_kumir_type == KumirType.BOOL:
-                        initial_value = KumirValue(False, KumirType.BOOL.value)
-                    elif param_kumir_type == KumirType.CHAR:
-                        initial_value = KumirValue(' ', KumirType.CHAR.value)
-                    elif param_kumir_type == KumirType.STR:
-                        initial_value = KumirValue('', KumirType.STR.value)
-                    else:
-                        initial_value = KumirValue(None, param_kumir_type.value)
-                    
-                    # Объявляем параметр с начальным значением
-                    self.scope_manager.declare_variable(
-                        param.name,
-                        param_kumir_type,
-                        initial_value,
-                        ctx.start.line,
-                        ctx.start.column
-                    )
-                    
-                    # Запоминаем для копирования обратно
-                    # ВАЖНО: рез параметр требует имя переменной, а не значение
-                    if isinstance(param_value, str):
-                        # param_value должно быть именем переменной
-                        output_parameters.append({
-                            'param_name': param.name,
-                            'target_var_name': param_value,
-                            'mode': 'рез'
-                        })
-                    else:
-                        raise KumirRuntimeError(f"Параметр 'рез' должен быть именем переменной, получено: {type(param_value)}")
-                    
-                elif param.mode == 'аргрез':
-                    # Параметр для ввода-вывода - копируем значение и запоминаем для обратного копирования
-                    if isinstance(param_value, str):
-                        # param_value это имя переменной - получаем её значение
-                        var_info, _ = self.scope_manager.find_variable(param_value)
-                        if var_info is None:
-                            raise KumirRuntimeError(f"Переменная '{param_value}' не найдена для параметра 'аргрез'")
-                        
-                        # Используем значение переменной
-                        actual_value = var_info['value']
-                        if not isinstance(actual_value, KumirValue):
-                            # Преобразуем в KumirValue
-                            if isinstance(actual_value, int):
-                                actual_value = KumirValue(actual_value, KumirType.INT.value)
-                            elif isinstance(actual_value, float):
-                                actual_value = KumirValue(actual_value, KumirType.REAL.value)
-                            elif isinstance(actual_value, bool):
-                                actual_value = KumirValue(actual_value, KumirType.BOOL.value)
-                            elif isinstance(actual_value, str):
-                                if len(actual_value) == 1:
-                                    actual_value = KumirValue(actual_value, KumirType.CHAR.value)
-                                else:
-                                    actual_value = KumirValue(actual_value, KumirType.STR.value)
-                            else:
-                                actual_value = KumirValue(actual_value, KumirType.UNKNOWN.value)
-                        
-                        param_kumir_type = KumirType.from_string(param.param_type)
-                        
-                        # Объявляем параметр с копией значения
-                        self.scope_manager.declare_variable(
-                            param.name,
-                            param_kumir_type,
-                            actual_value,
-                            ctx.start.line,
-                            ctx.start.column
-                        )
-                        
-                        # Запоминаем для копирования обратно
-                        output_parameters.append({
-                            'param_name': param.name,
-                            'target_var_name': param_value,
-                            'mode': 'аргрез'
-                        })
-                    else:
-                        raise KumirRuntimeError(f"Параметр 'аргрез' должен быть именем переменной, получено: {type(param_value)}")
-                    
-                else:
-                    raise KumirRuntimeError(f"Неизвестный режим параметра: {param.mode}")
-              # Сброс возвращаемого значения процедуры/функции
-            self.procedure_manager.set_return_value(None)
-            
-            # Выполняем тело функции
-            try:
-                self.visit(algorithm_def.body_context)
-                
-                # Проверяем, было ли установлено возвращаемое значение через 'знач := выражение'
-                if self.procedure_manager.has_return_value():
-                    return_value = self.procedure_manager.get_and_clear_return_value()
-                    print(f"[DEBUG] Функция '{func_name}' возвращает значение: {return_value}", file=sys.stderr)
-                else:
-                    print(f"[DEBUG] Функция '{func_name}' не вернула значение!", file=sys.stderr)
-                    raise KumirRuntimeError(f"Функция '{func_name}' должна вернуть значение через 'знач := выражение'")
-                
-            except FunctionReturnException as return_exc:
-                # Это старый способ возврата из функции (если где-то еще используется)
-                return_value = return_exc.return_value
-            
-            # Копируем значения выходных параметров обратно в вызывающую область
-            for output_param in output_parameters:
-                param_name = output_param['param_name']
-                target_var_name = output_param['target_var_name']
-                
-                # Получаем текущее значение параметра в функции
-                param_var_info, _ = self.scope_manager.find_variable(param_name)
-                if param_var_info:
-                    param_value = param_var_info['value']
-                    
-                    # Обновляем переменную в предыдущей области видимости
-                    # Временно выходим из текущей области
-                    self.scope_manager.pop_scope()
-                    try:
-                        self.scope_manager.update_variable(target_var_name, param_value, line_index=0, column_index=0)
-                    finally:
-                        # Возвращаемся в область функции для корректной очистки
-                        self.scope_manager.push_scope()
-                
-        finally:
-            # Всегда восстанавливаем предыдущую область видимости
-            self.scope_manager.pop_scope()
-            # Всегда убираем фрейм возвращаемого значения из стека
-            self.procedure_manager.pop_return_value_frame()
-        
-        # Возвращаем значение после finally (если не было return в try)
         return return_value
 
     def _call_user_procedure(self, proc_name: str, args: List[Any], ctx: ParserRuleContext) -> None:

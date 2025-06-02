@@ -293,17 +293,21 @@ class DeclarationVisitorMixin:
             print(f"[DEBUG][DeclVisitor] Successfully registered {'function' if is_func else 'procedure'}: {algo_name_tokens}", file=sys.stderr)
         except Exception as e:
             print(f"[ERROR][DeclVisitor] Failed to register {algo_name_tokens}: {e}", file=sys.stderr)
-            raise
-
-        # ВАЖНО: Проверяем режим сбора определений
-        # Если включен режим "только сбор определений", НЕ выполняем тело алгоритма
-        if kiv_self.is_definition_collection_mode():
-            print(f"[DEBUG][DeclVisitor] Definition collection mode: skipping algorithm body for {algo_name_tokens}", file=sys.stderr)
-            return None  # Завершаем обработку, не позволяя ANTLR обходить дочерние узлы
+            raise        # ВАЖНО: Не выполняем тела пользовательских функций и процедур при их определении, 
+        # только при явных вызовах. Это исправляет проблему с выполнением тела функции во время парсинга.
+        # Если это алгоритм (функция или процедура), всегда пропускаем выполнение тела,
+        # так как оно должно выполняться только при явном вызове.
+        
+        # Главный алгоритм в КУМИРе - это алгоритм без имени (пустая строка)
+        is_main = algo_name_tokens == ""
+        
+        if is_func or not is_main:  # Если это функция или не главный алгоритм программы
+            print(f"[DEBUG][DeclVisitor] Skipping algorithm body execution for {algo_name_tokens} - will execute only on explicit call", file=sys.stderr)
+            return None
             
-        # В обычном режиме позволяем ANTLR обойти дочерние узлы (включая algorithmBody)
+        # В обычном режиме для ГЛАВНОГО алгоритма позволяем ANTLR обойти дочерние узлы
         # Это поведение по умолчанию, так что возвращаем результат по умолчанию
-        print(f"[DEBUG][DeclVisitor] Normal mode: allowing algorithm body execution for {algo_name_tokens}", file=sys.stderr)
+        print(f"[DEBUG][DeclVisitor] Allowing body execution for main algorithm {algo_name_tokens}", file=sys.stderr)
         return None # Algorithm definition is a declaration, not an expression with a value
 
     # Removed duplicated/placeholder visit methods for specific var/arr/proc/func declare statements

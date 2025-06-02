@@ -486,9 +486,8 @@ class ProcedureManager:
                                  line_content=lc_no_body)
 
         self.visitor.scope_manager.push_scope()
-        # self.visitor.call_stack.append(proc_name) # Если будет использоваться стек вызовов
-
-        # Объявление и инициализация параметров в новой области видимости
+        # self.visitor.call_stack.append(proc_name) # Если будет использоваться стек вызовов        # Объявление и инициализация параметров в новой области видимости
+        print(f"[DEBUG] Начинаем объявление параметров для {proc_name}. Количество параметров: {len(proc_def['params'])}")
         for i, (formal_param_name_lower, formal_param_info) in enumerate(proc_def['params'].items()):
             param_name_original_case = formal_param_info['name']
             # param_base_type = formal_param_info['base_type'] # Не используется напрямую здесь после рефакторинга declare_variable
@@ -520,15 +519,16 @@ class ProcedureManager:
                                          line_index=(call_site_ctx.start.line-1) if call_site_ctx else None, 
                                          column_index=call_site_ctx.start.column if call_site_ctx else None,
                                          line_content=lc_arg_count)
-
-            # 1. Объявляем переменную параметра
+              # 1. Объявляем переменную параметра
+            print(f"[DEBUG] Объявляем параметр '{param_name_original_case}' с типом {formal_param_info['type']}")
             self.visitor.scope_manager.declare_variable(
                 name=param_name_original_case,
                 kumir_type=formal_param_info['type'], 
-                is_table=param_is_table,
-                dimensions=declaration_dimensions, 
-                ctx_declaration_item=call_site_ctx 
+                initial_value=None,  # Будет установлено ниже при присваивании
+                line_index=(call_site_ctx.start.line-1) if call_site_ctx and call_site_ctx.start else 0,
+                column_index=call_site_ctx.start.column if call_site_ctx and call_site_ctx.start else 0
             )
+            print(f"[DEBUG] Параметр '{param_name_original_case}' объявлен успешно")
 
             # 2. Присваиваем значение параметру (если нужно)
             if param_mode_for_evaluator == 'arg' or param_mode_for_evaluator == 'arg_res' or param_mode_for_evaluator == 'arg_res_table_special':
@@ -553,19 +553,16 @@ class ProcedureManager:
                 # Для 'рез' параметров, они инициализируются значением по умолчанию их типа.
                 # KumirTableVar сама себя инициализирует при создании через declare_variable.
                 # Для простых типов, get_default_value было вызвано внутри declare_variable (в ScopeManager).
-                pass
-
-
-        # Если это функция, инициализируем '__знач__' значением по умолчанию для ее типа
+                pass        # Если это функция, инициализируем '__знач__' значением по умолчанию для ее типа
         if proc_def['is_function']:
             expected_return_type = proc_def['result_type']
             if expected_return_type and expected_return_type != VOID_TYPE:
                 self.visitor.scope_manager.declare_variable(
                     name="__знач__", 
                     kumir_type=expected_return_type, 
-                    is_table=False, 
-                    dimensions=None,
-                    ctx_declaration_item=call_site_ctx
+                    initial_value=None,  # Будет установлено значение по умолчанию
+                    line_index=(call_site_ctx.start.line-1) if call_site_ctx and call_site_ctx.start else 0,
+                    column_index=call_site_ctx.start.column if call_site_ctx and call_site_ctx.start else 0
                 )
 
         self.visitor.function_call_active = proc_def['is_function']
@@ -607,7 +604,7 @@ class ProcedureManager:
                     if local_var_info is None: # pragma: no cover
                         lc_local_var = self.visitor.get_line_content_from_ctx(call_site_ctx)
                         raise KumirNameError(f"Внутренняя ошибка: локальная переменная параметра '{param_name_local_original_case}' не найдена.",
-                                             line_index=(call_site_ctx.start.line-1) if call_site_ctx else None,
+                                             line_index=(call_site_ctx.start.line -1) if call_site_ctx else None,
                                              column_index=call_site_ctx.start.column if call_site_ctx else None,
                                              line_content=lc_local_var)
                     
@@ -743,6 +740,21 @@ class ProcedureManager:
         value = self._return_value_stack.pop()
         print(f"[DEBUG] ProcedureManager.pop_return_value_frame() возвращает: {value}, стек теперь размером {len(self._return_value_stack)}", file=sys.stderr)
         return value
+
+    def execute_user_function(self, func_name: str, args: List[Any], call_site_ctx: ParserRuleContext) -> Any:
+        """
+        Публичный метод для вызова пользовательской функции.
+        
+        Args:
+            func_name: Имя функции для вызова
+            args: Список аргументов 
+            call_site_ctx: Контекст вызова для обработки ошибок
+            
+        Returns:
+            Результат выполнения функции
+        """
+        call_data = {'name': func_name, 'is_function': True}
+        return self._execute_procedure_call(call_data, args, call_site_ctx)
 
 
 # ... остальной код класса ...
