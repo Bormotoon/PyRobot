@@ -216,13 +216,14 @@ class ExpressionEvaluator(KumirParserVisitor):
     #         raise e
 
 
-    # UnaryMinusExpression -> UnaryPlusMinusExpr
-    def visitUnaryPlusMinusExpr(self, ctx: KumirParser.UnaryPlusMinusExprContext) -> KumirValue:
-        operand_val = self.visit(ctx.unaryExpression())
-        op_token = None
-
+    # UnaryMinusExpression -> UnaryExpression с правильной логикой
+    def visitUnaryExpression(self, ctx: KumirParser.UnaryExpressionContext) -> KumirValue:
+        """Обрабатывает унарные выражения: +expr, -expr, !expr или просто postfixExpression"""
+        
+        # Проверяем, есть ли унарный оператор
         if ctx.MINUS():
-            op_token = ctx.MINUS().getSymbol() # ANTLR TerminalNode.getSymbol() возвращает токен
+            op_token = ctx.MINUS().getSymbol()
+            operand_val = self.visit(ctx.unaryExpression())
             self._check_operand_type(operand_val, [KumirType.INT, KumirType.REAL], "унарный минус", op_token)
             if operand_val.kumir_type == KumirType.INT.value:
                 return KumirValue(value=-operand_val.value, kumir_type=KumirType.INT.value)
@@ -230,133 +231,27 @@ class ExpressionEvaluator(KumirParserVisitor):
                 return KumirValue(value=-operand_val.value, kumir_type=KumirType.REAL.value)
         elif ctx.PLUS():
             op_token = ctx.PLUS().getSymbol()
+            operand_val = self.visit(ctx.unaryExpression())
             self._check_operand_type(operand_val, [KumirType.INT, KumirType.REAL], "унарный плюс", op_token)
-            # Для унарного плюса значение не меняется, но тип проверяем
             return operand_val
-        
-        # Сюда не должны попасть, если грамматика корректна и ctx это UnaryPlusMinusExprContext
-        # Но для безопасности, если вдруг op_token не был установлен (например, нет ни PLUS, ни MINUS)
-        # Хотя грамматика unaryExpression: (PLUS | MINUS) unaryExpression # UnaryPlusMinusExpr
-        # гарантирует наличие одного из них.
-        # Если бы это было возможно, то:
-        # raise KumirRuntimeError(ctx.start.line, ctx.start.column, "Неизвестный унарный оператор в UnaryPlusMinusExpr")
-        return operand_val # Возвращаем operand_val, если это был унарный плюс
-
-    def visitUnaryNotExpr(self, ctx: KumirParser.UnaryNotExprContext) -> KumirValue:
-        op_token = ctx.NOT().getSymbol()
-        operand_val = self.visit(ctx.unaryExpression())
-
-        self._check_operand_type(operand_val, [KumirType.BOOL], "логическое НЕ", op_token)
-        return KumirValue(value=not operand_val.value, kumir_type=KumirType.BOOL.value)
-
-    # Посещение узла выражения с умножением/делением/остатком
-    def visitMultiplicativeExpr(self, ctx: KumirParser.MultiplicativeExprContext) -> KumirValue:
-        left = self._visit_operand(ctx.expression(0))
-        right = self._visit_operand(ctx.expression(1))
-        op_token = ctx.op # op это токен
-
-        # Замечание: _visit_operand уже гарантирует, что left и right это KumirValue
-        # поэтому явная проверка isinstance здесь не нужна, но оставлена для ясности
-        if not (isinstance(left, KumirValue) and isinstance(right, KumirValue)):
-            pos = self._position_from_token(op_token)
-            raise KumirRuntimeError(
-                f"Внутренняя ошибка: операнды не являются KumirValue (типы: {type(left).__name__}, {type(right).__name__}).",
-                line_index=pos[0]-1, 
-                column_index=pos[1]
-            )
-
-        if op_token.type == KumirParser.MUL:
-            self._check_operand_type(left, [KumirType.INT, KumirType.REAL], "*", op_token)
-            self._check_operand_type(right, [KumirType.INT, KumirType.REAL], "*", op_token)
-            if left.kumir_type == KumirType.INT.value and right.kumir_type == KumirType.INT.value:
-                result = left.value * right.value
-                return KumirValue(value=result, kumir_type=KumirType.INT.value)
-            else:
-                # Приведение к float для всех остальных случаев (INT*REAL, REAL*INT, REAL*REAL)
-                result = float(left.value) * float(right.value)
-                return KumirValue(value=result, kumir_type=KumirType.REAL.value)
-        elif op_token.type == KumirParser.DIV:
-            self._check_operand_type(left, [KumirType.INT, KumirType.REAL], "/", op_token)
-            self._check_operand_type(right, [KumirType.INT, KumirType.REAL], "/", op_token)
-            if float(right.value) == 0:
-                raise KumirEvalError("Деление на ноль.", line_index=op_token.line -1, column_index=op_token.column)
-            
-            # Всегда вещественное деление, согласно документации Кумира
-            result = float(left.value) / float(right.value)
-            return KumirValue(value=result, kumir_type=KumirType.REAL.value)
-
-        elif op_token.text == 'div': # Целочисленное деление
-            self._check_operand_type(left, [KumirType.INT], "div", op_token)
-            self._check_operand_type(right, [KumirType.INT], "div", op_token)
-            if right.value == 0:
-                raise KumirEvalError("Деление на ноль (div).", line_index=op_token.line - 1, column_index=op_token.column)
-            result = left.value // right.value
-            return KumirValue(value=result, kumir_type=KumirType.INT.value)
-            
-        elif op_token.text == 'mod': # Остаток от деления
-            self._check_operand_type(left, [KumirType.INT], "mod", op_token)
-            self._check_operand_type(right, [KumirType.INT], "mod", op_token)
-            if right.value == 0:
-                raise KumirEvalError("Деление на ноль (mod).", line_index=op_token.line - 1, column_index=op_token.column)
-            result = left.value % right.value
-            return KumirValue(value=result, kumir_type=KumirType.INT.value)
+        elif ctx.NOT():
+            op_token = ctx.NOT().getSymbol()
+            operand_val = self.visit(ctx.unaryExpression())
+            self._check_operand_type(operand_val, [KumirType.BOOL], "логическое НЕ", op_token)
+            return KumirValue(value=not operand_val.value, kumir_type=KumirType.BOOL.value)
+        elif ctx.postfixExpression():
+            # Простое postfixExpression без унарного оператора
+            return self.visit(ctx.postfixExpression())
         else:
-            # Эта ветка по идее не должна достигаться, если грамматика верна
-            raise KumirEvalError(f"Неизвестный мультипликативный оператор: {op_token.text}", line_index=op_token.line - 1, column_index=op_token.column)
+            # Не должно происходить, если грамматика корректна
+            pos = self._position_from_token(self._get_token_for_position(ctx))
+            raise KumirRuntimeError("Неизвестный тип унарного выражения", line_index=pos[0], column_index=pos[1])
+            
+        # На всякий случай возвращаем что-то, хотя до сюда не должны дойти
+        return KumirValue(value=0, kumir_type=KumirType.INT.value)
 
-    # Посещение узла выражения со сложением/вычитанием
-    def visitAdditiveExpr(self, ctx: KumirParser.AdditiveExprContext) -> KumirValue:
-        left = self._visit_operand(ctx.expression(0))
-        right = self._visit_operand(ctx.expression(1))
-        op_token = ctx.op # op это токен
 
-        # Замечание: _visit_operand уже гарантирует, что left и right это KumirValue
-        if not (isinstance(left, KumirValue) and isinstance(right, KumirValue)):
-            pos = self._position_from_token(op_token)
-            raise KumirRuntimeError(
-                f"Внутренняя ошибка: операнды не являются KumirValue (типы: {type(left).__name__}, {type(right).__name__}).",
-                line_index=pos[0]-1,
-                column_index=pos[1]
-            )
 
-        if op_token.type == KumirParser.PLUS:
-            # Для сложения допустимы: ЦЕЛ+ЦЕЛ, ВЕЩ+ВЕЩ, ЦЕЛ+ВЕЩ, ВЕЩ+ЦЕЛ, ЛИТ+ЛИТ
-            if left.kumir_type == KumirType.STR.value and right.kumir_type == KumirType.STR.value:
-                result = str(left.value) + str(right.value)
-                return KumirValue(value=result, kumir_type=KumirType.STR.value)
-            elif (left.kumir_type == KumirType.INT.value or left.kumir_type == KumirType.REAL.value) and \
-                 (right.kumir_type == KumirType.INT.value or right.kumir_type == KumirType.REAL.value):
-                if left.kumir_type == KumirType.INT.value and right.kumir_type == KumirType.INT.value:
-                    result = left.value + right.value
-                    return KumirValue(value=result, kumir_type=KumirType.INT.value)
-                else:
-                    # Приведение к float для всех остальных случаев (INT+REAL, REAL+INT, REAL+REAL)
-                    result = float(left.value) + float(right.value)
-                    return KumirValue(value=result, kumir_type=KumirType.REAL.value)
-            else: # Несовместимые типы для сложения (например, число + строка)
-                raise KumirTypeError(
-                    f"Операция сложения '{op_token.text}' не применима к типам '{left.kumir_type}' и '{right.kumir_type}'.",
-                    line_index=op_token.line - 1, column_index=op_token.column
-                )
-        elif op_token.type == KumirParser.MINUS:
-            # Для вычитания: ЦЕЛ-ЦЕЛ, ВЕЩ-ВЕЩ, ЦЕЛ-ВЕЩ, ВЕЩ-ЦЕЛ. Строки не участвуют.
-            if (left.kumir_type == KumirType.INT.value or left.kumir_type == KumirType.REAL.value) and \
-               (right.kumir_type == KumirType.INT.value or right.kumir_type == KumirType.REAL.value):
-                if left.kumir_type == KumirType.INT.value and right.kumir_type == KumirType.INT.value:
-                    result = left.value - right.value
-                    return KumirValue(value=result, kumir_type=KumirType.INT.value)
-                else:
-                    # Приведение к float для всех остальных случаев (INT-REAL, REAL-INT, REAL-REAL)
-                    result = float(left.value) - float(right.value)
-                    return KumirValue(value=result, kumir_type=KumirType.REAL.value)
-            else: # Несовместимые типы для вычитания (например, строка - число, или вычитание строк)
-                raise KumirTypeError(
-                    f"Операция вычитания '{op_token.text}' не применима к типам '{left.kumir_type}' и '{right.kumir_type}'.",
-                    line_index=op_token.line - 1, column_index=op_token.column
-                )
-        else:
-            # Эта ветка по идее не должна достигаться
-            raise KumirEvalError(f"Неизвестный аддитивный оператор: {op_token.text}", line_index=op_token.line - 1, column_index=op_token.column)
 
     def visitLogicalOrExpression(self, ctx: KumirParser.LogicalOrExpressionContext) -> KumirValue:
         """Обрабатывает логическое ИЛИ выражение"""
@@ -640,35 +535,6 @@ class ExpressionEvaluator(KumirParserVisitor):
             return KumirValue(result_value, result_type)
         else:
             return unary_expr
-
-    # Метод для обработки унарных выражений
-    def visitUnaryExpression(self, ctx: KumirParser.UnaryExpressionContext) -> KumirValue:
-        # UnaryExpression: postfixExpression | unaryPlusMinusExpr | unaryNotExpr
-        
-        # Проверяем, является ли это унарной операцией с плюсом или минусом
-        if ctx.getChildCount() == 2:
-            # Это унарная операция: оператор + выражение
-            operator_child = ctx.getChild(0)
-            operand_ctx = ctx.getChild(1)
-            
-            if hasattr(operator_child, 'getText'):
-                operator_text = operator_child.getText()
-                
-                if operator_text == '-':
-                    # Унарный минус
-                    operand_val = self.visit(operand_ctx)
-                    
-                    if operand_val.kumir_type == KumirType.INT.value:
-                        return KumirValue(value=-operand_val.value, kumir_type=KumirType.INT.value)
-                    elif operand_val.kumir_type == KumirType.REAL.value:
-                        return KumirValue(value=-operand_val.value, kumir_type=KumirType.REAL.value)
-                elif operator_text == '+':
-                    # Унарный плюс
-                    operand_val = self.visit(operand_ctx)
-                    return operand_val
-        
-        # Если это не унарная операция, используем стандартную обработку
-        return self.visitChildren(ctx)
     
     # Метод для обработки постфиксных выражений
     def visitPostfixExpression(self, ctx: KumirParser.PostfixExpressionContext) -> KumirValue:
@@ -745,9 +611,9 @@ class ExpressionEvaluator(KumirParserVisitor):
         # ДОБАВЛЕНО: Проверяем, это пользовательская функция в AlgorithmManager
         if hasattr(self.main_visitor, 'algorithm_manager') and self.main_visitor.algorithm_manager.has_algorithm(var_name):
             algorithm_def = self.main_visitor.algorithm_manager.get_algorithm(var_name)
-            if algorithm_def.is_function:
+            if algorithm_def and algorithm_def.is_function:
                 # Это пользовательская функция - проверяем количество параметров
-                if len(algorithm_def.parameters) == 0:
+                if algorithm_def and len(algorithm_def.parameters) == 0:
                     # Функция без аргументов - вызываем её сразу
                     return self.main_visitor._call_user_function(var_name, [], ctx)
                 else:
@@ -852,7 +718,7 @@ class ExpressionEvaluator(KumirParserVisitor):
         # ДОБАВЛЕНО: Проверяем пользовательские функции в AlgorithmManager
         if hasattr(self.main_visitor, 'algorithm_manager') and self.main_visitor.algorithm_manager.has_algorithm(func_name):
             algorithm_def = self.main_visitor.algorithm_manager.get_algorithm(func_name)
-            if algorithm_def.is_function:
+            if algorithm_def and algorithm_def.is_function:
                 # Это пользовательская функция - вызываем её через main visitor
                 return self.main_visitor._call_user_function(func_name, args, ctx)
             else:

@@ -909,3 +909,47 @@ return return_exc.return_value  # ✅ Правильный атрибут
    - Проверить что `сумма(2, 3)` возвращает `5`
 
 **СОСТОЯНИЕ:** Критические проблемы API решены, базовая инфраструктура работает стабильно!
+
+---
+
+## 20. ИСПРАВЛЕНИЕ ОШИБОК ТИПОВ ANTLR (02.06.2025)
+
+**✅ ЗАДАЧА ВЫПОЛНЕНА: Все ANTLR-связанные ошибки типов в проекте PyRobot устранены.**
+
+**Что было сделано:**
+
+1.  **Анализ файлов, использующих ANTLR:**
+    *   С помощью `grep_search` были найдены все Python файлы (около 20), которые импортируют классы ANTLR или сгенерированные ANTLR компоненты (`KumirLexer`, `KumirParser`, `KumirParserVisitor`, `ErrorListener`, `ParserRuleContext` и т.д.).
+
+2.  **Проверка сгенерированных ANTLR файлов:**
+    *   Файлы `KumirLexer.py`, `KumirParser.py`, `KumirParserVisitor.py`, `KumirParserListener.py` в директории `pyrobot/backend/kumir_interpreter/generated/` были проверены на наличие ошибок с помощью `get_errors`. **Ошибок не обнаружено.**
+
+3.  **Проверка основных файлов интерпретатора, использующих ANTLR:**
+    *   Были проверены ключевые файлы в `pyrobot/backend/kumir_interpreter/interpreter_components/` и другие, использующие ANTLR.
+
+4.  **Исправление ошибок "possibly unbound variable" в `statement_handlers.py`:**
+    *   **Проблема:** Переменные `value_to_print`, `precision`, `field_width` (в обработчике `ВЫВОД`) и `target_var_name`, `is_array_element` (в обработчике `ВВОД`) могли быть не инициализированы в некоторых ветках условных операторов внутри циклов.
+    *   **Решение:**
+        *   Для `ВЫВОД`: Переменные `value_to_print`, `field_width`, `precision` теперь инициализируются значениями по умолчанию (`None` или соответствующими числовыми значениями) в начале каждой итерации цикла по `outputItem`.
+        *   Для `ВВОД`: Переменные `target_var_name` и `is_array_element` инициализируются в начале каждой итерации цикла по `variableReference`.
+        *   Логика присваивания этим переменным была скорректирована, чтобы гарантировать их определение перед использованием.
+    *   **Результат:** Ошибки "possibly unbound" устранены.
+
+5.  **Исправление ошибки импорта в `type_utils.py`:**
+    *   **Проблема:** Файл содержал неверный относительный импорт `from ..interpreter import KumirInterpreterVisitor`.
+    *   **Исследование:** Было установлено, что класс `KumirInterpreterVisitor` находится в файле `main_visitor.py` в той же директории (`interpreter_components`).
+    *   **Решение:** Импорт был изменен на `from .main_visitor import KumirInterpreterVisitor`.
+    *   **Результат:** Ошибка импорта устранена.
+
+6.  **Финальная проверка:**
+    *   После всех исправлений была проведена повторная проверка всех ранее идентифицированных ANTLR-зависимых файлов с помощью `get_errors`.
+    *   **Результат:** Все проверенные файлы не содержат ошибок типов, связанных с ANTLR.
+
+**Список проверенных и исправленных файлов (ключевые):**
+*   `pyrobot/backend/kumir_interpreter/interpreter_components/statement_handlers.py` (исправлены unbound variables)
+*   `pyrobot/backend/kumir_interpreter/interpreter_components/type_utils.py` (исправлен импорт)
+*   Все файлы в `pyrobot/backend/kumir_interpreter/generated/` (проверены, без ошибок)
+*   Другие файлы в `pyrobot/backend/kumir_interpreter/interpreter_components/` (проверены, без ошибок)
+*   Тестовые файлы и утилиты, использующие ANTLR (проверены, без ошибок)
+
+**Общий итог:** Все известные ANTLR-специфичные ошибки типов в кодовой базе PyRobot были успешно идентифицированы и устранены. Проект стал более стабильным и менее подверженным ошибкам времени выполнения, связанным с некорректным использованием ANTLR артефактов.

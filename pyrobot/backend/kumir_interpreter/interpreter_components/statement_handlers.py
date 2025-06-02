@@ -255,6 +255,12 @@ class StatementHandlerMixin(KumirParserVisitor):
             current_output = ""
 
             for i, arg_ctx in enumerate(ctx.ioArgumentList().ioArgument()):
+                # Инициализируем переменные в начале цикла
+                value_to_print = None
+                field_width = None
+                precision = None
+                formatted_str = ""
+                
                 if arg_ctx.expression():
                     # arg_ctx.expression() возвращает список выражений
                     expressions = arg_ctx.expression()
@@ -271,9 +277,6 @@ class StatementHandlerMixin(KumirParserVisitor):
                             )
 
                         # Обработка форматных спецификаторов
-                        field_width = None
-                        precision = None
-                        
                         # Проверяем наличие форматных спецификаторов
                         if len(expressions) > 1:
                             # Второе выражение - ширина поля
@@ -289,37 +292,36 @@ class StatementHandlerMixin(KumirParserVisitor):
                             if precision_value and precision_value.kumir_type == KumirType.INT.value:
                                 precision = precision_value.value
 
-                    # Преобразование значения к строке с учетом типа и форматирования
-                    formatted_str = ""
-                    if value_to_print.kumir_type == KumirType.INT.value:
-                        formatted_str = str(value_to_print.value)
-                    elif value_to_print.kumir_type == KumirType.REAL.value:
-                        if precision is not None:
-                            # Форматируем с заданной точностью
-                            formatted_str = f"{value_to_print.value:.{precision}f}"
+                        # Преобразование значения к строке с учетом типа и форматирования
+                        if value_to_print.kumir_type == KumirType.INT.value:
+                            formatted_str = str(value_to_print.value)
+                        elif value_to_print.kumir_type == KumirType.REAL.value:
+                            if precision is not None:
+                                # Форматируем с заданной точностью
+                                formatted_str = f"{value_to_print.value:.{precision}f}"
+                            else:
+                                # Используем правильное форматирование для вещественных чисел КуМира
+                                # Если это целое число (7.0), выводим как целое (7)
+                                from ..utils import to_output_string
+                                formatted_str = to_output_string(value_to_print)
+                        elif value_to_print.kumir_type == KumirType.BOOL.value:
+                            formatted_str = "истина" if value_to_print.value else "ложь"
+                        elif value_to_print.kumir_type == KumirType.CHAR.value:
+                            formatted_str = value_to_print.value
+                        elif value_to_print.kumir_type == KumirType.STR.value:
+                            formatted_str = value_to_print.value
                         else:
-                            # Используем правильное форматирование для вещественных чисел КуМира
-                            # Если это целое число (7.0), выводим как целое (7)
-                            from ..utils import to_output_string
-                            formatted_str = to_output_string(value_to_print)
-                    elif value_to_print.kumir_type == KumirType.BOOL.value:
-                        formatted_str = "истина" if value_to_print.value else "ложь"
-                    elif value_to_print.kumir_type == KumirType.CHAR.value:
-                        formatted_str = value_to_print.value
-                    elif value_to_print.kumir_type == KumirType.STR.value:
-                        formatted_str = value_to_print.value
-                    else:
-                        raise KumirTypeError(
-                            f"Неизвестный или неподдерживаемый тип значения для вывода: {value_to_print.kumir_type}",
-                            line_index=arg_ctx.start.line -1,
-                            column_index=arg_ctx.start.column
-                        )
+                            raise KumirTypeError(
+                                f"Неизвестный или неподдерживаемый тип значения для вывода: {value_to_print.kumir_type}",
+                                line_index=arg_ctx.start.line -1,
+                                column_index=arg_ctx.start.column
+                            )
+                        
+                        # Применяем форматирование ширины поля
+                        if field_width is not None:
+                            formatted_str = formatted_str.rjust(field_width)
                     
-                    # Применяем форматирование ширины поля
-                    if field_width is not None:
-                        formatted_str = formatted_str.rjust(field_width)
-                    
-                    current_output += formatted_str
+                current_output += formatted_str
 
             if hasattr(kiv_self, 'io_handler') and kiv_self.io_handler is not None:
                 kiv_self.io_handler.write_output(current_output)
@@ -335,6 +337,10 @@ class StatementHandlerMixin(KumirParserVisitor):
             echo_values = []  # Собираем эхо всех введенных значений
 
             for i, arg_ctx in enumerate(ctx.ioArgumentList().ioArgument()):
+                # Инициализируем переменные в начале цикла
+                target_var_name = ""
+                is_array_element = False
+                
                 if arg_ctx.expression():
                     # For INPUT, we need to get the lvalue to assign to
                     # This is a bit tricky since we're expecting the expression to be an lvalue
@@ -345,9 +351,6 @@ class StatementHandlerMixin(KumirParserVisitor):
                         expr_ctx = expressions[0]
                         
                         # Try to extract variable info from the expression
-                        target_var_name = ""
-                        is_array_element = False
-                        
                         # For now, handle simple cases - ID and postfix with array access
                         if hasattr(expr_ctx, 'getText'):
                             target_var_name = expr_ctx.getText()

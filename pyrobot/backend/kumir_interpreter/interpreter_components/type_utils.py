@@ -9,7 +9,7 @@ from ..kumir_exceptions import DeclarationError
 
 if TYPE_CHECKING:
     # Assuming interpreter is in pyrobot.backend.kumir_interpreter
-    from ..interpreter import KumirInterpreterVisitor
+    from .main_visitor import KumirInterpreterVisitor
 
 def get_type_info_from_specifier(
     visitor: KumirInterpreterVisitor,
