@@ -589,9 +589,10 @@ class ExpressionEvaluator(KumirParserVisitor):
                     pos = self._position_from_token(self._get_token_for_position(ctx))
                     raise KumirEvalError(f"Невозможно вызвать функцию: {primary_expr}", line_index=pos[0], column_index=pos[1])
             
-            # TODO: Обработка массивов (LBRACK ... RBRACK)
-        
-        return primary_expr# Метод для обработки первичных выражений
+            # TODO: Обработка массивов (LBRACK ... RBRACK)        
+        return primary_expr
+    
+    # Метод для обработки первичных выражений
     def visitPrimaryExpression(self, ctx: KumirParser.PrimaryExpressionContext) -> KumirValue:
         # PrimaryExpression может быть literal, identifier, parenthesizedExpr и т.д.
         if ctx.literal():
@@ -600,9 +601,13 @@ class ExpressionEvaluator(KumirParserVisitor):
             # TODO: Обработка переменных и идентификаторов
             return self.visit(ctx.qualifiedIdentifier())
         elif ctx.RETURN_VALUE():
-            # TODO: Обработка ключевого слова 'знач'
-            pos = self._position_from_token(self._get_token_for_position(ctx))
-            raise KumirNotImplementedError("Ключевое слово 'знач' пока не поддерживается.", line_index=pos[0], column_index=pos[1])
+            # Обработка ключевого слова 'знач' - обращение к возвращаемому значению функции
+            try:
+                var_info, _ = self.main_visitor.scope_manager.find_variable('__знач__')
+                return var_info['value']
+            except Exception as e:
+                pos = self._position_from_token(self._get_token_for_position(ctx))
+                raise KumirRuntimeError(f"Ошибка при обращении к 'знач': {e}", line_index=pos[0], column_index=pos[1])
         elif ctx.expression():
             # Выражение в скобках
             return self.visit(ctx.expression())

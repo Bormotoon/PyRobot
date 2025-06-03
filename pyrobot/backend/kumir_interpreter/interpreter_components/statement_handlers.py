@@ -808,22 +808,24 @@ class StatementHandlerMixin(KumirParserVisitor):
                         if expressions:
                             arg_expressions = expressions
                             break
-                    break        
-        # Анализируем аргументы с учетом режимов параметров
+                    break          # Анализируем аргументы с учетом режимов параметров
         try:
             analyzed_args = self._analyze_procedure_arguments(procedure_name, arg_expressions)
             
             # Вызываем процедуру через procedure_manager
-            kiv_self.procedure_manager.call_procedure_with_analyzed_args(
-                procedure_name,
-                analyzed_args,
-                line_index=expr_ctx.start.line - 1,
-                column_index=expr_ctx.start.column
-            )
-        except ExitSignal:
-            # ExitSignal должен пробрасываться дальше без изменений
-            print(f"[DEBUG] _handle_procedure_call_from_expression: перехватили ExitSignal, пробрасываем дальше", file=sys.stderr)
-            raise
+            try:
+                kiv_self.procedure_manager.call_procedure_with_analyzed_args(
+                    procedure_name,
+                    analyzed_args,
+                    line_index=expr_ctx.start.line - 1,
+                    column_index=expr_ctx.start.column
+                )
+            except ExitSignal:
+                # ExitSignal от процедуры должен завершать ТОЛЬКО саму процедуру,
+                # а НЕ пробрасываться дальше. Это стандартная семантика КуМира.
+                print(f"[DEBUG] _handle_procedure_call_from_expression: перехватили ExitSignal, НЕ пробрасываем (процедура завершена корректно)", file=sys.stderr)
+                # НЕ пробрасываем ExitSignal дальше - процедура корректно завершилась
+                
         except Exception as e:
             print(f"[DEBUG] _handle_procedure_call_from_expression: перехватили исключение типа {type(e).__name__}: {str(e)}", file=sys.stderr)
             import traceback

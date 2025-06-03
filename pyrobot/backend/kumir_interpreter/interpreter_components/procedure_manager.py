@@ -28,6 +28,13 @@ class ProcedureManager:
         """        
         # TODO: Проверить, что мы находимся внутри вызова функции, а не процедуры.
         # TODO: Проверить тип value_to_assign с ожидаемым типом возврата функции.
+          # Обновляем переменную __знач__ в текущей области видимости
+        try:
+            self.visitor.scope_manager.update_variable('__знач__', value_to_assign, 0, 0)
+        except Exception as e:
+            print(f"[DEBUG] Ошибка при обновлении __знач__: {e}", file=sys.stderr)
+        
+        # Также устанавливаем значение в стеке возвращаемых значений
         if self._return_value_stack:
             self._return_value_stack[-1] = value_to_assign  # Устанавливаем значение в верхний элемент стека
         else:
@@ -772,9 +779,7 @@ class ProcedureManager:
                 # Для 'рез' параметров, они инициализируются значением по умолчанию их типа.
                 # KumirTableVar сама себя инициализирует при создании через declare_variable.
                 # Для простых типов, get_default_value было вызвано внутри declare_variable (в ScopeManager).
-                pass
-
-        # Если это функция, инициализируем '__знач__' значением по умолчанию для ее типа
+                pass        # Если это функция, инициализируем '__знач__' значением по умолчанию для ее типа
         if proc_def['is_function']:
             expected_return_type = proc_def['result_type']
             if expected_return_type and expected_return_type != VOID_TYPE:
@@ -792,13 +797,12 @@ class ProcedureManager:
         try:
             self.visitor.visit(body_ctx)
         except ExitSignal as es: 
-            # Для процедур без возвращаемого значения, ExitSignal должен останавливать всю рекурсию
-            if not proc_def['is_function']:
-                raise  # Пробрасываем ExitSignal дальше для остановки всей цепочки рекурсивных вызовов
-            # Для функций просто завершаем текущий вызов
+            # ExitSignal (команда "выход") должна завершать ТОЛЬКО текущий вызов процедуры/функции,
+            # а НЕ всю рекурсию. Это стандартная семантика в КуМире.
+            # Просто завершаем выполнение текущего вызова
             pass
         except BreakSignal as lee: 
-            pass 
+            pass
 
         if proc_def['is_function']:
             expected_return_type = proc_def['result_type']
