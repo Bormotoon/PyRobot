@@ -34,6 +34,32 @@ class ProcedureManager:
             # Если стек пуст, это ошибка использования 'знач' вне функции
             pass
 
+    def push_return_value_frame(self) -> None:
+        """Создает новый фрейм для возвращаемого значения функции."""
+        self._return_value_stack.append(None)
+        print(f"[DEBUG] push_return_value_frame: добавлен фрейм, размер стека = {len(self._return_value_stack)}", file=sys.stderr)
+    
+    def pop_return_value_frame(self) -> Optional[KumirValue]:
+        """Удаляет и возвращает верхний фрейм возвращаемого значения."""
+        if self._return_value_stack:
+            value = self._return_value_stack.pop()
+            print(f"[DEBUG] pop_return_value_frame: удален фрейм, размер стека = {len(self._return_value_stack)}, значение = {value}", file=sys.stderr)
+            return value
+        else:
+            print(f"[DEBUG] pop_return_value_frame: стек пуст", file=sys.stderr)
+            return None
+    
+    def get_and_clear_return_value(self) -> Optional[KumirValue]:
+        """Получает возвращаемое значение из текущего фрейма и очищает его."""
+        if self._return_value_stack:
+            value = self._return_value_stack[-1]  # Get without removing frame
+            self._return_value_stack[-1] = None   # Clear value in frame
+            print(f"[DEBUG] get_and_clear_return_value: получено значение = {value}", file=sys.stderr)
+            return value
+        else:
+            print(f"[DEBUG] get_and_clear_return_value: стек пуст", file=sys.stderr)
+            return None
+
     def register_procedure(self, name: str, ctx: KumirParser.AlgorithmDefinitionContext, 
                           is_function: bool = False, result_type: str = VOID_TYPE) -> None:
         """
