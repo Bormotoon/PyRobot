@@ -13,6 +13,7 @@ from .. import kumir_exceptions # <--- Добавляем импорт моду�
 from ..kumir_exceptions import KumirSemanticError, KumirRuntimeError, KumirSyntaxError, ExitSignal, BreakSignal, StopExecutionSignal, KumirNameError, KumirTypeError # Изменения: ProcedureExitCalled -> ExitSignal, LoopExitException -> BreakSignal
 from ..kumir_datatypes import KumirTableVar, KumirReturnValue, KumirValue, KumirType 
 from ..definitions import AlgorithmManager, AlgorithmDefinition, Parameter, FunctionCallFrame, FunctionReturnException  # Импорт наших новых классов
+from ..utils import KumirTypeConverter  # Импорт type converter
 
 # Импорты компонентов интерпретатора из __init__.py текущего пакета
 from .scope_manager import ScopeManager
@@ -85,6 +86,7 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementHandlerMixin, St
         self.scope_manager = ScopeManager(self)
         self.procedure_manager = ProcedureManager(self)
         self.algorithm_manager = AlgorithmManager()  # Новый менеджер алгоритмов
+        self.type_converter = KumirTypeConverter()  # Инициализируем type_converter
         self.expression_evaluator = ExpressionEvaluator(self, self.scope_manager, self.procedure_manager) # Передаем self (main_visitor)
         
         # Создаем IOHandler, передавая модуль исключений и потоки. Visitor будет None сначала.

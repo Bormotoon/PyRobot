@@ -6,7 +6,7 @@ from antlr4.tree.Tree import TerminalNode # Импорт TerminalNode
 
 # Локальные импорты КуМир (относительные)
 from ..generated.KumirParser import KumirParser # Исправленный импорт KumirParser
-from ..kumir_exceptions import DeclarationError, KumirArgumentError, KumirNameError, KumirTypeError, ExitSignal, AssignmentError, KumirEvalError, BreakSignal # Заменены ProcedureExitCalled на ExitSignal и LoopExitException на BreakSignal
+from ..kumir_exceptions import DeclarationError, KumirArgumentError, KumirNameError, KumirTypeError, ExitSignal, AssignmentError, KumirEvalError, BreakSignal, KumirRuntimeError # Заменены ProcedureExitCalled на ExitSignal и LoopExitException на BreakSignal, добавлен KumirRuntimeError
 from ..kumir_datatypes import KumirTableVar, KumirFunction, KumirValue, KumirType # <--- ДОБАВЛЕН KumirType
 from .constants import VOID_TYPE, INTEGER_TYPE, FLOAT_TYPE, STRING_TYPE, BOOLEAN_TYPE 
 from .scope_manager import get_default_value # <--- Import get_default_value
@@ -56,32 +56,90 @@ class ProcedureManager:
             'params': params_info,  # Теперь правильно извлекаем параметры!
             'is_func': is_function,
             'is_function': is_function,  # Добавляем для совместимости
-            'result_type': result_type
-        }
+            'result_type': result_type        }
         
         # print(f"[DEBUG][ProcedureManager] Зарегистрирован алгоритм '{name}' (функция: {is_function}) с {len(params_info)} параметрами", file=sys.stderr)
 
-    def call_procedure(self, proc_name: str, actual_args: List[Dict[str, Any]], 
+    def call_procedure(self, proc_name: str, actual_args: List[KumirValue], 
                        line_index: int, column_index: int) -> None:
         """
         Вызывает процедуру (не функцию) по имени.
-        actual_args - список словарей {'name': Optional[str], 'value': KumirValue, 'is_expression': bool, 'var_name_for_update': Optional[str]}
+        actual_args - список KumirValue объектов
         """
-        # TODO: Реализовать логику вызова процедуры, включая:
-        # 1. Поиск определения процедуры.
-        # 2. Проверку количества и типов аргументов.
-        # 3. Обработку параметров 'арг', 'рез', 'арг рез'.
-        # 4. Создание новой области видимости.
-        # 5. Объявление параметров в новой области.
-        # 6. Выполнение тела процедуры.
-        # 7. Обработку 'арг рез' и 'рез' параметров после выполнения.
-        # 8. Выход из области видимости.
-        # 9. Обработку ошибок (KumirNameError, KumirArgumentError, KumirTypeError).
+        # DEBUG: убрано для чистых тестов
+        # print(f"[INFO][ProcedureManager] Заглушка: вызов процедуры {proc_name} с аргументами: {actual_args} на строке {line_index+1}, колонке {column_index+1}")
         
-        # Заглушка
-        print(f"[INFO][ProcedureManager] Заглушка: вызов процедуры {proc_name} с аргументами: {actual_args} на строке {line_index+1}, колонке {column_index+1}")
-        # pass
-        raise NotImplementedError(f"Вызов процедуры '{proc_name}' еще не реализован.")
+        proc_name_lower = proc_name.lower()
+        
+        # 1. Поиск определения процедуры
+        if proc_name_lower not in self.procedures:
+            raise KumirNameError(f"Процедура '{proc_name}' не определена.",
+                                 line_index=line_index, column_index=column_index)
+        
+        proc_data = self.procedures[proc_name_lower]
+        
+        # 2. Проверка количества аргументов
+        formal_params_list = list(proc_data['params'].values())
+        if len(actual_args) != len(formal_params_list):
+            raise KumirArgumentError(
+                f"Неверное количество аргументов для процедуры '{proc_name}'. Ожидается {len(formal_params_list)}, получено {len(actual_args)}.",
+                line_index=line_index, column_index=column_index)
+        
+        # 3. Подготовка аргументов для _execute_procedure_call
+        # _execute_procedure_call ожидает список значений в нужном формате
+        python_args_for_execute = []
+        for i, arg_kv in enumerate(actual_args):
+            formal_param_info = formal_params_list[i]
+            param_mode = formal_param_info['mode']
+            
+            # Проверка типа аргумента
+            if not self.visitor.type_converter.are_types_compatible_for_assignment(
+                target_type_str=formal_param_info['type'],
+                value_kumir_type=arg_kv.kumir_type,        
+                value_py_type=type(arg_kv.value),
+                is_table_target=formal_param_info['is_table']
+            ):
+                param_name_for_error = formal_param_info.get('name', f'параметр {i+1}')
+                raise KumirTypeError(
+                    f"Тип аргумента для параметра '{param_name_for_error}' процедуры '{proc_name}' несовместим. "
+                    f"Ожидался тип '{formal_param_info['type']}', получен '{arg_kv.kumir_type}'.",
+                    line_index=line_index, column_index=column_index)
+            
+            # Подготавливаем аргумент в зависимости от режима параметра
+            if param_mode in ['арг', 'arg']:
+                # Для 'арг' параметров просто передаем KumirValue
+                python_args_for_execute.append(arg_kv)
+            elif param_mode in ['рез', 'арг рез']:
+                # Для 'рез' и 'арг рез' нужен специальный формат с возможностью модификации
+                # Пока что обрабатываем как обычные аргументы
+                python_args_for_execute.append(arg_kv)
+            else:
+                # Неизвестный режим параметра
+                python_args_for_execute.append(arg_kv)
+        
+        # 4. Создаем контекст вызова для передачи в _execute_procedure_call
+        # Создаем фиктивный контекст с информацией о позиции
+        class FakeCallSiteContext:
+            def __init__(self, line: int, col: int):
+                self.start = type('obj', (object,), {'line': line + 1, 'column': col})()
+        
+        fake_ctx = FakeCallSiteContext(line_index, column_index)
+          # 5. Вызываем _execute_procedure_call
+        try:
+            result = self._execute_procedure_call(proc_data, python_args_for_execute, fake_ctx)
+            # Для процедур результат не используется (должен быть None)
+        except ExitSignal:
+            # ExitSignal должен пробрасываться дальше без изменений
+            raise
+        except Exception as e:
+            # Перехватываем и перепробрасываем исключения с правильной информацией о позиции
+            if hasattr(e, 'line_index') and hasattr(e, 'column_index'):
+                # Исключение уже содержит информацию о позиции
+                raise
+            else:
+                # Добавляем информацию о позиции к исключению
+                raise KumirRuntimeError(f"Ошибка при выполнении процедуры '{proc_name}': {str(e)}",
+                                        line_index=line_index, column_index=column_index)
 
     def is_function_defined(self, name: str) -> bool:
         """Проверяет, определена ли функция с таким именем."""
@@ -91,6 +149,15 @@ class ProcedureManager:
         if not proc_data:
             return False
         return proc_data.get('is_function', False) and proc_data.get('result_type') != VOID_TYPE
+
+    def is_procedure_defined(self, name: str) -> bool:
+        """Проверяет, определена ли процедура с таким именем (не функция)."""
+        name_lower = name.lower()
+        proc_data = self.procedures.get(name_lower)
+        if not proc_data:
+            return False
+        # Процедура - это алгоритм, который НЕ является функцией
+        return not proc_data.get('is_function', False)
 
     def get_function_definition(self, name: str, error_ctx: Optional[ParserRuleContext] = None) -> KumirFunction:
         """
@@ -607,11 +674,15 @@ class ProcedureManager:
 
         self.visitor.function_call_active = proc_def['is_function']
         execution_result = None
-
+        
         try:
             self.visitor.visit(body_ctx)
-        except ExitSignal: 
-            pass 
+        except ExitSignal as es: 
+            # Для процедур без возвращаемого значения, ExitSignal должен останавливать всю рекурсию
+            if not proc_def['is_function']:
+                raise  # Пробрасываем ExitSignal дальше для остановки всей цепочки рекурсивных вызовов
+            # Для функций просто завершаем текущий вызов
+            pass
         except BreakSignal as lee: 
             pass 
 

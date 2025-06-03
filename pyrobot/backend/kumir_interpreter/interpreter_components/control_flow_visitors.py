@@ -274,21 +274,13 @@ class ControlFlowVisitorMixin:
             if len(all_stm_sequences) > else_clause_stm_seq_index:
                 else_body_sequence = all_stm_sequences[else_clause_stm_seq_index]
                 if else_body_sequence: 
-                     kiv_self.visit(else_body_sequence)
-        
+                     kiv_self.visit(else_body_sequence)        
         return None
-
+        
     def visitExitStatement(self, ctx: KumirParser.ExitStatementContext) -> None:
-        # exitStatement: EXIT
-        # В КуМире ВЫХОД используется для выхода из цикла или процедуры/функции.
-        # Мы генерируем BreakSignal для циклов.
-        # Для процедур/функций ExitSignal генерируется в visitReturnStatement или при завершении.
-        # Здесь мы должны решить, это выход из цикла или из процедуры.
-        # Пока что будем считать, что EXIT в общем потоке - это выход из текущего цикла.
-        # Если мы не внутри цикла, это может быть ошибкой или выходом из процедуры.
-        # Для простоты, пусть EXIT всегда генерирует BreakSignal.
-        # Более сложная логика потребовала бы отслеживания, находимся ли мы в цикле.
-        raise BreakSignal()
+        # Отключена эта реализация в пользу более детальной в statement_handlers.py
+        # которая правильно определяет контекст (цикл vs процедура)
+        pass
 
     def visitStopStatement(self, ctx: KumirParser.StopStatementContext) -> None:
         # stopStatement: STOP

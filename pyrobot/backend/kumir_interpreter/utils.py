@@ -195,38 +195,77 @@ class KumirTypeConverter:
                                 f'в тип {target_type_str}: {e}',
                                 ctx_for_error)
 
+    def are_types_compatible_for_assignment(self, target_type_str: str, value_kumir_type: str, 
+                                           value_py_type: type, is_table_target: bool = False) -> bool:
+        """
+        Проверяет совместимость типов для присваивания.
+        
+        Args:
+            target_type_str: Строка типа цели (например, "ЦЕЛ", "ВЕЩ")
+            value_kumir_type: Строка типа значения Кумир
+            value_py_type: Python тип значения  
+            is_table_target: True если цель - массив/таблица
+            
+        Returns:
+            bool: True если типы совместимы для присваивания
+        """
+        # Нормализуем типы к верхнему регистру
+        target_type_str = target_type_str.upper()
+        value_kumir_type = value_kumir_type.upper()
+        
+        # Точное совпадение типов
+        if target_type_str == value_kumir_type:
+            return True
+        
+        # Совместимость числовых типов (ЦЕЛ можно присвоить к ВЕЩ)
+        if target_type_str == "ВЕЩ" and value_kumir_type == "ЦЕЛ":
+            return True
+            
+        # В Кумире обычно не разрешается автоматическое приведение ВЕЩ к ЦЕЛ
+        # без явного вызова функции преобразования
+        
+        # Пока что строгая проверка - остальные типы несовместимы
+        return False
 
-class ErrorHandler:
-    """Error handler for Kumir interpreter."""
-    
-    def __init__(self, interpreter):
-        self.interpreter = interpreter
-    
-    def runtime_error(self, message, ctx):
-        """Handle runtime error."""
-        print(f"Runtime Error: {message} at line "
-              f"{ctx.start.line if ctx else 'N/A'}")
-        raise KumirRuntimeError(message)  # Используем KumirRuntimeError
-    
-    def type_error(self, message, ctx):
-        """Handle type error."""
-        print(f"Type Error: {message} at line "
-              f"{ctx.start.line if ctx else 'N/A'}")
-        raise KumirTypeError(message)
+    def is_python_type_compatible_with_kumir_type(self, py_value, kumir_type_str: str) -> bool:
+        """
+        Проверяет совместимость Python значения с типом Кумир.
+        
+        Args:
+            py_value: Python значение
+            kumir_type_str: Строка типа Кумир (например, "ЦЕЛ")
+            
+        Returns:
+            bool: True если совместимы
+        """
+        kumir_type_str = kumir_type_str.upper()
+        
+        if kumir_type_str == "ЦЕЛ":
+            return isinstance(py_value, int)
+        elif kumir_type_str == "ВЕЩ":
+            return isinstance(py_value, (int, float))
+        elif kumir_type_str == "ЛОГ":
+            return isinstance(py_value, bool)
+        elif kumir_type_str == "ЛИТ":
+            return isinstance(py_value, str)
+        elif kumir_type_str == "СИМ":
+            return isinstance(py_value, str) and len(py_value) == 1
+        
+        return False
 
-
-class TypeDeterminer:
-    """Type determiner for values."""
-    
-    def determine_type(self, py_value) -> str:
-        """Determine Kumir type from Python value."""
-        # Возвращает строку вместо KumirType
-        if isinstance(py_value, bool):
-            return "ЛОГ"
-        elif isinstance(py_value, int):
-            return "ЦЕЛ"
-        elif isinstance(py_value, float):
-            return "ВЕЩ"
-        elif isinstance(py_value, str):
-            return "ЛИТ"
-        return "НЕИЗВЕСТНЫЙ"  # Строковое значение по умолчанию
+    def to_string_for_error(self, value) -> str:
+        """
+        Преобразует значение в строку для отображения в ошибках.
+        
+        Args:
+            value: Значение для преобразования
+            
+        Returns:
+            str: Строковое представление значения
+        """
+        if value is None:
+            return "None"
+        elif isinstance(value, KumirValue):
+            return f"{value.value} ({value.kumir_type})"
+        else:
+            return f"{value} ({type(value).__name__})"

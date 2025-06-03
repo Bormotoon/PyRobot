@@ -14,7 +14,7 @@ from antlr4.error.ErrorListener import ErrorListener
 
 # Interpreter components
 from .interpreter_components.main_visitor import KumirInterpreterVisitor
-from .kumir_exceptions import KumirSyntaxError, KumirInputRequiredError, KumirRuntimeError 
+from .kumir_exceptions import KumirSyntaxError, KumirInputRequiredError, KumirRuntimeError, ExitSignal
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.DEBUG) # Добавим базовую конфигурацию логирования
@@ -142,9 +142,12 @@ def interpret_kumir(code: str, input_data: Optional[str] = None) -> str:
         else:
             with open("debug_interpret.log", "a", encoding="utf-8") as debug_f:
                 debug_f.write(f"No algorithms found to execute\n")
-            
     except KumirInputRequiredError:
-        pass 
+        pass
+    except ExitSignal:
+        # ExitSignal - это нормальное завершение программы или процедуры с помощью "выход все"
+        # Для главной программы просто завершаем без ошибки
+        pass
     except KumirSyntaxError as e: 
         line_info = f"строка {e.line_index + 1}" if hasattr(e, 'line_index') and e.line_index is not None else "N/A"
         col_info = f", столбец {e.column_index}" if hasattr(e, 'column_index') and e.column_index is not None else ""

@@ -2,7 +2,7 @@ import sys
 from typing import TYPE_CHECKING, cast, Optional
 from pyrobot.backend.kumir_interpreter.kumir_exceptions import (
     KumirRuntimeError, KumirSyntaxError, DeclarationError, KumirNameError,
-    KumirTypeError, KumirArgumentError, BreakSignal, ContinueSignal, StopExecutionSignal, ReturnSignal,
+    KumirTypeError, KumirArgumentError, BreakSignal, ContinueSignal, StopExecutionSignal, ExitSignal,
     KumirNotImplementedError
 )
 from ..generated.KumirParser import KumirParser
@@ -161,16 +161,25 @@ class StatementHandlerMixin(KumirParserVisitor):
 
     def visitAssignmentStatement(self, ctx: KumirParser.AssignmentStatementContext) -> None:
         kiv_self = cast('KumirInterpreterVisitor', self)
-        
-        # Если это просто expression (например, вызов процедуры без присваивания результата)
+          # Если это просто expression (например, вызов процедуры без присваивания результата)
         if ctx.expression() and not ctx.ASSIGN():
             # Проверяем, является ли это вызовом процедуры
             procedure_name = self._extract_procedure_name_from_expression(ctx.expression())
-            if procedure_name and hasattr(kiv_self, 'algorithm_manager') and kiv_self.algorithm_manager.is_procedure(procedure_name):
-                # Это вызов процедуры - обрабатываем через procedure call handler
-                self._handle_procedure_call_from_expression(ctx.expression())
-                return
+            print(f"[DEBUG] AssignmentStatement: извлечено имя процедуры: {procedure_name} из выражения: {ctx.expression().getText()}", file=sys.stderr)
+            
+            if procedure_name and hasattr(kiv_self, 'procedure_manager'):
+                is_proc_defined = kiv_self.procedure_manager.is_procedure_defined(procedure_name)
+                print(f"[DEBUG] AssignmentStatement: процедура '{procedure_name}' определена: {is_proc_defined}", file=sys.stderr)
+                
+                if is_proc_defined:
+                    print(f"[DEBUG] AssignmentStatement: обрабатываем как вызов процедуры '{procedure_name}'", file=sys.stderr)
+                    # Это вызов процедуры - обрабатываем через procedure call handler
+                    self._handle_procedure_call_from_expression(ctx.expression())
+                    return
+                else:
+                    print(f"[DEBUG] AssignmentStatement: '{procedure_name}' не является процедурой, обрабатываем как выражение", file=sys.stderr)
             else:
+                print(f"[DEBUG] AssignmentStatement: обрабатываем как обычное выражение", file=sys.stderr)
                 # Обычное выражение - в expression evaluator
                 kiv_self.expression_evaluator.visit(ctx.expression())
             return
@@ -602,22 +611,20 @@ class StatementHandlerMixin(KumirParserVisitor):
                 is_in_loop = True
                 break
             current = current.parentCtx if hasattr(current, 'parentCtx') else None
-        
-        # Determine the type of exit based on context and text
+          # Determine the type of exit based on context and text
         if ("цикла" in exit_text or "loop" in exit_text or is_in_loop):
             # Exit from loop
             raise BreakSignal()
-        elif ("процедуры" in exit_text or "procedure" in exit_text):
-            # Exit from procedure
-            raise ReturnSignal()
+        elif ("процедуры" in exit_text or "procedure" in exit_text) or "все" in exit_text or "all" in exit_text:
+            # Exit from procedure (вызов все / all)
+            raise ExitSignal()
         else:
-            # Default behavior - if ambiguous, prefer loop exit if we're in a loop
+            # Default behavior - если контекст неоднозначен, в цикле используем выход из цикла
             if is_in_loop:
                 raise BreakSignal()
             else:
-                # Otherwise, stop execution entirely
-                raise StopExecutionSignal()
-        
+                # Иначе, выход из текущей процедуры/алгоритма
+                raise ExitSignal()
         return None
 
     def visitProcedureCallStatement(self, ctx: KumirParser.ProcedureCallStatementContext) -> None:
@@ -625,8 +632,9 @@ class StatementHandlerMixin(KumirParserVisitor):
         proc_name = ctx.qualifiedIdentifier().getText()
         args_ctx = ctx.argumentList()
         actual_args = []
-        if args_ctx and args_ctx.expressionList():
-            for expr_ctx in args_ctx.expressionList().expression():
+        if args_ctx:
+            # argumentList содержит expression напрямую, а не через expressionList
+            for expr_ctx in args_ctx.expression():
                 arg_val = kiv_self.expression_evaluator.visit(expr_ctx)
                 if arg_val is None:
                     raise KumirRuntimeError(
@@ -747,14 +755,12 @@ class StatementHandlerMixin(KumirParserVisitor):
                     # Используем getattr для безопасной проверки типа токена
                     if hasattr(child, 'getSymbol') and getattr(child.getSymbol(), 'type', None) == getattr(KumirLexer, 'LPAREN', None):
                         # Это вызов функции/процедуры
-                        return qualified_id.getText()
-            
-            return None
-            
+                        return qualified_id.getText()            
+            return None            
         except Exception:
             # Если что-то пошло не так при анализе AST, возвращаем None
             return None
-
+            
     def _handle_procedure_call_from_expression(self, expr_ctx: 'KumirParser.ExpressionContext') -> None:
         """
         Обрабатывает вызов процедуры из expression context.
@@ -762,44 +768,66 @@ class StatementHandlerMixin(KumirParserVisitor):
         """
         kiv_self = cast('KumirInterpreterVisitor', self)
         
-        try:
-            # Извлекаем имя процедуры (мы уже знаем, что это вызов процедуры)
-            procedure_name = self._extract_procedure_name_from_expression(expr_ctx)
-            if not procedure_name:
-                raise KumirRuntimeError(
-                    f"Не удалось извлечь имя процедуры из выражения: {expr_ctx.getText()}",
-                    line_index=expr_ctx.start.line - 1,
-                    column_index=expr_ctx.start.column
-                )
-            
-            # Извлекаем аргументы из postfix expression
-            actual_args = []
-            postfix_expr = self._extract_postfix_expression(expr_ctx)
-            if postfix_expr and len(postfix_expr.children) > 2:  # name + LPAREN + ... + RPAREN
-                # Ищем argumentList между LPAREN и RPAREN
-                for i in range(1, len(postfix_expr.children) - 1):
-                    child = postfix_expr.children[i]
-                    if hasattr(child, 'expressionList'):  # Это argumentList
-                        for expr in child.expressionList().expression():
-                            arg_val = kiv_self.expression_evaluator.visit(expr)
-                            if arg_val is None:
-                                raise KumirRuntimeError(
-                                    f"Не удалось вычислить аргумент для вызова процедуры '{procedure_name}'.",
-                                    line_index=expr.start.line - 1,
-                                    column_index=expr.start.column
-                                )
-                            actual_args.append(arg_val)
-                        break
-            
-            # Вызываем процедуру через procedure_manager
-            kiv_self.procedure_manager.call_procedure(
-                procedure_name,
-                actual_args,
+        # Извлекаем имя процедуры (мы уже знаем, что это вызов процедуры)
+        procedure_name = self._extract_procedure_name_from_expression(expr_ctx)
+        if not procedure_name:
+            raise KumirRuntimeError(
+                f"Не удалось извлечь имя процедуры из выражения: {expr_ctx.getText()}",
                 line_index=expr_ctx.start.line - 1,
                 column_index=expr_ctx.start.column
             )
+        print(f"[DEBUG] _handle_procedure_call_from_expression: procedure_name = {procedure_name}", file=sys.stderr)
+        
+        # Извлекаем аргументы из postfix expression
+        actual_args = []
+        postfix_expr = self._extract_postfix_expression(expr_ctx)
+        print(f"[DEBUG] _handle_procedure_call_from_expression: postfix_expr = {postfix_expr}", file=sys.stderr)
+        
+        if postfix_expr is None:
+            print(f"[DEBUG] _handle_procedure_call_from_expression: postfix_expr is None!", file=sys.stderr)
+        else:
+            print(f"[DEBUG] _handle_procedure_call_from_expression: postfix_expr has {len(postfix_expr.children)} children", file=sys.stderr)
             
+            # Проходим по детям postfixExpression: name LPAREN argumentList? RPAREN
+            for i, child in enumerate(postfix_expr.children):
+                child_type = type(child).__name__
+                child_text = child.getText() if hasattr(child, 'getText') else str(child)
+                print(f"[DEBUG] _handle_procedure_call_from_expression: child[{i}] type={child_type}, text='{child_text}'", file=sys.stderr)
+                
+                # Ищем ArgumentListContext (по названию класса)
+                if 'ArgumentList' in child_type:
+                    print(f"[DEBUG] _handle_procedure_call_from_expression: Найден ArgumentListContext!", file=sys.stderr)
+                    if hasattr(child, 'expression'):
+                        expressions = child.expression()
+                        print(f"[DEBUG] _handle_procedure_call_from_expression: ArgumentList содержит {len(expressions) if expressions else 0} выражений", file=sys.stderr)
+                        if expressions:
+                            for j, expr in enumerate(expressions):
+                                print(f"[DEBUG] _handle_procedure_call_from_expression: Вычисляем аргумент {j}: {expr.getText()}", file=sys.stderr)
+                                arg_val = kiv_self.expression_evaluator.visit(expr)
+                                print(f"[DEBUG] _handle_procedure_call_from_expression: Аргумент {j} = {arg_val}", file=sys.stderr)
+                                if arg_val is None:
+                                    raise KumirRuntimeError(
+                                        f"Не удалось вычислить аргумент для вызова процедуры '{procedure_name}'.",
+                                        line_index=expr.start.line - 1,
+                                        column_index=expr.start.column
+                                    )
+                                actual_args.append(arg_val)
+                            break
+                    break                # Вызываем процедуру через procedure_manager
+        try:
+            kiv_self.procedure_manager.call_procedure(
+                procedure_name,                actual_args,
+                line_index=expr_ctx.start.line - 1,
+                column_index=expr_ctx.start.column
+            )
+        except ExitSignal:
+            # ExitSignal должен пробрасываться дальше без изменений
+            print(f"[DEBUG] _handle_procedure_call_from_expression: перехватили ExitSignal, пробрасываем дальше", file=sys.stderr)
+            raise
         except Exception as e:
+            print(f"[DEBUG] _handle_procedure_call_from_expression: перехватили исключение типа {type(e).__name__}: {str(e)}", file=sys.stderr)
+            import traceback
+            traceback.print_exc(file=sys.stderr)
             if isinstance(e, (KumirRuntimeError, KumirTypeError, KumirNameError)):
                 raise
             else:
