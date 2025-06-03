@@ -179,38 +179,72 @@ def interpret_kumir(code: str, input_data: Optional[str] = None) -> str:
         
     return final_output
 
+def run_kumir_file(file_path: str, input_data: Optional[str] = None) -> str:
+    """
+    Загружает и выполняет файл КуМира.
+    Args:
+        file_path (str): Путь к файлу с кодом КуМира
+        input_data (Optional[str]): Входные данные для программы
+    Returns:
+        str: Результат выполнения программы
+    """
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            code = f.read()
+        return interpret_kumir(code, input_data)
+    except FileNotFoundError:
+        return f"ОШИБКА: Файл '{file_path}' не найден"
+    except UnicodeDecodeError as e:
+        return f"ОШИБКА: Не удалось прочитать файл '{file_path}': {e}"
+
 # Пример использования (можно раскомментировать для быстрой проверки)
-# if __name__ == '__main__':
-#     test_code_simple = """
-#     алг начало
-#       вывод "Привет, мир!"
-#     кон
-#     """
-#     print(f"--- Test Simple ---\\nOutput:\\n{interpret_kumir(test_code_simple)}\\n--------------------")
-
-#     test_code_input = """
-#     алг начало
-#       цел а
-#       ввод а
-#       вывод "Вы ввели: ", а * 2
-#     кон
-#     """
-#     print(f"--- Test Input ---\\nOutput:\\n{interpret_kumir(test_code_input, input_data='123')}\\n--------------------")
+if __name__ == '__main__':
+    import sys
     
-#     test_code_error_syntax = """
-#     алг начало
-#       вывод "Привет, мир!
-#     кон
-#     """
-#     print(f"--- Test Syntax Error ---\\nOutput:\\n{interpret_kumir(test_code_error_syntax)}\\n--------------------")
+    if len(sys.argv) > 1:
+        # Запуск файла из командной строки
+        file_path = sys.argv[1]
+        input_data = None
+        if len(sys.argv) > 2:
+            input_data = sys.argv[2]
+        
+        print(f"Запуск файла: {file_path}")
+        result = run_kumir_file(file_path, input_data)
+        print("=== РЕЗУЛЬТАТ ===")
+        print(result)
+        print("=== КОНЕЦ ===")
+    else:
+        # Тестовые примеры
+        test_code_simple = """
+        алг начало
+          вывод "Привет, мир!"
+        кон
+        """
+        print(f"--- Test Simple ---\\nOutput:\\n{interpret_kumir(test_code_simple)}\\n--------------------")
 
-#     test_code_error_runtime = """
-#     алг начало
-#       цел а
-#       а := 1 / 0
-#       вывод а
-#     кон
-#     """
-#     # Ожидаем, что KumirRuntimeError (или специфическая ошибка деления на ноль) будет поймана.
-#     # В Kumir'е деление целого на ноль - это ошибка времени выполнения.
-#     print(f"--- Test Runtime Error ---\\nOutput:\\n{interpret_kumir(test_code_error_runtime)}\\n--------------------")
+        test_code_input = """
+        алг начало
+          цел а
+          ввод а
+          вывод "Вы ввели: ", а * 2
+        кон
+        """
+        print(f"--- Test Input ---\\nOutput:\\n{interpret_kumir(test_code_input, input_data='123')}\\n--------------------")
+        
+        test_code_error_syntax = """
+        алг начало
+          вывод "Привет, мир!
+        кон
+        """
+        print(f"--- Test Syntax Error ---\\nOutput:\\n{interpret_kumir(test_code_error_syntax)}\\n--------------------")
+
+        test_code_error_runtime = """
+        алг начало
+          цел а
+          а := 1 / 0
+          вывод а
+        кон
+        """
+        # Ожидаем, что KumirRuntimeError (или специфическая ошибка деления на ноль) будет поймана.
+        # В Kumir'е деление целого на ноль - это ошибка времени выполнения.
+        print(f"--- Test Runtime Error ---\\nOutput:\\n{interpret_kumir(test_code_error_runtime)}\\n--------------------")

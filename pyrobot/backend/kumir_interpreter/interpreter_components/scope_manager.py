@@ -189,6 +189,18 @@ class ScopeManager:
                 return scope[var_name_lower], scope
         return None, None
 
+    def find_variable_with_scope_depth(self, var_name: str) -> Optional[Tuple[Dict[str, Any], int]]:
+        """
+        Ищет переменную во всех областях видимости, возвращает информацию о переменной и глубину области видимости.
+        Возвращает (var_info, scope_depth) или None если переменная не найдена.
+        scope_depth = 0 для текущей области, 1 для родительской и т.д.
+        """
+        var_name_lower = var_name.lower()
+        for depth, scope in enumerate(reversed(self.scopes)):
+            if var_name_lower in scope:
+                return scope[var_name_lower], depth
+        return None
+
     def update_variable(self, var_name: str, value_to_assign: KumirValue,
                         line_index: int, column_index: int) -> None:
         """Обновляет значение существующей переменной (простой или целой таблицы)."""

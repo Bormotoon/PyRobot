@@ -1,5 +1,5 @@
 import sys
-from typing import TYPE_CHECKING, cast, Optional
+from typing import TYPE_CHECKING, cast, Optional, List, Dict
 from pyrobot.backend.kumir_interpreter.kumir_exceptions import (
     KumirRuntimeError, KumirSyntaxError, DeclarationError, KumirNameError,
     KumirTypeError, KumirArgumentError, BreakSignal, ContinueSignal, StopExecutionSignal, ExitSignal,
@@ -746,17 +746,23 @@ class StatementHandlerMixin(KumirParserVisitor):
             qualified_id = primary_expr.qualifiedIdentifier()
             if not qualified_id:
                 return None
-            
-            # Проверяем, что у postfixExpression есть аргументы (признак вызова)
+              # Проверяем, что у postfixExpression есть аргументы (признак вызова с параметрами)
             # Структура: primaryExpression LPAREN argumentList? RPAREN
+            has_arguments = False
             if len(postfix_expr.children) > 1:
                 for i in range(1, len(postfix_expr.children)):
                     child = postfix_expr.children[i]
                     # Используем getattr для безопасной проверки типа токена
                     if hasattr(child, 'getSymbol') and getattr(child.getSymbol(), 'type', None) == getattr(KumirLexer, 'LPAREN', None):
-                        # Это вызов функции/процедуры
-                        return qualified_id.getText()            
-            return None            
+                        # Это вызов функции/процедуры с аргументами
+                        has_arguments = True
+                        break
+            
+            # Возвращаем имя как потенциальный вызов процедуры 
+            # (независимо от того, есть ли аргументы)
+            # Вызывающий код должен проверить, является ли это действительно процедурой
+            return qualified_id.getText()
+            
         except Exception:
             # Если что-то пошло не так при анализе AST, возвращаем None
             return None
@@ -777,9 +783,8 @@ class StatementHandlerMixin(KumirParserVisitor):
                 column_index=expr_ctx.start.column
             )
         print(f"[DEBUG] _handle_procedure_call_from_expression: procedure_name = {procedure_name}", file=sys.stderr)
-        
-        # Извлекаем аргументы из postfix expression
-        actual_args = []
+          # Извлекаем выражения аргументов из postfix expression
+        arg_expressions = []
         postfix_expr = self._extract_postfix_expression(expr_ctx)
         print(f"[DEBUG] _handle_procedure_call_from_expression: postfix_expr = {postfix_expr}", file=sys.stderr)
         
@@ -801,22 +806,17 @@ class StatementHandlerMixin(KumirParserVisitor):
                         expressions = child.expression()
                         print(f"[DEBUG] _handle_procedure_call_from_expression: ArgumentList содержит {len(expressions) if expressions else 0} выражений", file=sys.stderr)
                         if expressions:
-                            for j, expr in enumerate(expressions):
-                                print(f"[DEBUG] _handle_procedure_call_from_expression: Вычисляем аргумент {j}: {expr.getText()}", file=sys.stderr)
-                                arg_val = kiv_self.expression_evaluator.visit(expr)
-                                print(f"[DEBUG] _handle_procedure_call_from_expression: Аргумент {j} = {arg_val}", file=sys.stderr)
-                                if arg_val is None:
-                                    raise KumirRuntimeError(
-                                        f"Не удалось вычислить аргумент для вызова процедуры '{procedure_name}'.",
-                                        line_index=expr.start.line - 1,
-                                        column_index=expr.start.column
-                                    )
-                                actual_args.append(arg_val)
+                            arg_expressions = expressions
                             break
-                    break                # Вызываем процедуру через procedure_manager
+                    break        
+        # Анализируем аргументы с учетом режимов параметров
         try:
-            kiv_self.procedure_manager.call_procedure(
-                procedure_name,                actual_args,
+            analyzed_args = self._analyze_procedure_arguments(procedure_name, arg_expressions)
+            
+            # Вызываем процедуру через procedure_manager
+            kiv_self.procedure_manager.call_procedure_with_analyzed_args(
+                procedure_name,
+                analyzed_args,
                 line_index=expr_ctx.start.line - 1,
                 column_index=expr_ctx.start.column
             )
@@ -879,6 +879,106 @@ class StatementHandlerMixin(KumirParserVisitor):
                 return None
             
             return unary_expr.postfixExpression()
+        except:
+            return None
+
+    def _analyze_procedure_arguments(self, procedure_name: str, arg_expressions: List['KumirParser.ExpressionContext']) -> List[Dict]:
+        """
+        Анализирует аргументы процедуры с учетом режимов параметров ('арг', 'рез', 'аргрез').
+        Возвращает список словарей с информацией о каждом аргументе.
+        """
+        kiv_self = cast('KumirInterpreterVisitor', self)
+        
+        # Получаем информацию о процедуре
+        proc_name_lower = procedure_name.lower()
+        if proc_name_lower not in kiv_self.procedure_manager.procedures:
+            raise KumirNameError(f"Процедура '{procedure_name}' не определена.")
+        
+        proc_data = kiv_self.procedure_manager.procedures[proc_name_lower]
+        formal_params_list = list(proc_data['params'].values())
+        
+        # Проверяем количество аргументов
+        if len(arg_expressions) != len(formal_params_list):
+            raise KumirArgumentError(
+                f"Неверное количество аргументов для процедуры '{procedure_name}'. "
+                f"Ожидается {len(formal_params_list)}, получено {len(arg_expressions)}."
+            )
+        
+        analyzed_args = []
+        
+        for i, (expr_ctx, formal_param) in enumerate(zip(arg_expressions, formal_params_list)):
+            param_mode = formal_param['mode']
+            param_name = formal_param.get('name', f'параметр {i+1}')
+            
+            # DEBUG: анализ режима параметра убран для production
+            pass
+            
+            if param_mode in ['арг', 'arg']:
+                # Для 'арг' параметров вычисляем значение
+                arg_value = kiv_self.expression_evaluator.visit(expr_ctx)
+                if arg_value is None:
+                    raise KumirRuntimeError(f"Не удалось вычислить значение аргумента для параметра '{param_name}'")
+                
+                analyzed_args.append({
+                    'mode': param_mode,
+                    'value': arg_value,
+                    'variable_info': None  # Для 'арг' не нужно
+                })
+                
+            elif param_mode in ['рез', 'res', 'аргрез', 'argres']:
+                # Для 'рез'/'аргрез' нужно извлечь имя переменной для обратной записи
+                var_name = self._extract_variable_name_from_expression(expr_ctx)
+                if not var_name:
+                    raise KumirRuntimeError(
+                        f"Для параметра режима '{param_mode}' требуется переменная, "
+                        f"а не выражение: {expr_ctx.getText()}"
+                    )
+                
+                # Для 'аргрез' также вычисляем исходное значение
+                arg_value = None
+                if param_mode in ['аргрез', 'argres']:
+                    arg_value = kiv_self.expression_evaluator.visit(expr_ctx)
+                    if arg_value is None:
+                        raise KumirRuntimeError(f"Не удалось вычислить значение аргумента для параметра '{param_name}'")
+                
+                # Получаем информацию о переменной для обратной записи
+                var_info = kiv_self.scope_manager.find_variable_with_scope_depth(var_name)
+                if not var_info:
+                    raise KumirNameError(f"Переменная '{var_name}' не определена")
+                
+                analyzed_args.append({
+                    'mode': param_mode,
+                    'value': arg_value,  # None для 'рез', значение для 'аргрез'
+                    'variable_info': {
+                        'name': var_name,
+                        'scope_depth': var_info[1],  # Глубина области видимости
+                        'current_value': var_info[0]['value']  # Текущее значение
+                    }
+                })
+                
+            else:
+                raise KumirRuntimeError(f"Неизвестный режим параметра: '{param_mode}'")
+        
+        return analyzed_args
+
+    def _extract_variable_name_from_expression(self, expr_ctx: 'KumirParser.ExpressionContext') -> Optional[str]:
+        """
+        Извлекает имя переменной из простого выражения вида 'имя_переменной'.
+        Возвращает None, если выражение не является простой переменной.
+        """
+        try:
+            # Проходим по цепочке: expression -> logicalOrExpression -> ... -> postfixExpression
+            postfix_expr = self._extract_postfix_expression(expr_ctx)
+            if not postfix_expr or not postfix_expr.children:
+                return None
+            
+            # Проверяем, что это простой identifier (один элемент)
+            if len(postfix_expr.children) == 1:
+                child = postfix_expr.children[0]
+                if hasattr(child, 'getText'):
+                    return child.getText()
+            
+            return None
         except:
             return None
 

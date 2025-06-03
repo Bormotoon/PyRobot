@@ -141,6 +141,108 @@ class ProcedureManager:
                 raise KumirRuntimeError(f"Ошибка при выполнении процедуры '{proc_name}': {str(e)}",
                                         line_index=line_index, column_index=column_index)
 
+    def call_procedure_with_analyzed_args(self, proc_name: str, analyzed_args: List[Dict], 
+                                         line_index: int, column_index: int) -> None:
+        """
+        Вызывает процедуру с уже проанализированными аргументами с учетом режимов параметров.
+        analyzed_args - список словарей с информацией о каждом аргументе
+        """
+        # DEBUG: убран лог вызова процедуры для production
+        
+        proc_name_lower = proc_name.lower()
+        
+        # 1. Поиск определения процедуры
+        if proc_name_lower not in self.procedures:
+            raise KumirNameError(f"Процедура '{proc_name}' не определена.",
+                                 line_index=line_index, column_index=column_index)
+        
+        proc_data = self.procedures[proc_name_lower]
+        formal_params_list = list(proc_data['params'].values())
+        
+        # 2. Подготовка области видимости для выполнения процедуры
+        self.visitor.scope_manager.push_scope()
+        try:
+            # 3. Инициализация параметров в новой области видимости
+            output_parameters = []  # Параметры, которые нужно скопировать обратно
+            
+            for i, (analyzed_arg, formal_param) in enumerate(zip(analyzed_args, formal_params_list)):
+                param_name = formal_param['name']
+                param_mode = analyzed_arg['mode']
+                param_type = formal_param['type']
+                param_kumir_type_str = formal_param['base_type']  # это строка типа "цел"
+                
+                # Конвертируем строку в KumirType enum
+                from ..kumir_datatypes import KumirType
+                param_kumir_type = KumirType.from_string(param_kumir_type_str)
+                
+                # DEBUG: убран лог обработки параметров
+                
+                # Объявляем параметр в локальной области видимости
+                self.visitor.scope_manager.declare_variable(
+                    param_name, 
+                    param_kumir_type,
+                    initial_value=None,  # изначально None
+                    line_index=line_index,
+                    column_index=column_index
+                )
+                
+                # Инициализируем значение в зависимости от режима
+                if param_mode in ['арг', 'arg', 'аргрез', 'argres']:
+                    # Для 'арг' и 'аргрез' - используем переданное значение
+                    if analyzed_arg['value'] is not None:
+                        self.visitor.scope_manager.update_variable(
+                            param_name,
+                            analyzed_arg['value'],
+                            line_index=line_index,
+                            column_index=column_index
+                        )
+                        # DEBUG: убран лог инициализации параметра
+                
+                # Запоминаем output параметры для копирования обратно
+                if param_mode in ['рез', 'res', 'аргрез', 'argres'] and analyzed_arg.get('variable_info'):
+                    output_parameters.append({
+                        'param_name': param_name,
+                        'variable_info': analyzed_arg['variable_info'],
+                        'mode': param_mode
+                    })
+                    # DEBUG: убран лог пометки для копирования
+            
+            # 4. Выполнение тела процедуры
+            print(f"[DEBUG] call_procedure_with_analyzed_args: выполняем тело процедуры", file=sys.stderr)
+            self.visitor.visit(proc_data['body_ctx'])
+            
+            # 5. Копирование значений обратно для output параметров
+            for output_param in output_parameters:
+                param_name = output_param['param_name']
+                var_info = output_param['variable_info']
+                original_var_name = var_info['name']
+                scope_depth = var_info['scope_depth']
+                
+                print(f"[DEBUG] call_procedure_with_analyzed_args: копируем '{param_name}' обратно в '{original_var_name}'", file=sys.stderr)
+                
+                # Получаем новое значение параметра из локальной области видимости
+                param_var_info, _ = self.visitor.scope_manager.find_variable(param_name)
+                if param_var_info:
+                    new_value = param_var_info['value']
+                    print(f"[DEBUG] call_procedure_with_analyzed_args: новое значение '{param_name}' = {new_value}", file=sys.stderr)
+                    
+                    # Обновляем исходную переменную в соответствующей области видимости
+                    # Используем стандартный update_variable, который найдет переменную сам
+                    self.visitor.scope_manager.update_variable(
+                        original_var_name,
+                        new_value,
+                        line_index=line_index,
+                        column_index=column_index
+                    )
+                    print(f"[DEBUG] call_procedure_with_analyzed_args: обновили исходную переменную '{original_var_name}' = {new_value}", file=sys.stderr)
+                else:
+                    print(f"[DEBUG] call_procedure_with_analyzed_args: ОШИБКА - не найден параметр '{param_name}' в локальной области", file=sys.stderr)
+        
+        finally:
+            # 6. Очистка области видимости
+            self.visitor.scope_manager.pop_scope()
+            print(f"[DEBUG] call_procedure_with_analyzed_args: очистили область видимости", file=sys.stderr)
+
     def is_function_defined(self, name: str) -> bool:
         """Проверяет, определена ли функция с таким именем."""
         name_lower = name.lower()
@@ -364,42 +466,28 @@ class ProcedureManager:
 
     def clear_procedures(self):
         '''Очищает список известных процедур.'''
-        self.procedures = {}
-
-    # Сюда будут перенесены:
+        self.procedures = {}    # Сюда будут перенесены:
     # _collect_procedure_definitions
     # _execute_procedure_call
-    # _extract_parameters
-    # _get_param_mode
+    # _extract_parameters    # _get_param_mode
     # (возможно _get_result_type, _get_type_info_from_specifier, если решим их перенести) 
-
     def _get_param_mode(self, param_decl_ctx: KumirParser.ParameterDeclarationContext) -> str:
-        """Определяет режим параметра ('арг', 'рез', 'арг рез')."""
-        # В Kumir.g4 параметр режима описывается так:
-        # parameterDeclaration: parameterModifier typeSpecifier variableList;
-        # parameterModifier: ARG_RES_MODE | ARG_MODE | RES_MODE | EMPTY_MODE (?); // EMPTY_MODE - это отсутствие модификатора
-        # ARG_MODE: 'арг'; RES_MODE: 'рез'; ARG_RES_MODE: 'арг' 'рез';
-
-        # --- ИСПРАВЛЕНИЕ ДЛЯ ОШИБКИ ЛИНТЕРА 2332 ---
-        # У ParameterDeclarationContext нет parameterModifier().
-        # Режим определяется наличием токенов IN_PARAM, OUT_PARAM, INOUT_PARAM.
+        """Определяет режим параметра ('арг', 'рез', 'аргрез')."""
+        # В грамматике KumirParser.g4 режим определяется наличием токенов:
+        # IN_PARAM: 'арг'
+        # OUT_PARAM: 'рез' 
+        # INOUT_PARAM: ('аргрез' | 'арг' WS 'рез' | 'арг_рез')
         
-        has_in_param = hasattr(param_decl_ctx, 'IN_PARAM') and callable(param_decl_ctx.IN_PARAM) and param_decl_ctx.IN_PARAM()
-        has_out_param = hasattr(param_decl_ctx, 'OUT_PARAM') and callable(param_decl_ctx.OUT_PARAM) and param_decl_ctx.OUT_PARAM()
-        # INOUT_PARAM в грамматике не используется для прямого указания "арг рез", там просто "арг" и "рез" вместе
-        # Но если бы был отдельный токен INOUT_PARAM, его бы проверяли так:
-        # has_inout_param = hasattr(param_decl_ctx, 'INOUT_PARAM') and callable(param_decl_ctx.INOUT_PARAM) and param_decl_ctx.INOUT_PARAM()
-
-        if has_in_param and has_out_param:
-            return 'арг рез'
-        elif has_in_param:
+        # Проверяем наличие соответствующих токенов (по аналогии с declaration_visitors.py)
+        if param_decl_ctx.INOUT_PARAM():
+            return 'аргрез'
+        elif param_decl_ctx.IN_PARAM():
             return 'арг'
-        elif has_out_param:
+        elif param_decl_ctx.OUT_PARAM():
             return 'рез'
         else:
-            # Если нет ни IN_PARAM, ни OUT_PARAM, по умолчанию это 'арг'
+            # Если нет ни одного модификатора, по умолчанию это 'арг'
             return 'арг'
-        # --- КОНЕЦ ИСПРАВЛЕНИЯ --- 
 
     def _extract_parameters(self, header_ctx: KumirParser.AlgorithmHeaderContext) -> Dict[str, Dict[str, Any]]:
         params = {}
@@ -809,52 +897,6 @@ class ProcedureManager:
         self.visitor.function_call_active = False
         # print(f"[DEBUG][ProcManager] Exiting {proc_name}. Return value: {execution_result}", file=sys.stderr)
         return execution_result
-
-    def _get_type_info_from_specifier(self, type_spec_ctx: KumirParser.TypeSpecifierContext) -> Tuple[str, Optional[List[Tuple[Optional[int], Optional[int]]]]]:
-        if not self.visitor:
-            # Это критическая ошибка конфигурации, если visitor не установлен к моменту вызова
-            raise Exception("ProcedureManager.visitor не инициализирован, но требуется для _get_type_info_from_specifier")
-          # Делегируем вызов методу из TypeUtilsMixin (или где он там будет) через visitor
-        return self.visitor.get_type_info_from_specifier(type_spec_ctx)
-
-    def get_and_clear_return_value(self) -> Optional[KumirValue]:
-        """
-        Получает возвращаемое значение функции и сбрасывает его в текущем фрейме.
-        Возвращает None, если значение не было установлено.
-        """
-        if not self._return_value_stack:
-            print(f"[DEBUG] ProcedureManager.get_and_clear_return_value() - стек пуст, возвращаем None", file=sys.stderr)
-            return None
-        
-        value = self._return_value_stack[-1]  # Получаем значение из верхнего фрейма, НЕ удаляя фрейм
-        self._return_value_stack[-1] = None   # Сбрасываем значение в фрейме
-        print(f"[DEBUG] ProcedureManager.get_and_clear_return_value() возвращает: {value}", file=sys.stderr)
-        return value
-
-    def has_return_value(self) -> bool:
-        """
-        Проверяет, было ли установлено возвращаемое значение функции.
-        """
-        return bool(self._return_value_stack and self._return_value_stack[-1] is not None)
-
-    def push_return_value_frame(self) -> None:
-        """
-        Добавляет новый фрейм в стек возвращаемых значений для нового вызова функции.
-        """
-        self._return_value_stack.append(None)
-        print(f"[DEBUG] ProcedureManager.push_return_value_frame() - стек теперь размером {len(self._return_value_stack)}", file=sys.stderr)
-
-    def pop_return_value_frame(self) -> Optional[KumirValue]:
-        """
-        Удаляет верхний фрейм из стека возвращаемых значений и возвращает его значение.
-        """
-        if not self._return_value_stack:
-            print(f"[DEBUG] ProcedureManager.pop_return_value_frame() - стек пуст!", file=sys.stderr)
-            return None
-        
-        value = self._return_value_stack.pop()
-        print(f"[DEBUG] ProcedureManager.pop_return_value_frame() возвращает: {value}, стек теперь размером {len(self._return_value_stack)}", file=sys.stderr)
-        return value
 
     def execute_user_function(self, func_name: str, args: List[Any], call_site_ctx: ParserRuleContext) -> Any:
         """
