@@ -27,14 +27,13 @@ class ProcedureManager:
         Используется оператором 'знач'.
         """        
         # TODO: Проверить, что мы находимся внутри вызова функции, а не процедуры.
-        # TODO: Проверить тип value_to_assign с ожидаемым типом возврата функции.
-          # Обновляем переменную __знач__ в текущей области видимости
+        # TODO: Проверить тип value_to_assign с ожидаемым типом возврата функции.        # Обновляем переменную __знач__ в текущей области видимости
         try:
             self.visitor.scope_manager.update_variable('__знач__', value_to_assign, 0, 0)
-        except Exception as e:
-            print(f"[DEBUG] Ошибка при обновлении __знач__: {e}", file=sys.stderr)
-        
-        # Также устанавливаем значение в стеке возвращаемых значений
+        except Exception:
+            # Ошибка при обновлении __знач__ (игнорируем для стабильности)
+            pass
+          # Также устанавливаем значение в стеке возвращаемых значений
         if self._return_value_stack:
             self._return_value_stack[-1] = value_to_assign  # Устанавливаем значение в верхний элемент стека
         else:
@@ -44,16 +43,16 @@ class ProcedureManager:
     def push_return_value_frame(self) -> None:
         """Создает новый фрейм для возвращаемого значения функции."""
         self._return_value_stack.append(None)
-        print(f"[DEBUG] push_return_value_frame: добавлен фрейм, размер стека = {len(self._return_value_stack)}", file=sys.stderr)
+        # print(f"[DEBUG] push_return_value_frame: добавлен фрейм, размер стека = {len(self._return_value_stack)}", file=sys.stderr)
     
     def pop_return_value_frame(self) -> Optional[KumirValue]:
         """Удаляет и возвращает верхний фрейм возвращаемого значения."""
         if self._return_value_stack:
             value = self._return_value_stack.pop()
-            print(f"[DEBUG] pop_return_value_frame: удален фрейм, размер стека = {len(self._return_value_stack)}, значение = {value}", file=sys.stderr)
+            # print(f"[DEBUG] pop_return_value_frame: удален фрейм, размер стека = {len(self._return_value_stack)}, значение = {value}", file=sys.stderr)
             return value
         else:
-            print(f"[DEBUG] pop_return_value_frame: стек пуст", file=sys.stderr)
+            # print(f"[DEBUG] pop_return_value_frame: стек пуст", file=sys.stderr)
             return None
     
     def get_and_clear_return_value(self) -> Optional[KumirValue]:
@@ -61,10 +60,10 @@ class ProcedureManager:
         if self._return_value_stack:
             value = self._return_value_stack[-1]  # Get without removing frame
             self._return_value_stack[-1] = None   # Clear value in frame
-            print(f"[DEBUG] get_and_clear_return_value: получено значение = {value}", file=sys.stderr)
+            # print(f"[DEBUG] get_and_clear_return_value: получено значение = {value}", file=sys.stderr)
             return value
         else:
-            print(f"[DEBUG] get_and_clear_return_value: стек пуст", file=sys.stderr)
+            # print(f"[DEBUG] get_and_clear_return_value: стек пуст", file=sys.stderr)
             return None
 
     def register_procedure(self, name: str, ctx: KumirParser.AlgorithmDefinitionContext, 
