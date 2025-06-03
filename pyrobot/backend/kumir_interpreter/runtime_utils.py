@@ -116,8 +116,7 @@ def interpret_kumir(code: str, input_data: Optional[str] = None) -> str:
         # После сбора определений алгоритмов, нужно найти и запустить главный алгоритм
         # В КуМире обычно есть один алгоритм без параметров, который запускается автоматически
         with open("debug_interpret.log", "a", encoding="utf-8") as debug_f:
-            debug_f.write(f"Available procedures: {list(visitor.procedure_manager.procedures.keys())}\n")
-            
+            debug_f.write(f"Available procedures: {list(visitor.procedure_manager.procedures.keys())}\n")        
         # Ищем алгоритм для запуска
         # Может быть "главный" или единственный алгоритм
         algorithm_to_run = None
@@ -127,8 +126,12 @@ def interpret_kumir(code: str, input_data: Optional[str] = None) -> str:
             if "главный" in visitor.procedure_manager.procedures:
                 algorithm_to_run = "главный"
             else:
-                # Если нет "главного", берем первый попавшийся алгоритм
-                algorithm_to_run = list(visitor.procedure_manager.procedures.keys())[0]
+                # Если нет "главного", берем первую ПРОЦЕДУРУ (не функцию)
+                for alg_name_lower, alg_data in visitor.procedure_manager.procedures.items():
+                    # Процедура - это алгоритм без возвращаемого значения (is_function=False)
+                    if not alg_data.get('is_function', False):
+                        algorithm_to_run = alg_name_lower
+                        break
         
         if algorithm_to_run:
             with open("debug_interpret.log", "a", encoding="utf-8") as debug_f:

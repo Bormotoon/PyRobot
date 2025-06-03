@@ -110,11 +110,13 @@ class ExpressionEvaluator(KumirParserVisitor):
         # Если program содержит выражения верхнего уровня для вычисления (редко),
         # то здесь может быть логика. Чаще всего этот метод не нужен в ExpressionEvaluator.
         # Для примера, если бы программа была просто одним выражением:
-        # if ctx.expression():        #     return self.visit(ctx.expression())
+        # if ctx.expression():
+        #     return self.visit(ctx.expression())
         pass # Обычно не используется в ExpressionEvaluator
-
+    
     def visitLiteral(self, ctx: KumirParser.LiteralContext) -> KumirValue:
         text = ctx.getText()
+        # Получаем текст из литерала
         
         if ctx.INTEGER():
             return KumirValue(value=int(text), kumir_type=KumirType.INT.value)
@@ -454,26 +456,37 @@ class ExpressionEvaluator(KumirParserVisitor):
             op_token = ctx.getChild(2*i - 1)  # Операторы находятся между выражениями
             right = self.visit(power_expressions[i])
             
-            if not (isinstance(result, KumirValue) and isinstance(right, KumirValue)):
-                # Для TerminalNodeImpl используем .symbol для получения токена
+            if not (isinstance(result, KumirValue) and isinstance(right, KumirValue)):                # Для TerminalNodeImpl используем .symbol для получения токена
                 pos_err = self._position_from_token(op_token.symbol if hasattr(op_token, 'symbol') else ctx.start)
                 raise KumirRuntimeError(
                     f"Внутренняя ошибка: операнды не являются KumirValue (типы: {type(result).__name__}, {type(right).__name__}).",
                     line_index=pos_err[0], 
                     column_index=pos_err[1]
-                )
-            
+                )            
             op_text = op_token.getText()
             actual_token = self._get_token_from_node(op_token)
             
             if op_text == '*':
                 # Умножение: только числа
-                if ((result.kumir_type == KumirType.INT.value or result.kumir_type == KumirType.REAL.value) and
-                    (right.kumir_type == KumirType.INT.value or right.kumir_type == KumirType.REAL.value)):
-                    if result.kumir_type == KumirType.INT.value and right.kumir_type == KumirType.INT.value:
-                        result = KumirValue(value=result.value * right.value, kumir_type=KumirType.INT.value)
+                # Нормализуем типы для сравнения
+                result_type_normalized = result.kumir_type.value if hasattr(result.kumir_type, 'value') else result.kumir_type
+                right_type_normalized = right.kumir_type.value if hasattr(right.kumir_type, 'value') else right.kumir_type
+                
+                # Извлекаем базовые Python-значения из KumirValue объектов
+                result_value = result.value
+                if isinstance(result_value, KumirValue):
+                    result_value = result_value.value
+                
+                right_value = right.value
+                if isinstance(right_value, KumirValue):
+                    right_value = right_value.value
+                
+                if ((result_type_normalized == KumirType.INT.value or result_type_normalized == KumirType.REAL.value) and
+                    (right_type_normalized == KumirType.INT.value or right_type_normalized == KumirType.REAL.value)):
+                    if result_type_normalized == KumirType.INT.value and right_type_normalized == KumirType.INT.value:
+                        result = KumirValue(value=result_value * right_value, kumir_type=KumirType.INT.value)
                     else:
-                        result = KumirValue(value=float(result.value) * float(right.value), kumir_type=KumirType.REAL.value)
+                        result = KumirValue(value=float(result_value) * float(right_value), kumir_type=KumirType.REAL.value)
                 else:
                     raise KumirTypeError(
                         f"Операция умножения не применима к типам '{result.kumir_type}' и '{right.kumir_type}'.",
@@ -625,17 +638,22 @@ class ExpressionEvaluator(KumirParserVisitor):
             else:
                 # Это процедура - возвращаем имя для обработки в postfixExpression
                 return KumirValue(var_name, KumirType.STR.value)
-        
-        # Ищем переменную в scope_manager (возвращает кортеж (var_info, scope))
+          # Ищем переменную в scope_manager (возвращает кортеж (var_info, scope))
         var_info, scope = self.scope_manager.find_variable(var_name)
         if var_info is None:
             pos = self._position_from_token(ctx.ID().symbol)
             raise KumirNameError(f"Переменная '{var_name}' не объявлена.", line_index=pos[0], column_index=pos[1])
-        
-        # var_info это словарь с ключами 'value', 'kumir_type', etc.
+          # var_info это словарь с ключами 'value', 'kumir_type', etc.
         value = var_info['value']
-        
-        return value
+        kumir_type = var_info['kumir_type']
+          # value уже должно быть KumirValue, просто возвращаем его
+        if isinstance(value, KumirValue):
+            return value
+        else:
+            # Если по какой-то причине value не KumirValue, создаем его
+            # kumir_type это KumirType enum, нужно взять .value для строкового представления
+            kumir_type_str = kumir_type.value if hasattr(kumir_type, 'value') else str(kumir_type)
+            return KumirValue(value, kumir_type_str)
 
     def visitExpression(self, ctx: KumirParser.ExpressionContext) -> KumirValue:
         """Обрабатывает Expression узел, делегируя обработку дальше по дереву"""
@@ -652,7 +670,7 @@ class ExpressionEvaluator(KumirParserVisitor):
         }
         return name in builtin_functions
     
-    def _evaluate_argument_list(self, arg_list_ctx) -> list:
+    def _evaluate_argument_list(self, arg_list_ctx) -> list[KumirValue]:
         """Вычисляет список аргументов функции"""
         args = []
         if hasattr(arg_list_ctx, 'expression') and callable(getattr(arg_list_ctx, 'expression')):
@@ -660,10 +678,12 @@ class ExpressionEvaluator(KumirParserVisitor):
             expressions = arg_list_ctx.expression()
             if isinstance(expressions, list):
                 for expr in expressions:
-                    args.append(self.visit(expr))
+                    result = self.visit(expr)
+                    args.append(result)
             else:
                 # Только один аргумент
-                args.append(self.visit(expressions))
+                result = self.visit(expressions)
+                args.append(result)
         return args
     
     def _call_function(self, func_name: str, args: list, ctx) -> KumirValue:

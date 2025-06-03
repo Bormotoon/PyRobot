@@ -286,17 +286,20 @@ class StatementHandlerMixin(KumirParserVisitor):
                             if width_value and width_value.kumir_type == KumirType.INT.value:
                                 field_width = width_value.value
                                 
-                        if len(expressions) > 2:
-                            # Третье выражение - точность (для вещественных чисел)
+                        if len(expressions) > 2:                            # Третье выражение - точность (для вещественных чисел)
                             precision_expr = expressions[2]
                             precision_value = kiv_self.expression_evaluator.visit(precision_expr)
                             if precision_value and precision_value.kumir_type == KumirType.INT.value:
-                                precision = precision_value.value
-
-                        # Преобразование значения к строке с учетом типа и форматирования
-                        if value_to_print.kumir_type == KumirType.INT.value:
+                                precision = precision_value.value                        # Преобразование значения к строке с учетом типа и форматирования
+                        # Нормализуем тип - обрабатываем и строковый и enum варианты
+                        type_value = value_to_print.kumir_type
+                        if hasattr(type_value, 'value'):
+                            # Это enum объект, берем его значение
+                            type_value = type_value.value
+                        
+                        if type_value == KumirType.INT.value or type_value == 'ЦЕЛ':
                             formatted_str = str(value_to_print.value)
-                        elif value_to_print.kumir_type == KumirType.REAL.value:
+                        elif type_value == KumirType.REAL.value or type_value == 'ВЕЩ':
                             if precision is not None:
                                 # Форматируем с заданной точностью
                                 formatted_str = f"{value_to_print.value:.{precision}f}"
@@ -305,11 +308,11 @@ class StatementHandlerMixin(KumirParserVisitor):
                                 # Если это целое число (7.0), выводим как целое (7)
                                 from ..utils import to_output_string
                                 formatted_str = to_output_string(value_to_print)
-                        elif value_to_print.kumir_type == KumirType.BOOL.value:
+                        elif type_value == KumirType.BOOL.value or type_value == 'ЛОГ':
                             formatted_str = "истина" if value_to_print.value else "ложь"
-                        elif value_to_print.kumir_type == KumirType.CHAR.value:
+                        elif type_value == KumirType.CHAR.value or type_value == 'СИМ':
                             formatted_str = value_to_print.value
-                        elif value_to_print.kumir_type == KumirType.STR.value:
+                        elif type_value == KumirType.STR.value or type_value == 'ЛИТЕР':
                             formatted_str = value_to_print.value
                         else:
                             raise KumirTypeError(
