@@ -798,8 +798,23 @@ class ProcedureManager:
         except ExitSignal as es: 
             # ExitSignal (команда "выход") должна завершать ТОЛЬКО текущий вызов процедуры/функции,
             # а НЕ всю рекурсию. Это стандартная семантика в КуМире.
-            # Просто завершаем выполнение текущего вызова
-            pass
+            # Немедленно завершаем выполнение текущего вызова
+            # Важно: НЕ продолжаем выполнение после этого блока!
+            if proc_def['is_function']:
+                # Для функции сразу возвращаем значение
+                expected_return_type = proc_def['result_type']
+                if expected_return_type and expected_return_type != VOID_TYPE:
+                    try:
+                        return_var_info, _ = self.visitor.scope_manager.find_variable('__знач__') 
+                        if return_var_info:
+                            result = return_var_info['value']
+                            return result
+                    except Exception:
+                        pass
+                return 0  # Возвращаем 0 по умолчанию для функций
+            else:
+                # Для процедуры просто завершаем
+                return
         except BreakSignal as lee: 
             pass
 

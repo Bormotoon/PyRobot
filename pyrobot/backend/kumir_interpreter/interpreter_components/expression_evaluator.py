@@ -27,6 +27,12 @@ COMPARISON_OPS = {
     KumirLexer.GE: operator.ge,
 }
 
+# Словарь логических операций
+LOGICAL_OPS = {
+    KumirLexer.AND: lambda a, b: a and b,
+    KumirLexer.OR: lambda a, b: a or b,
+}
+
 
 from typing import TYPE_CHECKING
 
@@ -257,13 +263,101 @@ class ExpressionEvaluator(KumirParserVisitor):
 
     def visitLogicalOrExpression(self, ctx: KumirParser.LogicalOrExpressionContext) -> KumirValue:
         """Обрабатывает логическое ИЛИ выражение"""
-        # Пока просто делегируем к следующему уровню
-        return self.visit(ctx.logicalAndExpression(0))  # Берем первый элемент
+        # Проверяем, есть ли логическая операция ИЛИ
+        logical_and_expressions = ctx.logicalAndExpression()
+        
+        if len(logical_and_expressions) == 1:
+            # Простой случай: нет операции, просто делегируем дальше
+            return self.visit(logical_and_expressions[0])
+        
+        # Есть операции ИЛИ: вычисляем слева направо
+        result = self.visit(logical_and_expressions[0])
+        
+        for i in range(1, len(logical_and_expressions)):
+            op_token = ctx.getChild(2*i - 1)  # Операторы находятся между выражениями
+            right = self.visit(logical_and_expressions[i])
+            
+            if not (isinstance(result, KumirValue) and isinstance(right, KumirValue)):
+                # Для TerminalNodeImpl используем .symbol для получения токена
+                pos_err = self._position_from_token(op_token.symbol if hasattr(op_token, 'symbol') else ctx.start)
+                raise KumirRuntimeError(
+                    f"Внутренняя ошибка: операнды не являются KumirValue (типы: {type(result).__name__}, {type(right).__name__}).",
+                    line_index=pos_err[0], 
+                    column_index=pos_err[1]
+                )
+
+            # Получаем тип токена для логической операции
+            if hasattr(op_token, 'symbol'):
+                op_token_type = op_token.symbol.type
+            else:
+                op_token_type = op_token.type
+            
+            # Приводим операнды к boolean
+            left_val = bool(result.value)
+            right_val = bool(right.value)
+            
+            # Используем LOGICAL_OPS
+            op_func = LOGICAL_OPS.get(op_token_type)
+            if op_func:
+                bool_result = op_func(left_val, right_val)
+                result = KumirValue(value=bool_result, kumir_type=KumirType.BOOL.value)
+            else:
+                # Этого не должно произойти, если грамматика верна
+                op_text = op_token.getText()
+                pos = self._position_from_token(op_token.symbol if hasattr(op_token, 'symbol') else ctx.start)
+                raise KumirRuntimeError(f"Неизвестный логический оператор: {op_text}", 
+                                      line_index=pos[0], column_index=pos[1])
+        
+        return result
 
     def visitLogicalAndExpression(self, ctx: KumirParser.LogicalAndExpressionContext) -> KumirValue:
         """Обрабатывает логическое И выражение"""
-        # Пока просто делегируем к следующему уровню
-        return self.visit(ctx.equalityExpression(0))  # Берем первый элемент
+        # Проверяем, есть ли логическая операция И
+        equality_expressions = ctx.equalityExpression()
+        
+        if len(equality_expressions) == 1:
+            # Простой случай: нет операции, просто делегируем дальше
+            return self.visit(equality_expressions[0])
+        
+        # Есть операции И: вычисляем слева направо
+        result = self.visit(equality_expressions[0])
+        
+        for i in range(1, len(equality_expressions)):
+            op_token = ctx.getChild(2*i - 1)  # Операторы находятся между выражениями
+            right = self.visit(equality_expressions[i])
+            
+            if not (isinstance(result, KumirValue) and isinstance(right, KumirValue)):
+                # Для TerminalNodeImpl используем .symbol для получения токена
+                pos_err = self._position_from_token(op_token.symbol if hasattr(op_token, 'symbol') else ctx.start)
+                raise KumirRuntimeError(
+                    f"Внутренняя ошибка: операнды не являются KumirValue (типы: {type(result).__name__}, {type(right).__name__}).",
+                    line_index=pos_err[0], 
+                    column_index=pos_err[1]
+                )
+
+            # Получаем тип токена для логической операции
+            if hasattr(op_token, 'symbol'):
+                op_token_type = op_token.symbol.type
+            else:
+                op_token_type = op_token.type
+            
+            # Приводим операнды к boolean
+            left_val = bool(result.value)
+            right_val = bool(right.value)
+            
+            # Используем LOGICAL_OPS
+            op_func = LOGICAL_OPS.get(op_token_type)
+            if op_func:
+                bool_result = op_func(left_val, right_val)
+                result = KumirValue(value=bool_result, kumir_type=KumirType.BOOL.value)
+            else:
+                # Этого не должно произойти, если грамматика верна
+                op_text = op_token.getText()
+                pos = self._position_from_token(op_token.symbol if hasattr(op_token, 'symbol') else ctx.start)
+                raise KumirRuntimeError(f"Неизвестный логический оператор: {op_text}", 
+                                      line_index=pos[0], column_index=pos[1])
+        
+        return result
 
     def visitEqualityExpression(self, ctx: KumirParser.EqualityExpressionContext) -> KumirValue:
         """Обрабатывает выражения равенства"""

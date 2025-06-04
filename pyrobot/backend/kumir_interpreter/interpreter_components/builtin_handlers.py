@@ -114,11 +114,21 @@ BUILTIN_FUNCTIONS = {
     # --- Функции для работы с символами (конец) ---
 
     # --- Функции для работы со строками (начало) ---
-    # \'длина\': {
-    #     \'min_args\': 1, \'max_args\': 1,
-    #     \'arg_types\': [[\'лит\']],
-    #     \'handler\': lambda visitor_self, args, ctx: bf.handle_length(visitor_self, args[0], ctx)
-    # },
+    'длин': {
+        'min_args': 1, 'max_args': 1,
+        'arg_types': [['лит']],
+        'handler': lambda visitor_self, args, ctx: bf.handle_length(visitor_self, args[0], ctx)
+    },
+    'лит_в_цел': {
+        'min_args': 1, 'max_args': 1,
+        'arg_types': [['лит']],
+        'handler': lambda visitor_self, args, ctx: bf.handle_lit_to_int(visitor_self, args[0], ctx)
+    },
+    'найти': {
+        'min_args': 2, 'max_args': 2,
+        'arg_types': [['лит', 'лит']],
+        'handler': lambda visitor_self, args, ctx: bf.handle_position(visitor_self, args[0], args[1], ctx)
+    },
     # \'копировать\': {
     #     \'min_args\': 3, \'max_args\': 3,
     #     \'arg_types\': [[\'лит\', \'цел\', \'цел\']],

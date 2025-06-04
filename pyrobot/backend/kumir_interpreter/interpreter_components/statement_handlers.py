@@ -3,12 +3,12 @@ from typing import TYPE_CHECKING, cast, Optional, List, Dict
 from pyrobot.backend.kumir_interpreter.kumir_exceptions import (
     KumirRuntimeError, KumirSyntaxError, DeclarationError, KumirNameError,
     KumirTypeError, KumirArgumentError, BreakSignal, ContinueSignal, StopExecutionSignal, ExitSignal,
-    KumirNotImplementedError
+    KumirNotImplementedError, KumirEvalError
 )
 from ..generated.KumirParser import KumirParser
 from ..generated.KumirParserVisitor import KumirParserVisitor
 from ..generated.KumirLexer import KumirLexer
-from ..kumir_datatypes import KumirType, KumirValue
+from ..kumir_datatypes import KumirType, KumirValue, KumirTableVar
 from ..utils import KumirTypeConverter
 
 if TYPE_CHECKING:
@@ -302,7 +302,7 @@ class StatementHandlerMixin(KumirParserVisitor):
                                 precision = precision_value.value                        # Преобразование значения к строке с учетом типа и форматирования
                         # Нормализуем тип - обрабатываем и строковый и enum варианты
                         type_value = value_to_print.kumir_type
-                        if hasattr(type_value, 'value'):
+                        if hasattr(type_value, 'value') and not isinstance(type_value, str):
                             # Это enum объект, берем его значение
                             type_value = type_value.value
                         
@@ -364,14 +364,22 @@ class StatementHandlerMixin(KumirParserVisitor):
                         expr_ctx = expressions[0]
                         
                         # Try to extract variable info from the expression
-                        # For now, handle simple cases - ID and postfix with array access
-                        if hasattr(expr_ctx, 'getText'):
+                        # Check if this is an array element access (e.g., A[i])
+                        postfix_expr = self._extract_postfix_expression(expr_ctx)
+                        if postfix_expr and self._has_array_access(postfix_expr):
+                            # This is array element access
+                            primary_expr = postfix_expr.primaryExpression()
+                            if primary_expr and primary_expr.qualifiedIdentifier():
+                                target_var_name = primary_expr.qualifiedIdentifier().getText()
+                                is_array_element = True
+                            else:
+                                target_var_name = expr_ctx.getText()
+                        else:
+                            # Simple variable
                             target_var_name = expr_ctx.getText()
-                            # Extract just the variable name if it has array notation
+                            # Clean up potential array notation for error messages
                             if '[' in target_var_name and ']' in target_var_name:
                                 target_var_name = target_var_name.split('[')[0]
-                                is_array_element = True
-                            # Otherwise it's a simple variable, keep is_array_element = False
 
                     try:
                         var_info = kiv_self.scope_manager.get_variable_info(target_var_name)
@@ -387,13 +395,110 @@ class StatementHandlerMixin(KumirParserVisitor):
 
                     try:
                         if is_array_element:
-                            # For array elements, we'll use the expression evaluator to handle the assignment
-                            # This is a simplified approach for now
-                            raise KumirNotImplementedError(
-                                "Ввод в элементы массива пока не поддерживается полностью.",
+                            # Ввод в элемент массива
+                            # Извлекаем postfixExpression из аргумента для получения структуры массива
+                            postfix_expr = self._extract_postfix_expression(arg_ctx)
+                            if not postfix_expr:
+                                raise KumirSyntaxError(
+                                    f"Неверная структура выражения для ввода в массив: {arg_ctx.getText()}",
+                                    line_index=arg_ctx.start.line -1,
+                                    column_index=arg_ctx.start.column
+                                )
+                            
+                            # Извлекаем имя переменной из primaryExpression
+                            primary_expr = postfix_expr.primaryExpression()
+                            if not primary_expr or not primary_expr.qualifiedIdentifier():
+                                raise KumirSyntaxError(
+                                    f"Невозможно определить имя переменной массива: {arg_ctx.getText()}",
+                                    line_index=arg_ctx.start.line -1,
+                                    column_index=arg_ctx.start.column
+                                )
+                            
+                            # Получаем имя переменной массива
+                            var_name = primary_expr.qualifiedIdentifier().getText()
+                            
+                            # Ищем indexList в postfixExpression
+                            index_list_ctx = None
+                            for i in range(1, postfix_expr.getChildCount()):
+                                child = postfix_expr.getChild(i)
+                                if hasattr(child, 'getRuleIndex') and child.getRuleIndex() == KumirParser.RULE_indexList:
+                                    index_list_ctx = child
+                                    break
+                            
+                            if not index_list_ctx:
+                                raise KumirSyntaxError(
+                                    f"Не найден список индексов для массива: {arg_ctx.getText()}",
+                                    line_index=arg_ctx.start.line -1,
+                                    column_index=arg_ctx.start.column
+                                )
+                            
+                            # Вычисляем индексы
+                            indices = []
+                            for expr_ctx in index_list_ctx.expression():
+                                idx_result = kiv_self.expression_evaluator.visit(expr_ctx)
+                                if not isinstance(idx_result, KumirValue) or idx_result.kumir_type != KumirType.INT.value:
+                                    raise KumirTypeError(
+                                        f"Индекс массива должен быть целым числом, получено: {idx_result}",
+                                        line_index=expr_ctx.start.line -1,
+                                        column_index=expr_ctx.start.column
+                                    )
+                                indices.append(idx_result.value)
+                            
+                            # Получаем информацию о массиве для определения типа элементов
+                            var_info, _ = kiv_self.scope_manager.find_variable(var_name)
+                            if not var_info:
+                                raise KumirNameError(
+                                    f"Переменная '{var_name}' не объявлена",
+                                    line_index=arg_ctx.start.line -1,
+                                    column_index=arg_ctx.start.column
+                                )
+                            
+                            if not var_info['is_table']:
+                                raise KumirTypeError(
+                                    f"Переменная '{var_name}' не является массивом",
+                                    line_index=arg_ctx.start.line -1,
+                                    column_index=arg_ctx.start.column
+                                )
+                            
+                            # Получаем тип элементов массива
+                            table_var = var_info['value']
+                            if not isinstance(table_var, KumirTableVar):
+                                raise KumirEvalError(
+                                    f"Внутренняя ошибка: переменная '{var_name}' помечена как массив, но не является KumirTableVar",
+                                    line_index=arg_ctx.start.line -1,
+                                    column_index=arg_ctx.start.column
+                                )
+                            
+                            # Определяем тип элементов и конвертируем введенную строку
+                            element_type_str = table_var.element_kumir_type
+                            if element_type_str == KumirType.INT.value:
+                                converted_value = KumirValue(int(input_str), KumirType.INT.value)
+                            elif element_type_str == KumirType.REAL.value:
+                                converted_value = KumirValue(float(input_str.replace(',', '.')), KumirType.REAL.value)
+                            elif element_type_str == KumirType.BOOL.value:
+                                if input_str.lower() in ["истина", "true", "1"]:
+                                    converted_value = KumirValue(True, KumirType.BOOL.value)
+                                elif input_str.lower() in ["ложь", "false", "0"]:
+                                    converted_value = KumirValue(False, KumirType.BOOL.value)
+                                else:
+                                    raise ValueError("Для лог типа ожидалось 'истина' или 'ложь'.")
+                            elif element_type_str == KumirType.CHAR.value:
+                                if len(input_str) == 1:
+                                    converted_value = KumirValue(input_str, KumirType.CHAR.value)
+                                else:
+                                    raise ValueError("Для лит типа ожидался один символ.")
+                            elif element_type_str == KumirType.STR.value:
+                                converted_value = KumirValue(input_str, KumirType.STR.value)
+                            else:
+                                raise KumirTypeError(f"Ввод для элементов массива типа {element_type_str} не поддерживается.")
+                            
+                            # Обновляем элемент массива
+                            kiv_self.scope_manager.update_table_element(
+                                var_name, indices, converted_value,
                                 line_index=arg_ctx.start.line -1,
                                 column_index=arg_ctx.start.column
                             )
+                            
                         else: # Ввод в простую переменную
                             if target_type == KumirType.INT:
                                 converted_value = KumirValue(int(input_str), KumirType.INT.value)
@@ -983,6 +1088,25 @@ class StatementHandlerMixin(KumirParserVisitor):
             return None
         except:
             return None
+
+    def _has_array_access(self, postfix_expr):
+        """Проверяет, содержит ли postfixExpression доступ к массиву (LBRACK ... RBRACK)"""
+        if not postfix_expr:
+            return False
+        
+        # Проверяем, есть ли дочерние элементы после primaryExpression
+        if postfix_expr.getChildCount() <= 1:
+            return False
+        
+        # Ищем LBRACK среди дочерних элементов
+        for i in range(1, postfix_expr.getChildCount()):
+            child = postfix_expr.getChild(i)
+            if hasattr(child, 'symbol') and hasattr(child.symbol, 'type'):
+                from pyrobot.backend.kumir_interpreter.generated.KumirLexer import KumirLexer
+                if child.symbol.type == KumirLexer.LBRACK:
+                    return True
+        
+        return False
 
 class StatementHandler(StatementHandlerMixin):
     def __init__(self, scope_manager, expression_evaluator, procedure_manager):
