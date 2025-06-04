@@ -589,7 +589,115 @@ class ExpressionEvaluator(KumirParserVisitor):
                     pos = self._position_from_token(self._get_token_for_position(ctx))
                     raise KumirEvalError(f"Невозможно вызвать функцию: {primary_expr}", line_index=pos[0], column_index=pos[1])
             
-            # TODO: Обработка массивов (LBRACK ... RBRACK)        
+            # Обработка массивов (LBRACK ... RBRACK)
+            if hasattr(child, 'symbol') and child.symbol.type == KumirParser.LBRACK:
+                # Это доступ к массиву - ищем indexList и RBRACK
+                if i + 2 >= ctx.getChildCount():
+                    pos = self._position_from_token(child.symbol)
+                    raise KumirSyntaxError("Некорректная структура доступа к элементу таблицы после '['.", line_index=pos[0], column_index=pos[1])
+                
+                index_list_ctx = ctx.getChild(i + 1)
+                rbrack_child = ctx.getChild(i + 2)
+                
+                if not (hasattr(index_list_ctx, 'getRuleIndex') and 
+                        index_list_ctx.getRuleIndex() == KumirParser.RULE_indexList):
+                    pos = self._position_from_token(child.symbol)
+                    raise KumirSyntaxError("Ожидается список индексов после '['.", line_index=pos[0], column_index=pos[1])
+                
+                if not (hasattr(rbrack_child, 'symbol') and 
+                        rbrack_child.symbol.type == KumirParser.RBRACK):
+                    pos = self._position_from_token(child.symbol)
+                    raise KumirSyntaxError("Ожидается ']' после списка индексов.", line_index=pos[0], column_index=pos[1])
+                
+                # Вычисляем индексы
+                indices = []
+                for expr_ctx in index_list_ctx.expression():
+                    idx_val = self.visit(expr_ctx)
+                    if not isinstance(idx_val, KumirValue) or idx_val.kumir_type != KumirType.INT.value:
+                        pos = self._position_from_token(self._get_token_for_position(expr_ctx))
+                        var_name = primary_expr.value if hasattr(primary_expr, 'value') and isinstance(primary_expr.value, str) else "переменная"
+                        raise KumirEvalError(
+                            f"Индекс для '{var_name}' должен быть целым числом, получено: {idx_val.value if isinstance(idx_val, KumirValue) else idx_val}",
+                            line_index=pos[0], column_index=pos[1]
+                        )
+                    indices.append(idx_val.value)
+                
+                # Обрабатываем доступ к элементам массива или строки
+                if isinstance(primary_expr, KumirValue):
+                    if primary_expr.kumir_type == KumirType.STR.value:
+                        # Доступ к символам строки
+                        string_value = primary_expr.value
+                        if len(indices) == 1:
+                            # Доступ к одному символу
+                            kumir_idx = indices[0]
+                            if kumir_idx < 1 or kumir_idx > len(string_value):
+                                pos = self._position_from_token(self._get_token_for_position(index_list_ctx))
+                                raise KumirIndexError(
+                                    f"Индекс символа {kumir_idx} вне допустимого диапазона [1..{len(string_value)}]",
+                                    line_index=pos[0], column_index=pos[1]
+                                )
+                            py_idx = kumir_idx - 1  # КуМир 1-based -> Python 0-based
+                            char_value = string_value[py_idx]
+                            return KumirValue(value=char_value, kumir_type=KumirType.CHAR.value)
+                        elif len(indices) == 2:
+                            # Срез строки
+                            k_idx1, k_idx2 = indices[0], indices[1]
+                            if k_idx1 < 1 or k_idx2 < k_idx1:
+                                pos = self._position_from_token(self._get_token_for_position(index_list_ctx))
+                                raise KumirIndexError(
+                                    f"Неверные границы среза. Начальный индекс ({k_idx1}) должен быть >= 1, конечный ({k_idx2}) >= начального",
+                                    line_index=pos[0], column_index=pos[1]
+                                )
+                            
+                            py_start = k_idx1 - 1
+                            py_end = min(k_idx2, len(string_value))
+                            if py_start >= len(string_value):
+                                slice_value = ""
+                            else:
+                                slice_value = string_value[py_start:py_end]
+                            return KumirValue(value=slice_value, kumir_type=KumirType.STRING.value)
+                        else:
+                            pos = self._position_from_token(self._get_token_for_position(index_list_ctx))
+                            raise KumirIndexError(
+                                f"Для строки ожидается 1 индекс (символ) или 2 индекса (срез). Получено {len(indices)}",
+                                line_index=pos[0], column_index=pos[1]
+                            )
+                    
+                    elif hasattr(primary_expr, 'value') and hasattr(primary_expr.value, 'get_value'):
+                        # Это объект массива (KumirTableVar)
+                        table_var = primary_expr.value
+                        try:
+                            element_value = table_var.get_value(tuple(indices), index_list_ctx)
+                            return element_value
+                        except Exception as e:
+                            pos = self._position_from_token(self._get_token_for_position(index_list_ctx))
+                            raise KumirEvalError(
+                                f"Ошибка при доступе к элементу массива: {e}",
+                                line_index=pos[0], column_index=pos[1]
+                            )
+                    else:
+                        # primary_expr возвращает KumirTableVar напрямую
+                        if hasattr(primary_expr.value, 'get_value'):
+                            table_var = primary_expr.value
+                            try:
+                                element_value = table_var.get_value(tuple(indices), index_list_ctx)
+                                return element_value
+                            except Exception as e:
+                                pos = self._position_from_token(self._get_token_for_position(index_list_ctx))
+                                raise KumirEvalError(
+                                    f"Ошибка при доступе к элементу массива: {e}",
+                                    line_index=pos[0], column_index=pos[1]
+                                )
+                else:
+                    pos = self._position_from_token(self._get_token_for_position(ctx))
+                    raise KumirEvalError(
+                        f"Невозможно применить индексы к выражению типа {type(primary_expr)}",
+                        line_index=pos[0], column_index=pos[1]
+                    )
+                
+                # Пропускаем обработанные токены (LBRACK, indexList, RBRACK)
+                i += 2
+        
         return primary_expr
     
     # Метод для обработки первичных выражений
@@ -651,7 +759,13 @@ class ExpressionEvaluator(KumirParserVisitor):
           # var_info это словарь с ключами 'value', 'kumir_type', etc.
         value = var_info['value']
         kumir_type = var_info['kumir_type']
-          # value уже должно быть KumirValue, просто возвращаем его
+        
+        # Для массивов (таблиц) возвращаем специальный KumirValue, содержащий KumirTableVar
+        if hasattr(value, 'get_value') and hasattr(value, 'set_value'):  # Это KumirTableVar
+            # Создаем KumirValue, который содержит ссылку на объект массива
+            return KumirValue(value=value, kumir_type=kumir_type.value if hasattr(kumir_type, 'value') else str(kumir_type))
+        
+        # value уже должно быть KumirValue, просто возвращаем его
         if isinstance(value, KumirValue):
             return value
         else:
