@@ -793,8 +793,7 @@ class ExpressionEvaluator(KumirParserVisitor):
                 i += 2
         
         return primary_expr
-    
-    # Метод для обработки первичных выражений
+      # Метод для обработки первичных выражений
     def visitPrimaryExpression(self, ctx: KumirParser.PrimaryExpressionContext) -> KumirValue:
         # PrimaryExpression может быть literal, identifier, parenthesizedExpr и т.д.
         if ctx.literal():
@@ -817,9 +816,8 @@ class ExpressionEvaluator(KumirParserVisitor):
             # Выражение в скобках
             return self.visit(ctx.expression())
         elif ctx.arrayLiteral():
-            # TODO: Обработка литералов массивов
-            pos = self._position_from_token(self._get_token_for_position(ctx))
-            raise KumirNotImplementedError("Литералы массивов пока не поддерживаются.", line_index=pos[0], column_index=pos[1])
+            # Обработка литералов массивов
+            return self.visitArrayLiteral(ctx.arrayLiteral())
         else:
             pos = self._position_from_token(self._get_token_for_position(ctx))
             raise KumirNotImplementedError(f"Неизвестный тип первичного выражения: {ctx.getText()}", line_index=pos[0], column_index=pos[1])

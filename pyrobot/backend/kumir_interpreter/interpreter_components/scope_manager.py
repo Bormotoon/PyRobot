@@ -242,13 +242,11 @@ class ScopeManager:
                     f"Несовместимые размерности таблиц при присваивании \'{var_info['name_original']}\'.",
                     line_index=line_index, column_index=column_index, line_content=l_content
                 )
-            
-            raise NotImplementedError(
-                f"Присваивание целых таблиц (A := B) пока не реализовано с глубоким копированием. "
-                f"Операция для '{var_info['name_original']}' не выполнена."
-            )
-            # scope[var_name_lower]['value'] = table_to_assign.clone(...) # Если бы был clone
-            # scope[var_name_lower]['initialized'] = True
+              # Проводим присваивание таблицы
+            # Заменяем содержимое текущей таблицы содержимым новой таблицы
+            current_table.data.clear()  # Очищаем старые данные
+            current_table.data.update(table_to_assign.data)  # Копируем новые данные
+            scope[var_name_lower]['initialized'] = True
         else:
             # Простая переменная
             target_kumir_type: KumirType = var_info['kumir_type'] # Это KumirType enum

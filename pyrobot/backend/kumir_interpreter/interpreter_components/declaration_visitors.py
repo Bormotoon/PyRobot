@@ -5,12 +5,45 @@ from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Union, cast
 from ..generated.KumirParser import KumirParser
 from ..kumir_exceptions import (KumirEvalError, KumirNotImplementedError,
                                 DeclarationError, AssignmentError)
-from ..kumir_datatypes import KumirType
+from ..kumir_datatypes import KumirType, KumirValue, KumirTableVar
 from ..definitions import Parameter, AlgorithmDefinition  # Импорт наших новых классов
 from .type_utils import get_type_info_from_specifier
 
 if TYPE_CHECKING:
     from .main_visitor import KumirInterpreterVisitor
+
+
+def _create_table_from_array_literal(array_elements, element_type, dimension_bounds_list, ctx):
+    """Создаёт KumirTableVar из литерала массива"""
+    # Проверяем, что размеры совпадают
+    if len(dimension_bounds_list) != 1:
+        raise KumirEvalError(
+            f"Инициализация многомерных массивов пока не поддерживается.",
+            line_index=ctx.start.line - 1,
+            column_index=ctx.start.column
+        )
+    
+    min_idx, max_idx = dimension_bounds_list[0]
+    expected_size = max_idx - min_idx + 1
+    
+    if len(array_elements) != expected_size:
+        raise KumirEvalError(
+            f"Количество элементов в литерале массива ({len(array_elements)}) не соответствует объявленному размеру [{min_idx}:{max_idx}] ({expected_size}).",
+            line_index=ctx.start.line - 1,
+            column_index=ctx.start.column
+        )
+    
+    # Нормализуем тип элемента к верхнему регистру
+    normalized_element_type = element_type.upper()
+    
+    # Создаём KumirTableVar
+    table_var = KumirTableVar(normalized_element_type, dimension_bounds_list, ctx)
+      # Заполняем данными через set_value для правильной обработки типов
+    for i, element in enumerate(array_elements):
+        index = min_idx + i
+        table_var.set_value((index,), element, ctx)
+    
+    return table_var
 
 
 class DeclarationVisitorMixin:
@@ -154,13 +187,61 @@ class DeclarationVisitorMixin:
                     if not hasattr(e, 'line_content') or e.line_content is None:
                         e.line_content = kiv_self.get_line_content_from_ctx(var_decl_item_ctx)
                     raise
-
+                
                 if var_decl_item_ctx.expression():
-                    raise KumirNotImplementedError(
-                        f"Строка {var_decl_item_ctx.expression().start.line}: Инициализация таблиц при объявлении ('{var_name} = ...') пока не поддерживается.",
-                        line_index=var_decl_item_ctx.expression().start.line -1, 
-                        column_index=var_decl_item_ctx.expression().start.column,
-                        line_content=kiv_self.get_line_content_from_ctx(var_decl_item_ctx.expression()))
+                    # Инициализация таблицы литералом массива
+                    try:
+                        value_to_assign = kiv_self.expression_evaluator.visitExpression(var_decl_item_ctx.expression())
+                        print(f"[DEBUG][ARRAY_INIT] Получено значение для инициализации: {value_to_assign}, тип: {value_to_assign.kumir_type}, value: {value_to_assign.value}", file=sys.stderr)
+                        
+                        # Для таблиц нужно создать KumirTableVar из литерала массива
+                        if value_to_assign.kumir_type == KumirType.TABLE.value and isinstance(value_to_assign.value, list):
+                            print(f"[DEBUG][ARRAY_INIT] Создаем KumirTableVar из литерала массива", file=sys.stderr)
+                            # Создаём KumirTableVar из литерала массива
+                            table_var = _create_table_from_array_literal(
+                                value_to_assign.value, 
+                                base_kumir_type, 
+                                dimension_bounds_list,
+                                var_decl_item_ctx.expression()
+                            )
+                            validated_value = KumirValue(table_var, KumirType.TABLE.value)
+                            print(f"[DEBUG][ARRAY_INIT] Создан KumirTableVar: {validated_value}", file=sys.stderr)
+                        else:
+                            print(f"[DEBUG][ARRAY_INIT] Используем валидацию, тип: {value_to_assign.kumir_type}, значение: {type(value_to_assign.value)}", file=sys.stderr)
+                            # Используем метод для валидации таблиц
+                            validated_value = kiv_self._validate_and_convert_value_for_assignment(
+                                value_to_assign, base_kumir_type, var_name, is_target_table=True
+                            )
+                        
+                        kiv_self.scope_manager.update_variable(
+                            var_name, 
+                            validated_value, 
+                            line_index=var_decl_item_ctx.expression().start.line - 1, 
+                            column_index=var_decl_item_ctx.expression().start.column
+                        )
+                        print(
+                            f"[DEBUG][VisitVarDecl_Mixin] Таблице '{var_name}' присвоено значение при инициализации: {validated_value}",
+                            file=sys.stderr
+                        )
+                    except (AssignmentError, DeclarationError, KumirEvalError) as e:
+                        line = var_decl_item_ctx.expression().start.line
+                        column = var_decl_item_ctx.expression().start.column
+                        if isinstance(e, KumirEvalError):
+                            raise KumirEvalError(
+                                f"Строка {line}, столбец {column}: Ошибка при инициализации таблицы '{var_name}': {e.args[0]}",
+                                line_index=line-1, 
+                                column_index=column, 
+                                line_content=kiv_self.get_line_content_from_ctx(var_decl_item_ctx.expression())
+                            ) from e
+                        elif isinstance(e, (AssignmentError, DeclarationError)):
+                            raise KumirEvalError(
+                                f"Строка {line}, столбец {column}: Ошибка при инициализации таблицы '{var_name}': {e.args[0]}",
+                                line_index=line-1, 
+                                column_index=column, 
+                                line_content=kiv_self.get_line_content_from_ctx(var_decl_item_ctx.expression())
+                            ) from e
+                        else:
+                            raise
 
             else:  # Обычная (скалярная) переменная
                 if var_decl_item_ctx.LBRACK():

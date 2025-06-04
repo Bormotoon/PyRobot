@@ -10,7 +10,7 @@ from ..generated.KumirLexer import KumirLexer
 from ..generated.KumirParser import KumirParser
 from ..generated.KumirParserVisitor import KumirParserVisitor # Базовый визитор ANTLR
 from .. import kumir_exceptions # <--- Добавляем импорт модуля исключений
-from ..kumir_exceptions import KumirSemanticError, KumirRuntimeError, KumirSyntaxError, ExitSignal, BreakSignal, StopExecutionSignal, KumirNameError, KumirTypeError # Изменения: ProcedureExitCalled -> ExitSignal, LoopExitException -> BreakSignal
+from ..kumir_exceptions import KumirSemanticError, KumirRuntimeError, KumirSyntaxError, ExitSignal, BreakSignal, StopExecutionSignal, KumirNameError, KumirTypeError, DeclarationError # Изменения: ProcedureExitCalled -> ExitSignal, LoopExitException -> BreakSignal
 from ..kumir_datatypes import KumirTableVar, KumirReturnValue, KumirValue, KumirType 
 from ..definitions import AlgorithmManager, AlgorithmDefinition, Parameter, FunctionCallFrame, FunctionReturnException  # Импорт наших новых классов
 from ..utils import KumirTypeConverter  # Импорт type converter
@@ -533,10 +533,51 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementHandlerMixin, St
             var_name = var_item_ctx.ID().getText()
             dimensions = None
             initial_value_ctx = None
-
+            
             if var_item_ctx.LBRACK(): 
-                print(f"Предупреждение: Парсинг границ для глобальных таблиц ('{var_name}') пока не полностью реализован в visitGlobalDeclaration и будет пропущен.\n", file=sys.stderr)
-                pass 
+                print(f"[DEBUG] Обрабатываем границы для глобальной таблицы '{var_name}'", file=sys.stderr)
+                # Парсим границы массива
+                dimensions = []
+                array_bounds_nodes = var_item_ctx.arrayBounds()
+                if array_bounds_nodes:
+                    for i, bounds_ctx in enumerate(array_bounds_nodes):
+                        print(f"[DEBUG] Обработка границ измерения {i + 1} для '{var_name}': {bounds_ctx.getText()}", file=sys.stderr)
+                        
+                        if not (bounds_ctx.expression(0) and bounds_ctx.expression(1) and bounds_ctx.COLON()):
+                            raise DeclarationError(
+                                f"Строка {bounds_ctx.start.line}: Некорректный формат границ для измерения {i + 1} таблицы '{var_name}'. Ожидается [нижняя:верхняя].",
+                                line_index=bounds_ctx.start.line -1, 
+                                column_index=bounds_ctx.start.column,
+                                line_content=self.get_line_content_from_ctx(bounds_ctx))
+
+                        min_idx_val = self.expression_evaluator.visitExpression(bounds_ctx.expression(0))
+                        max_idx_val = self.expression_evaluator.visitExpression(bounds_ctx.expression(1))
+                        
+                        # Извлекаем значения из KumirValue
+                        min_idx = min_idx_val.value if hasattr(min_idx_val, 'value') else min_idx_val
+                        max_idx = max_idx_val.value if hasattr(max_idx_val, 'value') else max_idx_val
+
+                        if not isinstance(min_idx, int):
+                            raise KumirEvalError(
+                                f"Строка {bounds_ctx.expression(0).start.line}: Нижняя граница измерения {i + 1} для таблицы '{var_name}' должна быть целым числом, получено: {min_idx} (тип: {type(min_idx).__name__}).",
+                                line_index=bounds_ctx.expression(0).start.line -1, 
+                                column_index=bounds_ctx.expression(0).start.column,
+                                line_content=self.get_line_content_from_ctx(bounds_ctx.expression(0)))
+                        if not isinstance(max_idx, int):
+                            raise KumirEvalError(
+                                f"Строка {bounds_ctx.expression(1).start.line}: Верхняя граница измерения {i + 1} для таблицы '{var_name}' должна быть целым числом, получено: {max_idx} (тип: {type(max_idx).__name__}).",
+                                line_index=bounds_ctx.expression(1).start.line -1, 
+                                column_index=bounds_ctx.expression(1).start.column,
+                                line_content=self.get_line_content_from_ctx(bounds_ctx.expression(1)))
+
+                        dimensions.append((min_idx, max_idx))
+                    print(f"[DEBUG] Определены границы для '{var_name}': {dimensions}", file=sys.stderr)
+                else:
+                    raise DeclarationError(
+                        f"Строка {var_item_ctx.LBRACK().getSymbol().line}: Отсутствуют определения границ для таблицы '{var_name}'.",
+                        line_index=var_item_ctx.LBRACK().getSymbol().line -1, 
+                        column_index=var_item_ctx.LBRACK().getSymbol().column,
+                        line_content=self.get_line_content_from_ctx(var_item_ctx))
 
             if var_item_ctx.EQ(): 
                 initial_value_ctx = var_item_ctx.expression()
@@ -562,15 +603,42 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementHandlerMixin, St
                     line_index=var_item_ctx.ID().getSymbol().line - 1,
                     column_index=var_item_ctx.ID().getSymbol().column
                 )
-
+            
             if initial_value_ctx:
                 value_to_assign = self.visit(initial_value_ctx)
-                validated_value = cast(KumirInterpreterVisitor, self)._validate_and_convert_value_for_assignment(
-                    value_to_assign, 
-                    base_kumir_type, 
-                    var_name,
-                    is_table_type
-                )
+                print(f"[DEBUG][GLOBAL_ARRAY_INIT] Получено значение для инициализации '{var_name}': {value_to_assign}, тип: {value_to_assign.kumir_type}", file=sys.stderr)
+                
+                if is_table_type:
+                    # Для таблиц нужно создать KumirTableVar из литерала массива
+                    if value_to_assign.kumir_type == KumirType.TABLE.value and isinstance(value_to_assign.value, list):
+                        print(f"[DEBUG][GLOBAL_ARRAY_INIT] Создаем KumirTableVar из литерала массива для '{var_name}'", file=sys.stderr)
+                        # Импортируем функцию создания таблицы из литерала
+                        from .declaration_visitors import _create_table_from_array_literal
+                        
+                        # Создаём KumirTableVar из литерала массива
+                        table_var = _create_table_from_array_literal(
+                            value_to_assign.value, 
+                            base_kumir_type, 
+                            dimensions,
+                            initial_value_ctx
+                        )
+                        validated_value = KumirValue(table_var, KumirType.TABLE.value)
+                        print(f"[DEBUG][GLOBAL_ARRAY_INIT] Создан KumirTableVar для '{var_name}': {validated_value}", file=sys.stderr)
+                    else:
+                        validated_value = cast(KumirInterpreterVisitor, self)._validate_and_convert_value_for_assignment(
+                            value_to_assign, 
+                            base_kumir_type, 
+                            var_name,
+                            is_table_type
+                        )
+                else:
+                    validated_value = cast(KumirInterpreterVisitor, self)._validate_and_convert_value_for_assignment(
+                        value_to_assign, 
+                        base_kumir_type, 
+                        var_name,
+                        is_table_type
+                    )
+                
                 self.scope_manager.update_variable(
                     var_name, 
                     validated_value, 
