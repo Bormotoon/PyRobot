@@ -19,14 +19,16 @@ class IOHandler:
             self.output_stream(prompt)
         
         if self.input_stream:
-            return self.input_stream()
+            input_value = self.input_stream()
+            return input_value
         else:
             # Если input_stream не предоставлен, можно либо вызвать исключение,
             # либо вернуть какое-то значение по умолчанию, либо запросить ввод через stdin.
             # Для тестов и CLI это может быть input().
             # print(f"[IOHandler DEBUG] input_stream is None, falling back to input(). Prompt: {prompt}", file=__import__('sys').stderr)
             try:
-                return input(prompt if not self.output_stream else "") # Если prompt уже вывели, не дублируем
+                input_value = input(prompt if not self.output_stream else "") # Если prompt уже вывели, не дублируем
+                return input_value
             except EOFError:
                 # print("[IOHandler DEBUG] EOFError during input()", file=__import__('sys').stderr)
                 # В случае EOF (например, если ввод перенаправлен из пустого файла)

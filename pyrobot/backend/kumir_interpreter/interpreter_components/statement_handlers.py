@@ -366,7 +366,13 @@ class StatementHandlerMixin(KumirParserVisitor):
                         # Try to extract variable info from the expression
                         # Check if this is an array element access (e.g., A[i])
                         postfix_expr = self._extract_postfix_expression(expr_ctx)
-                        if postfix_expr and self._has_array_access(postfix_expr):
+                        
+                        # Debug: проверим что у нас есть
+                        if '[' in expr_ctx.getText() and ']' in expr_ctx.getText():
+                            # Если в тексте есть скобки массива, это должно быть обращение к массиву
+                            is_array_element = True
+                            target_var_name = expr_ctx.getText().split('[')[0]
+                        elif postfix_expr and self._has_array_access(postfix_expr):
                             # This is array element access
                             primary_expr = postfix_expr.primaryExpression()
                             if primary_expr and primary_expr.qualifiedIdentifier():
@@ -396,8 +402,10 @@ class StatementHandlerMixin(KumirParserVisitor):
                     try:
                         if is_array_element:
                             # Ввод в элемент массива
-                            # Извлекаем postfixExpression из аргумента для получения структуры массива
-                            postfix_expr = self._extract_postfix_expression(arg_ctx)
+                            # Используем уже извлеченное выражение из expr_ctx, а не arg_ctx
+                            if not postfix_expr:
+                                postfix_expr = self._extract_postfix_expression(expr_ctx)
+                            
                             if not postfix_expr:
                                 raise KumirSyntaxError(
                                     f"Неверная структура выражения для ввода в массив: {arg_ctx.getText()}",
@@ -498,6 +506,9 @@ class StatementHandlerMixin(KumirParserVisitor):
                                 line_index=arg_ctx.start.line -1,
                                 column_index=arg_ctx.start.column
                             )
+                            
+                            # В КуМире для ввода в массив введенное значение отображается в выводе
+                            kiv_self.io_handler.write_output(input_str)
                             
                         else: # Ввод в простую переменную
                             if target_type == KumirType.INT:
@@ -1101,9 +1112,35 @@ class StatementHandlerMixin(KumirParserVisitor):
         # Ищем LBRACK среди дочерних элементов
         for i in range(1, postfix_expr.getChildCount()):
             child = postfix_expr.getChild(i)
+            # Проверяем на terminal node
             if hasattr(child, 'symbol') and hasattr(child.symbol, 'type'):
                 from pyrobot.backend.kumir_interpreter.generated.KumirLexer import KumirLexer
                 if child.symbol.type == KumirLexer.LBRACK:
+                    return True
+            # Проверяем на non-terminal node, который может содержать LBRACK
+            elif hasattr(child, 'getChildCount'):
+                # Рекурсивно ищем LBRACK в дочерних узлах
+                if self._contains_array_access_recursive(child):
+                    return True
+        
+        return False
+    
+    def _contains_array_access_recursive(self, node):
+        """Рекурсивно ищет LBRACK в AST узле"""
+        if not node:
+            return False
+            
+        # Проверяем terminal nodes
+        if hasattr(node, 'symbol') and hasattr(node.symbol, 'type'):
+            from pyrobot.backend.kumir_interpreter.generated.KumirLexer import KumirLexer
+            if node.symbol.type == KumirLexer.LBRACK:
+                return True
+        
+        # Проверяем дочерние узлы
+        if hasattr(node, 'getChildCount'):
+            for i in range(node.getChildCount()):
+                child = node.getChild(i)
+                if self._contains_array_access_recursive(child):
                     return True
         
         return False

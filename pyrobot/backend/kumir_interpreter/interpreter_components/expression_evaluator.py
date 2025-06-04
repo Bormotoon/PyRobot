@@ -12,7 +12,7 @@ from ..generated.KumirParserVisitor import KumirParserVisitor
 from ..generated.KumirParser import KumirParser
 from .scope_manager import ScopeManager # Исправленный импорт ScopeManager
 from ..kumir_datatypes import KumirValue, KumirType # Добавлено
-from ..kumir_exceptions import KumirEvalError, KumirTypeError, KumirNameError, KumirRuntimeError, KumirNotImplementedError, KumirArgumentError # Добавлены KumirRuntimeError, KumirNotImplementedError, KumirArgumentError
+from ..kumir_exceptions import KumirEvalError, KumirTypeError, KumirNameError, KumirRuntimeError, KumirNotImplementedError, KumirArgumentError, KumirSyntaxError, KumirIndexError # Добавлены KumirRuntimeError, KumirNotImplementedError, KumirArgumentError, KumirSyntaxError, КумирIndexError
 import sys # Добавлено
 import operator # Добавлено для реляционных операций
 from ..generated.KumirLexer import KumirLexer # Добавлено для констант токенов
@@ -563,8 +563,8 @@ class ExpressionEvaluator(KumirParserVisitor):
             if op_text == '*':
                 # Умножение: только числа
                 # Нормализуем типы для сравнения
-                result_type_normalized = result.kumir_type.value if hasattr(result.kumir_type, 'value') else result.kumir_type
-                right_type_normalized = right.kumir_type.value if hasattr(right.kumir_type, 'value') else right.kumir_type
+                result_type_normalized = result.kumir_type
+                right_type_normalized = right.kumir_type
                 
                 # Извлекаем базовые Python-значения из KumirValue объектов
                 result_value = result.value
@@ -749,7 +749,7 @@ class ExpressionEvaluator(KumirParserVisitor):
                                 slice_value = ""
                             else:
                                 slice_value = string_value[py_start:py_end]
-                            return KumirValue(value=slice_value, kumir_type=KumirType.STRING.value)
+                            return KumirValue(value=slice_value, kumir_type=KumirType.STR.value)
                         else:
                             pos = self._position_from_token(self._get_token_for_position(index_list_ctx))
                             raise KumirIndexError(
@@ -806,6 +806,9 @@ class ExpressionEvaluator(KumirParserVisitor):
             # Обработка ключевого слова 'знач' - обращение к возвращаемому значению функции
             try:
                 var_info, _ = self.main_visitor.scope_manager.find_variable('__знач__')
+                if var_info is None:
+                    pos = self._position_from_token(self._get_token_for_position(ctx))
+                    raise KumirRuntimeError("Переменная '__знач__' не найдена.", line_index=pos[0], column_index=pos[1])
                 return var_info['value']
             except Exception as e:
                 pos = self._position_from_token(self._get_token_for_position(ctx))
@@ -969,15 +972,38 @@ class ExpressionEvaluator(KumirParserVisitor):
                 else:
                     # Это процедура, а не функция - ошибка
                     print(f"[DEBUG] '{func_name}' не является функцией", file=sys.stderr)
-                pos = self._position_from_token(self._get_token_for_position(ctx))
-                raise KumirTypeError(f"'{func_name}' является процедурой, а не функцией, и не может использоваться в выражении", line_index=pos[0], column_index=pos[1])
+                    pos = self._position_from_token(self._get_token_for_position(ctx))
+                    raise KumirTypeError(f"'{func_name}' является процедурой, а не функцией, и не может использоваться в выражении", line_index=pos[0], column_index=pos[1])
         
         # Если дошли до сюда - неизвестная функция
-        else:
-            pos = self._position_from_token(self._get_token_for_position(ctx))
-            raise KumirNotImplementedError(f"Встроенная функция '{func_name}' пока не реализована", line_index=pos[0], column_index=pos[1])
+        pos = self._position_from_token(self._get_token_for_position(ctx))
+        raise KumirNotImplementedError(f"Встроенная функция '{func_name}' пока не реализована", line_index=pos[0], column_index=pos[1])
 
     def visit(self, tree) -> KumirValue:
         """Общий метод visit для обхода AST дерева"""
         result = super().visit(tree)
         return result
+
+    def visitArrayLiteral(self, ctx: KumirParser.ArrayLiteralContext) -> KumirValue:
+        """Обрабатывает литералы массивов (например, {1, 2, 3})"""
+        expression_list = ctx.expressionList()
+        
+        if expression_list is None:
+            # Пустой массив
+            return KumirValue(value=[], kumir_type=KumirType.TABLE.value)
+        
+        # Вычисляем все выражения в массиве
+        elements = []
+        expressions = expression_list.expression()
+        
+        for expr in expressions:
+            element_value = self.visit(expr)
+            if not isinstance(element_value, KumirValue):
+                pos = self._position_from_token(self._get_token_for_position(ctx))
+                raise KumirRuntimeError(
+                    f"Элемент массива должен быть значением",
+                    line_index=pos[0], column_index=pos[1]
+                )
+            elements.append(element_value.value)
+        
+        return KumirValue(value=elements, kumir_type=KumirType.TABLE.value)
