@@ -129,6 +129,11 @@ BUILTIN_FUNCTIONS = {
         'arg_types': [['лит', 'лит']],
         'handler': lambda visitor_self, args, ctx: bf.handle_position(visitor_self, args[0], args[1], ctx)
     },
+    'позиция': {
+        'min_args': 2, 'max_args': 2,
+        'arg_types': [['лит', 'лит']],
+        'handler': lambda visitor_self, args, ctx: bf.handle_position(visitor_self, args[0], args[1], ctx)
+    },
     # \'копировать\': {
     #     \'min_args\': 3, \'max_args\': 3,
     #     \'arg_types\': [[\'лит\', \'цел\', \'цел\']],

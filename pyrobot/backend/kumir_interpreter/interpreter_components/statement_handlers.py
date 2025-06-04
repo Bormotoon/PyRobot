@@ -323,6 +323,19 @@ class StatementHandlerMixin(KumirParserVisitor):
                             formatted_str = value_to_print.value
                         elif type_value == KumirType.STR.value or type_value == 'ЛИТЕР':
                             formatted_str = value_to_print.value
+                        elif type_value == KumirType.TABLE.value or type_value == 'ТАБ':
+                            # Handle array output
+                            from ..utils import to_output_string
+                            # Format array elements with spaces between them
+                            array_values = value_to_print.value
+                            formatted_elements = []
+                            for elem in array_values:
+                                # Convert the element to appropriate string representation
+                                if isinstance(elem, (int, float, bool, str)):
+                                    formatted_elements.append(to_output_string(elem))
+                                else:
+                                    formatted_elements.append(str(elem))
+                            formatted_str = ' '.join(formatted_elements)
                         else:
                             raise KumirTypeError(
                                 f"Неизвестный или неподдерживаемый тип значения для вывода: {value_to_print.kumir_type}",
