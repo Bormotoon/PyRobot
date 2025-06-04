@@ -100,92 +100,59 @@ BUILTIN_FUNCTIONS = {
     },
     # --- Математические функции (конец) ---
 
-    # --- Функции для работы с символами (начало) ---
-    # \'симвкод\': {
-    #     \'min_args\': 1, \'max_args\': 1,
-    #     \'arg_types\': [[\'сим\']],
-    #     \'handler\': lambda visitor_self, args, ctx: bf.handle_char_code(visitor_self, args[0], ctx)
-    # },
-    # \'кодсимв\': {
-    #     \'min_args\': 1, \'max_args\': 1,
-    #     \'arg_types\': [[\'цел\']],
-    #     \'handler\': lambda visitor_self, args, ctx: bf.handle_code_char(visitor_self, args[0], ctx)
-    # },
-    # --- Функции для работы с символами (конец) ---
-
-    # --- Функции для работы со строками (начало) ---
-    'длин': {
+    # --- Строковые функции (начало) ---
+    'длин': { 
         'min_args': 1, 'max_args': 1,
         'arg_types': [['лит']],
         'handler': lambda visitor_self, args, ctx: bf.handle_length(visitor_self, args[0], ctx)
-    },
-    'лит_в_цел': {
-        'min_args': 1, 'max_args': 1,
-        'arg_types': [['лит']],
-        'handler': lambda visitor_self, args, ctx: bf.handle_lit_to_int(visitor_self, args[0], ctx)
-    },
-    'найти': {
-        'min_args': 2, 'max_args': 2,
-        'arg_types': [['лит', 'лит']],
-        'handler': lambda visitor_self, args, ctx: bf.handle_position(visitor_self, args[0], args[1], ctx)
     },
     'позиция': {
         'min_args': 2, 'max_args': 2,
         'arg_types': [['лит', 'лит']],
         'handler': lambda visitor_self, args, ctx: bf.handle_position(visitor_self, args[0], args[1], ctx)
     },
-    # \'копировать\': {
-    #     \'min_args\': 3, \'max_args\': 3,
-    #     \'arg_types\': [[\'лит\', \'цел\', \'цел\']],
-    #     \'handler\': lambda visitor_self, args, ctx: bf.handle_copy(visitor_self, args[0], args[1], args[2], ctx)
-    # },
-    # \'найти\': {
-    #     \'min_args\': 2, \'max_args\': 2, # TODO: Проверить, есть ли вариант с 3 аргументами (начальная позиция)
-    #     \'arg_types\': [[\'лит\', \'лит\']], # TODO: Добавить [[\'лит\', \'лит\', \'цел\']] если есть
-    #     \'handler\': lambda visitor_self, args, ctx: bf.handle_find(visitor_self, args[0], args[1], ctx) # TODO: Добавить args[2] если есть
-    # },
-    # \'удалить\': { # Это процедура, а не функция. Должна быть в BUILTIN_PROCEDURES
-    #     \'min_args\': 3, \'max_args\': 3,
-    #     \'arg_types\': [[\'лит\', \'цел\', \'цел\']], # Первый аргумент - переменная, тип \'лит арг рез\'
-    #     \'handler\': lambda visitor_self, args, ctx: bf.handle_delete_string_part(visitor_self, args[0], args[1], args[2], ctx)
-    # },
-    # \'вставить\': { # Это процедура, а не функция. Должна быть в BUILTIN_PROCEDURES
-    #     \'min_args\': 3, \'max_args\': 3,
-    #     \'arg_types\': [[\'лит\', \'лит\', \'цел\']], # Первый аргумент - переменная, тип \'лит арг рез\'
-    #     \'handler\': lambda visitor_self, args, ctx: bf.handle_insert_string_part(visitor_self, args[0], args[1], args[2], ctx)
-    # },
-    # --- Функции для работы со строками (конец) ---
+    'поз': { # Сокращенный вариант для "позиция"
+        'min_args': 2, 'max_args': 2,
+        'arg_types': [['лит', 'лит']],
+        'handler': lambda visitor_self, args, ctx: bf.handle_position(visitor_self, args[0], args[1], ctx)
+    },
+    'лит_в_цел': {
+        'min_args': 1, 'max_args': 2, # может быть с параметром успех или без
+        'arg_types': [['лит'], ['лит', 'лог']], # TODO: нужно уточнить формат для рез параметров
+        'handler': lambda visitor_self, args, ctx: bf.handle_lit_to_int(visitor_self, args[0], ctx) if len(args) == 1 else bf.handle_lit_to_int_with_success(visitor_self, args[0], args[1], ctx)
+    },
+    'лит_в_вещ': {
+        'min_args': 1, 'max_args': 2,
+        'arg_types': [['лит'], ['лит', 'лог']], 
+        'handler': lambda visitor_self, args, ctx: bf.handle_lit_to_real(visitor_self, args[0], ctx) if len(args) == 1 else bf.handle_lit_to_real_with_success(visitor_self, args[0], args[1], ctx)
+    },
+    'цел_в_лит': {
+        'min_args': 1, 'max_args': 1,
+        'arg_types': [['цел']],
+        'handler': lambda visitor_self, args, ctx: bf.handle_int_to_lit(visitor_self, args[0], ctx)
+    },
+    'вещ_в_лит': {
+        'min_args': 1, 'max_args': 1,
+        'arg_types': [['вещ']],
+        'handler': lambda visitor_self, args, ctx: bf.handle_real_to_lit(visitor_self, args[0], ctx)
+    },
+    # --- Строковые функции (конец) ---
 
-    # --- Функции для работы с таблицами (начало) ---
-    # \'размер\': { # Может быть и для строк, и для таблиц
-    #     \'min_args\': 1, \'max_args\': 2, # Для таблиц может быть 2 аргумента (имя таблицы, номер измерения)
-    #     \'arg_types\': [[\'лит\'], [\'таб\'], [\'таб\', \'цел\']], # TODO: Уточнить типы для таблиц
-    #     \'handler\': lambda visitor_self, args, ctx: bf.handle_size(visitor_self, args, ctx) # args будет списком
-    # },
-    # \'нразм\': { # Для таблиц
-    #     \'min_args\': 1, \'max_args\': 1,
-    #     \'arg_types\': [[\'таб\']], # TODO: Уточнить тип для таблиц
-    #     \'handler\': lambda visitor_self, args, ctx: bf.handle_dimensions_count(visitor_self, args[0], ctx)
-    # },
-    # \'максиндекс\': { # Для таблиц
-    #     \'min_args\': 1, \'max_args\': 2,
-    #     \'arg_types\': [[\'таб\'], [\'таб\', \'цел\']], # TODO: Уточнить типы
-    #     \'handler\': lambda visitor_self, args, ctx: bf.handle_max_index(visitor_self, args, ctx)
-    # },
-    # \'мининдекс\': { # Для таблиц
-    #     \'min_args\': 1, \'max_args\': 2,
-    #     \'arg_types\': [[\'таб\'], [\'таб\', \'цел\']], # TODO: Уточнить типы
-    #     \'handler\': lambda visitor_self, args, ctx: bf.handle_min_index(visitor_self, args, ctx)
-    # },
-    # --- Функции для работы с таблицами (конец) ---
+    # --- Функции модуля "Строки" (начало) ---
+    # TODO: эти функции нужно добавить при подключении "использовать Строки"
+    'удалить': {
+        'min_args': 3, 'max_args': 3,
+        'arg_types': [['лит', 'цел', 'цел']], # аргрез лит строка, арг цел начало, арг цел количество
+        'handler': lambda visitor_self, args, ctx: bf.handle_delete_substring(visitor_self, args[0], args[1], args[2], ctx)
+    },
+    'вставить': {
+        'min_args': 3, 'max_args': 3,
+        'arg_types': [['лит', 'лит', 'цел']], # лит фрагмент, аргрез лит строка, арг цел начало
+        'handler': lambda visitor_self, args, ctx: bf.handle_insert_substring(visitor_self, args[0], args[1], args[2], ctx)
+    },
+    # --- Функции модуля "Строки" (конец) ---
 
-    # --- Функции для работы с файлами (начало) ---
-    # \'eof\': { # End Of File
-    #     \'min_args\': 1, \'max_args\': 1,
-    #     \'arg_types\': [[\'файл\']], # TODO: Уточнить тип "файл"
-    #     \'handler\': lambda visitor_self, args, ctx: bf.handle_eof(visitor_self, args[0], ctx)
-    # },
-    # --- Функции для работы с файлами (конец) ---
+    # --- Математические функции (начало) ---
 }
 
 
