@@ -209,3 +209,111 @@ def handle_position(visitor: 'KumirInterpreterVisitor', sub_string: str, main_st
         return find_result + 1
     else:
         return 0
+
+# --- Строковые функции преобразования ---
+
+def handle_lit_to_int(visitor: 'KumirInterpreterVisitor', s_val: str, ctx: Optional[ParserRuleContext]) -> int:
+    """Обработчик для функции лит_в_цел(строка)."""
+    try:
+        return int(s_val.strip())
+    except ValueError:
+        l_content = visitor.get_line_content_from_ctx(ctx)
+        raise KumirEvalError(
+            f"Невозможно преобразовать строку '{s_val}' в целое число.",
+            line_index=ctx.start.line -1 if ctx else None, 
+            column_index=ctx.start.column if ctx else None,
+            line_content=l_content
+        )
+
+def handle_lit_to_int_with_success(visitor: 'KumirInterpreterVisitor', s_val: str, success_var, ctx: Optional[ParserRuleContext]) -> int:
+    """Обработчик для функции лит_в_цел(строка, рез лог успех)."""
+    try:
+        result = int(s_val.strip())
+        # TODO: установить success_var в True
+        return result
+    except ValueError:
+        # TODO: установить success_var в False
+        return 0
+
+def handle_lit_to_real(visitor: 'KumirInterpreterVisitor', s_val: str, ctx: Optional[ParserRuleContext]) -> float:
+    """Обработчик для функции лит_в_вещ(строка)."""
+    try:
+        # В КуМире может быть запятая как десятичный разделитель
+        cleaned_s = s_val.strip().replace(',', '.')
+        return float(cleaned_s)
+    except ValueError:
+        l_content = visitor.get_line_content_from_ctx(ctx)
+        raise KumirEvalError(
+            f"Невозможно преобразовать строку '{s_val}' в вещественное число.",
+            line_index=ctx.start.line -1 if ctx else None, 
+            column_index=ctx.start.column if ctx else None,
+            line_content=l_content
+        )
+
+def handle_lit_to_real_with_success(visitor: 'KumirInterpreterVisitor', s_val: str, success_var, ctx: Optional[ParserRuleContext]) -> float:
+    """Обработчик для функции лит_в_вещ(строка, рез лог успех)."""
+    try:
+        cleaned_s = s_val.strip().replace(',', '.')
+        result = float(cleaned_s)
+        # TODO: установить success_var в True
+        return result
+    except ValueError:
+        # TODO: установить success_var в False
+        return 0.0
+
+def handle_int_to_lit(visitor: 'KumirInterpreterVisitor', int_val: int, ctx: Optional[ParserRuleContext]) -> str:
+    """Обработчик для функции цел_в_лит(число)."""
+    return str(int_val)
+
+def handle_real_to_lit(visitor: 'KumirInterpreterVisitor', real_val: float, ctx: Optional[ParserRuleContext]) -> str:
+    """Обработчик для функции вещ_в_лит(число)."""
+    return str(real_val)
+
+# --- Функции модуля "Строки" ---
+
+def handle_delete_substring(visitor: 'KumirInterpreterVisitor', target_str: str, start_pos: int, count: int, ctx: Optional[ParserRuleContext]) -> str:
+    """Обработчик для процедуры удалить(аргрез лит строка, арг цел начало, арг цел количество)."""
+    if start_pos < 1:
+        l_content = visitor.get_line_content_from_ctx(ctx)
+        raise KumirArgumentError(
+            f"Начальная позиция должна быть >= 1, получено: {start_pos}",
+            line_index=ctx.start.line -1 if ctx else None,
+            column_index=ctx.start.column if ctx else None,
+            line_content=l_content
+        )
+    
+    if start_pos > len(target_str):
+        return target_str  # Ничего не удаляем, если позиция за концом строки
+        
+    # Преобразуем в 0-based индексы
+    start_idx = start_pos - 1
+    end_idx = min(start_idx + count, len(target_str))
+    
+    # Возвращаем строку без удаленной части
+    return target_str[:start_idx] + target_str[end_idx:]
+
+def handle_insert_substring(visitor: 'KumirInterpreterVisitor', fragment: str, target_str: str, start_pos: int, ctx: Optional[ParserRuleContext]) -> str:
+    """Обработчик для процедуры вставить(лит фрагмент, аргрез лит строка, арг цел начало)."""
+    if start_pos < 1:
+        l_content = visitor.get_line_content_from_ctx(ctx)
+        raise KumirArgumentError(
+            f"Позиция для вставки должна быть >= 1, получено: {start_pos}",
+            line_index=ctx.start.line -1 if ctx else None,
+            column_index=ctx.start.column if ctx else None,
+            line_content=l_content
+        )
+    
+    if start_pos > len(target_str) + 1:
+        l_content = visitor.get_line_content_from_ctx(ctx)
+        raise KumirArgumentError(
+            f"Позиция для вставки не может быть больше длины строки + 1. Длина: {len(target_str)}, позиция: {start_pos}",
+            line_index=ctx.start.line -1 if ctx else None,
+            column_index=ctx.start.column if ctx else None,
+            line_content=l_content
+        )
+    
+    # Преобразуем в 0-based индекс
+    insert_idx = start_pos - 1
+    
+    # Вставляем фрагмент
+    return target_str[:insert_idx] + fragment + target_str[insert_idx:]

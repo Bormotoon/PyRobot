@@ -494,14 +494,14 @@ class ExpressionEvaluator(KumirParserVisitor):
                     f"Внутренняя ошибка: операнды не являются KumirValue (типы: {type(result).__name__}, {type(right).__name__}).",
                     line_index=pos_err[0], 
                     column_index=pos_err[1]
-                )
-            
+                )            
             op_text = op_token.getText()
             actual_token = self._get_token_from_node(op_token)
             
             if op_text == '+':
-                # Сложение: числа или строки
-                if result.kumir_type == KumirType.STR.value and right.kumir_type == KumirType.STR.value:
+                # Сложение: числа или строки (ЛИТ и СИМ)
+                if ((result.kumir_type == KumirType.STR.value or result.kumir_type == KumirType.CHAR.value) and 
+                    (right.kumir_type == KumirType.STR.value or right.kumir_type == KumirType.CHAR.value)):
                     result = KumirValue(value=str(result.value) + str(right.value), kumir_type=KumirType.STR.value)
                 elif ((result.kumir_type == KumirType.INT.value or result.kumir_type == KumirType.REAL.value) and 
                       (right.kumir_type == KumirType.INT.value or right.kumir_type == KumirType.REAL.value)):
@@ -872,12 +872,15 @@ class ExpressionEvaluator(KumirParserVisitor):
     def visitExpression(self, ctx: KumirParser.ExpressionContext) -> KumirValue:
         """Обрабатывает Expression узел, делегируя обработку дальше по дереву"""
         # Expression -> logicalOrExpression, делегируем обработку
-        return self.visit(ctx.logicalOrExpression())
-
-    # ====== МЕТОДЫ ДЛЯ ОБРАБОТКИ ВСТРОЕННЫХ ФУНКЦИЙ ======
+        return self.visit(ctx.logicalOrExpression())    # ====== МЕТОДЫ ДЛЯ ОБРАБОТКИ ВСТРОЕННЫХ ФУНКЦИЙ ======
     
     def _is_builtin_function(self, name: str) -> bool:
         """Проверяет, является ли имя встроенной функцией"""
+        # Проверяем в новом реестре встроенных функций
+        if hasattr(self.main_visitor, 'builtin_function_handler'):
+            return name in self.main_visitor.builtin_function_handler.functions
+        
+        # Fallback к старому списку для совместимости
         builtin_functions = {
             'div', 'mod', 'abs', 'sqrt', 'sin', 'cos', 'tan', 'arctan', 'sign',
             'irand', 'rand', 'цел', 'вещ', 'длина', 'позиция'
@@ -949,9 +952,47 @@ class ExpressionEvaluator(KumirParserVisitor):
             
             a = args[0]
             result = abs(a.value)
-            return KumirValue(result, a.kumir_type)          # TODO: Добавить остальные встроенные функции при необходимости
-          # ДОБАВЛЕНО: Проверяем пользовательские функции в AlgorithmManager
+            return KumirValue(result, a.kumir_type)          # TODO: Добавить остальные встроенные функции при необходимости        # ДОБАВЛЕНО: Проверяем встроенные функции через builtin_function_handler
         print(f"[DEBUG] expression_evaluator._call_function для '{func_name}' с аргументами: {args}", file=sys.stderr)
+        
+        # Сначала проверяем встроенные функции
+        if hasattr(self.main_visitor, 'builtin_function_handler'):
+            builtin_handler = self.main_visitor.builtin_function_handler
+            if func_name.lower() in builtin_handler.functions:
+                print(f"[DEBUG] Найдена встроенная функция '{func_name}', вызываем через builtin_function_handler", file=sys.stderr)
+                try:
+                    # Преобразуем аргументы в правильный формат (извлекаем значения из KumirValue)
+                    raw_args = []
+                    for arg in args:
+                        if isinstance(arg, KumirValue):
+                            raw_args.append(arg.value)
+                        else:
+                            raw_args.append(arg)
+                    
+                    # Вызываем встроенную функцию
+                    result = builtin_handler.call_function(func_name, raw_args, ctx)
+                    print(f"[DEBUG] Встроенная функция '{func_name}' вернула: {result}", file=sys.stderr)
+                    
+                    # Оборачиваем результат в KumirValue, если нужно
+                    if not isinstance(result, KumirValue):
+                        if isinstance(result, int):
+                            result = KumirValue(result, KumirType.INT.value)
+                        elif isinstance(result, float):
+                            result = KumirValue(result, KumirType.REAL.value)
+                        elif isinstance(result, str):
+                            result = KumirValue(result, KumirType.STR.value)
+                        elif isinstance(result, bool):
+                            result = KumirValue(result, KumirType.BOOL.value)
+                        else:
+                            result = KumirValue(result, "unknown")
+                    
+                    return result
+                except Exception as e:
+                    print(f"[DEBUG] Ошибка при вызове встроенной функции '{func_name}': {e}", file=sys.stderr)
+                    pos = self._position_from_token(self._get_token_for_position(ctx))
+                    raise KumirEvalError(f"Ошибка при вызове функции '{func_name}': {str(e)}", line_index=pos[0], column_index=pos[1])
+        
+        # Потом проверяем пользовательские функции в AlgorithmManager
         print(f"[DEBUG] Проверяем наличие algorithm_manager: {hasattr(self.main_visitor, 'algorithm_manager')}", file=sys.stderr)
         
         if hasattr(self.main_visitor, 'algorithm_manager'):
