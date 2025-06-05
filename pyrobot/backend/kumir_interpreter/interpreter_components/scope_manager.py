@@ -328,3 +328,71 @@ class ScopeManager:
         col_idx = ctx_for_error.start.column if ctx_for_error and hasattr(ctx_for_error, 'start') else None
         # Передаем is_read_operation в get_variable_info
         return self.get_variable_info(var_name, line_idx, col_idx, is_read_operation=is_read_operation)
+
+    def update_string_character(self, var_name: str, index: int, new_char: 'KumirValue',
+                               line_index: Optional[int] = None,
+                               column_index: Optional[int] = None) -> None:
+        """Обновляет символ в строке по указанному индексу."""
+        var_info, _ = self.find_variable(var_name) 
+
+        if not var_info:
+            l_content = self.get_line_content_from_coords(line_index)
+            raise KumirNameError(
+                f"Строковая переменная '{var_name}' не найдена для обновления символа.",
+                line_index=line_index, column_index=column_index, line_content=l_content
+            )
+
+        # Проверяем, что это действительно строка
+        if (var_info['is_table'] or 
+            not isinstance(var_info['value'], KumirValue) or 
+            var_info['value'].kumir_type != KumirType.STR.value):
+            l_content = self.get_line_content_from_coords(line_index)
+            raise KumirTypeError(
+                f"Переменная '{var_info['name_original']}' не является строкой.",
+                line_index=line_index, column_index=column_index, line_content=l_content
+            )
+
+        # Проверяем, что новое значение - символ
+        if new_char.kumir_type not in [KumirType.CHAR.value, KumirType.STR.value]:
+            l_content = self.get_line_content_from_coords(line_index)
+            raise KumirTypeError(
+                f"Присваиваемое значение должно быть символом или строкой, получено: {new_char.kumir_type}",
+                line_index=line_index, column_index=column_index, line_content=l_content
+            )
+
+        # Получаем текущую строку
+        current_string = var_info['value'].value
+        if not isinstance(current_string, str):
+            l_content = self.get_line_content_from_coords(line_index)
+            raise KumirTypeError(
+                f"Внутренняя ошибка: значение строковой переменной не является строкой.",
+                line_index=line_index, column_index=column_index, line_content=l_content
+            )
+
+        # Проверяем границы индекса (КуМир использует 1-based индексы)
+        if index < 1 or index > len(current_string):
+            l_content = self.get_line_content_from_coords(line_index)
+            raise KumirIndexError(
+                f"Индекс символа {index} вне допустимого диапазона [1..{len(current_string)}]",
+                line_index=line_index, column_index=column_index, line_content=l_content
+            )
+
+        # Преобразуем новое значение в символ
+        if new_char.kumir_type == KumirType.STR.value:
+            if len(new_char.value) != 1:
+                l_content = self.get_line_content_from_coords(line_index)
+                raise KumirTypeError(
+                    f"Для присваивания символу строки можно использовать только строки длиной 1, получена строка длиной {len(new_char.value)}",
+                    line_index=line_index, column_index=column_index, line_content=l_content
+                )
+            char_to_assign = new_char.value
+        else:  # CHAR
+            char_to_assign = new_char.value
+
+        # Создаем новую строку с замененным символом
+        py_index = index - 1  # Конвертируем из 1-based в 0-based
+        new_string = current_string[:py_index] + char_to_assign + current_string[py_index + 1:]
+        
+        # Обновляем значение переменной
+        var_info['value'] = KumirValue(value=new_string, kumir_type=KumirType.STR.value)
+        var_info['initialized'] = True

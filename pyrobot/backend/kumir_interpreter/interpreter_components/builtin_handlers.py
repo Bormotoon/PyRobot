@@ -140,16 +140,7 @@ BUILTIN_FUNCTIONS = {
 
     # --- Функции модуля "Строки" (начало) ---
     # TODO: эти функции нужно добавить при подключении "использовать Строки"
-    'удалить': {
-        'min_args': 3, 'max_args': 3,
-        'arg_types': [['лит', 'цел', 'цел']], # аргрез лит строка, арг цел начало, арг цел количество
-        'handler': lambda visitor_self, args, ctx: bf.handle_delete_substring(visitor_self, args[0], args[1], args[2], ctx)
-    },
-    'вставить': {
-        'min_args': 3, 'max_args': 3,
-        'arg_types': [['лит', 'лит', 'цел']], # лит фрагмент, аргрез лит строка, арг цел начало
-        'handler': lambda visitor_self, args, ctx: bf.handle_insert_substring(visitor_self, args[0], args[1], args[2], ctx)
-    },
+    # ПРИМЕЧАНИЕ: удалить и вставить перенесены в BUILTIN_PROCEDURES
     # --- Функции модуля "Строки" (конец) ---
 
     # --- Математические функции (начало) ---
@@ -190,18 +181,62 @@ class BuiltinFunctionHandler:
 
         raise NameError(f"Встроенная функция \'{func_name}\' не найдена.") # Заменить на KumirNameError
 
+# Словарь встроенных процедур Кумира
+BUILTIN_PROCEDURES = {
+    # --- Процедуры модуля "Строки" (начало) ---
+    'удалить': {
+        'params': [
+            {'name': 'строка', 'type': 'лит', 'mode': 'аргрез'},
+            {'name': 'начало', 'type': 'цел', 'mode': 'арг'},
+            {'name': 'количество', 'type': 'цел', 'mode': 'арг'}
+        ],
+        'handler': 'handle_delete_substring_procedure'
+    },
+    'вставить': {
+        'params': [
+            {'name': 'фрагмент', 'type': 'лит', 'mode': 'арг'},
+            {'name': 'строка', 'type': 'лит', 'mode': 'аргрез'},
+            {'name': 'начало', 'type': 'цел', 'mode': 'арг'}
+        ],
+        'handler': 'handle_insert_substring_procedure'
+    }
+    # --- Процедуры модуля "Строки" (конец) ---
+}
+
 class BuiltinProcedureHandler:
     def __init__(self, visitor: 'KumirInterpreterVisitor'):
         self.visitor = visitor
-        # self.procedures = BUILTIN_PROCEDURES # Когда будет создан
+        self.procedures = BUILTIN_PROCEDURES
 
-    def call_procedure(self, proc_name: str, args: List[Any], ctx: Optional['ParserRuleContext']) -> None:
-        # TODO: Реализовать логику вызова встроенной процедуры.
-        # Сейчас это просто заглушка.
-        # raise NotImplementedError(f"Builtin procedure \'{proc_name}\' handler not implemented yet.")
-        # Пример:
-        # if proc_name.lower() == "вывод":
-        #     self.visitor.io_handler.handle_output(args, ctx) # Предполагая, что io_handler есть у visitor
-        # else:
-        #     raise NameError(f"Встроенная процедура \'{proc_name}\' не найдена.") # Заменить на KumirNameError
-        pass # Пока заглушка
+    def call_procedure(self, proc_name: str, analyzed_args: List[Dict], ctx: Optional['ParserRuleContext']) -> None:
+        """Вызывает встроенную процедуру с проанализированными аргументами."""
+        proc_name_lower = proc_name.lower()
+        
+        if proc_name_lower not in self.procedures:
+            raise NameError(f"Встроенная процедура '{proc_name}' не найдена.")
+        
+        proc_info = self.procedures[proc_name_lower]
+        handler_name = proc_info['handler']
+        
+        # Импортируем модуль с обработчиками
+        from . import builtin_functions as bf
+        
+        # Получаем функцию-обработчик
+        if hasattr(bf, handler_name):
+            handler_func = getattr(bf, handler_name)
+            
+            # Вызываем обработчик с проанализированными аргументами
+            handler_func(self.visitor, analyzed_args, ctx)
+        else:
+            raise NotImplementedError(f"Обработчик '{handler_name}' для процедуры '{proc_name}' не реализован.")
+
+    def is_builtin_procedure(self, proc_name: str) -> bool:
+        """Проверяет, является ли процедура встроенной."""
+        return proc_name.lower() in self.procedures
+        
+    def get_procedure_info(self, proc_name: str) -> Dict:
+        """Возвращает информацию о встроенной процедуре."""
+        proc_name_lower = proc_name.lower()
+        if proc_name_lower in self.procedures:
+            return self.procedures[proc_name_lower]
+        return {}

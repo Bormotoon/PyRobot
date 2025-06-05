@@ -183,7 +183,19 @@ class ProcedureManager:
         
         proc_name_lower = proc_name.lower()
         
-        # 1. Поиск определения процедуры
+        # 1. Проверяем встроенные процедуры
+        if hasattr(self.visitor, 'builtin_procedure_handler') and \
+           self.visitor.builtin_procedure_handler.is_builtin_procedure(proc_name):
+            # Создаем фиктивный контекст для передачи информации о позиции
+            class FakeContext:
+                def __init__(self, line, column):
+                    self.start = type('', (), {'line': line + 1, 'column': column})()
+            
+            fake_ctx = FakeContext(line_index, column_index)
+            self.visitor.builtin_procedure_handler.call_procedure(proc_name, analyzed_args, fake_ctx)
+            return
+        
+        # 2. Поиск определения пользовательской процедуры
         if proc_name_lower not in self.procedures:
             raise KumirNameError(f"Процедура '{proc_name}' не определена.",
                                  line_index=line_index, column_index=column_index)

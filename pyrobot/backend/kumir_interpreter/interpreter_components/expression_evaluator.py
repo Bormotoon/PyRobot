@@ -11,7 +11,7 @@ from .procedure_manager import ProcedureManager
 from ..generated.KumirParserVisitor import KumirParserVisitor
 from ..generated.KumirParser import KumirParser
 from .scope_manager import ScopeManager # Исправленный импорт ScopeManager
-from ..kumir_datatypes import KumirValue, KumirType # Добавлено
+from ..kumir_datatypes import KumirValue, KumirType, KumirTableVar # Добавлено
 from ..kumir_exceptions import KumirEvalError, KumirTypeError, KumirNameError, KumirRuntimeError, KumirNotImplementedError, KumirArgumentError, KumirSyntaxError, KumirIndexError # Добавлены KumirRuntimeError, KumirNotImplementedError, KumirArgumentError, KumirSyntaxError, КумирIndexError
 import sys # Добавлено
 import operator # Добавлено для реляционных операций
@@ -718,20 +718,36 @@ class ExpressionEvaluator(KumirParserVisitor):
                 
                 # Обрабатываем доступ к элементам массива или строки
                 if isinstance(primary_expr, KumirValue):
-                    if primary_expr.kumir_type == KumirType.STR.value:
-                        # Доступ к символам строки
+                    # Проверяем, является ли это строковым массивом (литтаб)
+                    if (primary_expr.kumir_type == KumirType.STR.value and 
+                        isinstance(primary_expr.value, KumirTableVar)):
+                        # Это строковый массив - обрабатываем как массив
+                        table_var = primary_expr.value
+                        try:
+                            element_value = table_var.get_value(tuple(indices), index_list_ctx)
+                            return element_value
+                        except Exception as e:
+                            pos = self._position_from_token(self._get_token_for_position(index_list_ctx))
+                            raise KumirEvalError(
+                                f"Ошибка при доступе к элементу строкового массива: {e}",
+                                line_index=pos[0], column_index=pos[1]
+                            )
+                    elif primary_expr.kumir_type == KumirType.STR.value:
+                        # Доступ к символам обычной строки (не массива)
                         string_value = primary_expr.value
+                        actual_string = string_value
+                        
                         if len(indices) == 1:
                             # Доступ к одному символу
                             kumir_idx = indices[0]
-                            if kumir_idx < 1 or kumir_idx > len(string_value):
+                            if kumir_idx < 1 or kumir_idx > len(actual_string):
                                 pos = self._position_from_token(self._get_token_for_position(index_list_ctx))
                                 raise KumirIndexError(
-                                    f"Индекс символа {kumir_idx} вне допустимого диапазона [1..{len(string_value)}]",
+                                    f"Индекс символа {kumir_idx} вне допустимого диапазона [1..{len(actual_string)}]",
                                     line_index=pos[0], column_index=pos[1]
                                 )
                             py_idx = kumir_idx - 1  # КуМир 1-based -> Python 0-based
-                            char_value = string_value[py_idx]
+                            char_value = actual_string[py_idx]
                             return KumirValue(value=char_value, kumir_type=KumirType.CHAR.value)
                         elif len(indices) == 2:
                             # Срез строки
@@ -744,11 +760,11 @@ class ExpressionEvaluator(KumirParserVisitor):
                                 )
                             
                             py_start = k_idx1 - 1
-                            py_end = min(k_idx2, len(string_value))
-                            if py_start >= len(string_value):
+                            py_end = min(k_idx2, len(actual_string))
+                            if py_start >= len(actual_string):
                                 slice_value = ""
                             else:
-                                slice_value = string_value[py_start:py_end]
+                                slice_value = actual_string[py_start:py_end]
                             return KumirValue(value=slice_value, kumir_type=KumirType.STR.value)
                         else:
                             pos = self._position_from_token(self._get_token_for_position(index_list_ctx))

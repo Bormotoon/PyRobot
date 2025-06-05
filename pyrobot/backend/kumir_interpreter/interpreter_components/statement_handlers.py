@@ -207,7 +207,7 @@ class StatementHandlerMixin(KumirParserVisitor):
                 var_name = var_name_node.getText()
                 index_list_ctx = lvalue_ctx.indexList()
 
-                if index_list_ctx: # Присваивание элементу массива/таблицы
+                if index_list_ctx: # Присваивание элементу массива/таблицы или символу строки
                     # Собираем индексы
                     indices = []
                     if index_list_ctx.expression():
@@ -225,18 +225,49 @@ class StatementHandlerMixin(KumirParserVisitor):
                     # Проверяем, есть ли ':' для среза (пока не поддерживаем присваивание срезам)
                     if index_list_ctx.COLON():
                         raise KumirNotImplementedError(
-                            f"Присваивание срезам таблиц ('{var_name}[{index_list_ctx.getText()}]') пока не поддерживается.",
+                            f"Присваивание срезам ('{var_name}[{index_list_ctx.getText()}]') пока не поддерживается.",
                             line_index=index_list_ctx.start.line-1,
                             column_index=index_list_ctx.start.column
                         )
 
-                    kiv_self.scope_manager.update_table_element(
-                        var_name,
-                        indices,
-                        value_to_assign,
-                        line_index=lvalue_ctx.start.line -1,
-                        column_index=lvalue_ctx.start.column
-                    )
+                    # Проверяем, является ли переменная строкой
+                    try:
+                        var_info = kiv_self.scope_manager.get_variable_info(var_name)
+                        if (not var_info['is_table'] and 
+                            isinstance(var_info['value'], KumirValue) and 
+                            var_info['value'].kumir_type == KumirType.STR.value):
+                            # Это строка - используем специальную функцию для символов
+                            if len(indices) != 1:
+                                raise KumirTypeError(
+                                    f"Для присваивания символу строки нужен один индекс, получено {len(indices)}.",
+                                    line_index=lvalue_ctx.start.line -1,
+                                    column_index=lvalue_ctx.start.column
+                                )
+                            kiv_self.scope_manager.update_string_character(
+                                var_name,
+                                indices[0],
+                                value_to_assign,
+                                line_index=lvalue_ctx.start.line -1,
+                                column_index=lvalue_ctx.start.column
+                            )
+                        else:
+                            # Это таблица - используем обычную функцию
+                            kiv_self.scope_manager.update_table_element(
+                                var_name,
+                                indices,
+                                value_to_assign,
+                                line_index=lvalue_ctx.start.line -1,
+                                column_index=lvalue_ctx.start.column
+                            )
+                    except KumirNameError:
+                        # Переменная не найдена - пытаемся обработать как таблицу
+                        kiv_self.scope_manager.update_table_element(
+                            var_name,
+                            indices,
+                            value_to_assign,
+                            line_index=lvalue_ctx.start.line -1,
+                            column_index=lvalue_ctx.start.column
+                        )
                 else: # Присваивание обычной переменной
                     kiv_self.scope_manager.update_variable(
                         var_name,
@@ -271,7 +302,11 @@ class StatementHandlerMixin(KumirParserVisitor):
                 precision = None
                 formatted_str = ""
                 
-                if arg_ctx.expression():
+                if arg_ctx.NEWLINE_CONST():
+                    # Обработка константы новой строки 'нс'
+                    formatted_str = "\n"
+                    print(f"[DEBUG] Processing NEWLINE_CONST: adding newline", file=sys.stderr)
+                elif arg_ctx.expression():
                     # arg_ctx.expression() возвращает список выражений
                     expressions = arg_ctx.expression()
                     if expressions:
@@ -1022,11 +1057,19 @@ class StatementHandlerMixin(KumirParserVisitor):
         
         # Получаем информацию о процедуре
         proc_name_lower = procedure_name.lower()
-        if proc_name_lower not in kiv_self.procedure_manager.procedures:
-            raise KumirNameError(f"Процедура '{procedure_name}' не определена.")
         
-        proc_data = kiv_self.procedure_manager.procedures[proc_name_lower]
-        formal_params_list = list(proc_data['params'].values())
+        # Проверяем встроенные процедуры
+        if hasattr(kiv_self, 'builtin_procedure_handler') and \
+           kiv_self.builtin_procedure_handler.is_builtin_procedure(procedure_name):
+            proc_info = kiv_self.builtin_procedure_handler.get_procedure_info(procedure_name)
+            formal_params_list = proc_info.get('params', [])
+        else:
+            # Пользовательская процедура
+            if proc_name_lower not in kiv_self.procedure_manager.procedures:
+                raise KumirNameError(f"Процедура '{procedure_name}' не определена.")
+            
+            proc_data = kiv_self.procedure_manager.procedures[proc_name_lower]
+            formal_params_list = list(proc_data['params'].values())
         
         # Проверяем количество аргументов
         if len(arg_expressions) != len(formal_params_list):
@@ -1038,8 +1081,20 @@ class StatementHandlerMixin(KumirParserVisitor):
         analyzed_args = []
         
         for i, (expr_ctx, formal_param) in enumerate(zip(arg_expressions, formal_params_list)):
-            param_mode = formal_param['mode']
-            param_name = formal_param.get('name', f'параметр {i+1}')
+            # Унифицированное извлечение параметров для встроенных и пользовательских процедур
+            if isinstance(formal_param, dict):
+                # Встроенная процедура - простой словарь {'name': ..., 'type': ..., 'mode': ...}
+                if 'mode' in formal_param:
+                    param_mode = formal_param['mode']
+                    param_name = formal_param.get('name', f'параметр {i+1}')
+                else:
+                    # Пользовательская процедура - сложная структура
+                    param_mode = formal_param.get('mode', 'арг')
+                    param_name = formal_param.get('name', f'параметр {i+1}')
+            else:
+                # Fallback для непредвиденной структуры
+                param_mode = 'арг'
+                param_name = f'параметр {i+1}'
             
             # DEBUG: анализ режима параметра убран для production
             pass

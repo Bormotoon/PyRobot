@@ -1,11 +1,11 @@
 # Built-in functions, their handlers, and the BUILTIN_FUNCTIONS dictionary 
 import math
 import random
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Optional, List, Dict
 from antlr4 import ParserRuleContext
 
 if TYPE_CHECKING:
-    from ..interpreter import KumirInterpreterVisitor # Для аннотации типов, избегаем циклического импорта
+    from ..main_visitor import KumirInterpreterVisitor # Для аннотации типов, избегаем циклического импорта
 
 from ..kumir_exceptions import KumirArgumentError, KumirEvalError
 from ..math_functions import irand as kumir_irand, rand as kumir_rand # Импортируем с псевдонимами
@@ -212,19 +212,6 @@ def handle_position(visitor: 'KumirInterpreterVisitor', sub_string: str, main_st
 
 # --- Строковые функции преобразования ---
 
-def handle_lit_to_int(visitor: 'KumirInterpreterVisitor', s_val: str, ctx: Optional[ParserRuleContext]) -> int:
-    """Обработчик для функции лит_в_цел(строка)."""
-    try:
-        return int(s_val.strip())
-    except ValueError:
-        l_content = visitor.get_line_content_from_ctx(ctx)
-        raise KumirEvalError(
-            f"Невозможно преобразовать строку '{s_val}' в целое число.",
-            line_index=ctx.start.line -1 if ctx else None, 
-            column_index=ctx.start.column if ctx else None,
-            line_content=l_content
-        )
-
 def handle_lit_to_int_with_success(visitor: 'KumirInterpreterVisitor', s_val: str, success_var, ctx: Optional[ParserRuleContext]) -> int:
     """Обработчик для функции лит_в_цел(строка, рез лог успех)."""
     try:
@@ -317,3 +304,89 @@ def handle_insert_substring(visitor: 'KumirInterpreterVisitor', fragment: str, t
     
     # Вставляем фрагмент
     return target_str[:insert_idx] + fragment + target_str[insert_idx:]
+
+# --- Новые обработчики процедур ---
+
+def handle_delete_substring_procedure(visitor: 'KumirInterpreterVisitor', analyzed_args: List[Dict], ctx: Optional[ParserRuleContext]) -> None:
+    """Обработчик процедуры удалить(аргрез лит строка, арг цел начало, арг цел количество)."""
+    # analyzed_args[0] - строка (аргрез)
+    # analyzed_args[1] - начало (арг) 
+    # analyzed_args[2] - количество (арг)
+    
+    if len(analyzed_args) != 3:
+        raise KumirArgumentError(f"Процедура 'удалить' ожидает 3 аргумента, получено {len(analyzed_args)}")
+    
+    # Извлекаем аргументы
+    string_arg = analyzed_args[0]
+    start_arg = analyzed_args[1] 
+    count_arg = analyzed_args[2]
+    
+    # Получаем значения
+    if string_arg['mode'] != 'аргрез':
+        raise KumirArgumentError("Первый параметр процедуры 'удалить' должен быть 'аргрез'")
+    
+    current_string = string_arg['variable_info']['current_value']
+    start_pos = start_arg['value']
+    count = count_arg['value']
+    
+    # Валидируем типы
+    if not isinstance(current_string, str):
+        current_string = str(current_string)
+    if not isinstance(start_pos, int):
+        start_pos = int(start_pos)
+    if not isinstance(count, int):
+        count = int(count)
+    
+    # Выполняем удаление
+    result_string = handle_delete_substring(visitor, current_string, start_pos, count, ctx)
+    
+    # Обновляем исходную переменную
+    var_name = string_arg['variable_info']['name']
+    visitor.scope_manager.update_variable(
+        var_name,
+        result_string,
+        line_index=ctx.start.line - 1 if ctx and ctx.start else 0,
+        column_index=ctx.start.column if ctx and ctx.start else 0
+    )
+
+def handle_insert_substring_procedure(visitor: 'KumirInterpreterVisitor', analyzed_args: List[Dict], ctx: Optional[ParserRuleContext]) -> None:
+    """Обработчик процедуры вставить(лит фрагмент, аргрез лит строка, арг цел начало)."""
+    # analyzed_args[0] - фрагмент (арг)
+    # analyzed_args[1] - строка (аргрез)
+    # analyzed_args[2] - начало (арг)
+    
+    if len(analyzed_args) != 3:
+        raise KumirArgumentError(f"Процедура 'вставить' ожидает 3 аргумента, получено {len(analyzed_args)}")
+    
+    # Извлекаем аргументы
+    fragment_arg = analyzed_args[0]
+    string_arg = analyzed_args[1]
+    start_arg = analyzed_args[2]
+    
+    # Получаем значения
+    if string_arg['mode'] != 'аргрез':
+        raise KumirArgumentError("Второй параметр процедуры 'вставить' должен быть 'аргрез'")
+    
+    fragment = fragment_arg['value']
+    current_string = string_arg['variable_info']['current_value']
+    start_pos = start_arg['value']
+    
+    # Валидируем типы
+    if not isinstance(fragment, str):
+        fragment = str(fragment)
+    if not isinstance(current_string, str):
+        current_string = str(current_string)
+    if not isinstance(start_pos, int):
+        start_pos = int(start_pos)
+    
+    # Выполняем вставку
+    result_string = handle_insert_substring(visitor, fragment, current_string, start_pos, ctx)
+    
+    # Обновляем исходную переменную
+    var_name = string_arg['variable_info']['name']
+    visitor.scope_manager.update_variable(
+        var_name,
+        result_string,
+        line_index=ctx.start.line - 1 if ctx and ctx.start else 0,
+        column_index=ctx.start.column if ctx and ctx.start else 0
+    )
