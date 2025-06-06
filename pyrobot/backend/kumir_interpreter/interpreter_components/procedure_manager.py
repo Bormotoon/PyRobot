@@ -270,15 +270,35 @@ class ProcedureManager:
                     new_value = param_var_info['value']
                     print(f"[DEBUG] call_procedure_with_analyzed_args: новое значение '{param_name}' = {new_value}", file=sys.stderr)
                     
-                    # Обновляем исходную переменную в соответствующей области видимости
-                    # Используем стандартный update_variable, который найдет переменную сам
-                    self.visitor.scope_manager.update_variable(
-                        original_var_name,
-                        new_value,
-                        line_index=line_index,
-                        column_index=column_index
-                    )
-                    print(f"[DEBUG] call_procedure_with_analyzed_args: обновили исходную переменную '{original_var_name}' = {new_value}", file=sys.stderr)
+                    # Обновляем исходную переменную в КОНКРЕТНОЙ области видимости
+                    # scope_depth = 0 означает текущую область (когда анализировали аргументы ВНЕ процедуры)
+                    # scope_depth = 1 означает родительскую область (когда анализировали аргументы ВНЕ процедуры)
+                    # Но сейчас мы ВНУТРИ процедуры, поэтому нужно скорректировать:
+                    # target_scope_index = len(scopes) - 2 - scope_depth (вычитаем 2: одну за процедуру, одну за базовый индекс)
+                    target_scope_index = len(self.visitor.scope_manager.scopes) - 2 - scope_depth
+                    if 0 <= target_scope_index < len(self.visitor.scope_manager.scopes):
+                        target_scope = self.visitor.scope_manager.scopes[target_scope_index]
+                        original_var_name_lower = original_var_name.lower()
+                        if original_var_name_lower in target_scope:
+                            # Проверяем совместимость типов
+                            var_info_in_target = target_scope[original_var_name_lower]
+                            target_kumir_type = var_info_in_target['kumir_type']
+                            
+                            if new_value.kumir_type == target_kumir_type.value:
+                                target_scope[original_var_name_lower]['value'] = new_value
+                                target_scope[original_var_name_lower]['initialized'] = True
+                                print(f"[DEBUG] call_procedure_with_analyzed_args: обновили исходную переменную '{original_var_name}' = {new_value}", file=sys.stderr)
+                            elif target_kumir_type == KumirType.REAL and new_value.kumir_type == KumirType.INT.value:
+                                converted_value = KumirValue(float(new_value.value), KumirType.REAL.value)
+                                target_scope[original_var_name_lower]['value'] = converted_value
+                                target_scope[original_var_name_lower]['initialized'] = True
+                                print(f"[DEBUG] call_procedure_with_analyzed_args: обновили исходную переменную '{original_var_name}' = {converted_value} (конвертировано)", file=sys.stderr)
+                            else:
+                                print(f"[DEBUG] call_procedure_with_analyzed_args: ОШИБКА - несовместимые типы при копировании '{param_name}' -> '{original_var_name}': {new_value.kumir_type} vs {target_kumir_type.value}", file=sys.stderr)
+                        else:
+                            print(f"[DEBUG] call_procedure_with_analyzed_args: ОШИБКА - переменная '{original_var_name}' не найдена в целевой области видимости", file=sys.stderr)
+                    else:
+                        print(f"[DEBUG] call_procedure_with_analyzed_args: ОШИБКА - некорректный target_scope_index {target_scope_index} для scope_depth {scope_depth}", file=sys.stderr)
                 else:
                     print(f"[DEBUG] call_procedure_with_analyzed_args: ОШИБКА - не найден параметр '{param_name}' в локальной области", file=sys.stderr)
         
