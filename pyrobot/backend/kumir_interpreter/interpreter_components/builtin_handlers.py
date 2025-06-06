@@ -118,12 +118,14 @@ BUILTIN_FUNCTIONS = {
     },
     'лит_в_цел': {
         'min_args': 1, 'max_args': 2, # может быть с параметром успех или без
-        'arg_types': [['лит'], ['лит', 'лог']], # TODO: нужно уточнить формат для рез параметров
+        'arg_types': [['лит'], ['лит', 'лог']], 
+        'param_modes': [['арг'], ['арг', 'рез']], # первый параметр - арг, второй (если есть) - рез
         'handler': lambda visitor_self, args, ctx: bf.handle_lit_to_int(visitor_self, args[0], ctx) if len(args) == 1 else bf.handle_lit_to_int_with_success(visitor_self, args[0], args[1], ctx)
     },
     'лит_в_вещ': {
         'min_args': 1, 'max_args': 2,
         'arg_types': [['лит'], ['лит', 'лог']], 
+        'param_modes': [['арг'], ['арг', 'рез']], # первый параметр - арг, второй (если есть) - рез
         'handler': lambda visitor_self, args, ctx: bf.handle_lit_to_real(visitor_self, args[0], ctx) if len(args) == 1 else bf.handle_lit_to_real_with_success(visitor_self, args[0], args[1], ctx)
     },
     'цел_в_лит': {

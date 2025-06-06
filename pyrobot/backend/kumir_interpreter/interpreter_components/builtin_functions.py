@@ -217,10 +217,18 @@ def handle_lit_to_int_with_success(visitor: 'KumirInterpreterVisitor', s_val: st
     """Обработчик для функции лит_в_цел(строка, рез лог успех)."""
     try:
         result = int(s_val.strip())
-        # TODO: установить success_var в True
+        # Устанавливаем успех в True
+        success_value = KumirValue(True, KumirType.BOOL.value)
+        visitor.scope_manager.update_variable(success_var, success_value, 
+                                           ctx.start.line - 1 if ctx else 0, 
+                                           ctx.start.column if ctx else 0)
         return result
     except ValueError:
-        # TODO: установить success_var в False
+        # Устанавливаем успех в False
+        success_value = KumirValue(False, KumirType.BOOL.value)
+        visitor.scope_manager.update_variable(success_var, success_value,
+                                           ctx.start.line - 1 if ctx else 0, 
+                                           ctx.start.column if ctx else 0)
         return 0
 
 def handle_lit_to_real(visitor: 'KumirInterpreterVisitor', s_val: str, ctx: Optional[ParserRuleContext]) -> float:
@@ -243,10 +251,18 @@ def handle_lit_to_real_with_success(visitor: 'KumirInterpreterVisitor', s_val: s
     try:
         cleaned_s = s_val.strip().replace(',', '.')
         result = float(cleaned_s)
-        # TODO: установить success_var в True
+        # Устанавливаем успех в True
+        success_value = KumirValue(True, KumirType.BOOL.value)
+        visitor.scope_manager.update_variable(success_var, success_value,
+                                           ctx.start.line - 1 if ctx else 0, 
+                                           ctx.start.column if ctx else 0)
         return result
     except ValueError:
-        # TODO: установить success_var в False
+        # Устанавливаем успех в False
+        success_value = KumirValue(False, KumirType.BOOL.value)
+        visitor.scope_manager.update_variable(success_var, success_value,
+                                           ctx.start.line - 1 if ctx else 0, 
+                                           ctx.start.column if ctx else 0)
         return 0.0
 
 def handle_int_to_lit(visitor: 'KumirInterpreterVisitor', int_val: int, ctx: Optional[ParserRuleContext]) -> str:

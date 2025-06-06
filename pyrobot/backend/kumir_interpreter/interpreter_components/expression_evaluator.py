@@ -667,18 +667,20 @@ class ExpressionEvaluator(KumirParserVisitor):
                 # Это вызов функции - обрабатываем аргументы
                 # Следующий элемент должен быть argumentList или RPAREN
                 args = []
+                arg_expressions = []
                 arg_list_idx = i + 1
                 if arg_list_idx < ctx.getChildCount():
                     next_child = ctx.getChild(arg_list_idx)
                     # Если есть argumentList, обрабатываем аргументы
                     if hasattr(next_child, 'expression') and callable(getattr(next_child, 'expression')):
-                        # Это argumentList
+                        # Это argumentList - сохраняем исходные выражения и вычисляем значения
+                        arg_expressions = self._get_argument_expressions(next_child)
                         args = self._evaluate_argument_list(next_child)
                 
                 # primary_expr должно содержать имя функции
                 if hasattr(primary_expr, 'value') and isinstance(primary_expr.value, str):
                     func_name = primary_expr.value
-                    return self._call_function(func_name, args, ctx)
+                    return self._call_function(func_name, args, arg_expressions, ctx)
                 else:
                     pos = self._position_from_token(self._get_token_for_position(ctx))
                     raise KumirEvalError(f"Невозможно вызвать функцию: {primary_expr}", line_index=pos[0], column_index=pos[1])
@@ -919,7 +921,20 @@ class ExpressionEvaluator(KumirParserVisitor):
                 args.append(result)
         return args
     
-    def _call_function(self, func_name: str, args: list, ctx) -> KumirValue:
+    def _get_argument_expressions(self, arg_list_ctx):
+        """Извлекает исходные AST-узлы аргументов без их вычисления"""
+        expressions = []
+        if hasattr(arg_list_ctx, 'expression') and callable(getattr(arg_list_ctx, 'expression')):
+            # argumentList: expression (COMMA expression)*
+            expr_nodes = arg_list_ctx.expression()
+            if isinstance(expr_nodes, list):
+                expressions = expr_nodes
+            else:
+                # Только один аргумент
+                expressions = [expr_nodes]
+        return expressions
+
+    def _call_function(self, func_name: str, args: list, arg_expressions: list, ctx) -> KumirValue:
         """Вызывает встроенную функцию с аргументами"""
         
         # Обрабатываем арифметические встроенные функции
@@ -977,13 +992,42 @@ class ExpressionEvaluator(KumirParserVisitor):
             if func_name.lower() in builtin_handler.functions:
                 print(f"[DEBUG] Найдена встроенная функция '{func_name}', вызываем через builtin_function_handler", file=sys.stderr)
                 try:
-                    # Преобразуем аргументы в правильный формат (извлекаем значения из KumirValue)
+                    # Получаем информацию о функции для определения типов параметров
+                    func_info = builtin_handler.functions[func_name.lower()]
+                    param_modes = func_info.get('param_modes', [])
+                    
+                    # Подготавливаем аргументы согласно param_modes
                     raw_args = []
-                    for arg in args:
-                        if isinstance(arg, KumirValue):
-                            raw_args.append(arg.value)
+                    for i, arg in enumerate(args):
+                        # Определяем режим параметра
+                        if i < len(param_modes) and len(param_modes) > 0:
+                            # Есть информация о режимах для текущего количества аргументов
+                            if len(args) <= len(param_modes):
+                                mode_list = param_modes[len(args) - 1]  # Выбираем режимы для нужного количества аргументов
+                                if i < len(mode_list):
+                                    param_mode = mode_list[i]
+                                else:
+                                    param_mode = 'арг'  # по умолчанию
+                            else:
+                                param_mode = 'арг'  # по умолчанию
                         else:
-                            raw_args.append(arg)
+                            param_mode = 'арг'  # по умолчанию
+                        
+                        if param_mode == 'рез':
+                            # Для параметров "рез" нужно передать имя переменной
+                            if i < len(arg_expressions):
+                                var_name = self._extract_variable_name(arg_expressions[i])
+                                raw_args.append(var_name)
+                            else:
+                                # Ошибка - не хватает выражений
+                                pos = self._position_from_token(self._get_token_for_position(ctx))
+                                raise KumirArgumentError(f"Недостаточно аргументов для функции '{func_name}'", line_index=pos[0], column_index=pos[1])
+                        else:
+                            # Для параметров "арг" передаем значение
+                            if isinstance(arg, KumirValue):
+                                raw_args.append(arg.value)
+                            else:
+                                raw_args.append(arg)
                     
                     # Вызываем встроенную функцию
                     result = builtin_handler.call_function(func_name, raw_args, ctx)
@@ -1062,3 +1106,36 @@ class ExpressionEvaluator(KumirParserVisitor):
             elements.append(element_value.value)
         
         return KumirValue(value=elements, kumir_type=KumirType.TABLE.value)
+    
+    def _extract_variable_name(self, expr_ctx):
+        """Извлекает имя переменной из AST-узла выражения"""
+        # Проверяем, является ли это простым идентификатором
+        if hasattr(expr_ctx, 'getRuleIndex') and expr_ctx.getRuleIndex() == KumirParser.RULE_logicalOrExpression:
+            # Идем по цепочке: logicalOrExpression -> logicalAndExpression -> ... -> qualifiedIdentifier
+            return self._extract_variable_name_recursive(expr_ctx)
+        else:
+            # Попробуем извлечь текст напрямую
+            text = expr_ctx.getText()
+            return text
+    
+    def _extract_variable_name_recursive(self, ctx):
+        """Рекурсивно извлекает имя переменной из сложных выражений"""
+        # Если есть только один дочерний элемент, идем глубже
+        if ctx.getChildCount() == 1:
+            child = ctx.getChild(0)
+            if hasattr(child, 'getRuleIndex'):
+                return self._extract_variable_name_recursive(child)
+            elif hasattr(child, 'getText'):
+                return child.getText()
+        
+        # Если это qualifiedIdentifier
+        if hasattr(ctx, 'getRuleIndex') and ctx.getRuleIndex() == KumirParser.RULE_qualifiedIdentifier:
+            if hasattr(ctx, 'ID') and ctx.ID():
+                return ctx.ID().getText()
+        
+        # Если это primaryExpression с qualifiedIdentifier
+        if hasattr(ctx, 'qualifiedIdentifier') and ctx.qualifiedIdentifier():
+            return self._extract_variable_name_recursive(ctx.qualifiedIdentifier())
+        
+        # Fallback - просто возвращаем текст
+        return ctx.getText()
