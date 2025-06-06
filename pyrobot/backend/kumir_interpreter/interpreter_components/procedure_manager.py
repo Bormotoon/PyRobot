@@ -299,11 +299,18 @@ class ProcedureManager:
     def is_procedure_defined(self, name: str) -> bool:
         """Проверяет, определена ли процедура с таким именем (не функция)."""
         name_lower = name.lower()
+        
+        # Сначала проверяем пользовательские процедуры
         proc_data = self.procedures.get(name_lower)
-        if not proc_data:
-            return False
-        # Процедура - это алгоритм, который НЕ является функцией
-        return not proc_data.get('is_function', False)
+        if proc_data:
+            # Процедура - это алгоритм, который НЕ является функцией
+            return not proc_data.get('is_function', False)
+        
+        # Затем проверяем встроенные процедуры
+        if hasattr(self.visitor, 'builtin_procedure_handler'):
+            return name_lower in self.visitor.builtin_procedure_handler.procedures
+            
+        return False
 
     def get_function_definition(self, name: str, error_ctx: Optional[ParserRuleContext] = None) -> KumirFunction:
         """

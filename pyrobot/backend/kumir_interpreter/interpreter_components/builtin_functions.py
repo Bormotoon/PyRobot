@@ -8,6 +8,7 @@ if TYPE_CHECKING:
     from ..main_visitor import KumirInterpreterVisitor # Для аннотации типов, избегаем циклического импорта
 
 from ..kumir_exceptions import KumirArgumentError, KumirEvalError
+from ..kumir_datatypes import KumirValue, KumirType
 from ..math_functions import irand as kumir_irand, rand as kumir_rand # Импортируем с псевдонимами
 
 # --- Математические функции ---
@@ -329,22 +330,31 @@ def handle_delete_substring_procedure(visitor: 'KumirInterpreterVisitor', analyz
     start_pos = start_arg['value']
     count = count_arg['value']
     
-    # Валидируем типы
+    # Валидируем типы и извлекаем значения из KumirValue, если необходимо
+    if hasattr(current_string, 'value'):  # KumirValue
+        current_string = current_string.value
     if not isinstance(current_string, str):
         current_string = str(current_string)
+        
+    if hasattr(start_pos, 'value'):  # KumirValue
+        start_pos = start_pos.value
     if not isinstance(start_pos, int):
         start_pos = int(start_pos)
+        
+    if hasattr(count, 'value'):  # KumirValue
+        count = count.value
     if not isinstance(count, int):
         count = int(count)
     
     # Выполняем удаление
     result_string = handle_delete_substring(visitor, current_string, start_pos, count, ctx)
     
-    # Обновляем исходную переменную
+    # Обновляем исходную переменную (оборачиваем в KumirValue)
+    kumir_result = KumirValue(result_string, KumirType.STR.value)
     var_name = string_arg['variable_info']['name']
     visitor.scope_manager.update_variable(
         var_name,
-        result_string,
+        kumir_result,
         line_index=ctx.start.line - 1 if ctx and ctx.start else 0,
         column_index=ctx.start.column if ctx and ctx.start else 0
     )
@@ -371,22 +381,31 @@ def handle_insert_substring_procedure(visitor: 'KumirInterpreterVisitor', analyz
     current_string = string_arg['variable_info']['current_value']
     start_pos = start_arg['value']
     
-    # Валидируем типы
+    # Валидируем типы и извлекаем значения из KumirValue, если необходимо
+    if hasattr(fragment, 'value'):  # KumirValue
+        fragment = fragment.value
     if not isinstance(fragment, str):
         fragment = str(fragment)
+        
+    if hasattr(current_string, 'value'):  # KumirValue
+        current_string = current_string.value
     if not isinstance(current_string, str):
         current_string = str(current_string)
+        
+    if hasattr(start_pos, 'value'):  # KumirValue
+        start_pos = start_pos.value
     if not isinstance(start_pos, int):
         start_pos = int(start_pos)
     
     # Выполняем вставку
     result_string = handle_insert_substring(visitor, fragment, current_string, start_pos, ctx)
     
-    # Обновляем исходную переменную
+    # Обновляем исходную переменную (оборачиваем в KumirValue)
+    kumir_result = KumirValue(result_string, KumirType.STR.value)
     var_name = string_arg['variable_info']['name']
     visitor.scope_manager.update_variable(
         var_name,
-        result_string,
+        kumir_result,
         line_index=ctx.start.line - 1 if ctx and ctx.start else 0,
         column_index=ctx.start.column if ctx and ctx.start else 0
     )
