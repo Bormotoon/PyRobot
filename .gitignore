@@ -176,6 +176,7 @@ antlr4-4.6/
 test_log.txt
 .vscode/
 .github/copilot-instructions.md
+polyakov_kurs_work/
 
 
 # Ignore temp and logs dirs
