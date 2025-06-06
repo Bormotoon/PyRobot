@@ -611,11 +611,9 @@ class StatementHandlerMixin(KumirParserVisitor):
                                            line_index=arg_ctx.start.line -1,
                                            column_index=arg_ctx.start.column)
             
-            # Выводим эхо всех введенных значений одной строкой через пробел
-            if echo_values:
-                echo_line = ' '.join(echo_values) + '\n'
-                kiv_self.io_handler.write_output(echo_line)
-        
+            # Выводим эхо всех введенных значений одной строкой через пробел        if echo_values:
+            echo_line = ' '.join(echo_values) + '\n'
+            kiv_self.io_handler.write_output(echo_line)
         return None
 
     def visitIfStatement(self, ctx: KumirParser.IfStatementContext) -> None:

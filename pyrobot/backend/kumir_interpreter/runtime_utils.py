@@ -81,7 +81,7 @@ def interpret_kumir(code: str, input_data: Optional[str] = None) -> str:
 
     def input_fn():
         line = input_buffer.readline()
-        result = line.rstrip('\\r\\n')
+        result = line.rstrip('\r\n')
         print(f"[DEBUG INPUT_FN] readline(): {line!r}, after rstrip: {result!r}", file=sys.stderr)
         return result
     
