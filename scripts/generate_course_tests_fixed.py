@@ -79,11 +79,11 @@ def clean_task_name_for_function(name: str) -> str:
     # Заменяем пробелы и дефисы на подчеркивания
     cleaned = re.sub(r'[\s\-]+', '_', cleaned)
     # Убираем множественные подчеркивания
-    cleaned = re.sub(r'_+', '_', cleaned)    # Убираем подчеркивания в начале и конце
+    cleaned = re.sub(r'_+', '_', cleaned)
+    # Убираем подчеркивания в начале и конце
     cleaned = cleaned.strip('_')
-    # Обрезаем до разумной длины (без многоточия для имен функций)
-    if len(cleaned) > 60:
-        cleaned = cleaned[:60].rstrip('_')
+    # Обрезаем до разумной длины (меньше, чтобы поместилось с префиксами)
+    cleaned = truncate_text(cleaned, 60)
     return cleaned if cleaned else "unnamed_task"
 
 
@@ -570,9 +570,10 @@ def generate_test_file_content(course_name: str, tasks_with_solutions: Dict[str,
             solution_algorithm = solution_code
           # Генерируем простую тестовую программу
         test_kumir_program = generate_simple_test_kumir_program(solution_algorithm, task_name)
-          # Создаем имя тестовой функции
-        safe_course_name = clean_task_name_for_function(course_name)
-        safe_task_name = clean_task_name_for_function(task_name)
+        
+        # Создаем имя тестовой функции
+        safe_course_name = sanitize_filename(course_name)
+        safe_task_name = sanitize_filename(task_name)
         test_func_name = f"test_{safe_course_name}_{safe_task_name}_{task_id}"
         
         # Создаем pytest-тест
