@@ -541,17 +541,59 @@ def generate_test_file_content(course_name: str, tasks_with_solutions: Dict[str,
         course_name: Имя курса
         tasks_with_solutions: Dict[task_id, {name, id, solution?}]
     """
-    
-    # Читаем шаблон тестов
+      # Создаём базовый шаблон с необходимыми импортами и функцией run_kumir_program
+    base_template = '''import pytest  # type: ignore
+import os
+import sys
+from io import StringIO
+
+from pyrobot.backend.kumir_interpreter.runtime_utils import interpret_kumir
+from pyrobot.backend.kumir_interpreter.kumir_exceptions import KumirSyntaxError, KumirEvalError
+
+
+def run_kumir_program(program_path: str, input_data: str | None = None) -> str:
+    """
+    Запускает программу КуМир и возвращает её стандартный вывод.
+
+    Args:
+        program_path (str): Путь к файлу программы .kum
+        input_data (str, optional): Строка с входными данными. Defaults to None.
+
+    Returns:
+        str: Стандартный вывод программы.
+    """
+    original_stdin = sys.stdin
+    original_stdout = sys.stdout
+    original_stderr = sys.stderr
+
+    input_buffer = StringIO(input_data if input_data else "")
+    actual_output_value = ""
+
     try:
-        with open(TEST_TEMPLATE_PATH, "r", encoding="utf-8") as f:
-            template_content = f.read()
-    except FileNotFoundError:
-        print(f"❌ Файл шаблона {TEST_TEMPLATE_PATH} не найден")
-        return ""
+        with open(program_path, 'r', encoding='utf-8') as f:
+            code = f.read()
+            code = code.replace('\\r\\n', '\\n').replace('\\r', '\\n')
+        sys.stdin = input_buffer
+
+        actual_output_value = interpret_kumir(code, input_data)
+    except KumirSyntaxError as e:
+        pytest.fail(f"KumirSyntaxError for {program_path}: {e}")
+    except KumirEvalError as e:
+        actual_output_value += f"\\nОШИБКА ВЫПОЛНЕНИЯ: {e}\\n"
+        pytest.fail(f"KumirEvalError for {program_path}: {e}")
     except Exception as e:
-        print(f"❌ Ошибка чтения шаблона: {e}")
-        return ""    # Генерируем тестовые функции
+        import traceback
+        traceback.print_exc(file=original_stderr)
+        pytest.fail(f"Unexpected exception for {program_path}: {e}")
+    finally:
+        sys.stdin = original_stdin
+        sys.stdout = original_stdout
+        sys.stderr = original_stderr
+
+    if actual_output_value and not actual_output_value.endswith('\\n'):
+        actual_output_value += '\\n'
+    return actual_output_value
+'''# Генерируем тестовые функции
     test_functions: List[str] = []
     
     for task_id, data in tasks_with_solutions.items():
@@ -574,10 +616,9 @@ def generate_test_file_content(course_name: str, tasks_with_solutions: Dict[str,
         safe_course_name = clean_task_name_for_function(course_name)
         safe_task_name = clean_task_name_for_function(task_name)
         test_func_name = f"test_{safe_course_name}_{safe_task_name}_{task_id}"
-        
-        # Создаем pytest-тест
+          # Создаем pytest-тест
         test_function = f"""
-def {test_func_name}(run_kumir_code_func, tmp_path):
+def {test_func_name}(tmp_path):
     \"\"\"
     Тест для задачи: {task_name} (ID: {task_id})
     Курс: {course_name}
@@ -589,13 +630,16 @@ def {test_func_name}(run_kumir_code_func, tmp_path):
     with open(test_file, "w", encoding="utf-8") as f:
         f.write(kumir_code)
     
-    # Запускаем интерпретатор
-    result = run_kumir_code_func(str(test_file))
-    
-    # Проверяем, что код выполнился без ошибок
-    assert result.return_code == 0, f"Код завершился с ошибкой: {{result.stderr_output}}"
-      # TODO: Добавить проверку конкретного вывода для каждой задачи
-    print(f"Тест {test_func_name} выполнен. Вывод: {{result.stdout_output[:100]}}")
+    # Запускаем интерпретатор через существующую функцию
+    try:
+        output = run_kumir_program(str(test_file))
+        print(f"Test {test_func_name} completed successfully. Output: {{output[:100]}}")
+    except KumirSyntaxError as e:
+        pytest.fail(f"KumirSyntaxError in {test_func_name}: {{e}}")
+    except KumirEvalError as e:
+        pytest.fail(f"KumirEvalError in {test_func_name}: {{e}}")
+    except Exception as e:
+        pytest.fail(f"Unexpected error in {test_func_name}: {{e}}")
 """
         
         test_functions.append(test_function)
@@ -604,10 +648,8 @@ def {test_func_name}(run_kumir_code_func, tmp_path):
     if not test_functions:
         print(f"⚠️  Нет тестов для генерации в курсе {course_name}")
         return ""
-    
-    # Собираем итоговый файл
-    # Берем шаблон и добавляем наши тесты в конец
-    final_content = template_content.rstrip() + "\n\n"
+      # Собираем итоговый файл
+    final_content = base_template.rstrip() + "\n\n"
     final_content += f"# Автогенерированные тесты для курса: {course_name}\n"
     final_content += f"# Сгенерировано: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
     final_content += "\n".join(test_functions)

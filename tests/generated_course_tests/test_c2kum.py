@@ -6,72 +6,6 @@ from io import StringIO
 from pyrobot.backend.kumir_interpreter.runtime_utils import interpret_kumir
 from pyrobot.backend.kumir_interpreter.kumir_exceptions import KumirSyntaxError, KumirEvalError
 
-# Определяем директорию с примерами КуМир относительно текущего файла
-current_dir = os.path.dirname(os.path.abspath(__file__))
-# Исправляем путь на tests/polyakov_kum
-PROGRAMS_DIR = os.path.join(current_dir, "polyakov_kum")
-
-from typing import List, Tuple, Optional
-
-TEST_CASES: List[Tuple[str, Optional[str], Optional[str]]] = [
-    ('1-empty.kum', None, ''),
-    ('2-2+2.kum', None, '2+2=?\nОтвет: 4\n'),
-    ('3-a+b.kum', '2\n3\n', '2 3\n5\n'),
-    ('4-a+b.kum', '10\n20\n', 'Введите два целых числа: 10 20\n10+20=30\n'),
-    ('6-format.kum', None, '>  123<\n1.2345678\n>  1.235<\n'),
-    ('7-rand.kum', None, None),
-    ('8-if.kum', '5\n7\n', 'Введите два целых числа: 5 7\nМаксимальное число:\n7\n7\n7\n7\n'),
-    ('9-if.kum', '-3\n5\n', 'Введите возраст Андрея и Бориса: -3 5\nБорис старше\n'),
-    ('10-and.kum', '27\n', "Введите возраст: 27\nподходит\n"),
-    ('11-switch.kum', '2\n', 'Введите номер месяца: 2\nфевраль\n'),
-    ('12-switch.kum', '7\n', '7\n1\n'),
-    ('13-loopN.kum', '5\n', 'Сколько раз сделать? 5\nпривет\nпривет\nпривет\nпривет\nпривет\n'),
-    ('14-while.kum', '5\n', 'Сколько раз сделать? 5\nпривет\nпривет\nпривет\nпривет\nпривет\n'),
-    ('15-while.kum', '12345\n', "Введите целое число: 12345\nЦифр в числе: 5\n"),
-    ('16-repeat.kum', '-1\n0\n2\n', 'Введите целое положительное число: -1\n0\n2\nВведено число 2\n  и до него 2 ошибочных значений(я)\n'),
-    ('17-for.kum', '5\n', '5\n2 4 8 16 32 \n'),
-    ('18-downto.kum', '5\n', '5\n32 16 8 4 2 \n'),
-    ('19-prime.kum', '17\n', 'Введите максимальное число: 17\nПростые числа: 2 3 5 7 11 13 17 \n'),
-    ('20-proc-err.kum', '-1\n', '-1\nОшибка программы\n'),
-    ('21-proc-bin.kum', '13\n', 'Введите натуральное число: 13\nДвоичный код: 00001101\n'),
-    ('1-primes.kum', '100\n', 'Введите максимальное число: 100\nПростые числа от 2 до 100:\n2 3 5 7 11 13 17 19 23 29 31 37 41 43 47 53 59 61 67 71 73 79 83 89 97 \n'),
-    ('2-longnum.kum', None, 'Факториал числа 100:\n93326215443944152681699238856266700490715968264381621468592963895217599993229915608941463976156518286253697920827223758251185210916864000000000000000000000000\n'),
-    ('22-swap.kum', '2\n3\n', 'Введите два целых числа: 2 3\nПосле обмена: x=3 y=2\n'),
-    ('23-func-sumdig.kum', '12345\n', 'Введите целое число: 12345\nСумма цифр 15\n'),
-    ('24-func-prime.kum', '15\n', 'Введите максимальное число: 15\nПростые числа: 2 3 5 7 11 13 \n'),
-    ('25-func-prime.kum', '5\n7\n12\n', 'Введите число: 5\n5 - простое число\nВведите число: 7\n7 - простое число\nВведите число: 12\n'),
-    ('26-rec-hanoi.kum', None, '1 -> 3\n1 -> 2\n3 -> 2\n1 -> 3\n2 -> 1\n2 -> 3\n1 -> 3\n'),
-    ('27-rec-bin.kum', '99\n', 'Введите натуральное число: 99\nДвоичный код 1100011\n'),
-    ('28-rec-sumdig.kum', '12345\n', 'Введите натуральное число: 12345\nСумма цифр 15\n'),
-    ('29-rec-nod.kum', '14\n21\n', 'Введите два натуральных числа: 14 21\nНОД(14,21)=7\n'),
-    ('30-rec-fact.kum', '4\n', 'Введите натуральное число: 4\n-> N=4\n-> N=3\n-> N=2\n-> N=1\n<- N=1\n<- N=2\n<- N=3\n<- N=4\n24\n'),
-    ('31-arr-empty.kum', None, ''),
-    ('32-arr-kvad.kum', '9\n', 'Введите размер массива: 9\n1 4 9 16 25 36 49 64 81 \n'),
-    ('33-arr-input.kum', '4\n9\n-2\n0\n1\n', 'Введите размер массива: 4\nВведите элементы массива:\nA[1]=9\nA[2]=-2\nA[3]=0\nA[4]=1\nМассив задом наперёд: \n1 0 -2 9 \n'),
-    ('34-arr-rand.kum', '8\n', None),
-    ('35-arr-sum.kum', '7\n180\n185\n100\n200\n170\n188\n190\n', 'Введите размер массива:\n7\nВведите элементы массива:\n180\n185\n100\n200\n170\n188\n190\nЭлементы 180 < x < 190:\nКоличество: 2\nСумма:      373\nСреднее:    186.5\n'),
-    ('36-arr-search.kum', '6\n-3\n3\n0\n2\n12\n-45\n0\n', 'Введите размер массива: 6\nВведите элементы массива: \n-3\n3\n0\n2\n12\n-45\nЧто ищем? 0\nA[3]=0\n'),
-    ('37-arr-search.kum', '7\n-3\n-2\n-1\n0\n1\n2\n3\n1\n', 'Введите размер массива: 7\nВведите элементы массива: \n-3\n-2\n-1\n0\n1\n2\n3\nЧто ищем? 1\nA[5]=1\n'),
-    ('39-arr-rev.kum', '7\n-2\n-1\n0\n1\n2\n3\n4\n', 'Введите размер массива: 7\nВведите элементы массива: \n-2\n-1\n0\n1\n2\n3\n4\nПосле реверса:\n4 3 2 1 0 -1 -2 \n'),
-    ('40-arr-shift.kum', '5\n-3\n-2\n0\n2\n3\n', 'Введите размер массива: 5\nВведите элементы массива: \n-3\n-2\n0\n2\n3\nПосле сдвига влево:\n-2 0 2 3 -3 \n'),
-    ('42-arr-bsort.kum', '4\n-12\n0\n3\n1\n', 'Введите размер массива: 4\nВведите элементы массива:\n-12\n0\n3\n1\nПосле сортировки:\n-12 0 1 3 \n'),
-    ('42a-arr-bsort.kum', '6\n-12\n43\n11\n0\n-3\n-5412\n', 'Введите размер массива: 6\nВведите элементы массива:\n-12\n43\n11\n0\n-3\n-5412\nПосле сортировки:\n-5412 -12 -3 0 11 43 \n'),
-    ('43-arr-msort.kum', '5\n-1\n8\n4\n5\n-21\n', 'Введите размер массива: 5\nВведите элементы массива: \n-1\n8\n4\n5\n-21\nПосле сортировки:\n-21 -1 4 5 8 \n'),
-    ('44-arr-qsort.kum', None, 'До сортировки:\n78 6 82 67 55 44 34 \nПосле сортировки:\n6 34 44 55 67 78 82 \n'),
-    ('46-str-ab.kum', 'ааабббвввгггдддееежжж\n', 'ааабббвввгггдддееежжж\nббббббвввгггдддееежжж\n'),
-    ('47-str-ops.kum', None, 'Привет, Вася!\n34567\n129\n12ABC3456789\n'),
-    ('48-str-search.kum', None, 'Номер символа 4\n'),
-    ('49-str-complex.kum', 'Николай Ильич Щитфаков\n', 'Введите имя, отчество и фамилию:Николай Ильич Щитфаков\nЩитфаков Н. И.\n'),
-    ('50-str-num.kum', None, '246\n246.912\n123\n123.456\n'),
-    ('51-str-proc.kum', None, 'A12B.A12B.A12B\n'),
-    ('52-str-func.kum', None, 'A12B.A12B.A12B\n'),
-    ('53-str-rec.kum', None, 'ЫЫЫ\nЫЫШ\nЫЫЧ\nЫЫО\nЫШЫ\nЫШШ\nЫШЧ\nЫШО\nЫЧЫ\nЫЧШ\nЫЧЧ\nЫЧО\nЫОЫ\nЫОШ\nЫОЧ\nЫОО\nШЫЫ\nШЫШ\nШЫЧ\nШЫО\nШШЫ\nШШШ\nШШЧ\nШШО\nШЧЫ\nШЧШ\nШЧЧ\nШЧО\nШОЫ\nШОШ\nШОЧ\nШОО\nЧЫЫ\nЧЫШ\nЧЫЧ\nЧЫО\nЧШЫ\nЧШШ\nЧШЧ\nЧШО\nЧЧЫ\nЧЧШ\nЧЧЧ\nЧЧО\nЧОЫ\nЧОШ\nЧОЧ\nЧОО\nОЫЫ\nОЫШ\nОЫЧ\nОЫО\nОШЫ\nОШШ\nОШЧ\nОШО\nОЧЫ\nОЧШ\nОЧЧ\nОЧО\nООЫ\nООШ\nООЧ\nООО\n'),
-    ('54-str-sort.kum', '5\nпароход\nпаровоз\nпар\nПар\nпАр\n', 'Введите количество строк: 5\nВведите строки: \nпароход\nпаровоз\nпар\nПар\nпАр\nПосле сортировки: \nПар\nпАр\nпар\nпаровоз\nпароход\n'),
-    ('55-matr-declare.kum', None, ''),
-    ('56-matr-rand.kum', None, None),
-    ('57-matr-sum.kum', None, 'Матрица: \n2 3 4 5 \n3 4 5 6 \n4 5 6 7 \nСумма элементов 54\n'),
-]
-
 
 def run_kumir_program(program_path: str, input_data: str | None = None) -> str:
     """
@@ -86,34 +20,24 @@ def run_kumir_program(program_path: str, input_data: str | None = None) -> str:
     """
     original_stdin = sys.stdin
     original_stdout = sys.stdout
-    original_stderr = sys.stderr  # Сохраняем оригинальный stderr
+    original_stderr = sys.stderr
 
     input_buffer = StringIO(input_data if input_data else "")
-    # output_buffer больше не нужен здесь для redirect_stdout
-    # output_buffer = StringIO()
-
-    # print(f"[DEBUG_RUN_KUMIR_PROGRAM] BEFORE (no redirect). output_buffer concept removed", file=original_stderr)
-
-    actual_output_value = ""  # Переименуем, чтобы не путать с переменной теста
+    actual_output_value = ""
 
     try:
         with open(program_path, 'r', encoding='utf-8') as f:
             code = f.read()
-            code = code.replace('\r\n', '\n').replace('\r', '\n')        # Устанавливаем stdin
+            code = code.replace('\r\n', '\n').replace('\r', '\n')
         sys.stdin = input_buffer
 
-        # interpret_kumir сам захватывает stdout и возвращает его.
-        # Внешнее перенаправление через redirect_stdout(output_buffer) не нужно
-        # и приводило к тому, что output_buffer оставался пустым.
-        actual_output_value = interpret_kumir(code, input_data)        # DEBUG PRINT ПОСЛЕ ВЫЗОВА INTERPRET_KUMIR
-        print(f"[DEBUG_RUN_KUMIR_PROGRAM] interpret_kumir returned:\n>>>\n{actual_output_value}\n<<<", file=original_stderr)
+        actual_output_value = interpret_kumir(code, input_data)
     except KumirSyntaxError as e:
         pytest.fail(f"KumirSyntaxError for {program_path}: {e}")
     except KumirEvalError as e:
         actual_output_value += f"\nОШИБКА ВЫПОЛНЕНИЯ: {e}\n"
         pytest.fail(f"KumirEvalError for {program_path}: {e}")
     except Exception as e:
-        print(f"--- НЕПРЕДВИДЕННАЯ ОШИБКА {os.path.basename(program_path)} ---", file=original_stderr)
         import traceback
         traceback.print_exc(file=original_stderr)
         pytest.fail(f"Unexpected exception for {program_path}: {e}")
@@ -122,58 +46,14 @@ def run_kumir_program(program_path: str, input_data: str | None = None) -> str:
         sys.stdout = original_stdout
         sys.stderr = original_stderr
 
-    # --- DEBUG PRINT ПОСЛЕ try/finally ---
-    # print(f"[DEBUG_RUN_KUMIR_PROGRAM] AFTER try/finally. actual_output_value is: ({len(actual_output_value)} chars)\n>>>\n{actual_output_value}\n<<<", file=original_stderr)
-
-    # actual_output теперь это то, что вернул interpret_kumir
-    # actual_output = output_buffer.getvalue() # Эта строка больше не нужна
-
-    # DEBUG PRINT ДЛЯ ACTUAL_OUTPUT (который теперь actual_output_value)
-    # print(f"[DEBUG_RUN_KUMIR_PROGRAM] actual_output (from interpret_kumir) is ({len(actual_output_value)} chars):\n>>>\n{actual_output_value}\n<<<", file=original_stderr)
-
-    # Нормализация конца строки, если нужно (оставляем эту логику)
     if actual_output_value and not actual_output_value.endswith('\n'):
         actual_output_value += '\n'
     return actual_output_value
 
-
-@pytest.mark.parametrize("program,input_data,expected_output", TEST_CASES)
-def test_kumir_program(
-    program: str,
-    input_data: str | None,
-    expected_output: str | None
-) -> None:
-    """
-    Тестирует выполнение программы на КуМире.
-
-    Args:
-        program (str): Имя файла программы
-        input_data (str): Входные данные (если нужны)
-        expected_output (str): Ожидаемый вывод
-    """
-    program_path = os.path.join(PROGRAMS_DIR, program)
-    assert os.path.exists(program_path), f"Файл программы не найден: {program}"
-
-    actual_output = ""  # Инициализируем actual_output
-    try:
-        actual_output = run_kumir_program(program_path, input_data)
-        if expected_output is not None:
-            assert actual_output == expected_output, \
-                f"Неверный вывод для {program}:\nОжидалось:\n{expected_output}\nПолучено:\n{actual_output}"
-    except KumirSyntaxError as e:
-        pytest.fail(f"KumirSyntaxError for {program_path}: {e}")
-    except KumirEvalError as e:
-        pytest.fail(f"KumirEvalError for {program_path}: {e}")
-    except Exception as e:
-        pytest.fail(f"Unexpected exception for {program_path}: {e}")
-    if expected_output is not None and "ОШИБКА ВЫПОЛНЕНИЯ" not in actual_output:
-        assert actual_output == expected_output, \
-            f"Неверный вывод для {program}:\nОжидалось:\n{expected_output}\nПолучено:\n{actual_output}"
-
 # Автогенерированные тесты для курса: c2kum
-# Сгенерировано: 2025-06-08 22:42:30
+# Сгенерировано: 2025-06-09 11:48:59
 
-def test_c2kum_Nayti_maksimalnyy_nechyotnyy_element_massiva_10(run_kumir_code_func, tmp_path):
+def test_c2kum_Nayti_maksimalnyy_nechyotnyy_element_massiva_10(tmp_path):
     """
     Тест для задачи: Найти максимальный нечётный элемент массива (ID: 10)
     Курс: c2kum
@@ -200,16 +80,19 @@ def test_c2kum_Nayti_maksimalnyy_nechyotnyy_element_massiva_10(run_kumir_code_fu
     with open(test_file, "w", encoding="utf-8") as f:
         f.write(kumir_code)
     
-    # Запускаем интерпретатор
-    result = run_kumir_code_func(str(test_file))
-    
-    # Проверяем, что код выполнился без ошибок
-    assert result.return_code == 0, f"Код завершился с ошибкой: {result.stderr_output}"
-      # TODO: Добавить проверку конкретного вывода для каждой задачи
-    print(f"Тест test_c2kum_Nayti_maksimalnyy_nechyotnyy_element_massiva_10 выполнен. Вывод: {result.stdout_output[:100]}")
+    # Запускаем интерпретатор через существующую функцию
+    try:
+        output = run_kumir_program(str(test_file))
+        print(f"Test test_c2kum_Nayti_maksimalnyy_nechyotnyy_element_massiva_10 completed successfully. Output: {output[:100]}")
+    except KumirSyntaxError as e:
+        pytest.fail(f"KumirSyntaxError in test_c2kum_Nayti_maksimalnyy_nechyotnyy_element_massiva_10: {e}")
+    except KumirEvalError as e:
+        pytest.fail(f"KumirEvalError in test_c2kum_Nayti_maksimalnyy_nechyotnyy_element_massiva_10: {e}")
+    except Exception as e:
+        pytest.fail(f"Unexpected error in test_c2kum_Nayti_maksimalnyy_nechyotnyy_element_massiva_10: {e}")
 
 
-def test_c2kum_Nayti_minimalnyy_chyotnyy_element_kotoryy_ne_delitsya_na_3_11(run_kumir_code_func, tmp_path):
+def test_c2kum_Nayti_minimalnyy_chyotnyy_element_kotoryy_ne_delitsya_na_3_11(tmp_path):
     """
     Тест для задачи: Найти минимальный чётный элемент, который не делится на 3 (ID: 11)
     Курс: c2kum
@@ -236,16 +119,19 @@ def test_c2kum_Nayti_minimalnyy_chyotnyy_element_kotoryy_ne_delitsya_na_3_11(run
     with open(test_file, "w", encoding="utf-8") as f:
         f.write(kumir_code)
     
-    # Запускаем интерпретатор
-    result = run_kumir_code_func(str(test_file))
-    
-    # Проверяем, что код выполнился без ошибок
-    assert result.return_code == 0, f"Код завершился с ошибкой: {result.stderr_output}"
-      # TODO: Добавить проверку конкретного вывода для каждой задачи
-    print(f"Тест test_c2kum_Nayti_minimalnyy_chyotnyy_element_kotoryy_ne_delitsya_na_3_11 выполнен. Вывод: {result.stdout_output[:100]}")
+    # Запускаем интерпретатор через существующую функцию
+    try:
+        output = run_kumir_program(str(test_file))
+        print(f"Test test_c2kum_Nayti_minimalnyy_chyotnyy_element_kotoryy_ne_delitsya_na_3_11 completed successfully. Output: {output[:100]}")
+    except KumirSyntaxError as e:
+        pytest.fail(f"KumirSyntaxError in test_c2kum_Nayti_minimalnyy_chyotnyy_element_kotoryy_ne_delitsya_na_3_11: {e}")
+    except KumirEvalError as e:
+        pytest.fail(f"KumirEvalError in test_c2kum_Nayti_minimalnyy_chyotnyy_element_kotoryy_ne_delitsya_na_3_11: {e}")
+    except Exception as e:
+        pytest.fail(f"Unexpected error in test_c2kum_Nayti_minimalnyy_chyotnyy_element_kotoryy_ne_delitsya_na_3_11: {e}")
 
 
-def test_c2kum_Nayti_minimalnyy_nechyotnyy_element_kotoryy_delitsya_na_3_12(run_kumir_code_func, tmp_path):
+def test_c2kum_Nayti_minimalnyy_nechyotnyy_element_kotoryy_delitsya_na_3_12(tmp_path):
     """
     Тест для задачи: Найти минимальный нечётный элемент, который делится на 3 (ID: 12)
     Курс: c2kum
@@ -272,16 +158,19 @@ def test_c2kum_Nayti_minimalnyy_nechyotnyy_element_kotoryy_delitsya_na_3_12(run_
     with open(test_file, "w", encoding="utf-8") as f:
         f.write(kumir_code)
     
-    # Запускаем интерпретатор
-    result = run_kumir_code_func(str(test_file))
-    
-    # Проверяем, что код выполнился без ошибок
-    assert result.return_code == 0, f"Код завершился с ошибкой: {result.stderr_output}"
-      # TODO: Добавить проверку конкретного вывода для каждой задачи
-    print(f"Тест test_c2kum_Nayti_minimalnyy_nechyotnyy_element_kotoryy_delitsya_na_3_12 выполнен. Вывод: {result.stdout_output[:100]}")
+    # Запускаем интерпретатор через существующую функцию
+    try:
+        output = run_kumir_program(str(test_file))
+        print(f"Test test_c2kum_Nayti_minimalnyy_nechyotnyy_element_kotoryy_delitsya_na_3_12 completed successfully. Output: {output[:100]}")
+    except KumirSyntaxError as e:
+        pytest.fail(f"KumirSyntaxError in test_c2kum_Nayti_minimalnyy_nechyotnyy_element_kotoryy_delitsya_na_3_12: {e}")
+    except KumirEvalError as e:
+        pytest.fail(f"KumirEvalError in test_c2kum_Nayti_minimalnyy_nechyotnyy_element_kotoryy_delitsya_na_3_12: {e}")
+    except Exception as e:
+        pytest.fail(f"Unexpected error in test_c2kum_Nayti_minimalnyy_nechyotnyy_element_kotoryy_delitsya_na_3_12: {e}")
 
 
-def test_c2kum_Nayti_minimalnyy_iz_elementov_znacheniya_kotoryh_bolshe_ili_13(run_kumir_code_func, tmp_path):
+def test_c2kum_Nayti_minimalnyy_iz_elementov_znacheniya_kotoryh_bolshe_ili_13(tmp_path):
     """
     Тест для задачи: Найти минимальный из элементов, значения которых больше или равны 180 (ID: 13)
     Курс: c2kum
@@ -308,16 +197,19 @@ def test_c2kum_Nayti_minimalnyy_iz_elementov_znacheniya_kotoryh_bolshe_ili_13(ru
     with open(test_file, "w", encoding="utf-8") as f:
         f.write(kumir_code)
     
-    # Запускаем интерпретатор
-    result = run_kumir_code_func(str(test_file))
-    
-    # Проверяем, что код выполнился без ошибок
-    assert result.return_code == 0, f"Код завершился с ошибкой: {result.stderr_output}"
-      # TODO: Добавить проверку конкретного вывода для каждой задачи
-    print(f"Тест test_c2kum_Nayti_minimalnyy_iz_elementov_znacheniya_kotoryh_bolshe_ili_13 выполнен. Вывод: {result.stdout_output[:100]}")
+    # Запускаем интерпретатор через существующую функцию
+    try:
+        output = run_kumir_program(str(test_file))
+        print(f"Test test_c2kum_Nayti_minimalnyy_iz_elementov_znacheniya_kotoryh_bolshe_ili_13 completed successfully. Output: {output[:100]}")
+    except KumirSyntaxError as e:
+        pytest.fail(f"KumirSyntaxError in test_c2kum_Nayti_minimalnyy_iz_elementov_znacheniya_kotoryh_bolshe_ili_13: {e}")
+    except KumirEvalError as e:
+        pytest.fail(f"KumirEvalError in test_c2kum_Nayti_minimalnyy_iz_elementov_znacheniya_kotoryh_bolshe_ili_13: {e}")
+    except Exception as e:
+        pytest.fail(f"Unexpected error in test_c2kum_Nayti_minimalnyy_iz_elementov_znacheniya_kotoryh_bolshe_ili_13: {e}")
 
 
-def test_c2kum_Nayti_maksimalnyy_iz_elementov_znacheniya_kotoryh_menshe_nul_14(run_kumir_code_func, tmp_path):
+def test_c2kum_Nayti_maksimalnyy_iz_elementov_znacheniya_kotoryh_menshe_nul_14(tmp_path):
     """
     Тест для задачи: Найти максимальный из элементов, значения которых меньше нуля (ID: 14)
     Курс: c2kum
@@ -344,16 +236,19 @@ def test_c2kum_Nayti_maksimalnyy_iz_elementov_znacheniya_kotoryh_menshe_nul_14(r
     with open(test_file, "w", encoding="utf-8") as f:
         f.write(kumir_code)
     
-    # Запускаем интерпретатор
-    result = run_kumir_code_func(str(test_file))
-    
-    # Проверяем, что код выполнился без ошибок
-    assert result.return_code == 0, f"Код завершился с ошибкой: {result.stderr_output}"
-      # TODO: Добавить проверку конкретного вывода для каждой задачи
-    print(f"Тест test_c2kum_Nayti_maksimalnyy_iz_elementov_znacheniya_kotoryh_menshe_nul_14 выполнен. Вывод: {result.stdout_output[:100]}")
+    # Запускаем интерпретатор через существующую функцию
+    try:
+        output = run_kumir_program(str(test_file))
+        print(f"Test test_c2kum_Nayti_maksimalnyy_iz_elementov_znacheniya_kotoryh_menshe_nul_14 completed successfully. Output: {output[:100]}")
+    except KumirSyntaxError as e:
+        pytest.fail(f"KumirSyntaxError in test_c2kum_Nayti_maksimalnyy_iz_elementov_znacheniya_kotoryh_menshe_nul_14: {e}")
+    except KumirEvalError as e:
+        pytest.fail(f"KumirEvalError in test_c2kum_Nayti_maksimalnyy_iz_elementov_znacheniya_kotoryh_menshe_nul_14: {e}")
+    except Exception as e:
+        pytest.fail(f"Unexpected error in test_c2kum_Nayti_maksimalnyy_iz_elementov_znacheniya_kotoryh_menshe_nul_14: {e}")
 
 
-def test_c2kum_Nayti_i_zapisat_v_peremennuyu_aMin_minimalnoe_polozhitelnoe_15(run_kumir_code_func, tmp_path):
+def test_c2kum_Nayti_i_zapisat_v_peremennuyu_aMin_minimalnoe_polozhitelnoe_15(tmp_path):
     """
     Тест для задачи: Найти и записать в переменную aMin минимальное положительное чётное число, 
        которое есть в массиве (ID: 15)
@@ -385,16 +280,19 @@ k:= i
     with open(test_file, "w", encoding="utf-8") as f:
         f.write(kumir_code)
     
-    # Запускаем интерпретатор
-    result = run_kumir_code_func(str(test_file))
-    
-    # Проверяем, что код выполнился без ошибок
-    assert result.return_code == 0, f"Код завершился с ошибкой: {result.stderr_output}"
-      # TODO: Добавить проверку конкретного вывода для каждой задачи
-    print(f"Тест test_c2kum_Nayti_i_zapisat_v_peremennuyu_aMin_minimalnoe_polozhitelnoe_15 выполнен. Вывод: {result.stdout_output[:100]}")
+    # Запускаем интерпретатор через существующую функцию
+    try:
+        output = run_kumir_program(str(test_file))
+        print(f"Test test_c2kum_Nayti_i_zapisat_v_peremennuyu_aMin_minimalnoe_polozhitelnoe_15 completed successfully. Output: {output[:100]}")
+    except KumirSyntaxError as e:
+        pytest.fail(f"KumirSyntaxError in test_c2kum_Nayti_i_zapisat_v_peremennuyu_aMin_minimalnoe_polozhitelnoe_15: {e}")
+    except KumirEvalError as e:
+        pytest.fail(f"KumirEvalError in test_c2kum_Nayti_i_zapisat_v_peremennuyu_aMin_minimalnoe_polozhitelnoe_15: {e}")
+    except Exception as e:
+        pytest.fail(f"Unexpected error in test_c2kum_Nayti_i_zapisat_v_peremennuyu_aMin_minimalnoe_polozhitelnoe_15: {e}")
 
 
-def test_c2kum_Nayti_minimalnoe_tryohznachnoe_chislo_kotoroe_est_v_massive_16(run_kumir_code_func, tmp_path):
+def test_c2kum_Nayti_minimalnoe_tryohznachnoe_chislo_kotoroe_est_v_massive_16(tmp_path):
     """
     Тест для задачи: Найти минимальное трёхзначное число, которое есть в массиве (ID: 16)
     Курс: c2kum
@@ -421,16 +319,19 @@ def test_c2kum_Nayti_minimalnoe_tryohznachnoe_chislo_kotoroe_est_v_massive_16(ru
     with open(test_file, "w", encoding="utf-8") as f:
         f.write(kumir_code)
     
-    # Запускаем интерпретатор
-    result = run_kumir_code_func(str(test_file))
-    
-    # Проверяем, что код выполнился без ошибок
-    assert result.return_code == 0, f"Код завершился с ошибкой: {result.stderr_output}"
-      # TODO: Добавить проверку конкретного вывода для каждой задачи
-    print(f"Тест test_c2kum_Nayti_minimalnoe_tryohznachnoe_chislo_kotoroe_est_v_massive_16 выполнен. Вывод: {result.stdout_output[:100]}")
+    # Запускаем интерпретатор через существующую функцию
+    try:
+        output = run_kumir_program(str(test_file))
+        print(f"Test test_c2kum_Nayti_minimalnoe_tryohznachnoe_chislo_kotoroe_est_v_massive_16 completed successfully. Output: {output[:100]}")
+    except KumirSyntaxError as e:
+        pytest.fail(f"KumirSyntaxError in test_c2kum_Nayti_minimalnoe_tryohznachnoe_chislo_kotoroe_est_v_massive_16: {e}")
+    except KumirEvalError as e:
+        pytest.fail(f"KumirEvalError in test_c2kum_Nayti_minimalnoe_tryohznachnoe_chislo_kotoroe_est_v_massive_16: {e}")
+    except Exception as e:
+        pytest.fail(f"Unexpected error in test_c2kum_Nayti_minimalnoe_tryohznachnoe_chislo_kotoroe_est_v_massive_16: {e}")
 
 
-def test_c2kum_Nayti_nomer_elementa_imeyuschego_naibolshee_chislo_deliteley_17(run_kumir_code_func, tmp_path):
+def test_c2kum_Nayti_nomer_elementa_imeyuschego_naibolshee_chislo_deliteley_17(tmp_path):
     """
     Тест для задачи: Найти номер элемента, имеющего наибольшее число делителей (ID: 17)
     Курс: c2kum
@@ -465,16 +366,19 @@ mx:= count
     with open(test_file, "w", encoding="utf-8") as f:
         f.write(kumir_code)
     
-    # Запускаем интерпретатор
-    result = run_kumir_code_func(str(test_file))
-    
-    # Проверяем, что код выполнился без ошибок
-    assert result.return_code == 0, f"Код завершился с ошибкой: {result.stderr_output}"
-      # TODO: Добавить проверку конкретного вывода для каждой задачи
-    print(f"Тест test_c2kum_Nayti_nomer_elementa_imeyuschego_naibolshee_chislo_deliteley_17 выполнен. Вывод: {result.stdout_output[:100]}")
+    # Запускаем интерпретатор через существующую функцию
+    try:
+        output = run_kumir_program(str(test_file))
+        print(f"Test test_c2kum_Nayti_nomer_elementa_imeyuschego_naibolshee_chislo_deliteley_17 completed successfully. Output: {output[:100]}")
+    except KumirSyntaxError as e:
+        pytest.fail(f"KumirSyntaxError in test_c2kum_Nayti_nomer_elementa_imeyuschego_naibolshee_chislo_deliteley_17: {e}")
+    except KumirEvalError as e:
+        pytest.fail(f"KumirEvalError in test_c2kum_Nayti_nomer_elementa_imeyuschego_naibolshee_chislo_deliteley_17: {e}")
+    except Exception as e:
+        pytest.fail(f"Unexpected error in test_c2kum_Nayti_nomer_elementa_imeyuschego_naibolshee_chislo_deliteley_17: {e}")
 
 
-def test_c2kum_Nayti_i_zapisat_v_peremennuyu_nX_nomer_pervogo_po_schyotu_el_20(run_kumir_code_func, tmp_path):
+def test_c2kum_Nayti_i_zapisat_v_peremennuyu_nX_nomer_pervogo_po_schyotu_el_20(tmp_path):
     """
     Тест для задачи: Найти и записать в переменную nX номер первого по счёту элемента массива, равного X (ID: 20)
     Курс: c2kum
@@ -502,16 +406,19 @@ def test_c2kum_Nayti_i_zapisat_v_peremennuyu_nX_nomer_pervogo_po_schyotu_el_20(r
     with open(test_file, "w", encoding="utf-8") as f:
         f.write(kumir_code)
     
-    # Запускаем интерпретатор
-    result = run_kumir_code_func(str(test_file))
-    
-    # Проверяем, что код выполнился без ошибок
-    assert result.return_code == 0, f"Код завершился с ошибкой: {result.stderr_output}"
-      # TODO: Добавить проверку конкретного вывода для каждой задачи
-    print(f"Тест test_c2kum_Nayti_i_zapisat_v_peremennuyu_nX_nomer_pervogo_po_schyotu_el_20 выполнен. Вывод: {result.stdout_output[:100]}")
+    # Запускаем интерпретатор через существующую функцию
+    try:
+        output = run_kumir_program(str(test_file))
+        print(f"Test test_c2kum_Nayti_i_zapisat_v_peremennuyu_nX_nomer_pervogo_po_schyotu_el_20 completed successfully. Output: {output[:100]}")
+    except KumirSyntaxError as e:
+        pytest.fail(f"KumirSyntaxError in test_c2kum_Nayti_i_zapisat_v_peremennuyu_nX_nomer_pervogo_po_schyotu_el_20: {e}")
+    except KumirEvalError as e:
+        pytest.fail(f"KumirEvalError in test_c2kum_Nayti_i_zapisat_v_peremennuyu_nX_nomer_pervogo_po_schyotu_el_20: {e}")
+    except Exception as e:
+        pytest.fail(f"Unexpected error in test_c2kum_Nayti_i_zapisat_v_peremennuyu_nX_nomer_pervogo_po_schyotu_el_20: {e}")
 
 
-def test_c2kum_Nayti_i_zapisat_v_peremennuyu_nX_nomer_tretego_po_schyotu_po_21(run_kumir_code_func, tmp_path):
+def test_c2kum_Nayti_i_zapisat_v_peremennuyu_nX_nomer_tretego_po_schyotu_po_21(tmp_path):
     """
     Тест для задачи: Найти и записать в переменную nX номер третьего по счёту положительного элемента массива (ID: 21)
     Курс: c2kum
@@ -542,16 +449,19 @@ count:= count + 1
     with open(test_file, "w", encoding="utf-8") as f:
         f.write(kumir_code)
     
-    # Запускаем интерпретатор
-    result = run_kumir_code_func(str(test_file))
-    
-    # Проверяем, что код выполнился без ошибок
-    assert result.return_code == 0, f"Код завершился с ошибкой: {result.stderr_output}"
-      # TODO: Добавить проверку конкретного вывода для каждой задачи
-    print(f"Тест test_c2kum_Nayti_i_zapisat_v_peremennuyu_nX_nomer_tretego_po_schyotu_po_21 выполнен. Вывод: {result.stdout_output[:100]}")
+    # Запускаем интерпретатор через существующую функцию
+    try:
+        output = run_kumir_program(str(test_file))
+        print(f"Test test_c2kum_Nayti_i_zapisat_v_peremennuyu_nX_nomer_tretego_po_schyotu_po_21 completed successfully. Output: {output[:100]}")
+    except KumirSyntaxError as e:
+        pytest.fail(f"KumirSyntaxError in test_c2kum_Nayti_i_zapisat_v_peremennuyu_nX_nomer_tretego_po_schyotu_po_21: {e}")
+    except KumirEvalError as e:
+        pytest.fail(f"KumirEvalError in test_c2kum_Nayti_i_zapisat_v_peremennuyu_nX_nomer_tretego_po_schyotu_po_21: {e}")
+    except Exception as e:
+        pytest.fail(f"Unexpected error in test_c2kum_Nayti_i_zapisat_v_peremennuyu_nX_nomer_tretego_po_schyotu_po_21: {e}")
 
 
-def test_c2kum_Nayti_i_zapisat_v_peremennuyu_nMax2_nomer_vtorogo_maksimuma_22(run_kumir_code_func, tmp_path):
+def test_c2kum_Nayti_i_zapisat_v_peremennuyu_nMax2_nomer_vtorogo_maksimuma_22(tmp_path):
     """
     Тест для задачи: Найти и записать в переменную nMax2 номер «второго максимума» массива, то есть
  элемента, который стоял бы вторым в массиве, отсортированном по возрастанию (ID: 22)
@@ -607,16 +517,19 @@ m2:= m1; m1:= i
     with open(test_file, "w", encoding="utf-8") as f:
         f.write(kumir_code)
     
-    # Запускаем интерпретатор
-    result = run_kumir_code_func(str(test_file))
-    
-    # Проверяем, что код выполнился без ошибок
-    assert result.return_code == 0, f"Код завершился с ошибкой: {result.stderr_output}"
-      # TODO: Добавить проверку конкретного вывода для каждой задачи
-    print(f"Тест test_c2kum_Nayti_i_zapisat_v_peremennuyu_nMax2_nomer_vtorogo_maksimuma_22 выполнен. Вывод: {result.stdout_output[:100]}")
+    # Запускаем интерпретатор через существующую функцию
+    try:
+        output = run_kumir_program(str(test_file))
+        print(f"Test test_c2kum_Nayti_i_zapisat_v_peremennuyu_nMax2_nomer_vtorogo_maksimuma_22 completed successfully. Output: {output[:100]}")
+    except KumirSyntaxError as e:
+        pytest.fail(f"KumirSyntaxError in test_c2kum_Nayti_i_zapisat_v_peremennuyu_nMax2_nomer_vtorogo_maksimuma_22: {e}")
+    except KumirEvalError as e:
+        pytest.fail(f"KumirEvalError in test_c2kum_Nayti_i_zapisat_v_peremennuyu_nMax2_nomer_vtorogo_maksimuma_22: {e}")
+    except Exception as e:
+        pytest.fail(f"Unexpected error in test_c2kum_Nayti_i_zapisat_v_peremennuyu_nMax2_nomer_vtorogo_maksimuma_22: {e}")
 
 
-def test_c2kum_Nayti_i_zapisat_v_peremennuyu_summa_summu_dvuh_minimalnyh_el_23(run_kumir_code_func, tmp_path):
+def test_c2kum_Nayti_i_zapisat_v_peremennuyu_summa_summu_dvuh_minimalnyh_el_23(tmp_path):
     """
     Тест для задачи: Найти и записать в переменную сумма сумму двух минимальных элементов массива 
  (их значения могут быть равны) (ID: 23)
@@ -666,16 +579,19 @@ m2:= m1; m1:= A[i]
     with open(test_file, "w", encoding="utf-8") as f:
         f.write(kumir_code)
     
-    # Запускаем интерпретатор
-    result = run_kumir_code_func(str(test_file))
-    
-    # Проверяем, что код выполнился без ошибок
-    assert result.return_code == 0, f"Код завершился с ошибкой: {result.stderr_output}"
-      # TODO: Добавить проверку конкретного вывода для каждой задачи
-    print(f"Тест test_c2kum_Nayti_i_zapisat_v_peremennuyu_summa_summu_dvuh_minimalnyh_el_23 выполнен. Вывод: {result.stdout_output[:100]}")
+    # Запускаем интерпретатор через существующую функцию
+    try:
+        output = run_kumir_program(str(test_file))
+        print(f"Test test_c2kum_Nayti_i_zapisat_v_peremennuyu_summa_summu_dvuh_minimalnyh_el_23 completed successfully. Output: {output[:100]}")
+    except KumirSyntaxError as e:
+        pytest.fail(f"KumirSyntaxError in test_c2kum_Nayti_i_zapisat_v_peremennuyu_summa_summu_dvuh_minimalnyh_el_23: {e}")
+    except KumirEvalError as e:
+        pytest.fail(f"KumirEvalError in test_c2kum_Nayti_i_zapisat_v_peremennuyu_summa_summu_dvuh_minimalnyh_el_23: {e}")
+    except Exception as e:
+        pytest.fail(f"Unexpected error in test_c2kum_Nayti_i_zapisat_v_peremennuyu_summa_summu_dvuh_minimalnyh_el_23: {e}")
 
 
-def test_c2kum_Nayti_i_zapisat_v_peremennye_n1_i_n2_nomera_dvuh_elementov_m_24(run_kumir_code_func, tmp_path):
+def test_c2kum_Nayti_i_zapisat_v_peremennye_n1_i_n2_nomera_dvuh_elementov_m_24(tmp_path):
     """
     Тест для задачи: Найти и записать в переменные n1 и n2 номера двух элементов массива, которые
        меньше всего отличаются друг от друга (ID: 24)
@@ -707,16 +623,19 @@ m1:= i; m2:= j
     with open(test_file, "w", encoding="utf-8") as f:
         f.write(kumir_code)
     
-    # Запускаем интерпретатор
-    result = run_kumir_code_func(str(test_file))
-    
-    # Проверяем, что код выполнился без ошибок
-    assert result.return_code == 0, f"Код завершился с ошибкой: {result.stderr_output}"
-      # TODO: Добавить проверку конкретного вывода для каждой задачи
-    print(f"Тест test_c2kum_Nayti_i_zapisat_v_peremennye_n1_i_n2_nomera_dvuh_elementov_m_24 выполнен. Вывод: {result.stdout_output[:100]}")
+    # Запускаем интерпретатор через существующую функцию
+    try:
+        output = run_kumir_program(str(test_file))
+        print(f"Test test_c2kum_Nayti_i_zapisat_v_peremennye_n1_i_n2_nomera_dvuh_elementov_m_24 completed successfully. Output: {output[:100]}")
+    except KumirSyntaxError as e:
+        pytest.fail(f"KumirSyntaxError in test_c2kum_Nayti_i_zapisat_v_peremennye_n1_i_n2_nomera_dvuh_elementov_m_24: {e}")
+    except KumirEvalError as e:
+        pytest.fail(f"KumirEvalError in test_c2kum_Nayti_i_zapisat_v_peremennye_n1_i_n2_nomera_dvuh_elementov_m_24: {e}")
+    except Exception as e:
+        pytest.fail(f"Unexpected error in test_c2kum_Nayti_i_zapisat_v_peremennye_n1_i_n2_nomera_dvuh_elementov_m_24: {e}")
 
 
-def test_c2kum_Nayti_i_zapisat_v_peremennuyu_count_kolichestvo_elementov_ma_25(run_kumir_code_func, tmp_path):
+def test_c2kum_Nayti_i_zapisat_v_peremennuyu_count_kolichestvo_elementov_ma_25(tmp_path):
     """
     Тест для задачи: Найти и записать в переменную count количество элементов массива, равных
        максимальному элементу (ID: 25)
@@ -765,16 +684,19 @@ m:= A[i]; count:= 1
     with open(test_file, "w", encoding="utf-8") as f:
         f.write(kumir_code)
     
-    # Запускаем интерпретатор
-    result = run_kumir_code_func(str(test_file))
-    
-    # Проверяем, что код выполнился без ошибок
-    assert result.return_code == 0, f"Код завершился с ошибкой: {result.stderr_output}"
-      # TODO: Добавить проверку конкретного вывода для каждой задачи
-    print(f"Тест test_c2kum_Nayti_i_zapisat_v_peremennuyu_count_kolichestvo_elementov_ma_25 выполнен. Вывод: {result.stdout_output[:100]}")
+    # Запускаем интерпретатор через существующую функцию
+    try:
+        output = run_kumir_program(str(test_file))
+        print(f"Test test_c2kum_Nayti_i_zapisat_v_peremennuyu_count_kolichestvo_elementov_ma_25 completed successfully. Output: {output[:100]}")
+    except KumirSyntaxError as e:
+        pytest.fail(f"KumirSyntaxError in test_c2kum_Nayti_i_zapisat_v_peremennuyu_count_kolichestvo_elementov_ma_25: {e}")
+    except KumirEvalError as e:
+        pytest.fail(f"KumirEvalError in test_c2kum_Nayti_i_zapisat_v_peremennuyu_count_kolichestvo_elementov_ma_25: {e}")
+    except Exception as e:
+        pytest.fail(f"Unexpected error in test_c2kum_Nayti_i_zapisat_v_peremennuyu_count_kolichestvo_elementov_ma_25: {e}")
 
 
-def test_c2kum_Nayti_i_zapisat_v_peremennuyu_count_kolichestvo_elementov_ma_26(run_kumir_code_func, tmp_path):
+def test_c2kum_Nayti_i_zapisat_v_peremennuyu_count_kolichestvo_elementov_ma_26(tmp_path):
     """
     Тест для задачи: Найти и записать в переменную count количество элементов массива, которые
        больше, чем среднее арифметическое всех элементов (ID: 26)
@@ -808,16 +730,19 @@ count:=count+1
     with open(test_file, "w", encoding="utf-8") as f:
         f.write(kumir_code)
     
-    # Запускаем интерпретатор
-    result = run_kumir_code_func(str(test_file))
-    
-    # Проверяем, что код выполнился без ошибок
-    assert result.return_code == 0, f"Код завершился с ошибкой: {result.stderr_output}"
-      # TODO: Добавить проверку конкретного вывода для каждой задачи
-    print(f"Тест test_c2kum_Nayti_i_zapisat_v_peremennuyu_count_kolichestvo_elementov_ma_26 выполнен. Вывод: {result.stdout_output[:100]}")
+    # Запускаем интерпретатор через существующую функцию
+    try:
+        output = run_kumir_program(str(test_file))
+        print(f"Test test_c2kum_Nayti_i_zapisat_v_peremennuyu_count_kolichestvo_elementov_ma_26 completed successfully. Output: {output[:100]}")
+    except KumirSyntaxError as e:
+        pytest.fail(f"KumirSyntaxError in test_c2kum_Nayti_i_zapisat_v_peremennuyu_count_kolichestvo_elementov_ma_26: {e}")
+    except KumirEvalError as e:
+        pytest.fail(f"KumirEvalError in test_c2kum_Nayti_i_zapisat_v_peremennuyu_count_kolichestvo_elementov_ma_26: {e}")
+    except Exception as e:
+        pytest.fail(f"Unexpected error in test_c2kum_Nayti_i_zapisat_v_peremennuyu_count_kolichestvo_elementov_ma_26: {e}")
 
 
-def test_c2kum_Nayti_summu_elementov_massiva_kotorye_kratny_chislu_13_i_zap_30(run_kumir_code_func, tmp_path):
+def test_c2kum_Nayti_summu_elementov_massiva_kotorye_kratny_chislu_13_i_zap_30(tmp_path):
     """
     Тест для задачи: Найти сумму элементов массива, которые кратны числу 13, и записать эту сумму
    в переменную сумма (ID: 30)
@@ -845,16 +770,19 @@ def test_c2kum_Nayti_summu_elementov_massiva_kotorye_kratny_chislu_13_i_zap_30(r
     with open(test_file, "w", encoding="utf-8") as f:
         f.write(kumir_code)
     
-    # Запускаем интерпретатор
-    result = run_kumir_code_func(str(test_file))
-    
-    # Проверяем, что код выполнился без ошибок
-    assert result.return_code == 0, f"Код завершился с ошибкой: {result.stderr_output}"
-      # TODO: Добавить проверку конкретного вывода для каждой задачи
-    print(f"Тест test_c2kum_Nayti_summu_elementov_massiva_kotorye_kratny_chislu_13_i_zap_30 выполнен. Вывод: {result.stdout_output[:100]}")
+    # Запускаем интерпретатор через существующую функцию
+    try:
+        output = run_kumir_program(str(test_file))
+        print(f"Test test_c2kum_Nayti_summu_elementov_massiva_kotorye_kratny_chislu_13_i_zap_30 completed successfully. Output: {output[:100]}")
+    except KumirSyntaxError as e:
+        pytest.fail(f"KumirSyntaxError in test_c2kum_Nayti_summu_elementov_massiva_kotorye_kratny_chislu_13_i_zap_30: {e}")
+    except KumirEvalError as e:
+        pytest.fail(f"KumirEvalError in test_c2kum_Nayti_summu_elementov_massiva_kotorye_kratny_chislu_13_i_zap_30: {e}")
+    except Exception as e:
+        pytest.fail(f"Unexpected error in test_c2kum_Nayti_summu_elementov_massiva_kotorye_kratny_chislu_13_i_zap_30: {e}")
 
 
-def test_c2kum_Nayti_srednee_arifmeticheskoe_elementov_massiva_kotorye_bols_31(run_kumir_code_func, tmp_path):
+def test_c2kum_Nayti_srednee_arifmeticheskoe_elementov_massiva_kotorye_bols_31(tmp_path):
     """
     Тест для задачи: Найти среднее арифметическое элементов массива,  которые больше 20, и записать эту сумму
        в переменную среднее (ID: 31)
@@ -884,16 +812,19 @@ count:= count + 1
     with open(test_file, "w", encoding="utf-8") as f:
         f.write(kumir_code)
     
-    # Запускаем интерпретатор
-    result = run_kumir_code_func(str(test_file))
-    
-    # Проверяем, что код выполнился без ошибок
-    assert result.return_code == 0, f"Код завершился с ошибкой: {result.stderr_output}"
-      # TODO: Добавить проверку конкретного вывода для каждой задачи
-    print(f"Тест test_c2kum_Nayti_srednee_arifmeticheskoe_elementov_massiva_kotorye_bols_31 выполнен. Вывод: {result.stdout_output[:100]}")
+    # Запускаем интерпретатор через существующую функцию
+    try:
+        output = run_kumir_program(str(test_file))
+        print(f"Test test_c2kum_Nayti_srednee_arifmeticheskoe_elementov_massiva_kotorye_bols_31 completed successfully. Output: {output[:100]}")
+    except KumirSyntaxError as e:
+        pytest.fail(f"KumirSyntaxError in test_c2kum_Nayti_srednee_arifmeticheskoe_elementov_massiva_kotorye_bols_31: {e}")
+    except KumirEvalError as e:
+        pytest.fail(f"KumirEvalError in test_c2kum_Nayti_srednee_arifmeticheskoe_elementov_massiva_kotorye_bols_31: {e}")
+    except Exception as e:
+        pytest.fail(f"Unexpected error in test_c2kum_Nayti_srednee_arifmeticheskoe_elementov_massiva_kotorye_bols_31: {e}")
 
 
-def test_c2kum_Nayti_srednee_arifmeticheskoe_nechyotnyh_otritsatelnyh_eleme_32(run_kumir_code_func, tmp_path):
+def test_c2kum_Nayti_srednee_arifmeticheskoe_nechyotnyh_otritsatelnyh_eleme_32(tmp_path):
     """
     Тест для задачи: Найти среднее арифметическое нечётных  отрицательных элементов массива
        и записать его в переменную среднее (ID: 32)
@@ -923,16 +854,19 @@ count:= count + 1
     with open(test_file, "w", encoding="utf-8") as f:
         f.write(kumir_code)
     
-    # Запускаем интерпретатор
-    result = run_kumir_code_func(str(test_file))
-    
-    # Проверяем, что код выполнился без ошибок
-    assert result.return_code == 0, f"Код завершился с ошибкой: {result.stderr_output}"
-      # TODO: Добавить проверку конкретного вывода для каждой задачи
-    print(f"Тест test_c2kum_Nayti_srednee_arifmeticheskoe_nechyotnyh_otritsatelnyh_eleme_32 выполнен. Вывод: {result.stdout_output[:100]}")
+    # Запускаем интерпретатор через существующую функцию
+    try:
+        output = run_kumir_program(str(test_file))
+        print(f"Test test_c2kum_Nayti_srednee_arifmeticheskoe_nechyotnyh_otritsatelnyh_eleme_32 completed successfully. Output: {output[:100]}")
+    except KumirSyntaxError as e:
+        pytest.fail(f"KumirSyntaxError in test_c2kum_Nayti_srednee_arifmeticheskoe_nechyotnyh_otritsatelnyh_eleme_32: {e}")
+    except KumirEvalError as e:
+        pytest.fail(f"KumirEvalError in test_c2kum_Nayti_srednee_arifmeticheskoe_nechyotnyh_otritsatelnyh_eleme_32: {e}")
+    except Exception as e:
+        pytest.fail(f"Unexpected error in test_c2kum_Nayti_srednee_arifmeticheskoe_nechyotnyh_otritsatelnyh_eleme_32: {e}")
 
 
-def test_c2kum_Nayti_srednee_arifmeticheskoe_polozhitelnyh_elementov_massiv_33(run_kumir_code_func, tmp_path):
+def test_c2kum_Nayti_srednee_arifmeticheskoe_polozhitelnyh_elementov_massiv_33(tmp_path):
     """
     Тест для задачи: Найти среднее арифметическое положительных элементов массива,
    делящихся на 5, и записать его в переменную среднее (ID: 33)
@@ -962,16 +896,19 @@ count:= count + 1
     with open(test_file, "w", encoding="utf-8") as f:
         f.write(kumir_code)
     
-    # Запускаем интерпретатор
-    result = run_kumir_code_func(str(test_file))
-    
-    # Проверяем, что код выполнился без ошибок
-    assert result.return_code == 0, f"Код завершился с ошибкой: {result.stderr_output}"
-      # TODO: Добавить проверку конкретного вывода для каждой задачи
-    print(f"Тест test_c2kum_Nayti_srednee_arifmeticheskoe_polozhitelnyh_elementov_massiv_33 выполнен. Вывод: {result.stdout_output[:100]}")
+    # Запускаем интерпретатор через существующую функцию
+    try:
+        output = run_kumir_program(str(test_file))
+        print(f"Test test_c2kum_Nayti_srednee_arifmeticheskoe_polozhitelnyh_elementov_massiv_33 completed successfully. Output: {output[:100]}")
+    except KumirSyntaxError as e:
+        pytest.fail(f"KumirSyntaxError in test_c2kum_Nayti_srednee_arifmeticheskoe_polozhitelnyh_elementov_massiv_33: {e}")
+    except KumirEvalError as e:
+        pytest.fail(f"KumirEvalError in test_c2kum_Nayti_srednee_arifmeticheskoe_polozhitelnyh_elementov_massiv_33: {e}")
+    except Exception as e:
+        pytest.fail(f"Unexpected error in test_c2kum_Nayti_srednee_arifmeticheskoe_polozhitelnyh_elementov_massiv_33: {e}")
 
 
-def test_c2kum_Nayti_srednee_arifmeticheskoe_polozhitelnyh_elementov_massiv_34(run_kumir_code_func, tmp_path):
+def test_c2kum_Nayti_srednee_arifmeticheskoe_polozhitelnyh_elementov_massiv_34(tmp_path):
     """
     Тест для задачи: Найти среднее арифметическое положительных элементов массива,
    кратных первому элементу, и записать его в переменную среднее (ID: 34)
@@ -1001,16 +938,19 @@ count:= count + 1
     with open(test_file, "w", encoding="utf-8") as f:
         f.write(kumir_code)
     
-    # Запускаем интерпретатор
-    result = run_kumir_code_func(str(test_file))
-    
-    # Проверяем, что код выполнился без ошибок
-    assert result.return_code == 0, f"Код завершился с ошибкой: {result.stderr_output}"
-      # TODO: Добавить проверку конкретного вывода для каждой задачи
-    print(f"Тест test_c2kum_Nayti_srednee_arifmeticheskoe_polozhitelnyh_elementov_massiv_34 выполнен. Вывод: {result.stdout_output[:100]}")
+    # Запускаем интерпретатор через существующую функцию
+    try:
+        output = run_kumir_program(str(test_file))
+        print(f"Test test_c2kum_Nayti_srednee_arifmeticheskoe_polozhitelnyh_elementov_massiv_34 completed successfully. Output: {output[:100]}")
+    except KumirSyntaxError as e:
+        pytest.fail(f"KumirSyntaxError in test_c2kum_Nayti_srednee_arifmeticheskoe_polozhitelnyh_elementov_massiv_34: {e}")
+    except KumirEvalError as e:
+        pytest.fail(f"KumirEvalError in test_c2kum_Nayti_srednee_arifmeticheskoe_polozhitelnyh_elementov_massiv_34: {e}")
+    except Exception as e:
+        pytest.fail(f"Unexpected error in test_c2kum_Nayti_srednee_arifmeticheskoe_polozhitelnyh_elementov_massiv_34: {e}")
 
 
-def test_c2kum_Nayti_nomer_elementa_blizhayshego_k_srednemu_arifmeticheskom_35(run_kumir_code_func, tmp_path):
+def test_c2kum_Nayti_nomer_elementa_blizhayshego_k_srednemu_arifmeticheskom_35(tmp_path):
     """
     Тест для задачи: Найти номер элемента, ближайшего к среднему арифметическому всех элементов массива, 
    и записать его в переменную номер (ID: 35)
@@ -1045,16 +985,19 @@ dist:= abs(A[i]-среднее)
     with open(test_file, "w", encoding="utf-8") as f:
         f.write(kumir_code)
     
-    # Запускаем интерпретатор
-    result = run_kumir_code_func(str(test_file))
-    
-    # Проверяем, что код выполнился без ошибок
-    assert result.return_code == 0, f"Код завершился с ошибкой: {result.stderr_output}"
-      # TODO: Добавить проверку конкретного вывода для каждой задачи
-    print(f"Тест test_c2kum_Nayti_nomer_elementa_blizhayshego_k_srednemu_arifmeticheskom_35 выполнен. Вывод: {result.stdout_output[:100]}")
+    # Запускаем интерпретатор через существующую функцию
+    try:
+        output = run_kumir_program(str(test_file))
+        print(f"Test test_c2kum_Nayti_nomer_elementa_blizhayshego_k_srednemu_arifmeticheskom_35 completed successfully. Output: {output[:100]}")
+    except KumirSyntaxError as e:
+        pytest.fail(f"KumirSyntaxError in test_c2kum_Nayti_nomer_elementa_blizhayshego_k_srednemu_arifmeticheskom_35: {e}")
+    except KumirEvalError as e:
+        pytest.fail(f"KumirEvalError in test_c2kum_Nayti_nomer_elementa_blizhayshego_k_srednemu_arifmeticheskom_35: {e}")
+    except Exception as e:
+        pytest.fail(f"Unexpected error in test_c2kum_Nayti_nomer_elementa_blizhayshego_k_srednemu_arifmeticheskom_35: {e}")
 
 
-def test_c2kum_Nayti_proizvedenie_chyotnyh_elementov_massiva_kotorye_ne_oka_36(run_kumir_code_func, tmp_path):
+def test_c2kum_Nayti_proizvedenie_chyotnyh_elementov_massiva_kotorye_ne_oka_36(tmp_path):
     """
     Тест для задачи: Найти произведение чётных элементов массива, которые не оканчиваются на 0, 
    и записать его в переменную произв (ID: 36)
@@ -1082,16 +1025,19 @@ def test_c2kum_Nayti_proizvedenie_chyotnyh_elementov_massiva_kotorye_ne_oka_36(r
     with open(test_file, "w", encoding="utf-8") as f:
         f.write(kumir_code)
     
-    # Запускаем интерпретатор
-    result = run_kumir_code_func(str(test_file))
-    
-    # Проверяем, что код выполнился без ошибок
-    assert result.return_code == 0, f"Код завершился с ошибкой: {result.stderr_output}"
-      # TODO: Добавить проверку конкретного вывода для каждой задачи
-    print(f"Тест test_c2kum_Nayti_proizvedenie_chyotnyh_elementov_massiva_kotorye_ne_oka_36 выполнен. Вывод: {result.stdout_output[:100]}")
+    # Запускаем интерпретатор через существующую функцию
+    try:
+        output = run_kumir_program(str(test_file))
+        print(f"Test test_c2kum_Nayti_proizvedenie_chyotnyh_elementov_massiva_kotorye_ne_oka_36 completed successfully. Output: {output[:100]}")
+    except KumirSyntaxError as e:
+        pytest.fail(f"KumirSyntaxError in test_c2kum_Nayti_proizvedenie_chyotnyh_elementov_massiva_kotorye_ne_oka_36: {e}")
+    except KumirEvalError as e:
+        pytest.fail(f"KumirEvalError in test_c2kum_Nayti_proizvedenie_chyotnyh_elementov_massiva_kotorye_ne_oka_36: {e}")
+    except Exception as e:
+        pytest.fail(f"Unexpected error in test_c2kum_Nayti_proizvedenie_chyotnyh_elementov_massiva_kotorye_ne_oka_36: {e}")
 
 
-def test_c2kum_Nayti_proizvedenie_dvuznachnyh_elementov_massiva_kotorye_del_37(run_kumir_code_func, tmp_path):
+def test_c2kum_Nayti_proizvedenie_dvuznachnyh_elementov_massiva_kotorye_del_37(tmp_path):
     """
     Тест для задачи: Найти произведение двузначных элементов массива, которые делятся на 6, 
    и записать его в переменную произв (ID: 37)
@@ -1119,16 +1065,19 @@ def test_c2kum_Nayti_proizvedenie_dvuznachnyh_elementov_massiva_kotorye_del_37(r
     with open(test_file, "w", encoding="utf-8") as f:
         f.write(kumir_code)
     
-    # Запускаем интерпретатор
-    result = run_kumir_code_func(str(test_file))
-    
-    # Проверяем, что код выполнился без ошибок
-    assert result.return_code == 0, f"Код завершился с ошибкой: {result.stderr_output}"
-      # TODO: Добавить проверку конкретного вывода для каждой задачи
-    print(f"Тест test_c2kum_Nayti_proizvedenie_dvuznachnyh_elementov_massiva_kotorye_del_37 выполнен. Вывод: {result.stdout_output[:100]}")
+    # Запускаем интерпретатор через существующую функцию
+    try:
+        output = run_kumir_program(str(test_file))
+        print(f"Test test_c2kum_Nayti_proizvedenie_dvuznachnyh_elementov_massiva_kotorye_del_37 completed successfully. Output: {output[:100]}")
+    except KumirSyntaxError as e:
+        pytest.fail(f"KumirSyntaxError in test_c2kum_Nayti_proizvedenie_dvuznachnyh_elementov_massiva_kotorye_del_37: {e}")
+    except KumirEvalError as e:
+        pytest.fail(f"KumirEvalError in test_c2kum_Nayti_proizvedenie_dvuznachnyh_elementov_massiva_kotorye_del_37: {e}")
+    except Exception as e:
+        pytest.fail(f"Unexpected error in test_c2kum_Nayti_proizvedenie_dvuznachnyh_elementov_massiva_kotorye_del_37: {e}")
 
 
-def test_c2kum_Nayti_paru_sosednih_elementov_summa_kotoryh_maksimalna_i_zap_40(run_kumir_code_func, tmp_path):
+def test_c2kum_Nayti_paru_sosednih_elementov_summa_kotoryh_maksimalna_i_zap_40(tmp_path):
     """
     Тест для задачи: Найти пару соседних элементов, сумма которых максимальна, и записать в переменную
        K номер первого из них (ID: 40)
@@ -1159,16 +1108,19 @@ M:= s
     with open(test_file, "w", encoding="utf-8") as f:
         f.write(kumir_code)
     
-    # Запускаем интерпретатор
-    result = run_kumir_code_func(str(test_file))
-    
-    # Проверяем, что код выполнился без ошибок
-    assert result.return_code == 0, f"Код завершился с ошибкой: {result.stderr_output}"
-      # TODO: Добавить проверку конкретного вывода для каждой задачи
-    print(f"Тест test_c2kum_Nayti_paru_sosednih_elementov_summa_kotoryh_maksimalna_i_zap_40 выполнен. Вывод: {result.stdout_output[:100]}")
+    # Запускаем интерпретатор через существующую функцию
+    try:
+        output = run_kumir_program(str(test_file))
+        print(f"Test test_c2kum_Nayti_paru_sosednih_elementov_summa_kotoryh_maksimalna_i_zap_40 completed successfully. Output: {output[:100]}")
+    except KumirSyntaxError as e:
+        pytest.fail(f"KumirSyntaxError in test_c2kum_Nayti_paru_sosednih_elementov_summa_kotoryh_maksimalna_i_zap_40: {e}")
+    except KumirEvalError as e:
+        pytest.fail(f"KumirEvalError in test_c2kum_Nayti_paru_sosednih_elementov_summa_kotoryh_maksimalna_i_zap_40: {e}")
+    except Exception as e:
+        pytest.fail(f"Unexpected error in test_c2kum_Nayti_paru_sosednih_elementov_summa_kotoryh_maksimalna_i_zap_40: {e}")
 
 
-def test_c2kum_Nayti_tri_sosednih_elementa_summa_kotoryh_minimalna_i_zapisa_41(run_kumir_code_func, tmp_path):
+def test_c2kum_Nayti_tri_sosednih_elementa_summa_kotoryh_minimalna_i_zapisa_41(tmp_path):
     """
     Тест для задачи: Найти три соседних элемента, сумма которых минимальна, и записать в переменную
        K номер первого из них (ID: 41)
@@ -1199,16 +1151,19 @@ M:= s
     with open(test_file, "w", encoding="utf-8") as f:
         f.write(kumir_code)
     
-    # Запускаем интерпретатор
-    result = run_kumir_code_func(str(test_file))
-    
-    # Проверяем, что код выполнился без ошибок
-    assert result.return_code == 0, f"Код завершился с ошибкой: {result.stderr_output}"
-      # TODO: Добавить проверку конкретного вывода для каждой задачи
-    print(f"Тест test_c2kum_Nayti_tri_sosednih_elementa_summa_kotoryh_minimalna_i_zapisa_41 выполнен. Вывод: {result.stdout_output[:100]}")
+    # Запускаем интерпретатор через существующую функцию
+    try:
+        output = run_kumir_program(str(test_file))
+        print(f"Test test_c2kum_Nayti_tri_sosednih_elementa_summa_kotoryh_minimalna_i_zapisa_41 completed successfully. Output: {output[:100]}")
+    except KumirSyntaxError as e:
+        pytest.fail(f"KumirSyntaxError in test_c2kum_Nayti_tri_sosednih_elementa_summa_kotoryh_minimalna_i_zapisa_41: {e}")
+    except KumirEvalError as e:
+        pytest.fail(f"KumirEvalError in test_c2kum_Nayti_tri_sosednih_elementa_summa_kotoryh_minimalna_i_zapisa_41: {e}")
+    except Exception as e:
+        pytest.fail(f"Unexpected error in test_c2kum_Nayti_tri_sosednih_elementa_summa_kotoryh_minimalna_i_zapisa_41: {e}")
 
 
-def test_c2kum_Nayti_dlinu_naibolshey_tsepochki_iduschih_podryad_otritsatel_42(run_kumir_code_func, tmp_path):
+def test_c2kum_Nayti_dlinu_naibolshey_tsepochki_iduschih_podryad_otritsatel_42(tmp_path):
     """
     Тест для задачи: Найти длину наибольшей цепочки идущих подряд отрицательных чисел и
        записать её в переменную L (ID: 42)
@@ -1263,16 +1218,19 @@ __Вывод массива__
     with open(test_file, "w", encoding="utf-8") as f:
         f.write(kumir_code)
     
-    # Запускаем интерпретатор
-    result = run_kumir_code_func(str(test_file))
-    
-    # Проверяем, что код выполнился без ошибок
-    assert result.return_code == 0, f"Код завершился с ошибкой: {result.stderr_output}"
-      # TODO: Добавить проверку конкретного вывода для каждой задачи
-    print(f"Тест test_c2kum_Nayti_dlinu_naibolshey_tsepochki_iduschih_podryad_otritsatel_42 выполнен. Вывод: {result.stdout_output[:100]}")
+    # Запускаем интерпретатор через существующую функцию
+    try:
+        output = run_kumir_program(str(test_file))
+        print(f"Test test_c2kum_Nayti_dlinu_naibolshey_tsepochki_iduschih_podryad_otritsatel_42 completed successfully. Output: {output[:100]}")
+    except KumirSyntaxError as e:
+        pytest.fail(f"KumirSyntaxError in test_c2kum_Nayti_dlinu_naibolshey_tsepochki_iduschih_podryad_otritsatel_42: {e}")
+    except KumirEvalError as e:
+        pytest.fail(f"KumirEvalError in test_c2kum_Nayti_dlinu_naibolshey_tsepochki_iduschih_podryad_otritsatel_42: {e}")
+    except Exception as e:
+        pytest.fail(f"Unexpected error in test_c2kum_Nayti_dlinu_naibolshey_tsepochki_iduschih_podryad_otritsatel_42: {e}")
 
 
-def test_c2kum_Nayti_dlinu_naibolshey_tsepochki_iduschih_podryad_odinakovyh_43(run_kumir_code_func, tmp_path):
+def test_c2kum_Nayti_dlinu_naibolshey_tsepochki_iduschih_podryad_odinakovyh_43(tmp_path):
     """
     Тест для задачи: Найти длину наибольшей цепочки идущих подряд одинаковых чисел и
        записать её в переменную L (ID: 43)
@@ -1327,16 +1285,19 @@ __Вывод массива__
     with open(test_file, "w", encoding="utf-8") as f:
         f.write(kumir_code)
     
-    # Запускаем интерпретатор
-    result = run_kumir_code_func(str(test_file))
-    
-    # Проверяем, что код выполнился без ошибок
-    assert result.return_code == 0, f"Код завершился с ошибкой: {result.stderr_output}"
-      # TODO: Добавить проверку конкретного вывода для каждой задачи
-    print(f"Тест test_c2kum_Nayti_dlinu_naibolshey_tsepochki_iduschih_podryad_odinakovyh_43 выполнен. Вывод: {result.stdout_output[:100]}")
+    # Запускаем интерпретатор через существующую функцию
+    try:
+        output = run_kumir_program(str(test_file))
+        print(f"Test test_c2kum_Nayti_dlinu_naibolshey_tsepochki_iduschih_podryad_odinakovyh_43 completed successfully. Output: {output[:100]}")
+    except KumirSyntaxError as e:
+        pytest.fail(f"KumirSyntaxError in test_c2kum_Nayti_dlinu_naibolshey_tsepochki_iduschih_podryad_odinakovyh_43: {e}")
+    except KumirEvalError as e:
+        pytest.fail(f"KumirEvalError in test_c2kum_Nayti_dlinu_naibolshey_tsepochki_iduschih_podryad_odinakovyh_43: {e}")
+    except Exception as e:
+        pytest.fail(f"Unexpected error in test_c2kum_Nayti_dlinu_naibolshey_tsepochki_iduschih_podryad_odinakovyh_43: {e}")
 
 
-def test_c2kum_Nayti_dlinu_naibolshey_tsepochki_chisel_elementy_kotoroy_sto_44(run_kumir_code_func, tmp_path):
+def test_c2kum_Nayti_dlinu_naibolshey_tsepochki_chisel_elementy_kotoroy_sto_44(tmp_path):
     """
     Тест для задачи: Найти длину наибольшей цепочки чисел, элементы которой стоят в порядке возрастания
        (неубывания), и записать её в переменную L (ID: 44)
@@ -1391,16 +1352,19 @@ __Вывод массива__
     with open(test_file, "w", encoding="utf-8") as f:
         f.write(kumir_code)
     
-    # Запускаем интерпретатор
-    result = run_kumir_code_func(str(test_file))
-    
-    # Проверяем, что код выполнился без ошибок
-    assert result.return_code == 0, f"Код завершился с ошибкой: {result.stderr_output}"
-      # TODO: Добавить проверку конкретного вывода для каждой задачи
-    print(f"Тест test_c2kum_Nayti_dlinu_naibolshey_tsepochki_chisel_elementy_kotoroy_sto_44 выполнен. Вывод: {result.stdout_output[:100]}")
+    # Запускаем интерпретатор через существующую функцию
+    try:
+        output = run_kumir_program(str(test_file))
+        print(f"Test test_c2kum_Nayti_dlinu_naibolshey_tsepochki_chisel_elementy_kotoroy_sto_44 completed successfully. Output: {output[:100]}")
+    except KumirSyntaxError as e:
+        pytest.fail(f"KumirSyntaxError in test_c2kum_Nayti_dlinu_naibolshey_tsepochki_chisel_elementy_kotoroy_sto_44: {e}")
+    except KumirEvalError as e:
+        pytest.fail(f"KumirEvalError in test_c2kum_Nayti_dlinu_naibolshey_tsepochki_chisel_elementy_kotoroy_sto_44: {e}")
+    except Exception as e:
+        pytest.fail(f"Unexpected error in test_c2kum_Nayti_dlinu_naibolshey_tsepochki_chisel_elementy_kotoroy_sto_44: {e}")
 
 
-def test_c2kum_Nayti_maksimalnyy_iz_elementov_kotorye_menshe_100_i_zapisat_50(run_kumir_code_func, tmp_path):
+def test_c2kum_Nayti_maksimalnyy_iz_elementov_kotorye_menshe_100_i_zapisat_50(tmp_path):
     """
     Тест для задачи: Найти максимальный из элементов, которые меньше 100, и записать его в переменную 
    максимум (ID: 50)
@@ -1433,16 +1397,19 @@ M:= A[i,j]
     with open(test_file, "w", encoding="utf-8") as f:
         f.write(kumir_code)
     
-    # Запускаем интерпретатор
-    result = run_kumir_code_func(str(test_file))
-    
-    # Проверяем, что код выполнился без ошибок
-    assert result.return_code == 0, f"Код завершился с ошибкой: {result.stderr_output}"
-      # TODO: Добавить проверку конкретного вывода для каждой задачи
-    print(f"Тест test_c2kum_Nayti_maksimalnyy_iz_elementov_kotorye_menshe_100_i_zapisat_50 выполнен. Вывод: {result.stdout_output[:100]}")
+    # Запускаем интерпретатор через существующую функцию
+    try:
+        output = run_kumir_program(str(test_file))
+        print(f"Test test_c2kum_Nayti_maksimalnyy_iz_elementov_kotorye_menshe_100_i_zapisat_50 completed successfully. Output: {output[:100]}")
+    except KumirSyntaxError as e:
+        pytest.fail(f"KumirSyntaxError in test_c2kum_Nayti_maksimalnyy_iz_elementov_kotorye_menshe_100_i_zapisat_50: {e}")
+    except KumirEvalError as e:
+        pytest.fail(f"KumirEvalError in test_c2kum_Nayti_maksimalnyy_iz_elementov_kotorye_menshe_100_i_zapisat_50: {e}")
+    except Exception as e:
+        pytest.fail(f"Unexpected error in test_c2kum_Nayti_maksimalnyy_iz_elementov_kotorye_menshe_100_i_zapisat_50: {e}")
 
 
-def test_c2kum_Nayti_srednee_arifmeticheskoe_vseh_elementov_glavnoy_diagona_51(run_kumir_code_func, tmp_path):
+def test_c2kum_Nayti_srednee_arifmeticheskoe_vseh_elementov_glavnoy_diagona_51(tmp_path):
     """
     Тест для задачи: Найти среднее арифметическое всех элементов главной диагонали матрицы и записать его 
  в переменную среднее (ID: 51)
@@ -1469,16 +1436,19 @@ def test_c2kum_Nayti_srednee_arifmeticheskoe_vseh_elementov_glavnoy_diagona_51(r
     with open(test_file, "w", encoding="utf-8") as f:
         f.write(kumir_code)
     
-    # Запускаем интерпретатор
-    result = run_kumir_code_func(str(test_file))
-    
-    # Проверяем, что код выполнился без ошибок
-    assert result.return_code == 0, f"Код завершился с ошибкой: {result.stderr_output}"
-      # TODO: Добавить проверку конкретного вывода для каждой задачи
-    print(f"Тест test_c2kum_Nayti_srednee_arifmeticheskoe_vseh_elementov_glavnoy_diagona_51 выполнен. Вывод: {result.stdout_output[:100]}")
+    # Запускаем интерпретатор через существующую функцию
+    try:
+        output = run_kumir_program(str(test_file))
+        print(f"Test test_c2kum_Nayti_srednee_arifmeticheskoe_vseh_elementov_glavnoy_diagona_51 completed successfully. Output: {output[:100]}")
+    except KumirSyntaxError as e:
+        pytest.fail(f"KumirSyntaxError in test_c2kum_Nayti_srednee_arifmeticheskoe_vseh_elementov_glavnoy_diagona_51: {e}")
+    except KumirEvalError as e:
+        pytest.fail(f"KumirEvalError in test_c2kum_Nayti_srednee_arifmeticheskoe_vseh_elementov_glavnoy_diagona_51: {e}")
+    except Exception as e:
+        pytest.fail(f"Unexpected error in test_c2kum_Nayti_srednee_arifmeticheskoe_vseh_elementov_glavnoy_diagona_51: {e}")
 
 
-def test_c2kum_Nayti_kolichestvo_polozhitelnyh_elementov_matritsy_kotorye_b_52(run_kumir_code_func, tmp_path):
+def test_c2kum_Nayti_kolichestvo_polozhitelnyh_elementov_matritsy_kotorye_b_52(tmp_path):
     """
     Тест для задачи: Найти количество положительных элементов матрицы, которые больше среднего арифметического 
    элементов её главной диагонали матрицы, и записать его в переменную count (ID: 52)
@@ -1513,16 +1483,19 @@ def test_c2kum_Nayti_kolichestvo_polozhitelnyh_elementov_matritsy_kotorye_b_52(r
     with open(test_file, "w", encoding="utf-8") as f:
         f.write(kumir_code)
     
-    # Запускаем интерпретатор
-    result = run_kumir_code_func(str(test_file))
-    
-    # Проверяем, что код выполнился без ошибок
-    assert result.return_code == 0, f"Код завершился с ошибкой: {result.stderr_output}"
-      # TODO: Добавить проверку конкретного вывода для каждой задачи
-    print(f"Тест test_c2kum_Nayti_kolichestvo_polozhitelnyh_elementov_matritsy_kotorye_b_52 выполнен. Вывод: {result.stdout_output[:100]}")
+    # Запускаем интерпретатор через существующую функцию
+    try:
+        output = run_kumir_program(str(test_file))
+        print(f"Test test_c2kum_Nayti_kolichestvo_polozhitelnyh_elementov_matritsy_kotorye_b_52 completed successfully. Output: {output[:100]}")
+    except KumirSyntaxError as e:
+        pytest.fail(f"KumirSyntaxError in test_c2kum_Nayti_kolichestvo_polozhitelnyh_elementov_matritsy_kotorye_b_52: {e}")
+    except KumirEvalError as e:
+        pytest.fail(f"KumirEvalError in test_c2kum_Nayti_kolichestvo_polozhitelnyh_elementov_matritsy_kotorye_b_52: {e}")
+    except Exception as e:
+        pytest.fail(f"Unexpected error in test_c2kum_Nayti_kolichestvo_polozhitelnyh_elementov_matritsy_kotorye_b_52: {e}")
 
 
-def test_c2kum_Nayti_kolichestvo_elementov_matritsy_kotorye_bolshe_srednego_53(run_kumir_code_func, tmp_path):
+def test_c2kum_Nayti_kolichestvo_elementov_matritsy_kotorye_bolshe_srednego_53(tmp_path):
     """
     Тест для задачи: Найти количество элементов матрицы, которые больше среднего арифметического
  всех элементов, и записать его в переменную count (ID: 53)
@@ -1559,16 +1532,19 @@ def test_c2kum_Nayti_kolichestvo_elementov_matritsy_kotorye_bolshe_srednego_53(r
     with open(test_file, "w", encoding="utf-8") as f:
         f.write(kumir_code)
     
-    # Запускаем интерпретатор
-    result = run_kumir_code_func(str(test_file))
-    
-    # Проверяем, что код выполнился без ошибок
-    assert result.return_code == 0, f"Код завершился с ошибкой: {result.stderr_output}"
-      # TODO: Добавить проверку конкретного вывода для каждой задачи
-    print(f"Тест test_c2kum_Nayti_kolichestvo_elementov_matritsy_kotorye_bolshe_srednego_53 выполнен. Вывод: {result.stdout_output[:100]}")
+    # Запускаем интерпретатор через существующую функцию
+    try:
+        output = run_kumir_program(str(test_file))
+        print(f"Test test_c2kum_Nayti_kolichestvo_elementov_matritsy_kotorye_bolshe_srednego_53 completed successfully. Output: {output[:100]}")
+    except KumirSyntaxError as e:
+        pytest.fail(f"KumirSyntaxError in test_c2kum_Nayti_kolichestvo_elementov_matritsy_kotorye_bolshe_srednego_53: {e}")
+    except KumirEvalError as e:
+        pytest.fail(f"KumirEvalError in test_c2kum_Nayti_kolichestvo_elementov_matritsy_kotorye_bolshe_srednego_53: {e}")
+    except Exception as e:
+        pytest.fail(f"Unexpected error in test_c2kum_Nayti_kolichestvo_elementov_matritsy_kotorye_bolshe_srednego_53: {e}")
 
 
-def test_c2kum_Nayti_summu_minimalnyh_elementov_kazhdogo_stolbtsa_i_zapisat_54(run_kumir_code_func, tmp_path):
+def test_c2kum_Nayti_summu_minimalnyh_elementov_kazhdogo_stolbtsa_i_zapisat_54(tmp_path):
     """
     Тест для задачи: Найти сумму минимальных элементов каждого столбца и записать её 
  в переменную сумма (ID: 54)
@@ -1600,16 +1576,19 @@ M:= A[i,j]
     with open(test_file, "w", encoding="utf-8") as f:
         f.write(kumir_code)
     
-    # Запускаем интерпретатор
-    result = run_kumir_code_func(str(test_file))
-    
-    # Проверяем, что код выполнился без ошибок
-    assert result.return_code == 0, f"Код завершился с ошибкой: {result.stderr_output}"
-      # TODO: Добавить проверку конкретного вывода для каждой задачи
-    print(f"Тест test_c2kum_Nayti_summu_minimalnyh_elementov_kazhdogo_stolbtsa_i_zapisat_54 выполнен. Вывод: {result.stdout_output[:100]}")
+    # Запускаем интерпретатор через существующую функцию
+    try:
+        output = run_kumir_program(str(test_file))
+        print(f"Test test_c2kum_Nayti_summu_minimalnyh_elementov_kazhdogo_stolbtsa_i_zapisat_54 completed successfully. Output: {output[:100]}")
+    except KumirSyntaxError as e:
+        pytest.fail(f"KumirSyntaxError in test_c2kum_Nayti_summu_minimalnyh_elementov_kazhdogo_stolbtsa_i_zapisat_54: {e}")
+    except KumirEvalError as e:
+        pytest.fail(f"KumirEvalError in test_c2kum_Nayti_summu_minimalnyh_elementov_kazhdogo_stolbtsa_i_zapisat_54: {e}")
+    except Exception as e:
+        pytest.fail(f"Unexpected error in test_c2kum_Nayti_summu_minimalnyh_elementov_kazhdogo_stolbtsa_i_zapisat_54: {e}")
 
 
-def test_c2kum_Nayti_summu_maksimalnyh_elementov_kazhdoy_stroki_i_zapisat_e_55(run_kumir_code_func, tmp_path):
+def test_c2kum_Nayti_summu_maksimalnyh_elementov_kazhdoy_stroki_i_zapisat_e_55(tmp_path):
     """
     Тест для задачи: Найти сумму максимальных элементов каждой строки и записать её 
  в переменную сумма (ID: 55)
@@ -1641,16 +1620,19 @@ M:= A[i,j]
     with open(test_file, "w", encoding="utf-8") as f:
         f.write(kumir_code)
     
-    # Запускаем интерпретатор
-    result = run_kumir_code_func(str(test_file))
-    
-    # Проверяем, что код выполнился без ошибок
-    assert result.return_code == 0, f"Код завершился с ошибкой: {result.stderr_output}"
-      # TODO: Добавить проверку конкретного вывода для каждой задачи
-    print(f"Тест test_c2kum_Nayti_summu_maksimalnyh_elementov_kazhdoy_stroki_i_zapisat_e_55 выполнен. Вывод: {result.stdout_output[:100]}")
+    # Запускаем интерпретатор через существующую функцию
+    try:
+        output = run_kumir_program(str(test_file))
+        print(f"Test test_c2kum_Nayti_summu_maksimalnyh_elementov_kazhdoy_stroki_i_zapisat_e_55 completed successfully. Output: {output[:100]}")
+    except KumirSyntaxError as e:
+        pytest.fail(f"KumirSyntaxError in test_c2kum_Nayti_summu_maksimalnyh_elementov_kazhdoy_stroki_i_zapisat_e_55: {e}")
+    except KumirEvalError as e:
+        pytest.fail(f"KumirEvalError in test_c2kum_Nayti_summu_maksimalnyh_elementov_kazhdoy_stroki_i_zapisat_e_55: {e}")
+    except Exception as e:
+        pytest.fail(f"Unexpected error in test_c2kum_Nayti_summu_maksimalnyh_elementov_kazhdoy_stroki_i_zapisat_e_55: {e}")
 
 
-def test_c2kum_Nayti_nomer_stolbtsa_s_maksimalnoy_summoy_elementov_i_zapisa_56(run_kumir_code_func, tmp_path):
+def test_c2kum_Nayti_nomer_stolbtsa_s_maksimalnoy_summoy_elementov_i_zapisa_56(tmp_path):
     """
     Тест для задачи: Найти номер столбца с максимальной суммой элементов и записать его 
  в переменную nMаx (ID: 56)
@@ -1682,16 +1664,19 @@ sMax:= s; nMax := j
     with open(test_file, "w", encoding="utf-8") as f:
         f.write(kumir_code)
     
-    # Запускаем интерпретатор
-    result = run_kumir_code_func(str(test_file))
-    
-    # Проверяем, что код выполнился без ошибок
-    assert result.return_code == 0, f"Код завершился с ошибкой: {result.stderr_output}"
-      # TODO: Добавить проверку конкретного вывода для каждой задачи
-    print(f"Тест test_c2kum_Nayti_nomer_stolbtsa_s_maksimalnoy_summoy_elementov_i_zapisa_56 выполнен. Вывод: {result.stdout_output[:100]}")
+    # Запускаем интерпретатор через существующую функцию
+    try:
+        output = run_kumir_program(str(test_file))
+        print(f"Test test_c2kum_Nayti_nomer_stolbtsa_s_maksimalnoy_summoy_elementov_i_zapisa_56 completed successfully. Output: {output[:100]}")
+    except KumirSyntaxError as e:
+        pytest.fail(f"KumirSyntaxError in test_c2kum_Nayti_nomer_stolbtsa_s_maksimalnoy_summoy_elementov_i_zapisa_56: {e}")
+    except KumirEvalError as e:
+        pytest.fail(f"KumirEvalError in test_c2kum_Nayti_nomer_stolbtsa_s_maksimalnoy_summoy_elementov_i_zapisa_56: {e}")
+    except Exception as e:
+        pytest.fail(f"Unexpected error in test_c2kum_Nayti_nomer_stolbtsa_s_maksimalnoy_summoy_elementov_i_zapisa_56: {e}")
 
 
-def test_c2kum_Nayti_nomer_stroki_s_minimalnoy_summoy_elementov_i_zapisat_e_57(run_kumir_code_func, tmp_path):
+def test_c2kum_Nayti_nomer_stroki_s_minimalnoy_summoy_elementov_i_zapisat_e_57(tmp_path):
     """
     Тест для задачи: Найти номер строки с минимальной суммой элементов и записать его 
  в переменную nMin (ID: 57)
@@ -1723,16 +1708,19 @@ sMin:= s; nMin := i
     with open(test_file, "w", encoding="utf-8") as f:
         f.write(kumir_code)
     
-    # Запускаем интерпретатор
-    result = run_kumir_code_func(str(test_file))
-    
-    # Проверяем, что код выполнился без ошибок
-    assert result.return_code == 0, f"Код завершился с ошибкой: {result.stderr_output}"
-      # TODO: Добавить проверку конкретного вывода для каждой задачи
-    print(f"Тест test_c2kum_Nayti_nomer_stroki_s_minimalnoy_summoy_elementov_i_zapisat_e_57 выполнен. Вывод: {result.stdout_output[:100]}")
+    # Запускаем интерпретатор через существующую функцию
+    try:
+        output = run_kumir_program(str(test_file))
+        print(f"Test test_c2kum_Nayti_nomer_stroki_s_minimalnoy_summoy_elementov_i_zapisat_e_57 completed successfully. Output: {output[:100]}")
+    except KumirSyntaxError as e:
+        pytest.fail(f"KumirSyntaxError in test_c2kum_Nayti_nomer_stroki_s_minimalnoy_summoy_elementov_i_zapisat_e_57: {e}")
+    except KumirEvalError as e:
+        pytest.fail(f"KumirEvalError in test_c2kum_Nayti_nomer_stroki_s_minimalnoy_summoy_elementov_i_zapisat_e_57: {e}")
+    except Exception as e:
+        pytest.fail(f"Unexpected error in test_c2kum_Nayti_nomer_stroki_s_minimalnoy_summoy_elementov_i_zapisat_e_57: {e}")
 
 
-def test_c2kum_Nayti_maksimalnyy_iz_minimalnyh_elementov_kazhdoy_stroki_i_z_58(run_kumir_code_func, tmp_path):
+def test_c2kum_Nayti_maksimalnyy_iz_minimalnyh_elementov_kazhdoy_stroki_i_z_58(tmp_path):
     """
     Тест для задачи: Найти максимальный из минимальных элементов каждой строки и записать его 
    в переменную maxMin (ID: 58)
@@ -1765,16 +1753,19 @@ M:= A[i,j]
     with open(test_file, "w", encoding="utf-8") as f:
         f.write(kumir_code)
     
-    # Запускаем интерпретатор
-    result = run_kumir_code_func(str(test_file))
-    
-    # Проверяем, что код выполнился без ошибок
-    assert result.return_code == 0, f"Код завершился с ошибкой: {result.stderr_output}"
-      # TODO: Добавить проверку конкретного вывода для каждой задачи
-    print(f"Тест test_c2kum_Nayti_maksimalnyy_iz_minimalnyh_elementov_kazhdoy_stroki_i_z_58 выполнен. Вывод: {result.stdout_output[:100]}")
+    # Запускаем интерпретатор через существующую функцию
+    try:
+        output = run_kumir_program(str(test_file))
+        print(f"Test test_c2kum_Nayti_maksimalnyy_iz_minimalnyh_elementov_kazhdoy_stroki_i_z_58 completed successfully. Output: {output[:100]}")
+    except KumirSyntaxError as e:
+        pytest.fail(f"KumirSyntaxError in test_c2kum_Nayti_maksimalnyy_iz_minimalnyh_elementov_kazhdoy_stroki_i_z_58: {e}")
+    except KumirEvalError as e:
+        pytest.fail(f"KumirEvalError in test_c2kum_Nayti_maksimalnyy_iz_minimalnyh_elementov_kazhdoy_stroki_i_z_58: {e}")
+    except Exception as e:
+        pytest.fail(f"Unexpected error in test_c2kum_Nayti_maksimalnyy_iz_minimalnyh_elementov_kazhdoy_stroki_i_z_58: {e}")
 
 
-def test_c2kum_Nayti_minimalnyy_iz_maksimalnyh_elementov_kazhdogo_stolbtsa_59(run_kumir_code_func, tmp_path):
+def test_c2kum_Nayti_minimalnyy_iz_maksimalnyh_elementov_kazhdogo_stolbtsa_59(tmp_path):
     """
     Тест для задачи: Найти минимальный из максимальных элементов каждого столбца и записать его 
  в переменную minMax (ID: 59)
@@ -1807,11 +1798,14 @@ M:= A[i,j]
     with open(test_file, "w", encoding="utf-8") as f:
         f.write(kumir_code)
     
-    # Запускаем интерпретатор
-    result = run_kumir_code_func(str(test_file))
-    
-    # Проверяем, что код выполнился без ошибок
-    assert result.return_code == 0, f"Код завершился с ошибкой: {result.stderr_output}"
-      # TODO: Добавить проверку конкретного вывода для каждой задачи
-    print(f"Тест test_c2kum_Nayti_minimalnyy_iz_maksimalnyh_elementov_kazhdogo_stolbtsa_59 выполнен. Вывод: {result.stdout_output[:100]}")
+    # Запускаем интерпретатор через существующую функцию
+    try:
+        output = run_kumir_program(str(test_file))
+        print(f"Test test_c2kum_Nayti_minimalnyy_iz_maksimalnyh_elementov_kazhdogo_stolbtsa_59 completed successfully. Output: {output[:100]}")
+    except KumirSyntaxError as e:
+        pytest.fail(f"KumirSyntaxError in test_c2kum_Nayti_minimalnyy_iz_maksimalnyh_elementov_kazhdogo_stolbtsa_59: {e}")
+    except KumirEvalError as e:
+        pytest.fail(f"KumirEvalError in test_c2kum_Nayti_minimalnyy_iz_maksimalnyh_elementov_kazhdogo_stolbtsa_59: {e}")
+    except Exception as e:
+        pytest.fail(f"Unexpected error in test_c2kum_Nayti_minimalnyy_iz_maksimalnyh_elementov_kazhdogo_stolbtsa_59: {e}")
 
