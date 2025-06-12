@@ -7,8 +7,7 @@ from typing import Optional, List, Dict, Any, Set
 def parse_kumir_xml_to_json(xml_file_path: str, json_file_path: str) -> None:
     """
     Парсит XML-файл с задачами Кумира и сохраняет их в JSON.
-    Эта версия не содержит проблемных конструкций и доверяет обработку
-    XML-сущностей парсеру.
+    Исправленная версия с правильным извлечением блока "надо".
     """
     if not os.path.exists(xml_file_path):
         print(f"Ошибка: Файл не найден по пути: {xml_file_path}")
@@ -16,15 +15,6 @@ def parse_kumir_xml_to_json(xml_file_path: str, json_file_path: str) -> None:
 
     all_tasks_data: List[Dict[str, Any]] = []
     processed_ids: Set[str] = set()
-
-    # Паттерн для разбора пользовательского блока
-    pattern = re.compile(
-        r"алг\s+(?P<name>.*?)\s*\|@protected\s*"
-        r"дано\s*\|(?P<dano>.*?)\|@protected\s*"
-        r"надо\s*\|(?P<nado>.*?)\|@protected\s*"
-        r"(?P<code>.*)",
-        re.DOTALL
-    )
 
     try:
         tree = ET.parse(xml_file_path)
@@ -37,55 +27,84 @@ def parse_kumir_xml_to_json(xml_file_path: str, json_file_path: str) -> None:
 
     for task_element in elements_to_process:
         test_id: Optional[str] = task_element.get('testId')
-        prg_full_code: Optional[str] = task_element.get('prg')
+        prg_full_content: Optional[str] = task_element.get('prg')
 
-        if not prg_full_code or not test_id or test_id in processed_ids:
+        if not prg_full_content or not test_id or test_id in processed_ids:
             continue
         
         processed_ids.add(test_id)
-        
-        # XML-парсер уже преобразовал в \n.
-        # Никаких дополнительных замен не требуется.
-        # Просто убираем лишние пробелы по краям всей строки.
-        prg_full_code = prg_full_code.strip()
+        prg_full_content = prg_full_content.strip()
 
-        # 1. Изолируем пользовательский блок по последнему маркеру конца
-        end_marker = 'кон|@protected'
-        end_marker_pos = prg_full_code.rfind(end_marker)
-        
-        if end_marker_pos == -1:
-            continue
+        # Отделяем тестовый блок
+        testing_separator = "алг цел @тестирование|@hidden"
+        student_program_part = prg_full_content.split(testing_separator, 1)[0].strip()
 
-        user_block = prg_full_code[:end_marker_pos + len(end_marker)]
-
-        # 2. Находим начало основного алгоритма (для задач с глобальными переменными)
-        alg_marker_pos = user_block.find('алг ')
-        if alg_marker_pos == -1:
-            continue
-            
-        main_alg_block = user_block[alg_marker_pos:]
+        # Извлекаем составные части с помощью регулярных выражений
         
-        # 3. Применяем regex к чистому блоку
-        match = pattern.search(main_alg_block)
+        # 1. Извлекаем название алгоритма
+        alg_match = re.search(r'алг\s+(.+?)\s*\|\@protected', student_program_part, re.DOTALL)
+        alg_name = alg_match.group(1).strip() if alg_match else ""
         
-        if match:
-            data = match.groupdict()
-            
-            # Очистка извлеченных секций
-            dano_clean = data['dano'].strip().replace('\n       |', '\n').replace('|', '')
-            nado_clean = data['nado'].strip().replace('\n       |', '\n').replace('|', '')
-            full_code = data['code'].replace('|@protected', '').strip()
-            
-            task_data = {
-                "testId": test_id,
-                "название": data['name'].strip(),
-                "дано": dano_clean,
-                "надо": nado_clean,
-                "ученический_код": full_code
-            }
-            all_tasks_data.append(task_data)
+        # 2. Извлекаем блок "дано" с улучшенной очисткой
+        dano_match = re.search(r'дано\s*\|\s*(.+?)\s*\|\@protected', student_program_part, re.DOTALL)
+        dano_content = dano_match.group(1).strip() if dano_match else ""
+        # Улучшенная очистка от внутренних маркеров
+        dano_clean = re.sub(r'\s*\|\s*', ' ', dano_content)
+        dano_clean = re.sub(r'\s+', ' ', dano_clean).strip()
+        
+        # 3. Извлекаем блок "надо" - ИСПРАВЛЕННАЯ ЛОГИКА
+        # Ищем начало блока "надо"
+        nado_start_match = re.search(r'надо\s*\|', student_program_part)
+        if nado_start_match:
+            nado_start_pos = nado_start_match.start()
+            # Ищем первый "нач|@protected" после "надо"
+            nach_match = re.search(r'нач\s*\|\@protected', student_program_part[nado_start_pos:])
+            if nach_match:
+                # Блок "надо" заканчивается перед "нач|@protected"
+                nado_end_pos = nado_start_pos + nach_match.start()
+                nado_block = student_program_part[nado_start_pos:nado_end_pos].strip()
+                
+                # Извлекаем содержимое блока "надо", убирая служебные маркеры
+                nado_content = re.sub(r'надо\s*\|\s*', '', nado_block)
+                nado_content = re.sub(r'\|\@protected', '', nado_content)
+                nado_content = re.sub(r'^\s*\|\s*', '', nado_content, flags=re.MULTILINE)
+                nado_clean = re.sub(r'\s+', ' ', nado_content).strip()
+            else:
+                nado_clean = ""
         else:
-            print(f"Предупреждение: не удалось разобрать пользовательский блок для testId={test_id}")
+            nado_clean = ""
+          # 4. Извлекаем ученический код - ИСПРАВЛЕННАЯ ЛОГИКА
+        student_code = ""
+        # Ищем первый "нач|@protected" - это начало кода
+        nach_match = re.search(r'нач\s*\|\@protected', student_program_part)
+        if nach_match:
+            code_start_pos = nach_match.start()  # Начинаем с "нач", а не после него
+            
+            # Ищем первый "кон|@protected" после начала кода
+            kon_match = re.search(r'кон\s*\|\@protected', student_program_part[code_start_pos:])
+            if kon_match:
+                code_end_pos = code_start_pos + kon_match.end()  # Включаем "кон" в код
+                student_code_raw = student_program_part[code_start_pos:code_end_pos].strip()
+                
+                # Очищаем код от маркеров, но оставляем "нач" и "кон"
+                student_code = re.sub(r'\|\@protected', '', student_code_raw)
+                student_code = re.sub(r'^\s*\|\s*', '', student_code, flags=re.MULTILINE)
+                student_code = student_code.strip()
+
+        task_data: Dict[str, str] = {
+            "testId": test_id,
+            "название": alg_name,
+            "дано": dano_clean,
+            "надо": nado_clean,
+            "ученический_код": student_code
+        }
+        all_tasks_data.append(task_data)
+        
+        # Логирование для отладки
+        if test_id in ["10", "13", "20", "22"]:  # Детальная отладка для некоторых задач
+            print(f"testId={test_id}: надо='{nado_clean[:50]}...', код='{student_code[:50]}...'")
+        else:
+            print(f"testId={test_id}: код={'найден' if student_code else 'НЕ НАЙДЕН'} ({len(student_code)} символов)")
     
     all_tasks_data.sort(key=lambda x: int(x['testId']) if x['testId'].isdigit() else 0)
     
