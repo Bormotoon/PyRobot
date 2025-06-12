@@ -1,8 +1,7 @@
   {
-    "mcpServers": {
-      "filesystem": {
-        "command": "mcp-filesystem-server",
-        "args": ["/Users/bormotoon/VSCodeProjects"]
+    "servers": {
+      "GH remote": {
+        "url": "https://api.githubcopilot.com/mcp/"
       }
     }
   }
