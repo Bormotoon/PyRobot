@@ -1,7 +1,0 @@
-  {
-    "servers": {
-      "GH remote": {
-        "url": "https://api.githubcopilot.com/mcp/"
-      }
-    }
-  }

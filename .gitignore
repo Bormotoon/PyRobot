@@ -187,4 +187,6 @@ logs/
 parsed_xml_results/
 parsed_xml_results_fixed/
 demo_results/
+kumir_python_solutions/
 mega_parser.log
+*.log
