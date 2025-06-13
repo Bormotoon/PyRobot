@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kumir_course>
+    <task>
+        <USER_PRG testId="50" prg="алг цел сумма всех элементов|@protected
+дано | цел N, таб цел A[1:N] |@protected  
+надо | найти сумму всех элементов массива |@protected
+нач |@protected
+    цел sum
+    sum := 0
+    нц для i от 1 до N
+        sum := sum + A[i]
+    кц
+    знач := sum
+кон |@protected
+
+алг цел @тестирование|@hidden
+нач
+    цел N
+    N := 4
+    таб цел A[1:N]
+    A[1] := 2; A[2] := 5; A[3] := 3; A[4] := 1
+    цел результат
+    результат := сумма всех элементов(N, A)
+    вывод результат
+кон"/>
+    </task>
+</kumir_course>

@@ -182,3 +182,9 @@ polyakov_kurs_work/
 # Ignore temp and logs dirs
 tmp/
 logs/
+
+# Ignore pipeline results and generated files
+parsed_xml_results/
+parsed_xml_results_fixed/
+demo_results/
+mega_parser.log
