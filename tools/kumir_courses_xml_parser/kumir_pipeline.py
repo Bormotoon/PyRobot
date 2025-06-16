@@ -35,8 +35,44 @@ class KumirToPythonPipeline:
         self.python_dir.mkdir(exist_ok=True)
         self.reports_dir.mkdir(exist_ok=True)
     
-    def clean_task_name_for_filename(self, task_name: str, task_id: str) -> str:
+    def clean_task_name_for_filename(self, task_name: str, task_id: str, task_type: str = "") -> str:
         """Создает короткое английское имя файла на основе типа задачи."""
+        
+        # Если у нас есть тип задачи из детектора
+        if task_type:
+            if task_type.startswith('func_'):
+                type_names = {
+                    'func_last_digit': 'last_digit',
+                    'func_tens_digit': 'tens_digit', 
+                    'func_hundreds_digit': 'hundreds_digit',
+                    'func_cube': 'cube',
+                    'func_square': 'square',
+                    'func_round': 'round',
+                    'func_round_up': 'round_up',
+                    'func_is_prime': 'is_prime',
+                    'func_is_palindrome': 'is_palindrome',
+                    'func_complex_algorithm': 'complex_func',
+                    'func_generic': 'function'
+                }
+                return type_names.get(task_type, 'function')
+            elif task_type.startswith('algorithm_'):
+                type_names = {
+                    'algorithm_binary_search': 'binary_search',
+                    'algorithm_sort': 'sort_algorithm', 
+                    'algorithm_complex': 'complex_algorithm'
+                }
+                return type_names.get(task_type, 'algorithm')
+            elif task_type.startswith('array_'):
+                type_names = {
+                    'array_reverse': 'array_reverse',
+                    'array_shift': 'array_shift',
+                    'array_sort': 'array_sort',
+                    'array_fill': 'array_fill',
+                    'array_search': 'array_search',
+                    'array_modify': 'array_modify',
+                    'array_procedure': 'array_proc'
+                }
+                return type_names.get(task_type, 'array_task')
         
         # Словарь сокращений для разных типов задач
         name_mappings = {
@@ -204,6 +240,119 @@ class KumirToPythonPipeline:
             print(f"❌ Ошибка записи в файл: {e}")
             return False
     
+    def detect_task_type(self, task: Dict[str, str]) -> str:
+        """Определяет тип задачи на основе её содержимого."""
+        task_name = task['task_name'].lower()
+        task_todo = task['task_todo'].lower()
+        kumir_code = task['kumir_code'].lower()
+        
+        # Проверяем наличие массивов в сигнатуре
+        has_array = any(keyword in task_name for keyword in ['аргрез', 'целтаб', 'вещтаб', 'лоттаб', 'массив'])
+        
+        # Сложные алгоритмы (двоичный поиск, сортировки, и т.д.)
+        if any(keyword in task_todo for keyword in ['двоичн', 'бинарн', 'поиск', 'сортир', 'пузыр', 'быстр', 'слиян']):
+            if 'двоичн' in task_todo or 'бинарн' in task_todo:
+                return 'algorithm_binary_search'
+            elif 'сортир' in task_todo:
+                return 'algorithm_sort'
+            else:
+                return 'algorithm_complex'
+        
+        # Процедуры работы с массивами
+        if has_array:
+            if 'реверс' in task_name or 'обратн' in task_todo:
+                return 'array_reverse'
+            elif 'циклическ' in task_todo or 'сдвиг' in task_todo:
+                return 'array_shift'
+            elif 'сортир' in task_todo:
+                return 'array_sort'
+            elif 'заполн' in task_todo:
+                return 'array_fill'
+            elif 'найт' in task_todo or 'поиск' in task_todo:
+                return 'array_search'
+            elif 'удал' in task_todo or 'вставк' in task_todo:
+                return 'array_modify'
+            else:
+                return 'array_procedure'
+        
+        # Функции (возвращают значение)
+        if any(prefix in task_name for prefix in ['цел ', 'вещ ']) and ('арг' in task_name or '(' in task_name):
+            # Простые математические функции
+            if 'последн' in task_name and 'цифр' in task_name:
+                return 'func_last_digit'
+            elif 'десятк' in task_name:
+                return 'func_tens_digit'
+            elif 'сотен' in task_name:
+                return 'func_hundreds_digit'
+            elif 'куб' in task_name and not ('поиск' in task_todo or 'корен' in task_todo):
+                return 'func_cube'
+            elif 'квадрат' in task_name and not ('поиск' in task_todo or 'корен' in task_todo):
+                return 'func_square'
+            elif 'округл' in task_name:
+                if 'вверх' in task_name:
+                    return 'func_round_up'
+                else:
+                    return 'func_round'
+            elif 'прост' in task_name:
+                return 'func_is_prime'
+            elif 'палиндром' in task_name:
+                return 'func_is_palindrome'
+            # Сложные алгоритмические функции
+            elif any(keyword in task_todo for keyword in ['шаг', 'поиск', 'корен', 'алгоритм']):
+                return 'func_complex_algorithm'
+            else:
+                return 'func_generic'
+        
+        # Массивы - заполнение (без аргрез в сигнатуре)
+        if 'заполн' in task_todo or 'заполн' in task_name:
+            if 'нул' in task_todo:
+                return 'arr_fill_zeros'
+            elif 'натур' in task_todo:
+                return 'arr_fill_natural'
+            elif 'фибо' in task_todo:
+                return 'arr_fill_fibonacci'
+            elif 'степен' in task_todo or '2^' in task_todo:
+                return 'arr_fill_powers2'
+            elif 'горк' in task_todo:
+                return 'arr_fill_pyramid'
+            else:
+                return 'arr_fill_generic'
+        
+        # Массивы - обработка
+        if 'увелич' in task_todo:
+            return 'arr_modify_increase'
+        elif 'умнож' in task_todo:
+            return 'arr_modify_multiply'
+        elif 'квадрат' in task_todo:
+            return 'arr_modify_square'
+        
+        # Массивы - поиск
+        elif 'макс' in task_todo:
+            return 'arr_find_max'
+        elif 'мин' in task_todo:
+            return 'arr_find_min'
+        elif 'найт' in task_todo:
+            return 'arr_find_value'
+        
+        # Массивы - подсчет
+        elif 'скольк' in task_todo or 'количест' in task_todo:
+            return 'arr_count'
+        
+        # Массивы - сумма
+        elif 'сумм' in task_todo:
+            return 'arr_sum'
+        
+        # Строки
+        elif 'строк' in task_name or 'лит' in task_name:
+            return 'string_task'
+        
+        # Робот
+        elif 'робот' in task_name.lower():
+            return 'robot_task'
+        
+        # По умолчанию
+        return 'generic_task'
+
     def generate_python_solution(self, task: Dict[str, str]) -> str:
         """Генерирует Python код для решения задачи."""
         task_id = task['task_id']
@@ -212,11 +361,15 @@ class KumirToPythonPipeline:
         task_todo = task['task_todo']
         kumir_code = task['kumir_code']
         
-        # Определяем параметры функции
-        has_X = 'арг цел X' in task_name
-        returns_value = any(prefix in task_name for prefix in ['цел ', 'вещ '])
+        # Определяем тип задачи
+        task_type = self.detect_task_type(task)
         
-        short_name = self.clean_task_name_for_filename(task_name, task_id)
+        # Определяем параметры функции
+        has_X = 'арг цел X' in task_name or 'арг вещ X' in task_name or '(цел X)' in task_name or '(вещ X)' in task_name
+        returns_value = any(prefix in task_name for prefix in ['цел ', 'вещ ']) and ('арг' in task_name or '(' in task_name)
+        is_function = task_type.startswith('func_')
+        
+        short_name = self.clean_task_name_for_filename(task_name, task_id, task_type)
         
         code_lines = [
             f'"""',
@@ -233,7 +386,19 @@ class KumirToPythonPipeline:
         ]
         
         # Определяем сигнатуру функции
-        if has_X and returns_value:
+        if task_type.startswith('func_'):
+            # Это функция, возвращающая значение
+            if has_X:
+                func_signature = f'def {short_name}(X):'
+            else:
+                func_signature = f'def {short_name}():'
+        elif task_type.startswith('algorithm_') or task_type.startswith('array_'):
+            # Алгоритмы и процедуры с массивами
+            if has_X:
+                func_signature = f'def {short_name}(N, A, X):'
+            else:
+                func_signature = f'def {short_name}(N, A):'
+        elif has_X and returns_value:
             func_signature = f'def {short_name}(N: int, A: list, X: int):'
         elif has_X:
             func_signature = f'def {short_name}(N: int, A: list, X: int) -> list:'
@@ -245,8 +410,183 @@ class KumirToPythonPipeline:
         code_lines.append(func_signature)
         code_lines.append('    """Python solution for the task."""')
         
-        # Генерируем код в зависимости от задачи
-        if task_id == "10":  # Заполнить нулями
+        # Генерируем код в зависимости от типа задачи
+        # Сначала проверяем новые типы (приоритет над старыми ID)
+        if task_type == 'algorithm_binary_search':
+            code_lines.extend([
+                '    # Binary search algorithm',
+                '    left, right = 1, min(N, 1000)',
+                '    steps = 0',
+                '    result = 0',
+                '    ',
+                '    while right >= left:',
+                '        mid = (right + left) // 2',
+                '        steps += 1',
+                '        mid_cubed = mid * mid * mid',
+                '        ',
+                '        if N == mid_cubed:',
+                '            result = mid',
+                '            break',
+                '        elif N < mid_cubed:',
+                '            right = mid - 1',
+                '        else:',
+                '            left = mid + 1',
+                '    ',
+                '    return steps'
+            ])
+        elif task_type == 'array_reverse':
+            code_lines.extend([
+                '    # Reverse array elements',
+                '    for i in range(N // 2):',
+                '        A[i], A[N - 1 - i] = A[N - 1 - i], A[i]',
+                '    return A'
+            ])
+        elif task_type == 'array_shift':
+            code_lines.extend([
+                '    # Cyclically shift array elements',
+                '    if N > 1:',
+                '        temp = A[N-1]',
+                '        for i in range(N-1, 0, -1):',
+                '            A[i] = A[i-1]',
+                '        A[0] = temp',
+                '    return A'
+            ])
+        elif task_type == 'array_sort':
+            code_lines.extend([
+                '    # Simple bubble sort',
+                '    for i in range(N):',
+                '        for j in range(N - 1 - i):',
+                '            if A[j] > A[j + 1]:',
+                '                A[j], A[j + 1] = A[j + 1], A[j]',
+                '    return A'
+            ])
+        elif task_type == 'array_procedure':
+            code_lines.extend([
+                '    # Array procedure - implement based on task description',
+                f'    # Task: {task_todo}',
+                '    # TODO: Add specific implementation',
+                '    return A'
+            ])
+        elif task_type == 'func_complex_algorithm':
+            code_lines.extend([
+                '    # Complex algorithmic function',
+                f'    # Task: {task_todo}',
+                '    # TODO: Implement complex algorithm',
+                '    return 0  # Placeholder'
+            ])
+        # Простые функции
+        elif task_type == 'func_last_digit':
+            code_lines.extend([
+                '    return X % 10'
+            ])
+        elif task_type == 'func_tens_digit':
+            code_lines.extend([
+                '    return (X // 10) % 10'
+            ])
+        elif task_type == 'func_hundreds_digit':
+            code_lines.extend([
+                '    return (X // 100) % 10'
+            ])
+        elif task_type == 'func_cube':
+            code_lines.extend([
+                '    return X * X * X'
+            ])
+        elif task_type == 'func_square':
+            code_lines.extend([
+                '    return X * X'
+            ])
+        elif task_type == 'func_round':
+            code_lines.extend([
+                '    from math import floor',
+                '    if X - floor(X) >= 0.5:',
+                '        return int(X) + 1',
+                '    else:',
+                '        return int(X)'
+            ])
+        elif task_type == 'func_round_up':
+            code_lines.extend([
+                '    import math',
+                '    return math.ceil(X)'
+            ])
+        elif task_type == 'func_is_prime':
+            code_lines.extend([
+                '    if X < 2:',
+                '        return 0',
+                '    for i in range(2, int(X**0.5) + 1):',
+                '        if X % i == 0:',
+                '            return 0',
+                '    return 1'
+            ])
+        elif task_type == 'func_is_palindrome':
+            code_lines.extend([
+                '    s = str(X)',
+                '    return 1 if s == s[::-1] else 0'
+            ])
+        elif task_type == 'func_generic':
+            # Попытаемся создать простую реализацию на основе описания
+            if 'сумм' in task_todo.lower() and 'натур' in task_todo.lower():
+                code_lines.extend([
+                    '    # Sum of natural numbers from 1 to X',
+                    '    return sum(range(1, X + 1))'
+                ])
+            elif 'произвед' in task_todo.lower() or 'факториал' in task_todo.lower():
+                code_lines.extend([
+                    '    # Factorial or product',
+                    '    result = 1',
+                    '    for i in range(1, X + 1):',
+                    '        result *= i',
+                    '    return result'
+                ])
+            elif 'четн' in task_todo.lower():
+                code_lines.extend([
+                    '    # Check if even',
+                    '    return 1 if X % 2 == 0 else 0'
+                ])
+            elif 'нечетн' in task_todo.lower():
+                code_lines.extend([
+                    '    # Check if odd',
+                    '    return 1 if X % 2 != 0 else 0'
+                ])
+            elif 'положит' in task_todo.lower():
+                code_lines.extend([
+                    '    # Check if positive',
+                    '    return 1 if X > 0 else 0'
+                ])
+            elif 'отрицат' in task_todo.lower():
+                code_lines.extend([
+                    '    # Check if negative',
+                    '    return 1 if X < 0 else 0'
+                ])
+            elif 'цифр' in task_todo.lower() and 'сумм' in task_todo.lower():
+                code_lines.extend([
+                    '    # Sum of digits',
+                    '    total = 0',
+                    '    x = abs(X)',
+                    '    while x > 0:',
+                    '        total += x % 10',
+                    '        x //= 10',
+                    '    return total'
+                ])
+            elif 'цифр' in task_todo.lower() and ('количест' in task_todo.lower() or 'скольк' in task_todo.lower()):
+                code_lines.extend([
+                    '    # Count of digits',
+                    '    if X == 0:',
+                    '        return 1',
+                    '    count = 0',
+                    '    x = abs(X)',
+                    '    while x > 0:',
+                    '        count += 1',
+                    '        x //= 10',
+                    '    return count'
+                ])
+            else:
+                # Базовая реализация
+                code_lines.extend([
+                    '    # TODO: Implement based on task description',
+                    f'    # Task: {task_todo}',
+                    '    return 0  # Placeholder'
+                ])
+        elif task_id == "10" or task_type == 'arr_fill_zeros':  # Заполнить нулями
             code_lines.extend([
                 '    for i in range(N):',
                 '        A[i] = 0',
@@ -376,19 +716,55 @@ class KumirToPythonPipeline:
             '',
             'def test_solution():',
             '    """Test the solution."""',
-            '    N = 5',
-            '    A = [0] * N',
         ])
         
-        if has_X:
-            code_lines.append('    X = 10')
-            code_lines.append(f'    result = {short_name}(N, A.copy(), X)')
+        if task_type.startswith('func_'):
+            # Для функций
+            code_lines.extend([
+                '    test_values = [0, 1, 5, 123, 999]',
+                '    for X in test_values:',
+                f'        result = {short_name}(X)',
+                '        print(f"Input: {X}, Result: {result}")',
+                '    return True'
+            ])
+        elif task_type.startswith('algorithm_') or task_type.startswith('array_'):
+            # Для алгоритмов и процедур с массивами
+            code_lines.extend([
+                '    # Test with sample data',
+                '    N = 5',
+                '    A = [1, 2, 3, 4, 5]',
+            ])
+            
+            if has_X:
+                code_lines.append('    X = 3')
+                code_lines.append(f'    result = {short_name}(N, A.copy(), X)')
+            else:
+                code_lines.append(f'    result = {short_name}(N, A.copy())')
+            
+            code_lines.extend([
+                '    print(f"Input: N={N}, A={A}")',
+                '    print(f"Result: {result}")',
+                '    return result'
+            ])
         else:
-            code_lines.append(f'    result = {short_name}(N, A.copy())')
+            # Для массивов
+            code_lines.extend([
+                '    N = 5',
+                '    A = [0] * N',
+            ])
+            
+            if has_X:
+                code_lines.append('    X = 10')
+                code_lines.append(f'    result = {short_name}(N, A.copy(), X)')
+            else:
+                code_lines.append(f'    result = {short_name}(N, A.copy())')
+            
+            code_lines.extend([
+                '    print(f"Result: {result}")',
+                '    return result'
+            ])
         
         code_lines.extend([
-            '    print(f"Result: {result}")',
-            '    return result',
             '',
             '',
             'if __name__ == "__main__":',
@@ -411,7 +787,8 @@ class KumirToPythonPipeline:
         success_count = 0
         for task in tasks:
             task_id = task['task_id']
-            short_name = self.clean_task_name_for_filename(task['task_name'], task_id)
+            task_type = self.detect_task_type(task)
+            short_name = self.clean_task_name_for_filename(task['task_name'], task_id, task_type)
             
             python_code = self.generate_python_solution(task)
             
@@ -620,6 +997,37 @@ if __name__ == "__main__":
         return True
 
 
+    def convert_kumir_to_python(self, kumir_code: str) -> str:
+        """Простой конвертер КУМИРовского кода в Python."""
+        lines = kumir_code.split('\n')
+        python_lines = []
+        
+        for line in lines:
+            line = line.strip()
+            if not line or line in ['нач', 'кон']:
+                continue
+                
+            # Заменяем основные операторы
+            line = line.replace('знач:=', 'result = ')
+            line = line.replace(':=', ' = ')
+            line = line.replace('mod(', '(')
+            line = line.replace('div(', '(')
+            line = line.replace(',', ' // ')
+            line = line.replace('mod', '%')
+            line = line.replace('div', '//')
+            line = line.replace('если', 'if')
+            line = line.replace('то', ':')
+            line = line.replace('все', '')
+            line = line.replace('для', 'for')
+            line = line.replace('от', 'in range(')
+            line = line.replace('до', ',')
+            line = line.replace('нц', ':')
+            line = line.replace('кц', '')
+            
+            if line:
+                python_lines.append(line)
+        
+        return '\n    '.join(python_lines) if python_lines else 'pass'
 def main():
     """Главная функция."""
     if len(sys.argv) != 2:
