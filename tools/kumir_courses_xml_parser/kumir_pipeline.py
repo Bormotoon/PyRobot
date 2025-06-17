@@ -60,6 +60,7 @@ class KumirToPythonPipeline:
                     'func_square': 'square',
                     'func_round': 'round',
                     'func_round_up': 'round_up',
+                    'func_average': 'average',
                     'func_is_prime': 'is_prime',
                     'func_is_palindrome': 'is_palindrome',
                     'func_count_binary_ones': 'count_binary_ones',
@@ -318,7 +319,87 @@ class KumirToPythonPipeline:
         if ('двоичный поиск' in task_todo or 'бинарный поиск' in task_todo) and 'записи' not in task_todo:
             return 'algorithm_binary_search'
         
-        # ПРОЦЕДУРЫ с аргумент-результат массивами (изменяют переданный массив) - СНАЧАЛА!
+        # ПРОЦЕДУРЫ с результирующими массивами (проверяем ПЕРВЫМИ!)
+        if has_result_array:
+            if 'заполн' in task_todo:
+                if 'нул' in task_todo:
+                    return 'arr_fill_zeros'
+                elif 'натур' in task_todo:
+                    return 'arr_fill_natural'
+                elif 'фибо' in task_todo:
+                    return 'arr_fill_fibonacci'
+                elif 'степен' in task_todo or '2^' in task_todo:
+                    return 'arr_fill_powers2'
+                elif 'горк' in task_todo:
+                    return 'arr_fill_pyramid'
+                else:
+                    return 'arr_fill_generic'
+            elif 'увелич' in task_todo:
+                return 'arr_modify_increase'
+            elif 'умнож' in task_todo:
+                return 'arr_modify_multiply'
+            elif 'квадрат' in task_todo:
+                return 'arr_modify_square'
+            else:
+                return 'array_procedure'
+        
+        # ФУНКЦИИ (возвращают значение) - проверяем ПОСЛЕ процедур с результирующими массивами!
+        if any(prefix in task_name for prefix in ['цел ', 'вещ ', 'лог ', 'лит ']) and ('арг' in task_name or '(' in task_name):
+            # Функции с массивами - специальные случаи ПЕРЕД обычными функциями!
+            if ('количест' in task_todo.lower() or 'количест' in task_name.lower()) and has_array:
+                return 'func_count_elements'
+            elif ('скольк' in task_todo.lower() or 'скольк' in task_name.lower()) and has_array:
+                return 'func_count_elements'  
+            elif 'единиц' in task_name and has_array:
+                return 'func_count_ones'
+            elif 'сумм' in task_todo and has_array and 'фибо' not in task_todo:
+                return 'func_sum_array'
+            elif 'макс' in task_todo and has_array:
+                return 'func_max_array'
+            elif 'мин' in task_todo and has_array:
+                return 'func_min_array'
+            # Специальные функции - высокий приоритет (НЕ только "арифметическ")
+            elif 'средн' in task_todo and 'арифметическ' in task_todo:
+                return 'func_average'
+            elif 'минимум' in task_todo or 'наименьш' in task_todo:
+                return 'func_min'
+            elif 'максимум' in task_todo or 'наибольш' in task_todo:
+                return 'func_max'
+            elif 'лог ' in task_name and ('оканчивается' in task_todo or 'на 0' in task_todo):
+                return 'func_ends_with_zero'
+            elif 'счастлив' in task_todo:
+                return 'func_lucky_ticket'
+            elif 'единиц' in task_name and 'двоичн' in task_todo:
+                return 'func_count_binary_ones'
+            elif 'нулей' in task_name and 'двоичн' in task_todo:
+                return 'func_count_binary_zeros'
+            elif 'палиндром' in task_name:
+                return 'func_is_palindrome'
+            elif 'прост' in task_name:
+                return 'func_is_prime'
+            # Простые математические функции
+            elif 'последн' in task_name and 'цифр' in task_name:
+                return 'func_last_digit'
+            elif 'десятк' in task_name:
+                return 'func_tens_digit'
+            elif 'сотен' in task_name:
+                return 'func_hundreds_digit'
+            elif 'куб' in task_name and not ('поиск' in task_todo or 'корен' in task_todo):
+                return 'func_cube'
+            elif 'квадрат' in task_name and not ('поиск' in task_todo or 'корен' in task_todo):
+                return 'func_square'
+            elif 'округл' in task_name:
+                if 'вверх' in task_name:
+                    return 'func_round_up'
+                else:
+                    return 'func_round'
+            # Сложные алгоритмические функции
+            elif any(keyword in task_todo for keyword in ['шаг', 'поиск', 'корен', 'алгоритм']):
+                return 'func_complex_algorithm'
+            else:
+                return 'func_generic'
+        
+        # ПРОЦЕДУРЫ с аргумент-результат массивами (изменяют переданный массив) - ПОСЛЕ функций!
         if has_argresult_array:
             if 'увелич' in task_todo:
                 if '1' in task_todo or 'на 1' in task_todo:
@@ -347,90 +428,6 @@ class KumirToPythonPipeline:
             else:
                 return 'array_procedure'
         
-        # ПРОЦЕДУРЫ с результирующими массивами (проверяем ПОСЛЕ аргрез!)
-        if has_result_array:
-            if 'заполн' in task_todo:
-                if 'нул' in task_todo:
-                    return 'arr_fill_zeros'
-                elif 'натур' in task_todo:
-                    return 'arr_fill_natural'
-                elif 'фибо' in task_todo:
-                    return 'arr_fill_fibonacci'
-                elif 'степен' in task_todo or '2^' in task_todo:
-                    return 'arr_fill_powers2'
-                elif 'горк' in task_todo:
-                    return 'arr_fill_pyramid'
-                else:
-                    return 'arr_fill_generic'
-            elif 'увелич' in task_todo:
-                return 'arr_modify_increase'
-            elif 'умнож' in task_todo:
-                return 'arr_modify_multiply'
-            elif 'квадрат' in task_todo:
-                return 'arr_modify_square'
-            else:
-                return 'array_procedure'
-        
-        # Функции (возвращают значение) - проверяем ПЕРЕД массивами!
-        if any(prefix in task_name for prefix in ['цел ', 'вещ ', 'лог ', 'лит ']) and ('арг' in task_name or '(' in task_name):
-            # Специальные функции
-            if 'средн' in task_todo and 'арифметическ' in task_todo:
-                return 'func_average'
-            elif 'минимум' in task_todo or 'наименьш' in task_todo:
-                return 'func_min'
-            elif 'максимум' in task_todo or 'наибольш' in task_todo:
-                return 'func_max'
-            elif 'лог ' in task_name and ('оканчивается' in task_todo or 'на 0' in task_todo):
-                return 'func_ends_with_zero'
-            elif 'счастлив' in task_todo:
-                return 'func_lucky_ticket'
-            elif 'единиц' in task_name and 'двоичн' in task_todo:
-                return 'func_count_binary_ones'
-            elif 'нулей' in task_name and 'двоичн' in task_todo:
-                return 'func_count_binary_zeros'
-            elif 'палиндром' in task_name:
-                return 'func_is_palindrome'
-            elif 'прост' in task_name:
-                return 'func_is_prime'
-            # Функции с массивами - специальные случаи
-            elif 'единиц' in task_name and has_array:
-                return 'func_count_ones'
-            elif ('количест' in task_todo.lower() or 'количест' in task_name.lower()) and has_array:
-                return 'func_count_elements'
-            elif ('скольк' in task_todo.lower() or 'скольк' in task_name.lower()) and has_array:
-                return 'func_count_elements'  
-            elif 'сумм' in task_todo and has_array:
-                return 'func_sum_array'
-            elif 'макс' in task_todo and has_array:
-                return 'func_max_array'
-            elif 'мин' in task_todo and has_array:
-                return 'func_min_array'
-            # Простые математические функции
-            elif 'последн' in task_name and 'цифр' in task_name:
-                return 'func_last_digit'
-            elif 'десятк' in task_name:
-                return 'func_tens_digit'
-            elif 'сотен' in task_name:
-                return 'func_hundreds_digit'
-            elif 'куб' in task_name and not ('поиск' in task_todo or 'корен' in task_todo):
-                return 'func_cube'
-            elif 'квадрат' in task_name and not ('поиск' in task_todo or 'корен' in task_todo):
-                return 'func_square'
-            elif 'округл' in task_name:
-                if 'вверх' in task_name:
-                    return 'func_round_up'
-                else:
-                    return 'func_round'
-            elif 'прост' in task_name:
-                return 'func_is_prime'
-            elif 'палиндром' in task_name:
-                return 'func_is_palindrome'
-            # Сложные алгоритмические функции
-            elif any(keyword in task_todo for keyword in ['шаг', 'поиск', 'корен', 'алгоритм']):
-                return 'func_complex_algorithm'
-            else:
-                return 'func_generic'
-        
         # Процедуры работы с массивами (только если НЕ функция!)
         if has_array:
             if 'реверс' in task_name or 'обратн' in task_todo:
@@ -447,53 +444,6 @@ class KumirToPythonPipeline:
                 return 'array_modify'
             else:
                 return 'array_procedure'
-        
-        # Функции (возвращают значение) - проверяем ПЕРЕД строками!
-        if any(prefix in task_name for prefix in ['цел ', 'вещ ', 'лог ', 'лит ']) and ('арг' in task_name or '(' in task_name):
-            # Специальные функции
-            if 'средн' in task_todo and 'арифметическ' in task_todo:
-                return 'func_average'
-            elif 'минимум' in task_todo or 'наименьш' in task_todo:
-                return 'func_min'
-            elif 'максимум' in task_todo or 'наибольш' in task_todo:
-                return 'func_max'
-            elif 'лог ' in task_name and ('оканчивается' in task_todo or 'на 0' in task_todo):
-                return 'func_ends_with_zero'
-            elif 'счастлив' in task_todo:
-                return 'func_lucky_ticket'
-            elif 'единиц' in task_name and 'двоичн' in task_todo:
-                return 'func_count_binary_ones'
-            elif 'нулей' in task_name and 'двоичн' in task_todo:
-                return 'func_count_binary_zeros'
-            elif 'палиндром' in task_name:
-                return 'func_is_palindrome'
-            elif 'прост' in task_name:
-                return 'func_is_prime'
-            # Простые математические функции
-            elif 'последн' in task_name and 'цифр' in task_name:
-                return 'func_last_digit'
-            elif 'десятк' in task_name:
-                return 'func_tens_digit'
-            elif 'сотен' in task_name:
-                return 'func_hundreds_digit'
-            elif 'куб' in task_name and not ('поиск' in task_todo or 'корен' in task_todo):
-                return 'func_cube'
-            elif 'квадрат' in task_name and not ('поиск' in task_todo or 'корен' in task_todo):
-                return 'func_square'
-            elif 'округл' in task_name:
-                if 'вверх' in task_name:
-                    return 'func_round_up'
-                else:
-                    return 'func_round'
-            elif 'прост' in task_name:
-                return 'func_is_prime'
-            elif 'палиндром' in task_name:
-                return 'func_is_palindrome'
-            # Сложные алгоритмические функции
-            elif any(keyword in task_todo for keyword in ['шаг', 'поиск', 'корен', 'алгоритм']):
-                return 'func_complex_algorithm'
-            else:
-                return 'func_generic'
         
         # Массивы - заполнение (без аргрез в сигнатуре)
         if 'заполн' in task_todo or 'заполн' in task_name:
@@ -708,7 +658,7 @@ class KumirToPythonPipeline:
                     string_params.add(param_name)
         
         # Определяем тип функции более точно на основе параметров
-        if len(params) >= 2 and 'средн' in task_todo:
+        if len(params) >= 2 and 'средн' in task_todo and 'арифметическ' in task_todo:
             task_type = 'func_average'
         elif len(params) >= 2 and ('минимум' in task_todo or 'наименьш' in task_todo):
             task_type = 'func_min'
@@ -1014,15 +964,27 @@ class KumirToPythonPipeline:
                 '    return count'
             ])
         elif task_type == 'func_count_elements':
-            code_lines.extend([
-                '    # Подсчет количества элементов по условию',
-                '    count = 0',
-                '    for i in range(N):',
-                '        # TODO: Добавить конкретное условие',
-                '        if True:  # Placeholder',
-                '            count += 1',
-                '    return count'
-            ])
+            # Специальная обработка для задачи "горки"
+            if 'горк' in task['task_todo'].lower():
+                code_lines.extend([
+                    '    # Подсчет "горок" в массиве',
+                    '    # "Горка" - три соседних элемента, средний больше крайних и равен X',
+                    '    count = 0',
+                    '    for i in range(N - 2):',
+                    '        if A[i] < X and A[i + 1] == X and A[i + 2] < X:',
+                    '            count += 1',
+                    '    return count'
+                ])
+            else:
+                code_lines.extend([
+                    '    # Подсчет количества элементов по условию',
+                    '    count = 0',
+                    '    for i in range(N):',
+                    '        # TODO: Добавить конкретное условие',
+                    '        if True:  # Placeholder',
+                    '            count += 1',
+                    '    return count'
+                ])
         elif task_type == 'func_sum_array':
             code_lines.extend([
                 '    # Сумма элементов массива',
@@ -1082,7 +1044,14 @@ class KumirToPythonPipeline:
             ])
         elif task_type == 'func_average':
             # Среднее арифметическое
-            if len(params) == 2:
+            if len(params) == 2 and any(p in array_params for p in params):
+                # Среднее арифметическое массива: func(N, A)
+                array_param = next(p for p in params if p in array_params)
+                size_param = next(p for p in params if p not in array_params)
+                code_lines.extend([
+                    f'    return sum({array_param}) / {size_param}'
+                ])
+            elif len(params) == 2:
                 code_lines.extend([
                     f'    return ({params[0]} + {params[1]}) / 2'
                 ])
