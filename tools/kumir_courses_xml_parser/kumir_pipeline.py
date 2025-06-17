@@ -28,6 +28,17 @@ class KumirToPythonPipeline:
         self.output_dir = Path(output_dir)
         self.tasks_json_file = self.output_dir / "tasks_data.json"
         self.python_dir = self.output_dir / "python_solutions"
+        
+        # Определяем тип курса по имени файла
+        file_name = Path(xml_file_path).name.lower()
+        if 'robot' in file_name:
+            self.course_type = 'robot'
+        elif 'водолей' in file_name:
+            self.course_type = 'waterman'
+        elif 'огэ' in file_name:
+            self.course_type = 'algorithms'
+        else:
+            self.course_type = 'general'
         self.reports_dir = self.output_dir / "reports"
         
         # Создаем директории
@@ -38,7 +49,7 @@ class KumirToPythonPipeline:
     def clean_task_name_for_filename(self, task_name: str, task_id: str, task_type: str = "") -> str:
         """Создает короткое английское имя файла на основе типа задачи."""
         
-        # Если у нас есть тип задачи из детектора
+        # Если у нас есть тип задачи из детектора - используем его
         if task_type:
             if task_type.startswith('func_'):
                 type_names = {
@@ -51,6 +62,8 @@ class KumirToPythonPipeline:
                     'func_round_up': 'round_up',
                     'func_is_prime': 'is_prime',
                     'func_is_palindrome': 'is_palindrome',
+                    'func_count_binary_ones': 'count_binary_ones',
+                    'func_count_binary_zeros': 'count_binary_zeros',
                     'func_complex_algorithm': 'complex_func',
                     'func_generic': 'function'
                 }
@@ -73,6 +86,10 @@ class KumirToPythonPipeline:
                     'array_procedure': 'array_proc'
                 }
                 return type_names.get(task_type, 'array_task')
+            elif task_type in ['robot_task', 'waterman_task', 'empty_task']:
+                return f'task_{task_id}'
+            elif task_type == 'string_task':
+                return 'string_task'
         
         # Словарь сокращений для разных типов задач
         name_mappings = {
@@ -243,20 +260,44 @@ class KumirToPythonPipeline:
     def detect_task_type(self, task: Dict[str, str]) -> str:
         """Определяет тип задачи на основе её содержимого."""
         task_name = task['task_name'].lower()
+        task_init = task['task_init'].lower()
         task_todo = task['task_todo'].lower()
         kumir_code = task['kumir_code'].lower()
+        
+        # Пропускаем пустые задачи
+        if not task_name.strip() and not task_init.strip() and not task_todo.strip() and not kumir_code.strip():
+            return 'empty_task'
+        
+        # Если это курс роботов - все задачи считаем robot_task
+        if self.course_type == 'robot':
+            return 'robot_task'
+        
+        # Если это курс Водолея - все задачи считаем waterman_task
+        if self.course_type == 'waterman':
+            return 'waterman_task'
+        
+        # Специальные исполнители - проверяем по содержимому
+        if ('робот' in task_name or 'робот' in task_init or 'робот' in task_todo or 
+            any(cmd in kumir_code for cmd in ['вверх', 'вниз', 'влево', 'вправо', 'закрасить'])):
+            return 'robot_task'
+        
+        if ('водолей' in task_name or 'водолей' in task_init or 'водолей' in task_todo or
+            any(cmd in kumir_code for cmd in ['наполнить', 'опустошить', 'перелить'])):
+            return 'waterman_task'
         
         # Проверяем наличие массивов в сигнатуре
         has_array = any(keyword in task_name for keyword in ['аргрез', 'целтаб', 'вещтаб', 'лоттаб', 'массив'])
         
-        # Сложные алгоритмы (двоичный поиск, сортировки, и т.д.)
-        if any(keyword in task_todo for keyword in ['двоичн', 'бинарн', 'поиск', 'сортир', 'пузыр', 'быстр', 'слиян']):
-            if 'двоичн' in task_todo or 'бинарн' in task_todo:
-                return 'algorithm_binary_search'
-            elif 'сортир' in task_todo:
+        # Сложные алгоритмы (только настоящий двоичный поиск, сортировки, и т.д.)
+        # Исключаем "двоичной записи" - это не двоичный поиск!
+        if any(keyword in task_todo for keyword in ['сортир', 'пузыр', 'быстр', 'слиян']):
+            if 'сортир' in task_todo:
                 return 'algorithm_sort'
             else:
                 return 'algorithm_complex'
+        # Настоящий двоичный поиск - только точное совпадение "двоичный поиск" или "бинарный поиск"
+        if ('двоичный поиск' in task_todo or 'бинарный поиск' in task_todo) and 'записи' not in task_todo:
+            return 'algorithm_binary_search'
         
         # Процедуры работы с массивами
         if has_array:
@@ -275,11 +316,7 @@ class KumirToPythonPipeline:
             else:
                 return 'array_procedure'
         
-        # Строки (проверяем до функций, так как строковые функции тоже имеют типы возврата)
-        if 'строк' in task_name.lower() or 'лит' in task_name:
-            return 'string_task'
-        
-        # Функции (возвращают значение)
+        # Функции (возвращают значение) - проверяем ПЕРЕД строками!
         if any(prefix in task_name for prefix in ['цел ', 'вещ ', 'лог ', 'лит ']) and ('арг' in task_name or '(' in task_name):
             # Специальные функции
             if 'средн' in task_todo and 'арифметическ' in task_todo:
@@ -292,10 +329,14 @@ class KumirToPythonPipeline:
                 return 'func_ends_with_zero'
             elif 'счастлив' in task_todo:
                 return 'func_lucky_ticket'
-            elif 'двоичн' in task_todo or 'бинарн' in task_todo:
-                return 'func_from_binary'
-            elif 'восьмеричн' in task_todo:
-                return 'func_from_octal'
+            elif 'единиц' in task_name and 'двоичн' in task_todo:
+                return 'func_count_binary_ones'
+            elif 'нулей' in task_name and 'двоичн' in task_todo:
+                return 'func_count_binary_zeros'
+            elif 'палиндром' in task_name:
+                return 'func_is_palindrome'
+            elif 'прост' in task_name:
+                return 'func_is_prime'
             # Простые математические функции
             elif 'последн' in task_name and 'цифр' in task_name:
                 return 'func_last_digit'
@@ -361,9 +402,9 @@ class KumirToPythonPipeline:
         elif 'сумм' in task_todo:
             return 'arr_sum'
         
-        # Робот
-        elif 'робот' in task_name.lower():
-            return 'robot_task'
+        # Строки (проверяем ПОСЛЕ функций!)
+        if 'строк' in task_name.lower() or ('лит' in task_name and 'лит ' not in task_name):
+            return 'string_task'
         
         # По умолчанию
         return 'generic_task'
@@ -451,6 +492,37 @@ class KumirToPythonPipeline:
             # Если найдены параметры в task_init, используем их
             if init_params:
                 params = init_params
+        
+        # Четвёртый вариант: улучшенный парсинг из task_name для функций вида "тип Название (параметры)"
+        if not params and ('(' in task_name and ')' in task_name):
+            # Ищем все в скобках более тщательно
+            paren_content = re.search(r'\(([^)]+)\)', task_name)
+            if paren_content:
+                content = paren_content.group(1).strip()
+                # Разбираем параметры через запятую
+                param_parts = [p.strip() for p in content.split(',')]
+                extracted_params = []
+                
+                for part in param_parts:
+                    if not part:
+                        continue
+                    
+                    # Ищем паттерны: "цел X", "целтаб A[1:N]", "сим c", etc.
+                    type_param_match = re.match(r'(цел|вещ|лог|лит|сим|целтаб|вещтаб|логтаб|литтаб)\s+([A-Za-z][A-Za-z0-9]*)', part)
+                    if type_param_match:
+                        param_type, param_name = type_param_match.groups()
+                        extracted_params.append(param_name)
+                        param_types[param_name] = param_type
+                        if param_type in ['лит', 'сим']:
+                            string_params.add(param_name)
+                        elif param_type in ['целтаб', 'вещтаб', 'логтаб', 'литтаб']:
+                            array_params.add(param_name)
+                    elif re.match(r'^[A-Za-z][A-Za-z0-9]*$', part):
+                        # Просто имя переменной
+                        extracted_params.append(part)
+                
+                if extracted_params:
+                    params = extracted_params
         
         # Определяем типы параметров для лучшей генерации кода
         # Анализируем типы параметров из сигнатуры
@@ -559,6 +631,15 @@ class KumirToPythonPipeline:
                 func_signature = f'def {short_name}({", ".join(params)}):'
             else:
                 func_signature = f'def {short_name}(s: str):'
+        elif task_type == 'robot_task':
+            # Задачи робота - без параметров
+            func_signature = f'def {short_name}():'
+        elif task_type == 'waterman_task':
+            # Задачи водолея - без параметров
+            func_signature = f'def {short_name}():'
+        elif task_type == 'empty_task':
+            # Пустые задачи - пропускаем
+            func_signature = f'def {short_name}():'
         elif has_X and returns_value:
             func_signature = f'def {short_name}(N: int, A: list, X: int):'
         elif has_X:
@@ -572,8 +653,31 @@ class KumirToPythonPipeline:
         code_lines.append('    """Python solution for the task."""')
         
         # Генерируем код в зависимости от типа задачи
+        # Сначала проверяем специальных исполнителей
+        if task_type == 'robot_task':
+            code_lines.extend([
+                '    # Задача робота - выполняем команды',
+                f'    # TODO: Реализовать алгоритм робота',
+                f'    # Команды: {kumir_code[:100]}...' if len(kumir_code) > 100 else f'    # Команды: {kumir_code}',
+                '    # Пример: robot.up(), robot.down(), robot.left(), robot.right(), robot.paint()',
+                '    pass'
+            ])
+        elif task_type == 'waterman_task':
+            code_lines.extend([
+                '    # Задача водолея - переливания жидкостей',
+                f'    # TODO: Реализовать алгоритм водолея',
+                f'    # Команды: {kumir_code[:100]}...' if len(kumir_code) > 100 else f'    # Команды: {kumir_code}',
+                '    # Пример: fill(A), empty(A), pour(A, B)',
+                '    pass'
+            ])
+        elif task_type == 'empty_task':
+            code_lines.extend([
+                '    # Пустая задача - нет описания',
+                '    # TODO: Добавить описание и реализацию',
+                '    pass'
+            ])
         # Сначала проверяем новые типы (приоритет над старыми ID)
-        if task_type == 'algorithm_binary_search':
+        elif task_type == 'algorithm_binary_search':
             code_lines.extend([
                 '    # Binary search algorithm',
                 '    left, right = 1, min(N, 1000)',
@@ -655,6 +759,48 @@ class KumirToPythonPipeline:
         elif task_type == 'func_square':
             code_lines.extend([
                 '    return X * X'
+            ])
+        elif task_type == 'func_count_binary_ones':
+            param_name = params[0] if params else 'X'
+            code_lines.extend([
+                '    # Подсчет единиц в двоичной записи числа',
+                '    count = 0',
+                f'    num = {param_name}',
+                '    while num > 0:',
+                '        if num % 2 == 1:',
+                '            count += 1',
+                '        num = num // 2',
+                '    return count'
+            ])
+        elif task_type == 'func_count_binary_zeros':
+            param_name = params[0] if params else 'X'
+            code_lines.extend([
+                '    # Подсчет нулей в двоичной записи числа',
+                '    count = 0',
+                f'    num = {param_name}',
+                '    while num > 0:',
+                '        if num % 2 == 0:',
+                '            count += 1',
+                '        num = num // 2',
+                '    return count'
+            ])
+        elif task_type == 'func_is_palindrome':
+            param_name = params[0] if params else 'N'
+            code_lines.extend([
+                '    # Проверка на палиндром',
+                f'    s = str({param_name})',
+                '    return s == s[::-1]'
+            ])
+        elif task_type == 'func_is_prime':
+            param_name = params[0] if params else 'N'
+            code_lines.extend([
+                '    # Проверка на простое число',
+                f'    if {param_name} < 2:',
+                '        return False',
+                f'    for i in range(2, int({param_name}**0.5) + 1):',
+                f'        if {param_name} % i == 0:',
+                '            return False',
+                '    return True'
             ])
         elif task_type == 'func_round':
             code_lines.extend([
@@ -1009,24 +1155,118 @@ class KumirToPythonPipeline:
             '    """Test the solution."""',
         ])
         
-        if task_type.startswith('func_') and not string_params:
-            # Для числовых функций
-            code_lines.extend([
-                '    test_values = [0, 1, 5, 123, 999]',
-                '    for X in test_values:',
-                f'        result = {short_name}(X)',
-                '        print(f"Input: {X}, Result: {result}")',
-                '    return True'
-            ])
-        elif task_type.startswith('func_') and string_params:
-            # Для строковых функций
-            code_lines.extend([
-                '    test_strings = ["hello", "Python", "123", "A B C", ""]',
-                '    for s in test_strings:',
-                f'        result = {short_name}(s)',
-                '        print(f"Input: \'{s}\', Result: {result}")',
-                '    return True'
-            ])
+        # Умная генерация тестов на основе параметров функции
+        if is_function or returns_value:
+            # Функция, возвращающая значение
+            if len(params) == 0:
+                code_lines.extend([
+                    f'    result = {short_name}()',
+                    '    print(f"Result: {result}")',
+                    '    return True'
+                ])
+            elif len(params) == 1:
+                param_name = params[0]
+                if param_name in string_params or param_types.get(param_name) in ['лит', 'сим']:
+                    # Строковый параметр
+                    code_lines.extend([
+                        '    test_strings = ["hello", "Python", "test", "A", ""]',
+                        f'    for {param_name} in test_strings:',
+                        f'        result = {short_name}({param_name})',
+                        f'        print(f"Input: {{{param_name}}}, Result: {{result}}")',
+                        '    return True'
+                    ])
+                else:
+                    # Числовой параметр
+                    code_lines.extend([
+                        '    test_values = [0, 1, 5, 10, 123]',
+                        f'    for {param_name} in test_values:',
+                        f'        result = {short_name}({param_name})',
+                        f'        print(f"Input: {{{param_name}}}, Result: {{result}}")',
+                        '    return True'
+                    ])
+            elif len(params) == 2:
+                param1, param2 = params[0], params[1]
+                if param1 in array_params or param2 in array_params:
+                    # Есть массив - используем стандартный тест с массивом
+                    code_lines.extend([
+                        '    N = 5',
+                        '    A = [3, 1, 4, 1, 5]',
+                        f'    result = {short_name}(N, A)',
+                        '    print(f"Input: N={N}, A={A}")',
+                        '    print(f"Result: {result}")',
+                        '    return result'
+                    ])
+                elif param1 in string_params or param2 in string_params:
+                    # Есть строка
+                    code_lines.extend([
+                        '    test_cases = [("hello", 5), ("Python", 3), ("test", 2)]',
+                        f'    for {param1}, {param2} in test_cases:',
+                        f'        result = {short_name}({param1}, {param2})',
+                        f'        print(f"Input: {{{param1}}}, {{{param2}}}, Result: {{result}}")',
+                        '    return True'
+                    ])
+                else:
+                    # Два числовых параметра
+                    code_lines.extend([
+                        '    test_cases = [(3, 5), (10, 20), (1, 1), (0, 10)]',
+                        f'    for {param1}, {param2} in test_cases:',
+                        f'        result = {short_name}({param1}, {param2})',
+                        f'        print(f"Input: {{{param1}}}, {{{param2}}}, Result: {{result}}")',
+                        '    return True'
+                    ])
+            elif len(params) == 3:
+                param1, param2, param3 = params[0], params[1], params[2]
+                if 'A' in params and 'N' in params:
+                    # Массив с дополнительным параметром
+                    code_lines.extend([
+                        '    N = 5',
+                        '    A = [3, 1, 4, 1, 5]',
+                        '    X = 1',
+                        f'    result = {short_name}(N, A, X)',
+                        '    print(f"Input: N={N}, A={A}, X={X}")',
+                        '    print(f"Result: {result}")',
+                        '    return result'
+                    ])
+                else:
+                    # Три обычных параметра
+                    code_lines.extend([
+                        '    test_cases = [(1, 2, 3), (5, 10, 15), (0, 1, 2)]',
+                        f'    for {param1}, {param2}, {param3} in test_cases:',
+                        f'        result = {short_name}({param1}, {param2}, {param3})',
+                        f'        print(f"Input: {{{param1}}}, {{{param2}}}, {{{param3}}}, Result: {{result}}")',
+                        '    return True'
+                    ])
+            else:
+                # Более 3 параметров - общий случай
+                params_str = ", ".join(params)
+                code_lines.extend([
+                    f'    # Test with parameters: {params_str}',
+                    f'    # TODO: Implement test for {short_name}({params_str})',
+                    '    return True'
+                ])
+        
+        elif task_type.startswith('array_'):
+            # Процедуры с массивами
+            if 'X' in params:
+                code_lines.extend([
+                    '    N = 5',
+                    '    A = [1, 2, 3, 4, 5]',
+                    '    X = 10',
+                    f'    result = {short_name}(N, A.copy(), X)',
+                    '    print(f"Input: N={N}, A={A}, X={X}")',
+                    '    print(f"Result: {result}")',
+                    '    return result'
+                ])
+            else:
+                code_lines.extend([
+                    '    N = 5',
+                    '    A = [1, 2, 3, 4, 5]',
+                    f'    result = {short_name}(N, A.copy())',
+                    '    print(f"Input: N={N}, A={A}")',
+                    '    print(f"Result: {result}")',
+                    '    return result'
+                ])
+        
         elif task_type == 'string_task':
             # Для строковых задач
             code_lines.extend([
@@ -1049,43 +1289,72 @@ class KumirToPythonPipeline:
             code_lines.extend([
                 '    return True'
             ])
-        elif task_type.startswith('algorithm_') or task_type.startswith('array_'):
-            # Для алгоритмов и процедур с массивами
+        
+        elif task_type == 'robot_task':
+            # Для задач робота
             code_lines.extend([
-                '    # Test with sample data',
-                '    N = 5',
-                '    A = [1, 2, 3, 4, 5]',
-            ])
-            
-            if has_X:
-                code_lines.append('    X = 3')
-                code_lines.append(f'    result = {short_name}(N, A.copy(), X)')
-            else:
-                code_lines.append(f'    result = {short_name}(N, A.copy())')
-            
-            code_lines.extend([
-                '    print(f"Input: N={N}, A={A}")',
-                '    print(f"Result: {result}")',
-                '    return result'
-            ])
-        else:
-            # Для массивов
-            code_lines.extend([
-                '    N = 5',
-                '    A = [0] * N',
-            ])
-            
-            if has_X:
-                code_lines.append('    X = 10')
-                code_lines.append(f'    result = {short_name}(N, A.copy(), X)')
-            else:
-                code_lines.append(f'    result = {short_name}(N, A.copy())')
-            
-            code_lines.extend([
-                '    print(f"Result: {result}")',
-                '    return result'
+                '    # Выполнить алгоритм робота',
+                f'    {short_name}()',
+                '    print("Robot task completed successfully!")',
+                '    return True'
             ])
         
+        elif task_type == 'waterman_task':
+            # Для задач водолея
+            code_lines.extend([
+                '    # Выполнить алгоритм водолея',
+                f'    {short_name}()',
+                '    print("Waterman task completed successfully!")',
+                '    return True'
+            ])
+        elif task_type == 'empty_task':
+            # Для пустых задач
+            code_lines.extend([
+                '    # Пустая задача - нет функциональности для тестирования',
+                f'    {short_name}()',
+                '    print("Empty task completed!")',
+                '    return True'
+            ])
+        else:
+            # Общий случай для всех остальных типов задач
+            if 'A' in params or any('массив' in str(p) for p in [task_name, task_todo]):
+                # Задача с массивом
+                code_lines.extend([
+                    '    N = 5',
+                    '    A = [1, 2, 3, 4, 5]',
+                ])
+                
+                if 'X' in params:
+                    code_lines.extend([
+                        '    X = 3',
+                        f'    result = {short_name}(N, A.copy(), X)',
+                        '    print(f"Input: N={N}, A={A}, X={X}")',
+                    ])
+                elif len(params) >= 2:
+                    code_lines.extend([
+                        f'    result = {short_name}(N, A.copy())',
+                        '    print(f"Input: N={N}, A={A}")',
+                    ])
+                else:
+                    code_lines.extend([
+                        f'    result = {short_name}(N)',
+                        '    print(f"Input: N={N}")',
+                    ])
+                
+                code_lines.extend([
+                    '    print(f"Result: {result}")',
+                    '    return result'
+                ])
+            else:
+                # Простая задача без массива
+                code_lines.extend([
+                    '    # Simple test case',
+                    f'    result = {short_name}()',
+                    '    print(f"Result: {result}")',
+                    '    return result'
+                ])
+        
+        # Добавляем основную функцию
         code_lines.extend([
             '',
             '',
