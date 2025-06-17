@@ -64,6 +64,11 @@ class KumirToPythonPipeline:
                     'func_is_palindrome': 'is_palindrome',
                     'func_count_binary_ones': 'count_binary_ones',
                     'func_count_binary_zeros': 'count_binary_zeros',
+                    'func_count_ones': 'count_ones',
+                    'func_count_elements': 'count_elements',
+                    'func_sum_array': 'sum_array',
+                    'func_max_array': 'max_array',
+                    'func_min_array': 'min_array',
                     'func_complex_algorithm': 'complex_func',
                     'func_generic': 'function'
                 }
@@ -83,7 +88,13 @@ class KumirToPythonPipeline:
                     'array_fill': 'array_fill',
                     'array_search': 'array_search',
                     'array_modify': 'array_modify',
-                    'array_procedure': 'array_proc'
+                    'array_procedure': 'array_proc',
+                    'array_proc': 'array_proc',
+                    'array_inc_by1': 'arr_inc_by1',
+                    'array_inc_byX': 'arr_inc_byX',
+                    'array_mult_by2': 'arr_mult_by2',
+                    'array_mult_byX': 'arr_mult_byX',
+                    'array_square': 'arr_square'
                 }
                 return type_names.get(task_type, 'array_task')
             elif task_type in ['robot_task', 'waterman_task', 'empty_task']:
@@ -285,21 +296,142 @@ class KumirToPythonPipeline:
             any(cmd in kumir_code for cmd in ['наполнить', 'опустошить', 'перелить'])):
             return 'waterman_task'
         
-        # Проверяем наличие массивов в сигнатуре
+        # Проверяем наличие массивов в сигнатуре (определяем заранее для использования в функциях)
         has_array = any(keyword in task_name for keyword in ['аргрез', 'целтаб', 'вещтаб', 'лоттаб', 'массив'])
+        # Проверяем наличие аргумент-результат массивов (принимают и изменяют массив) - СНАЧАЛА!
+        has_argresult_array = any(keyword in task_name for keyword in ['аргрез целтаб', 'аргрез вещтаб', 'аргрез лоттаб'])
+        # Проверяем наличие результирующих массивов в процедурах (только рез, но НЕ аргрез) - ПОСЛЕ!
+        # Важно: проверяем " рез " с пробелами или в начале строки, чтобы исключить "аргрез"
+        has_result_array = any(
+            (f' {keyword}' in task_name or task_name.startswith(keyword))
+            for keyword in ['рез целтаб', 'рез вещтаб', 'рез лоттаб']
+        )
         
         # Сложные алгоритмы (только настоящий двоичный поиск, сортировки, и т.д.)
         # Исключаем "двоичной записи" - это не двоичный поиск!
-        if any(keyword in task_todo for keyword in ['сортир', 'пузыр', 'быстр', 'слиян']):
-            if 'сортир' in task_todo:
-                return 'algorithm_sort'
-            else:
-                return 'algorithm_complex'
+        if any(keyword in task_todo for keyword in ['пузыр', 'быстр', 'слиян']):
+            return 'algorithm_complex'
+        elif 'сортир' in task_todo and not any(x in task_todo for x in ['после сортировки', 'максимум', 'минимум', 'экстремум', 'два максимума', 'два минимума', 'второй максимум', 'второй минимум']):
+            # Реальная сортировка, не просто упоминание сортировки в описании
+            return 'algorithm_sort'
         # Настоящий двоичный поиск - только точное совпадение "двоичный поиск" или "бинарный поиск"
         if ('двоичный поиск' in task_todo or 'бинарный поиск' in task_todo) and 'записи' not in task_todo:
             return 'algorithm_binary_search'
         
-        # Процедуры работы с массивами
+        # ПРОЦЕДУРЫ с аргумент-результат массивами (изменяют переданный массив) - СНАЧАЛА!
+        if has_argresult_array:
+            if 'увелич' in task_todo:
+                if '1' in task_todo or 'на 1' in task_todo:
+                    return 'array_inc_by1'
+                elif 'половин' in task_todo or 'часть' in task_todo:
+                    # Специальные случаи - увеличение части массива
+                    return 'array_proc'
+                else:
+                    return 'array_inc_byX'
+            elif 'умнож' in task_todo:
+                if '2' in task_todo or 'на 2' in task_todo:
+                    return 'array_mult_by2'
+                elif 'половин' in task_todo or 'часть' in task_todo:
+                    # Специальные случаи - умножение части массива
+                    return 'array_proc'
+                else:
+                    return 'array_mult_byX'
+            elif 'квадрат' in task_todo:
+                return 'array_square'
+            elif 'реверс' in task_todo or 'обратн' in task_todo:
+                return 'array_reverse'
+            elif 'циклическ' in task_todo or 'сдвиг' in task_todo:
+                return 'array_shift'
+            elif 'сортир' in task_todo:
+                return 'array_sort'
+            else:
+                return 'array_procedure'
+        
+        # ПРОЦЕДУРЫ с результирующими массивами (проверяем ПОСЛЕ аргрез!)
+        if has_result_array:
+            if 'заполн' in task_todo:
+                if 'нул' in task_todo:
+                    return 'arr_fill_zeros'
+                elif 'натур' in task_todo:
+                    return 'arr_fill_natural'
+                elif 'фибо' in task_todo:
+                    return 'arr_fill_fibonacci'
+                elif 'степен' in task_todo or '2^' in task_todo:
+                    return 'arr_fill_powers2'
+                elif 'горк' in task_todo:
+                    return 'arr_fill_pyramid'
+                else:
+                    return 'arr_fill_generic'
+            elif 'увелич' in task_todo:
+                return 'arr_modify_increase'
+            elif 'умнож' in task_todo:
+                return 'arr_modify_multiply'
+            elif 'квадрат' in task_todo:
+                return 'arr_modify_square'
+            else:
+                return 'array_procedure'
+        
+        # Функции (возвращают значение) - проверяем ПЕРЕД массивами!
+        if any(prefix in task_name for prefix in ['цел ', 'вещ ', 'лог ', 'лит ']) and ('арг' in task_name or '(' in task_name):
+            # Специальные функции
+            if 'средн' in task_todo and 'арифметическ' in task_todo:
+                return 'func_average'
+            elif 'минимум' in task_todo or 'наименьш' in task_todo:
+                return 'func_min'
+            elif 'максимум' in task_todo or 'наибольш' in task_todo:
+                return 'func_max'
+            elif 'лог ' in task_name and ('оканчивается' in task_todo or 'на 0' in task_todo):
+                return 'func_ends_with_zero'
+            elif 'счастлив' in task_todo:
+                return 'func_lucky_ticket'
+            elif 'единиц' in task_name and 'двоичн' in task_todo:
+                return 'func_count_binary_ones'
+            elif 'нулей' in task_name and 'двоичн' in task_todo:
+                return 'func_count_binary_zeros'
+            elif 'палиндром' in task_name:
+                return 'func_is_palindrome'
+            elif 'прост' in task_name:
+                return 'func_is_prime'
+            # Функции с массивами - специальные случаи
+            elif 'единиц' in task_name and has_array:
+                return 'func_count_ones'
+            elif ('количест' in task_todo.lower() or 'количест' in task_name.lower()) and has_array:
+                return 'func_count_elements'
+            elif ('скольк' in task_todo.lower() or 'скольк' in task_name.lower()) and has_array:
+                return 'func_count_elements'  
+            elif 'сумм' in task_todo and has_array:
+                return 'func_sum_array'
+            elif 'макс' in task_todo and has_array:
+                return 'func_max_array'
+            elif 'мин' in task_todo and has_array:
+                return 'func_min_array'
+            # Простые математические функции
+            elif 'последн' in task_name and 'цифр' in task_name:
+                return 'func_last_digit'
+            elif 'десятк' in task_name:
+                return 'func_tens_digit'
+            elif 'сотен' in task_name:
+                return 'func_hundreds_digit'
+            elif 'куб' in task_name and not ('поиск' in task_todo or 'корен' in task_todo):
+                return 'func_cube'
+            elif 'квадрат' in task_name and not ('поиск' in task_todo or 'корен' in task_todo):
+                return 'func_square'
+            elif 'округл' in task_name:
+                if 'вверх' in task_name:
+                    return 'func_round_up'
+                else:
+                    return 'func_round'
+            elif 'прост' in task_name:
+                return 'func_is_prime'
+            elif 'палиндром' in task_name:
+                return 'func_is_palindrome'
+            # Сложные алгоритмические функции
+            elif any(keyword in task_todo for keyword in ['шаг', 'поиск', 'корен', 'алгоритм']):
+                return 'func_complex_algorithm'
+            else:
+                return 'func_generic'
+        
+        # Процедуры работы с массивами (только если НЕ функция!)
         if has_array:
             if 'реверс' in task_name or 'обратн' in task_todo:
                 return 'array_reverse'
@@ -435,9 +567,33 @@ class KumirToPythonPipeline:
             for part in parts:
                 # Попробуем сначала найти полные конструкции типа "аргрез цел X" или "арг лит Y"
                 if re.match(r'аргрез\s+(цел|вещ|лог|лит)таб\s+[A-Z][a-zA-Z0-9]*', part):
-                    continue  # Будет обработано ниже
+                    # Аргумент-результат массив: обработаем ниже
+                    array_match = re.search(r'аргрез\s+(цел|вещ|лог|лит)таб\s+([A-Z][a-zA-Z0-9]*)', part)
+                    if array_match:
+                        var_name = array_match.group(2)
+                        var_type = array_match.group(1) + 'таб'
+                        params.append(var_name)
+                        param_types[var_name] = var_type
+                        array_params.add(var_name)
                 elif re.match(r'арг\s+(цел|вещ|лог|лит)\s+[A-Z][a-zA-Z0-9]*', part):
-                    continue  # Будет обработано ниже
+                    # Аргумент: "арг цел X"
+                    arg_match = re.search(r'арг\s+(цел|вещ|лог|лит)\s+([A-Z][a-zA-Z0-9]*)', part)
+                    if arg_match:
+                        var_name = arg_match.group(2)
+                        var_type = arg_match.group(1)
+                        params.append(var_name)
+                        param_types[var_name] = var_type
+                        if var_type == 'лит':
+                            string_params.add(var_name)
+                elif re.match(r'(цел|вещ|лог|лит)таб\s+[A-Z][a-zA-Z0-9]*', part):
+                    # Массив: "целтаб A[1:N]"
+                    array_match = re.search(r'(цел|вещ|лог|лит)таб\s+([A-Z][a-zA-Z0-9]*)', part)
+                    if array_match:
+                        var_name = array_match.group(2)
+                        var_type = array_match.group(1) + 'таб'
+                        params.append(var_name)
+                        param_types[var_name] = var_type
+                        array_params.add(var_name)
                 else:
                     # Простые формы: "лит s", "цел x", etc.
                     simple_match = re.search(r'(цел|вещ|лог|лит)\s+([a-zA-Z][a-zA-Z0-9]*)', part)
@@ -536,6 +692,8 @@ class KumirToPythonPipeline:
         # Обычные параметры с ключевым словом "арг"
         param_type_matches = re.findall(r'арг\s+(цел|вещ|лит|лог)\s+([A-Z][a-zA-Z0-9]*)', task_name)
         for param_type, param_name in param_type_matches:
+            if param_name not in params:
+                params.append(param_name)  # Добавляем в список параметров
             param_types[param_name] = param_type
             if param_type == 'лит':
                 string_params.add(param_name)
@@ -561,6 +719,9 @@ class KumirToPythonPipeline:
         
         # Определяем тип возврата
         returns_value = any(prefix in task_name for prefix in ['цел ', 'вещ ', 'лог ']) and ('арг' in task_name or '(' in task_name)
+        # Процедуры с результирующими массивами тоже возвращают значения
+        if task_type.startswith('arr_'):
+            returns_value = True
         return_type = None
         if 'цел ' in task_name[:10]:
             return_type = 'int'
@@ -576,7 +737,7 @@ class KumirToPythonPipeline:
         
         # Старое определение для совместимости
         has_X = 'X' in params
-        is_function = task_type.startswith('func_') or returns_value
+        is_function = task_type.startswith('func_') or task_type.startswith('arr_') or returns_value
         
         short_name = self.clean_task_name_for_filename(task_name, task_id, task_type)
         
@@ -595,7 +756,13 @@ class KumirToPythonPipeline:
         ]
         
         # Определяем сигнатуру функции
-        if is_function or returns_value:
+        if task_type.startswith('arr_'):
+            # Процедуры с результирующими массивами - создают массив внутри
+            if 'X' in params or has_X:
+                func_signature = f'def {short_name}(N: int, X: int = 1) -> list:'
+            else:
+                func_signature = f'def {short_name}(N: int) -> list:'
+        elif is_function or returns_value:
             # Это функция, возвращающая значение
             if array_params:
                 # Функция с массивами - используем стандартную сигнатуру с массивами
@@ -732,6 +899,41 @@ class KumirToPythonPipeline:
                 '    # TODO: Add specific implementation',
                 '    return A'
             ])
+        elif task_type == 'array_inc_by1':
+            code_lines.extend([
+                '    # Увеличить все элементы на 1',
+                '    for i in range(N):',
+                '        A[i] += 1',
+                '    return A'
+            ])
+        elif task_type == 'array_inc_byX':
+            code_lines.extend([
+                '    # Увеличить все элементы на X',
+                '    for i in range(N):',
+                '        A[i] += X',
+                '    return A'
+            ])
+        elif task_type == 'array_mult_by2':
+            code_lines.extend([
+                '    # Умножить все элементы на 2',
+                '    for i in range(N):',
+                '        A[i] *= 2',
+                '    return A'
+            ])
+        elif task_type == 'array_mult_byX':
+            code_lines.extend([
+                '    # Умножить все элементы на X',
+                '    for i in range(N):',
+                '        A[i] *= X',
+                '    return A'
+            ])
+        elif task_type == 'array_square':
+            code_lines.extend([
+                '    # Возвести все элементы в квадрат',
+                '    for i in range(N):',
+                '        A[i] = A[i] ** 2',
+                '    return A'
+            ])
         elif task_type == 'func_complex_algorithm':
             code_lines.extend([
                 '    # Complex algorithmic function',
@@ -801,6 +1003,55 @@ class KumirToPythonPipeline:
                 f'        if {param_name} % i == 0:',
                 '            return False',
                 '    return True'
+            ])
+        elif task_type == 'func_count_ones':
+            code_lines.extend([
+                '    # Подсчет количества единиц в массиве',
+                '    count = 0',
+                '    for i in range(N):',
+                '        if A[i] == 1:',
+                '            count += 1',
+                '    return count'
+            ])
+        elif task_type == 'func_count_elements':
+            code_lines.extend([
+                '    # Подсчет количества элементов по условию',
+                '    count = 0',
+                '    for i in range(N):',
+                '        # TODO: Добавить конкретное условие',
+                '        if True:  # Placeholder',
+                '            count += 1',
+                '    return count'
+            ])
+        elif task_type == 'func_sum_array':
+            code_lines.extend([
+                '    # Сумма элементов массива',
+                '    total = 0',
+                '    for i in range(N):',
+                '        total += A[i]',
+                '    return total'
+            ])
+        elif task_type == 'func_max_array':
+            code_lines.extend([
+                '    # Максимальный элемент массива',
+                '    if N == 0:',
+                '        return 0',
+                '    max_val = A[0]',
+                '    for i in range(1, N):',
+                '        if A[i] > max_val:',
+                '            max_val = A[i]',
+                '    return max_val'
+            ])
+        elif task_type == 'func_min_array':
+            code_lines.extend([
+                '    # Минимальный элемент массива',
+                '    if N == 0:',
+                '        return 0',
+                '    min_val = A[0]',
+                '    for i in range(1, N):',
+                '        if A[i] < min_val:',
+                '            min_val = A[i]',
+                '    return min_val'
             ])
         elif task_type == 'func_round':
             code_lines.extend([
@@ -1025,9 +1276,127 @@ class KumirToPythonPipeline:
                 ])
         elif task_id == "10" or task_type == 'arr_fill_zeros':  # Заполнить нулями
             code_lines.extend([
+                '    A = [0] * N  # Создаем массив',
                 '    for i in range(N):',
                 '        A[i] = 0',
                 '    return A'
+            ])
+        elif task_type == 'arr_fill_natural':  # Заполнить натуральными числами
+            code_lines.extend([
+                '    A = [0] * N  # Создаем массив',
+                '    for i in range(N):',
+                '        A[i] = i + 1',
+                '    return A'
+            ])
+        elif task_type == 'arr_fill_fibonacci':  # Заполнить числами Фибоначчи
+            code_lines.extend([
+                '    A = [0] * N  # Создаем массив',
+                '    if N > 0:',
+                '        A[0] = 1',
+                '    if N > 1:',
+                '        A[1] = 1',
+                '    for i in range(2, N):',
+                '        A[i] = A[i-1] + A[i-2]',
+                '    return A'
+            ])
+        elif task_type == 'arr_fill_powers2':  # Заполнить степенями двойки
+            code_lines.extend([
+                '    A = [0] * N  # Создаем массив',
+                '    for i in range(N):',
+                '        A[i] = 2 ** i',
+                '    return A'
+            ])
+        elif task_type == 'arr_fill_pyramid':  # Заполнить горкой
+            code_lines.extend([
+                '    A = [0] * N  # Создаем массив',
+                '    # Заполнить горкой: 1, 2, 1, 2, 3, 2, 1, ...',
+                '    pos = 0',
+                '    level = 1',
+                '    while pos < N:',
+                '        # Подъем',
+                '        for i in range(1, level + 1):',
+                '            if pos < N:',
+                '                A[pos] = i',
+                '                pos += 1',
+                '        # Спуск',
+                '        for i in range(level - 1, 0, -1):',
+                '            if pos < N:',
+                '                A[pos] = i',
+                '                pos += 1',
+                '        level += 1',
+                '    return A'
+            ])
+        elif task_type == 'arr_fill_generic':  # Заполнить (общий случай)
+            code_lines.extend([
+                '    A = [0] * N  # Создаем массив',
+                '    # Общее заполнение массива',
+                '    for i in range(N):',
+                '        A[i] = i + 1  # По умолчанию натуральными числами',
+                '    return A'
+            ])
+        elif task_type == 'arr_modify_increase':  # Увеличить элементы
+            code_lines.extend([
+                '    A = list(range(1, N+1))  # Создаем массив с начальными значениями',
+                '    for i in range(N):',
+                '        A[i] += X  # Увеличиваем на X',
+                '    return A'
+            ])
+        elif task_type == 'arr_modify_multiply':  # Умножить элементы
+            code_lines.extend([
+                '    A = list(range(1, N+1))  # Создаем массив с начальными значениями',
+                '    for i in range(N):',
+                '        A[i] *= X  # Умножаем на X',
+                '    return A'
+            ])
+        elif task_type == 'arr_modify_square':  # Возвести в квадрат
+            code_lines.extend([
+                '    A = list(range(1, N+1))  # Создаем массив с начальными значениями',
+                '    for i in range(N):',
+                '        A[i] = A[i] ** 2',
+                '    return A'
+            ])
+        elif task_type == 'arr_find_max':  # Найти максимум
+            code_lines.extend([
+                '    A = list(range(1, N+1))  # Создаем массив с начальными значениями',
+                '    max_val = A[0]',
+                '    for i in range(1, N):',
+                '        if A[i] > max_val:',
+                '            max_val = A[i]',
+                '    return max_val'
+            ])
+        elif task_type == 'arr_find_min':  # Найти минимум
+            code_lines.extend([
+                '    A = list(range(1, N+1))  # Создаем массив с начальными значениями',
+                '    min_val = A[0]',
+                '    for i in range(1, N):',
+                '        if A[i] < min_val:',
+                '            min_val = A[i]',
+                '    return min_val'
+            ])
+        elif task_type == 'arr_find_value':  # Найти значение
+            code_lines.extend([
+                '    A = list(range(1, N+1))  # Создаем массив с начальными значениями',
+                '    for i in range(N):',
+                '        if A[i] == X:',
+                '            return i + 1  # Возвращаем позицию (1-indexed)',
+                '    return 0  # Не найдено'
+            ])
+        elif task_type == 'arr_count':  # Подсчитать элементы
+            code_lines.extend([
+                '    A = list(range(1, N+1))  # Создаем массив с начальными значениями',
+                '    count = 0',
+                '    for i in range(N):',
+                '        if A[i] == X:  # Подсчитываем элементы равные X',
+                '            count += 1',
+                '    return count'
+            ])
+        elif task_type == 'arr_sum':  # Сумма элементов
+            code_lines.extend([
+                '    A = list(range(1, N+1))  # Создаем массив с начальными значениями',
+                '    total = 0',
+                '    for i in range(N):',
+                '        total += A[i]',
+                '    return total'
             ])
         elif task_id == "11":  # Заполнить натуральными числами
             code_lines.extend([
@@ -1156,7 +1525,47 @@ class KumirToPythonPipeline:
         ])
         
         # Умная генерация тестов на основе параметров функции
-        if is_function or returns_value:
+        if task_type.startswith('array_'):
+            # Процедуры с массивами (array_inc_by1, array_mult_by2, etc.)
+            if 'X' in params:
+                code_lines.extend([
+                    '    N = 5',
+                    '    A = [1, 2, 3, 4, 5]',
+                    '    X = 10',
+                    f'    result = {short_name}(N, A.copy(), X)',
+                    '    print(f"Input: N={N}, A={A}, X={X}")',
+                    '    print(f"Result: {result}")',
+                    '    return result'
+                ])
+            else:
+                code_lines.extend([
+                    '    N = 5',
+                    '    A = [1, 2, 3, 4, 5]',
+                    f'    result = {short_name}(N, A.copy())',
+                    '    print(f"Input: N={N}, A={A}")',
+                    '    print(f"Result: {result}")',
+                    '    return result'
+                ])
+        elif task_type.startswith('arr_'):
+            # Процедуры с результирующими массивами - создают массив сами
+            if 'X' in params or has_X:
+                code_lines.extend([
+                    '    N = 5',
+                    '    X = 3',
+                    f'    result = {short_name}(N, X)',
+                    '    print(f"Input: N={N}, X={X}")',
+                    '    print(f"Result: {result}")',
+                    '    return result'
+                ])
+            else:
+                code_lines.extend([
+                    '    N = 5',
+                    f'    result = {short_name}(N)',
+                    '    print(f"Input: N={N}")',
+                    '    print(f"Result: {result}")',
+                    '    return result'
+                ])
+        elif is_function or returns_value:
             # Функция, возвращающая значение
             if len(params) == 0:
                 code_lines.extend([
@@ -1243,28 +1652,6 @@ class KumirToPythonPipeline:
                     f'    # Test with parameters: {params_str}',
                     f'    # TODO: Implement test for {short_name}({params_str})',
                     '    return True'
-                ])
-        
-        elif task_type.startswith('array_'):
-            # Процедуры с массивами
-            if 'X' in params:
-                code_lines.extend([
-                    '    N = 5',
-                    '    A = [1, 2, 3, 4, 5]',
-                    '    X = 10',
-                    f'    result = {short_name}(N, A.copy(), X)',
-                    '    print(f"Input: N={N}, A={A}, X={X}")',
-                    '    print(f"Result: {result}")',
-                    '    return result'
-                ])
-            else:
-                code_lines.extend([
-                    '    N = 5',
-                    '    A = [1, 2, 3, 4, 5]',
-                    f'    result = {short_name}(N, A.copy())',
-                    '    print(f"Input: N={N}, A={A}")',
-                    '    print(f"Result: {result}")',
-                    '    return result'
                 ])
         
         elif task_type == 'string_task':
