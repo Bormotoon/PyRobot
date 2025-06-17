@@ -275,10 +275,29 @@ class KumirToPythonPipeline:
             else:
                 return 'array_procedure'
         
+        # Строки (проверяем до функций, так как строковые функции тоже имеют типы возврата)
+        if 'строк' in task_name.lower() or 'лит' in task_name:
+            return 'string_task'
+        
         # Функции (возвращают значение)
-        if any(prefix in task_name for prefix in ['цел ', 'вещ ']) and ('арг' in task_name or '(' in task_name):
+        if any(prefix in task_name for prefix in ['цел ', 'вещ ', 'лог ', 'лит ']) and ('арг' in task_name or '(' in task_name):
+            # Специальные функции
+            if 'средн' in task_todo and 'арифметическ' in task_todo:
+                return 'func_average'
+            elif 'минимум' in task_todo or 'наименьш' in task_todo:
+                return 'func_min'
+            elif 'максимум' in task_todo or 'наибольш' in task_todo:
+                return 'func_max'
+            elif 'лог ' in task_name and ('оканчивается' in task_todo or 'на 0' in task_todo):
+                return 'func_ends_with_zero'
+            elif 'счастлив' in task_todo:
+                return 'func_lucky_ticket'
+            elif 'двоичн' in task_todo or 'бинарн' in task_todo:
+                return 'func_from_binary'
+            elif 'восьмеричн' in task_todo:
+                return 'func_from_octal'
             # Простые математические функции
-            if 'последн' in task_name and 'цифр' in task_name:
+            elif 'последн' in task_name and 'цифр' in task_name:
                 return 'func_last_digit'
             elif 'десятк' in task_name:
                 return 'func_tens_digit'
@@ -342,10 +361,6 @@ class KumirToPythonPipeline:
         elif 'сумм' in task_todo:
             return 'arr_sum'
         
-        # Строки
-        elif 'строк' in task_name or 'лит' in task_name:
-            return 'string_task'
-        
         # Робот
         elif 'робот' in task_name.lower():
             return 'robot_task'
@@ -361,13 +376,135 @@ class KumirToPythonPipeline:
         task_todo = task['task_todo']
         kumir_code = task['kumir_code']
         
-        # Определяем тип задачи
-        task_type = self.detect_task_type(task)
+        # Определяем параметры функции более точно
+        import re
         
-        # Определяем параметры функции
-        has_X = 'арг цел X' in task_name or 'арг вещ X' in task_name or '(цел X)' in task_name or '(вещ X)' in task_name
-        returns_value = any(prefix in task_name for prefix in ['цел ', 'вещ ']) and ('арг' in task_name or '(' in task_name)
-        is_function = task_type.startswith('func_')
+        # Поиск параметров в сигнатуре функции - используем самый надёжный метод
+        params = []
+        param_types = {}
+        array_params = set()
+        string_params = set()
+        
+        # Ищем содержимое в скобках и разбираем
+        paren_match = re.search(r'\(([^)]+)\)', task_name)
+        if paren_match:
+            content = paren_match.group(1)
+            # Разделяем по запятым и ищем переменные
+            parts = [p.strip() for p in content.split(',')]
+            for part in parts:
+                # Попробуем сначала найти полные конструкции типа "аргрез цел X" или "арг лит Y"
+                if re.match(r'аргрез\s+(цел|вещ|лог|лит)таб\s+[A-Z][a-zA-Z0-9]*', part):
+                    continue  # Будет обработано ниже
+                elif re.match(r'арг\s+(цел|вещ|лог|лит)\s+[A-Z][a-zA-Z0-9]*', part):
+                    continue  # Будет обработано ниже
+                else:
+                    # Простые формы: "лит s", "цел x", etc.
+                    simple_match = re.search(r'(цел|вещ|лог|лит)\s+([a-zA-Z][a-zA-Z0-9]*)', part)
+                    if simple_match:
+                        var_name = simple_match.group(2)
+                        var_type = simple_match.group(1)
+                        params.append(var_name)
+                        param_types[var_name] = var_type
+                        if var_type == 'лит':
+                            string_params.add(var_name)
+                    else:
+                        # Последняя попытка - просто переменная в конце
+                        var_match = re.search(r'([a-zA-Z][a-zA-Z0-9]*)$', part.strip())
+                        if var_match:
+                            params.append(var_match.group(1))
+        
+        # Если ничего не найдено в task_name, пробуем альтернативные методы и task_init
+        if not params:
+            # Второй вариант: поиск арг конструкций (включая массивы)
+            # Ищем параметры массивов: аргрез целтаб X, аргрез вещтаб A, etc.
+            array_param_matches = re.findall(r'аргрез\s+(?:цел|вещ|лог|лит)таб\s+([A-Z][a-zA-Z0-9]*)', task_name)
+            if array_param_matches:
+                params.extend(array_param_matches)
+            
+            # Ищем обычные параметры: арг цел X, арг лит S, etc.
+            param_matches = re.findall(r'арг\s+(?:цел|вещ|лит|лог)\s+([A-Z][a-zA-Z0-9]*)', task_name)
+            if param_matches:
+                params.extend(param_matches)
+        
+        # Третий вариант: парсинг параметров из task_init (блок "дано")
+        if not params or len(params) < 2:
+            # Ищем параметры в task_init в формате "цел N, таб цел A[1:N], цел X"
+            init_params = []
+            
+            # Ищем простые параметры: цел N, цел X, лит s
+            simple_params = re.findall(r'(?:^|,\s*)(?:арг\s+)?(цел|вещ|лит|лог)\s+([A-Z][a-zA-Z0-9]*)', task_init)
+            for param_type, param_name in simple_params:
+                if param_name not in init_params:
+                    init_params.append(param_name)
+                    param_types[param_name] = param_type
+                    if param_type == 'лит':
+                        string_params.add(param_name)
+            
+            # Ищем массивы: таб цел A[1:N], рез целтаб A[1:N]
+            array_matches = re.findall(r'(?:рез\s+)?(цел|вещ|лит|лог)таб\s+([A-Z][a-zA-Z0-9]*)', task_init)
+            for param_type, param_name in array_matches:
+                if param_name not in init_params:
+                    init_params.append(param_name)
+                    param_types[param_name] = f'{param_type}таб'
+                    array_params.add(param_name)
+            
+            # Если найдены параметры в task_init, используем их
+            if init_params:
+                params = init_params
+        
+        # Определяем типы параметров для лучшей генерации кода
+        # Анализируем типы параметров из сигнатуры
+        if 'аргрез' in task_name:
+            # Массивы
+            array_matches = re.findall(r'аргрез\s+(цел|вещ|лог|лит)таб\s+([A-Z][a-zA-Z0-9]*)', task_name)
+            for param_type, param_name in array_matches:
+                array_params.add(param_name)
+                param_types[param_name] = f'{param_type}таб'
+        
+        # Обычные параметры с ключевым словом "арг"
+        param_type_matches = re.findall(r'арг\s+(цел|вещ|лит|лог)\s+([A-Z][a-zA-Z0-9]*)', task_name)
+        for param_type, param_name in param_type_matches:
+            param_types[param_name] = param_type
+            if param_type == 'лит':
+                string_params.add(param_name)
+        
+        # Простые типы без ключевого слова "арг"
+        simple_type_matches = re.findall(r'(?<!\w)(цел|вещ|лит|лог)\s+([A-Z][a-zA-Z0-9]*)', task_name)
+        for param_type, param_name in simple_type_matches:
+            # Убеждаемся, что это не часть аргрез или арг конструкции
+            if param_name in params:  # Только если параметр уже найден
+                param_types[param_name] = param_type
+                if param_type == 'лит':
+                    string_params.add(param_name)
+        
+        # Определяем тип функции более точно на основе параметров
+        if len(params) >= 2 and 'средн' in task_todo:
+            task_type = 'func_average'
+        elif len(params) >= 2 and ('минимум' in task_todo or 'наименьш' in task_todo):
+            task_type = 'func_min'
+        elif len(params) >= 2 and ('максимум' in task_todo or 'наибольш' in task_todo):
+            task_type = 'func_max'
+        else:
+            task_type = self.detect_task_type(task)
+        
+        # Определяем тип возврата
+        returns_value = any(prefix in task_name for prefix in ['цел ', 'вещ ', 'лог ']) and ('арг' in task_name or '(' in task_name)
+        return_type = None
+        if 'цел ' in task_name[:10]:
+            return_type = 'int'
+        elif 'вещ ' in task_name[:10]:
+            return_type = 'float'
+        elif 'лог ' in task_name[:10]:
+            return_type = 'bool'
+        elif 'лит ' in task_name[:10]:
+            return_type = 'str'
+        
+        # Определяем, есть ли строковые параметры
+        has_string_param = 'лит ' in task_name
+        
+        # Старое определение для совместимости
+        has_X = 'X' in params
+        is_function = task_type.startswith('func_') or returns_value
         
         short_name = self.clean_task_name_for_filename(task_name, task_id, task_type)
         
@@ -386,18 +523,42 @@ class KumirToPythonPipeline:
         ]
         
         # Определяем сигнатуру функции
-        if task_type.startswith('func_'):
+        if is_function or returns_value:
             # Это функция, возвращающая значение
-            if has_X:
-                func_signature = f'def {short_name}(X):'
-            else:
+            if array_params:
+                # Функция с массивами - используем стандартную сигнатуру с массивами
+                if 'X' in params:  # Есть дополнительный параметр поиска
+                    func_signature = f'def {short_name}(N: int, A: list, X: int):'
+                else:
+                    func_signature = f'def {short_name}(N: int, A: list):'
+            elif string_params:
+                # Функция со строками
+                string_param_names = [p for p in params if p in string_params]
+                other_param_names = [p for p in params if p not in string_params]
+                all_params = other_param_names + string_param_names
+                func_signature = f'def {short_name}({", ".join(all_params)}):'
+            elif len(params) == 0:
                 func_signature = f'def {short_name}():'
+            elif len(params) == 1:
+                func_signature = f'def {short_name}({params[0]}):'
+            elif len(params) == 2:
+                func_signature = f'def {short_name}({params[0]}, {params[1]}):'
+            elif len(params) == 3:
+                func_signature = f'def {short_name}({params[0]}, {params[1]}, {params[2]}):'
+            else:
+                func_signature = f'def {short_name}({", ".join(params)}):'
         elif task_type.startswith('algorithm_') or task_type.startswith('array_'):
             # Алгоритмы и процедуры с массивами
             if has_X:
                 func_signature = f'def {short_name}(N, A, X):'
             else:
                 func_signature = f'def {short_name}(N, A):'
+        elif task_type == 'string_task':
+            # Строковые задачи
+            if len(params) > 0:
+                func_signature = f'def {short_name}({", ".join(params)}):'
+            else:
+                func_signature = f'def {short_name}(s: str):'
         elif has_X and returns_value:
             func_signature = f'def {short_name}(N: int, A: list, X: int):'
         elif has_X:
@@ -522,6 +683,59 @@ class KumirToPythonPipeline:
                 '    s = str(X)',
                 '    return 1 if s == s[::-1] else 0'
             ])
+        elif task_type == 'func_average':
+            # Среднее арифметическое
+            if len(params) == 2:
+                code_lines.extend([
+                    f'    return ({params[0]} + {params[1]}) / 2'
+                ])
+            elif len(params) == 3:
+                code_lines.extend([
+                    f'    return ({params[0]} + {params[1]} + {params[2]}) / 3'
+                ])
+            else:
+                code_lines.extend([
+                    f'    return sum([{", ".join(params)}]) / {len(params)}'
+                ])
+        elif task_type == 'func_min':
+            # Минимум
+            code_lines.extend([
+                f'    return min({", ".join(params)})'
+            ])
+        elif task_type == 'func_max':
+            # Максимум
+            code_lines.extend([
+                f'    return max({", ".join(params)})'
+            ])
+        elif task_type == 'func_ends_with_zero':
+            # Оканчивается на ноль
+            code_lines.extend([
+                '    return 1 if N % 10 == 0 else 0'
+            ])
+        elif task_type == 'func_lucky_ticket':
+            # Счастливый билет
+            code_lines.extend([
+                '    # Счастливый билет - сумма первых 3 цифр == сумме последних 3',
+                '    s = str(N).zfill(6)  # Дополняем до 6 цифр',
+                '    if len(s) != 6:',
+                '        return 0',
+                '    first_sum = sum(int(d) for d in s[:3])',
+                '    last_sum = sum(int(d) for d in s[3:])',
+                '    return 1 if first_sum == last_sum else 0'
+            ])
+        elif task_type == 'func_from_binary':
+            # Из двоичной системы
+            code_lines.extend([
+                '    # Convert binary string to integer',
+                '    return int(s, 2)'
+            ])
+        elif task_type == 'func_from_octal':
+            # Из восьмеричной системы
+            code_lines.extend([
+                '    # Convert octal string to integer',
+                '    return int(s, 8)'
+            ])
+        # Специальные обработчики для конкретных функций
         elif task_type == 'func_generic':
             # Попытаемся создать простую реализацию на основе описания
             if 'сумм' in task_todo.lower() and 'натур' in task_todo.lower():
@@ -585,6 +799,83 @@ class KumirToPythonPipeline:
                     '    # TODO: Implement based on task description',
                     f'    # Task: {task_todo}',
                     '    return 0  # Placeholder'
+                ])
+        # Строковые задачи
+        elif task_type == 'string_task' or string_params:
+            # Определяем тип строковой операции
+            task_lower = task_todo.lower()
+            name_lower = task_name.lower()
+            
+            if ('первый' in task_lower or 'первый' in name_lower) and 'символ' in (task_lower + name_lower):
+                code_lines.extend([
+                    '    # Return first character',
+                    '    return s[0] if s else ""'
+                ])
+            elif ('последн' in task_lower or 'последн' in name_lower) and 'символ' in (task_lower + name_lower):
+                code_lines.extend([
+                    '    # Return last character',
+                    '    return s[-1] if s else ""'
+                ])
+            elif 'длин' in task_lower or 'длин' in name_lower:
+                code_lines.extend([
+                    '    # String length',
+                    '    return len(s)'
+                ])
+            elif 'символ' in task_lower and 'номер' in task_lower:
+                code_lines.extend([
+                    '    # Character at position',
+                    '    if 1 <= n <= len(s):',
+                    '        return s[n-1]  # Convert to 0-based index',
+                    '    return ""'
+                ])
+            elif 'поиск' in task_lower or 'найт' in task_lower:
+                code_lines.extend([
+                    '    # Find substring',
+                    '    pos = s.find(substr)',
+                    '    return pos + 1 if pos != -1 else 0  # Convert to 1-based index'
+                ])
+            elif 'замен' in task_lower:
+                code_lines.extend([
+                    '    # Replace substring',
+                    '    return s.replace(old_substr, new_substr)'
+                ])
+            elif 'удал' in task_lower:
+                code_lines.extend([
+                    '    # Remove substring',
+                    '    return s.replace(substr, "")'
+                ])
+            elif 'вставк' in task_lower:
+                code_lines.extend([
+                    '    # Insert substring',
+                    '    pos = pos - 1  # Convert to 0-based index',
+                    '    return s[:pos] + substr + s[pos:]'
+                ])
+            elif 'обрат' in task_lower or 'реверс' in task_lower:
+                code_lines.extend([
+                    '    # Reverse string',
+                    '    return s[::-1]'
+                ])
+            elif 'заглавн' in task_lower or 'больш' in task_lower:
+                code_lines.extend([
+                    '    # Convert to uppercase',
+                    '    return s.upper()'
+                ])
+            elif 'строчн' in task_lower or 'малень' in task_lower:
+                code_lines.extend([
+                    '    # Convert to lowercase',
+                    '    return s.lower()'
+                ])
+            elif 'слов' in task_lower and ('количест' in task_lower or 'скольк' in task_lower):
+                code_lines.extend([
+                    '    # Count words',
+                    '    return len(s.split())'
+                ])
+            else:
+                # Базовая реализация для строк
+                code_lines.extend([
+                    '    # TODO: Implement string operation',
+                    f'    # Task: {task_todo}',
+                    '    return s  # Placeholder'
                 ])
         elif task_id == "10" or task_type == 'arr_fill_zeros':  # Заполнить нулями
             code_lines.extend([
@@ -718,13 +1009,44 @@ class KumirToPythonPipeline:
             '    """Test the solution."""',
         ])
         
-        if task_type.startswith('func_'):
-            # Для функций
+        if task_type.startswith('func_') and not string_params:
+            # Для числовых функций
             code_lines.extend([
                 '    test_values = [0, 1, 5, 123, 999]',
                 '    for X in test_values:',
                 f'        result = {short_name}(X)',
                 '        print(f"Input: {X}, Result: {result}")',
+                '    return True'
+            ])
+        elif task_type.startswith('func_') and string_params:
+            # Для строковых функций
+            code_lines.extend([
+                '    test_strings = ["hello", "Python", "123", "A B C", ""]',
+                '    for s in test_strings:',
+                f'        result = {short_name}(s)',
+                '        print(f"Input: \'{s}\', Result: {result}")',
+                '    return True'
+            ])
+        elif task_type == 'string_task':
+            # Для строковых задач
+            code_lines.extend([
+                '    test_strings = ["hello", "Python", "test string", "ABC", ""]',
+                '    for s in test_strings:',
+            ])
+            
+            if len(params) > 1:
+                # Многопараметрная строковая функция
+                code_lines.extend([
+                    f'        result = {short_name}(s, "test")',  # Второй параметр по умолчанию
+                    '        print(f"Input: \'{s}\', Result: {result}")'
+                ])
+            else:
+                code_lines.extend([
+                    f'        result = {short_name}(s)',
+                    '        print(f"Input: \'{s}\', Result: {result}")'
+                ])
+            
+            code_lines.extend([
                 '    return True'
             ])
         elif task_type.startswith('algorithm_') or task_type.startswith('array_'):
