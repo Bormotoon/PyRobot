@@ -333,8 +333,8 @@ def execute_code():
     except (KumirExecutionError, KumirEvalError, RobotError, 
             KumirInputRequiredError, DeclarationError, AssignmentError,
             InputOutputError) as e:
-        err_msg = f"Ошибка выполнения: {str(e)}"
-        logger.error(err_msg, exc_info=False)
+        logger.error(f"Ошибка выполнения: {str(e)}", exc_info=True)
+        err_msg = "Произошла ошибка выполнения. Пожалуйста, проверьте ваш код."
         output_on_error = (interpreter.output 
                           if interpreter and hasattr(interpreter, 'output') 
                           else "")
@@ -352,7 +352,7 @@ def execute_code():
                         f"{getStateErr}")
             state_on_error = {"output": output_on_error}
         
-        logger.error(f"Kumir execution error: {err_msg}", exc_info=True)
+        logger.error("Kumir execution error occurred.", exc_info=True)
         return jsonify({
             'success': False,
             'message': err_msg,
