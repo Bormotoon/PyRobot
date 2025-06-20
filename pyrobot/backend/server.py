@@ -352,11 +352,11 @@ def execute_code():
                         f"{getStateErr}")
             state_on_error = {"output": output_on_error}
         
+        logger.error(f"Kumir execution error: {err_msg}", exc_info=True)
         return jsonify({
             'success': False,
             'message': err_msg,
             'finalState': state_on_error,
-            'trace': trace_data,
             'errorIndex': error_index
         }), 200
     
@@ -375,11 +375,11 @@ def execute_code():
             pass
         
         state_on_error["output"] = output_on_error
+        logger.exception("Unexpected server error during code execution.")
         return jsonify({
             'success': False,
-            'message': f'Внутренняя ошибка сервера: {type(e).__name__}',
-            'finalState': state_on_error,
-            'trace': trace_data
+            'message': 'Внутренняя ошибка сервера',
+            'finalState': state_on_error
         }), 500
 
 
