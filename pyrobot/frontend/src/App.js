@@ -1,15 +1,17 @@
 import React from 'react';
+import { ThemeProvider, CssBaseline } from '@mui/material';
 import RobotSimulator from './components/RobotSimulator';
-import './App.css';
-import './styles/styles.css'; // Подключаем новый файл стилей
+import theme from './styles/theme';
+import './styles/styles.css';
 
 function App() {
     return (
-        <div className="App">
-            <header className="App-header">
+        <ThemeProvider theme={theme}>
+            <CssBaseline />
+            <div className="App">
                 <RobotSimulator/>
-            </header>
-        </div>
+            </div>
+        </ThemeProvider>
     );
 }
 

@@ -1,6 +1,25 @@
 // FILE START: Field.jsx
 import React, {memo, useCallback, useEffect, useState, useRef} from 'react';
-import {Card, Typography} from '@mui/material';
+import {
+	Card, 
+	CardContent,
+	Typography, 
+	Box, 
+	Paper, 
+	Chip, 
+	Divider,
+	Tooltip,
+	IconButton,
+	useTheme
+} from '@mui/material';
+import {
+	Fullscreen as FullscreenIcon,
+	FullscreenExit as FullscreenExitIcon,
+	ZoomIn as ZoomInIcon,
+	ZoomOut as ZoomOutIcon,
+	Info as InfoIcon,
+	GridOn as GridOnIcon
+} from '@mui/icons-material';
 import {drawField, drawStaticLayer} from '../canvasDrawing'; // Уточните путь
 import {getHint} from '../hints'; // Уточните путь
 import './Field.css';
@@ -13,9 +32,11 @@ const Field = memo(({
 	                    setRobotPos, setWalls, setMarkers, setColoredCells, setCellSize, setStatusMessage,
                     }) => {
 
+	const theme = useTheme();
 	const offscreenCanvasRef = useRef(null);
 	const staticLayerNeedsUpdate = useRef(true);
 	const [isDraggingRobot, setIsDraggingRobot] = useState(false);
+	const [isFullscreen, setIsFullscreen] = useState(false);
 
 	// Эффект для статического слоя (без изменений)
 	useEffect(() => {
@@ -310,43 +331,247 @@ const Field = memo(({
 		}
 	}, [isDraggingRobot, handleMouseMove, handleMouseUp]);
 
+	// Обработчики для дополнительных функций
+	const handleZoomIn = useCallback(() => {
+		const maxCellSize = 180;
+		const zoomFactor = 1.15;
+		const newSize = Math.min(maxCellSize, Math.round(cellSize * zoomFactor));
+		if (newSize > cellSize) {
+			setCellSize(newSize);
+			setStatusMessage(getHint('wheelZoomIn'));
+			staticLayerNeedsUpdate.current = true;
+		} else {
+			setStatusMessage(getHint('zoomMaxReached'));
+		}
+	}, [cellSize, setCellSize, setStatusMessage]);
+
+	const handleZoomOut = useCallback(() => {
+		const minCellSize = 15;
+		const zoomFactor = 1.15;
+		const newSize = Math.max(minCellSize, Math.round(cellSize / zoomFactor));
+		if (newSize < cellSize) {
+			setCellSize(newSize);
+			setStatusMessage(getHint('wheelZoomOut'));
+			staticLayerNeedsUpdate.current = true;
+		} else {
+			setStatusMessage(getHint('zoomMinReached'));
+		}
+	}, [cellSize, setCellSize, setStatusMessage]);
+
+	const toggleFullscreen = useCallback(() => {
+		setIsFullscreen(prev => !prev);
+	}, []);
+
 	// --- Рендер компонента ---
 	return (
-		<div className="field-area">
-			{/* Карточка с canvas */}
-			<Card className="field-card" elevation={3}>
-				<canvas
-					ref={canvasRef}
-					className={`robot-canvas ${editMode ? 'edit-mode' : ''} ${isDraggingRobot ? 'dragging' : ''}`}
-					onMouseDown={handleMouseDown} onContextMenu={handleCanvasRightClick} onWheel={handleWheel}
-					onTouchStart={handleMouseDown}
-					style={{
-						display: 'block',
-						maxWidth: '100%',
-						maxHeight: '100%',
-						width: 'auto',
-						height: 'auto',
-						aspectRatio: `${width || 1} / ${height || 1}`,
-						cursor: editMode ? (isDraggingRobot ? 'grabbing' : 'crosshair') : 'default',
-						touchAction: 'none'
-					}}
-				/>
-			</Card>
-			{/* Карточка статуса */}
-			<Card className="status-card" elevation={2} sx={{mt: 1, width: '100%'}}>
-				<Typography variant="body2" component="div" className="status-text" sx={{
-					minHeight: '60px',
-					maxHeight: '100px',
-					overflowY: 'auto',
-					textAlign: 'center',
-					padding: '8px',
-					whiteSpace: 'pre-wrap',
-					wordBreak: 'break-word'
+		<Box className="field-area">
+			{/* Современная карточка игрового поля */}		<Card 
+			className="field-card game-field" 
+			elevation={1}
+			sx={{
+				borderRadius: 3,
+				overflow: 'hidden',
+				position: 'relative',
+				height: '100%',
+				display: 'flex',
+				flexDirection: 'column'
+			}}
+		>
+			<CardContent sx={{ 
+				px: { xs: 2, sm: 3 },
+				py: { xs: 1.5, sm: 2 },
+				display: 'flex',
+				flexDirection: 'column',
+				height: '100%',
+				pb: { xs: 1.5, sm: 2 }
+			}}>
+				{/* Заголовок игрового поля */}
+				<Box sx={{
+					display: 'flex',
+					alignItems: 'center',
+					justifyContent: 'space-between',
+					mb: { xs: 1.5, sm: 2 },
+					flexShrink: 0
 				}}>
-					{statusMessage || ' '}
+					<Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+						<GridOnIcon color="primary" fontSize="small" />
+						<Typography 
+							variant="subtitle2" 
+							fontWeight={500}
+							sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}
+						>
+							Игровое поле
+						</Typography>
+						<Chip 
+							label={`${width}×${height}`}
+							size="small"
+							variant="outlined"
+							sx={{ 
+								fontSize: { xs: '0.7rem', sm: '0.75rem' },
+								height: { xs: 20, sm: 24 }
+							}}
+						/>
+						{editMode && (
+							<Chip 
+								label="Редактирование"
+								size="small"
+								color="warning"
+								variant="filled"
+								sx={{ 
+									fontSize: { xs: '0.7rem', sm: '0.75rem' },
+									height: { xs: 20, sm: 24 }
+								}}
+							/>
+						)}
+					</Box>
+					
+					<Box sx={{ display: 'flex', gap: 0.5 }}>
+						<Tooltip title="Увеличить">
+							<IconButton 
+								size="small" 
+								onClick={handleZoomIn}
+							>
+								<ZoomInIcon fontSize="small" />
+							</IconButton>
+						</Tooltip>
+						
+						<Tooltip title="Уменьшить">
+							<IconButton 
+								size="small" 
+								onClick={handleZoomOut}
+							>
+								<ZoomOutIcon fontSize="small" />
+							</IconButton>
+						</Tooltip>
+						
+						<Tooltip title={isFullscreen ? 'Выйти из полноэкранного режима' : 'Полноэкранный режим'}>
+							<IconButton 
+								size="small" 
+								onClick={toggleFullscreen}
+							>
+								{isFullscreen ? <FullscreenExitIcon fontSize="small" /> : <FullscreenIcon fontSize="small" />}
+							</IconButton>
+						</Tooltip>
+					</Box>
+				</Box>
+
+				<Divider sx={{ mb: { xs: 1.5, sm: 2 }, flexShrink: 0 }} />
+
+				{/* Контейнер канваса */}
+				<Box sx={{
+					flexGrow: 1,
+					minHeight: 0,
+					display: 'flex',
+					justifyContent: 'center',
+					alignItems: 'center',
+					p: { xs: 1, sm: 2 }
+				}}>
+					<Paper
+						elevation={0}
+						sx={{
+							p: 1,
+							borderRadius: 2,
+							background: theme.palette.grey[50],
+							border: `1px solid ${theme.palette.divider}`,
+							width: '100%',
+							height: '100%',
+							display: 'flex',
+							justifyContent: 'center',
+							alignItems: 'center'
+						}}
+					>
+						<canvas
+							ref={canvasRef}
+							className={`robot-canvas ${editMode ? 'edit-mode' : ''} ${isDraggingRobot ? 'dragging' : ''}`}
+							onMouseDown={handleMouseDown} 
+							onContextMenu={handleCanvasRightClick} 
+							onWheel={handleWheel}
+							onTouchStart={handleMouseDown}
+							style={{
+								display: 'block',
+								maxWidth: '100%',
+								maxHeight: '100%',
+								width: 'auto',
+								height: 'auto',
+								aspectRatio: `${width || 1} / ${height || 1}`,
+								cursor: editMode ? (isDraggingRobot ? 'grabbing' : 'crosshair') : 'default',
+								touchAction: 'none',
+								borderRadius: theme.shape.borderRadius,
+								transition: 'all 0.2s ease',
+							}}
+						/>
+					</Paper>
+				</Box>
+			</CardContent>
+		</Card>
+					{/* Современная карточка статуса */}
+		<Card 
+			className="status-card" 
+			elevation={1} 
+			sx={{
+				mt: 2, 
+				borderRadius: 3
+			}}
+		>
+			<CardContent sx={{ 
+				px: { xs: 2, sm: 3 },
+				py: { xs: 1.5, sm: 2 },
+				pb: { xs: 1.5, sm: 2 }
+			}}>
+				<Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: { xs: 1, sm: 1.5 } }}>
+					<InfoIcon color="primary" fontSize="small" />
+					<Typography 
+						variant="subtitle2" 
+						fontWeight={500}
+						sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}
+					>
+						Статус
+					</Typography>
+				</Box>
+				
+				<Divider sx={{ mb: { xs: 1, sm: 1.5 } }} />
+				
+				<Typography 
+					variant="body2" 
+					component="div" 
+					className="status-text" 
+					sx={{
+						color: theme.palette.text.secondary,
+						fontSize: { xs: '0.75rem', sm: '0.875rem' },
+						lineHeight: 1.4,
+						fontFamily: 'var(--font-family-monospace)',
+						p: { xs: 1, sm: 1.5 },
+						background: theme.palette.grey[50],
+						border: `1px solid ${theme.palette.divider}`,
+						borderRadius: 1,
+						minHeight: '2rem',
+						maxHeight: '6rem',
+						overflowY: 'auto',
+						display: 'flex',
+						alignItems: 'center',
+						whiteSpace: 'pre-wrap',
+						wordBreak: 'break-word',
+						'&::-webkit-scrollbar': {
+							width: '4px',
+						},
+						'&::-webkit-scrollbar-track': {
+							background: theme.palette.grey[100],
+							borderRadius: '2px',
+						},
+						'&::-webkit-scrollbar-thumb': {
+							background: theme.palette.grey[400],
+							borderRadius: '2px',
+							'&:hover': {
+								background: theme.palette.grey[500],
+							}
+						}
+					}}
+				>
+					{statusMessage || 'Готов к работе...'}
 				</Typography>
-			</Card>
-		</div>
+			</CardContent>
+		</Card>
+		</Box>
 	);
 });
 

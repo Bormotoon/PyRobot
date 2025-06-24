@@ -1,16 +1,49 @@
 // FILE START: ControlPanel.jsx
 import React, {memo, useCallback, useRef, useState} from 'react';
-import {Button, Card, CardContent, CardHeader, Grid, Tooltip} from '@mui/material';
 import {
-	Add as AddIcon, AddLocation as AddLocationIcon, ArrowBack as ArrowBackIcon,
-	ArrowDownward as ArrowDownwardIcon, ArrowForward as ArrowForwardIcon, ArrowUpward as ArrowUpwardIcon,
-	Brush as BrushIcon, Clear as ClearIcon, DeleteOutline as DeleteOutlineIcon, Edit as EditIcon,
-	FileUpload as FileUploadIcon, HelpOutline as HelpOutlineIcon, Remove as RemoveIcon
+	Button, 
+	Card, 
+	CardContent, 
+	Typography, 
+	Grid, 
+	Tooltip, 
+	Box,
+	Divider,
+	Chip,
+	IconButton,
+	Switch,
+	FormControlLabel,
+	TextField,
+	Paper,
+	Accordion,
+	AccordionSummary,
+	AccordionDetails
+} from '@mui/material';
+import {
+	Add as AddIcon, 
+	AddLocation as AddLocationIcon, 
+	ArrowBack as ArrowBackIcon,
+	ArrowDownward as ArrowDownwardIcon, 
+	ArrowForward as ArrowForwardIcon, 
+	ArrowUpward as ArrowUpwardIcon,
+	Brush as BrushIcon, 
+	Clear as ClearIcon, 
+	DeleteOutline as DeleteOutlineIcon, 
+	Edit as EditIcon,
+	FileUpload as FileUploadIcon, 
+	HelpOutline as HelpOutlineIcon, 
+	Remove as RemoveIcon,
+	Settings as SettingsIcon,
+	SmartToy as RobotIcon,
+	GridOn as GridIcon,
+	ExpandMore as ExpandMoreIcon,
+	Palette as PaletteIcon,
+	LocationOn as LocationOnIcon
 } from '@mui/icons-material';
-import {getHint} from '../hints'; // Уточните путь
+import {getHint} from '../hints';
 import './ControlPanel.css';
-import HelpDialog from '../Help/HelpDialog'; // Уточните путь
-import logger from '../../Logger'; // Уточните путь
+import HelpDialog from '../Help/HelpDialog';
+import logger from '../../Logger';
 
 const parseWallCode = (code, x, y) => {
 	const w = [];
@@ -298,87 +331,335 @@ const ControlPanel = memo(({
 	}, [setStatusMessage, parseAndApplyFieldFile]);
 
 	return (
-		<>
-			<Card className="control-panel" elevation={3}>
-				<CardHeader title="Управление" titleTypographyProps={{align: 'center', variant: 'h6'}} sx={{pb: 0}}/>
-				<CardContent sx={{pt: 1}}>
-					<Grid container spacing={1} justifyContent="center" alignItems="center" className="control-section">
-						<Grid item xs={12} container justifyContent="center"><Tooltip title="Вверх (W)"><Button
-							onClick={() => moveRobot('up')} variant="contained" className="control-button small-button"><ArrowUpwardIcon/></Button></Tooltip></Grid>
-						<Grid item xs={4} container justifyContent="flex-end"><Tooltip title="Влево (A)"><Button
-							onClick={() => moveRobot('left')} variant="contained"
-							className="control-button small-button"><ArrowBackIcon/></Button></Tooltip></Grid>
-						<Grid item xs={4}/>
-						<Grid item xs={4} container justifyContent="flex-start"><Tooltip title="Вправо (D)"><Button
-							onClick={() => moveRobot('right')} variant="contained"
-							className="control-button small-button"><ArrowForwardIcon/></Button></Tooltip></Grid>
-						<Grid item xs={12} container justifyContent="center"><Tooltip title="Вниз (S)"><Button
-							onClick={() => moveRobot('down')} variant="contained"
-							className="control-button small-button"><ArrowDownwardIcon/></Button></Tooltip></Grid>
-					</Grid>
-					<Grid container spacing={1} className="control-section">
-						<Grid item xs={6}><Tooltip title="Поставить маркер (Q)"><Button onClick={putMarker}
-						                                                                startIcon={<AddLocationIcon/>}
-						                                                                color="success"
-						                                                                variant="contained" fullWidth
-						                                                                className="control-button">Маркер</Button></Tooltip></Grid>
-						<Grid item xs={6}><Tooltip title="Убрать маркер (E)"><Button onClick={pickMarker}
-						                                                             startIcon={<DeleteOutlineIcon/>}
-						                                                             color="error" variant="contained"
-						                                                             fullWidth
-						                                                             className="control-button">Маркер</Button></Tooltip></Grid>
-						<Grid item xs={6}><Tooltip title="Закрасить клетку (Z)"><Button onClick={paintCell}
-						                                                                startIcon={<BrushIcon/>}
-						                                                                color="warning"
-						                                                                variant="contained" fullWidth
-						                                                                className="control-button">Клетка</Button></Tooltip></Grid>
-						<Grid item xs={6}><Tooltip title="Очистить клетку (X)"><Button onClick={clearCell}
-						                                                               startIcon={<ClearIcon/>}
-						                                                               color="info" variant="contained"
-						                                                               fullWidth
-						                                                               className="control-button">Клетка</Button></Tooltip></Grid>
-					</Grid>
-					<Grid container spacing={1} className="control-section">
-						<Grid item xs={12}><Tooltip
-							title={editMode ? 'Выключить режим редактирования (R)' : 'Включить режим редактирования (R)'}><Button
-							onClick={toggleEditMode} startIcon={<EditIcon/>} color={editMode ? "secondary" : "primary"}
-							variant="contained" fullWidth
-							className="control-button">{editMode ? 'Выкл' : 'Вкл'} Ред.</Button></Tooltip></Grid>
-						<Grid item xs={6}><Tooltip title="Увеличить ширину (Только в режиме ред.)"><Button
-							onClick={increaseWidth} startIcon={<AddIcon/>} variant="outlined" fullWidth
-							className="control-button" disabled={!editMode}>Шире</Button></Tooltip></Grid>
-						<Grid item xs={6}><Tooltip title="Уменьшить ширину (Только в режиме ред.)"><Button
-							onClick={decreaseWidth} startIcon={<RemoveIcon/>} variant="outlined" fullWidth
-							className="control-button" disabled={!editMode || width <= 1}>Уже</Button></Tooltip></Grid>
-						<Grid item xs={6}><Tooltip title="Увеличить высоту (Только в режиме ред.)"><Button
-							onClick={increaseHeight} startIcon={<AddIcon/>} variant="outlined" fullWidth
-							className="control-button" disabled={!editMode}>Выше</Button></Tooltip></Grid>
-						<Grid item xs={6}><Tooltip title="Уменьшить высоту (Только в режиме ред.)"><Button
-							onClick={decreaseHeight} startIcon={<RemoveIcon/>} variant="outlined" fullWidth
-							className="control-button"
-							disabled={!editMode || height <= 1}>Ниже</Button></Tooltip></Grid>
-					</Grid>
-					<Grid container spacing={1} className="control-section">
-						<Grid item xs={6}><Tooltip title="Открыть справку (F1)"><Button onClick={openHelpDialog}
-						                                                                startIcon={<HelpOutlineIcon/>}
-						                                                                color="info" variant="text"
-						                                                                fullWidth
-						                                                                className="control-button">Помощь</Button></Tooltip></Grid>
+		<Box sx={{ 
+			display: 'flex', 
+			flexDirection: 'column', 
+			gap: 1.5, 
+			width: '100%'
+		}}>
+			{/* Управление роботом */}
+			<Card elevation={2} sx={{ borderRadius: 3 }}>
+				<CardContent sx={{ pb: 2 }}>
+					<Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+						<RobotIcon color="primary" />
+						<Typography variant="h6" component="h2" fontWeight={600}>
+							Управление Роботом
+						</Typography>
+						<Chip 
+							label={`(${robotPos?.x ?? '?'}, ${robotPos?.y ?? '?'})`} 
+							size="small" 
+							color="primary" 
+							variant="outlined"
+						/>
+					</Box>
+
+					{/* Стрелки управления */}
+					<Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+						<Tooltip title="Вверх (W)">
+							<IconButton 
+								onClick={() => moveRobot('up')}
+								color="primary"
+								sx={{ 
+									bgcolor: 'primary.50',
+									'&:hover': { bgcolor: 'primary.100' }
+								}}
+							>
+								<ArrowUpwardIcon />
+							</IconButton>
+						</Tooltip>
+						
+						<Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+							<Tooltip title="Влево (A)">
+								<IconButton 
+									onClick={() => moveRobot('left')}
+									color="primary"
+									sx={{ 
+										bgcolor: 'primary.50',
+										'&:hover': { bgcolor: 'primary.100' }
+									}}
+								>
+									<ArrowBackIcon />
+								</IconButton>
+							</Tooltip>
+							
+							<Box sx={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+								<LocationOnIcon color="primary" />
+							</Box>
+							
+							<Tooltip title="Вправо (D)">
+								<IconButton 
+									onClick={() => moveRobot('right')}
+									color="primary"
+									sx={{ 
+										bgcolor: 'primary.50',
+										'&:hover': { bgcolor: 'primary.100' }
+									}}
+								>
+									<ArrowForwardIcon />
+								</IconButton>
+							</Tooltip>
+						</Box>
+						
+						<Tooltip title="Вниз (S)">
+							<IconButton 
+								onClick={() => moveRobot('down')}
+								color="primary"
+								sx={{ 
+									bgcolor: 'primary.50',
+									'&:hover': { bgcolor: 'primary.100' }
+								}}
+							>
+								<ArrowDownwardIcon />
+							</IconButton>
+						</Tooltip>
+					</Box>
+
+					{/* Действия с маркерами и клетками */}
+					<Box sx={{ mt: 3 }}>
+						<Grid container spacing={1}>
+							<Grid item xs={6}>
+								<Tooltip title="Поставить маркер (Q)">
+									<Button 
+										onClick={putMarker}
+										startIcon={<AddLocationIcon />}
+										color="success"
+										variant="contained" 
+										fullWidth
+										size="small"
+										sx={{ borderRadius: 2 }}
+									>
+										+ Маркер
+									</Button>
+								</Tooltip>
+							</Grid>
+							<Grid item xs={6}>
+								<Tooltip title="Убрать маркер (E)">
+									<Button 
+										onClick={pickMarker}
+										startIcon={<DeleteOutlineIcon />}
+										color="error" 
+										variant="contained"
+										fullWidth
+										size="small"
+										sx={{ borderRadius: 2 }}
+									>
+										- Маркер
+									</Button>
+								</Tooltip>
+							</Grid>
+							<Grid item xs={6}>
+								<Tooltip title="Закрасить клетку (Z)">
+									<Button 
+										onClick={paintCell}
+										startIcon={<BrushIcon />}
+										color="warning"
+										variant="contained" 
+										fullWidth
+										size="small"
+										sx={{ borderRadius: 2 }}
+									>
+										Закрасить
+									</Button>
+								</Tooltip>
+							</Grid>
+							<Grid item xs={6}>
+								<Tooltip title="Очистить клетку (X)">
+									<Button 
+										onClick={clearCell}
+										startIcon={<ClearIcon />}
+										color="info" 
+										variant="contained"
+										fullWidth
+										size="small"
+										sx={{ borderRadius: 2 }}
+									>
+										Очистить
+									</Button>
+								</Tooltip>
+							</Grid>
+						</Grid>
+					</Box>
+				</CardContent>
+			</Card>
+
+			{/* Настройки поля */}
+			<Card elevation={2} sx={{ borderRadius: 3 }}>
+				<CardContent sx={{ pb: 2 }}>
+					<Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+						<SettingsIcon color="primary" />
+						<Typography variant="h6" component="h2" fontWeight={600}>
+							Настройки Поля
+						</Typography>
+						<Chip 
+							label={`${width}×${height}`} 
+							size="small" 
+							color="secondary" 
+							variant="outlined"
+						/>
+					</Box>
+
+					{/* Режим редактирования */}
+					<Box sx={{ mb: 2 }}>
+						<FormControlLabel
+							control={
+								<Switch
+									checked={editMode}
+									onChange={toggleEditMode}
+									color="primary"
+								/>
+							}
+							label={
+								<Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+									<EditIcon fontSize="small" />
+									<Typography variant="body2">
+										Режим редактирования
+									</Typography>
+								</Box>
+							}
+						/>
+					</Box>
+
+					{/* Управление размерами */}
+					<Accordion disabled={!editMode} sx={{ boxShadow: 1, borderRadius: 2 }}>
+						<AccordionSummary expandIcon={<ExpandMoreIcon />}>
+							<Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+								<GridIcon fontSize="small" />
+								<Typography variant="body2">Размеры поля</Typography>
+							</Box>
+						</AccordionSummary>
+						<AccordionDetails>
+							<Grid container spacing={1}>
+								<Grid item xs={6}>
+									<Typography variant="caption" color="text.secondary">
+										Ширина
+									</Typography>
+									<Box sx={{ display: 'flex', gap: 0.5, mt: 0.5 }}>
+										<Button 
+											onClick={decreaseWidth}
+											variant="outlined"
+											size="small"
+											disabled={!editMode || width <= 1}
+											sx={{ minWidth: 30, borderRadius: 2 }}
+										>
+											<RemoveIcon fontSize="small" />
+										</Button>
+										<TextField
+											value={width}
+											size="small"
+											disabled
+											sx={{ 
+												width: 60,
+												'& .MuiInputBase-input': { 
+													textAlign: 'center',
+													fontSize: '0.875rem'
+												}
+											}}
+										/>
+										<Button 
+											onClick={increaseWidth}
+											variant="outlined"
+											size="small"
+											disabled={!editMode}
+											sx={{ minWidth: 30, borderRadius: 2 }}
+										>
+											<AddIcon fontSize="small" />
+										</Button>
+									</Box>
+								</Grid>
+								<Grid item xs={6}>
+									<Typography variant="caption" color="text.secondary">
+										Высота
+									</Typography>
+									<Box sx={{ display: 'flex', gap: 0.5, mt: 0.5 }}>
+										<Button 
+											onClick={decreaseHeight}
+											variant="outlined"
+											size="small"
+											disabled={!editMode || height <= 1}
+											sx={{ minWidth: 30, borderRadius: 2 }}
+										>
+											<RemoveIcon fontSize="small" />
+										</Button>
+										<TextField
+											value={height}
+											size="small"
+											disabled
+											sx={{ 
+												width: 60,
+												'& .MuiInputBase-input': { 
+													textAlign: 'center',
+													fontSize: '0.875rem'
+												}
+											}}
+										/>
+										<Button 
+											onClick={increaseHeight}
+											variant="outlined"
+											size="small"
+											disabled={!editMode}
+											sx={{ minWidth: 30, borderRadius: 2 }}
+										>
+											<AddIcon fontSize="small" />
+										</Button>
+									</Box>
+								</Grid>
+							</Grid>
+						</AccordionDetails>
+					</Accordion>
+				</CardContent>
+			</Card>
+
+			{/* Дополнительные функции */}
+			<Card elevation={1} sx={{ borderRadius: 3 }}>
+				<CardContent sx={{ pb: 2 }}>
+					<Typography variant="h6" component="h2" fontWeight={600} sx={{ mb: 2 }}>
+						Дополнительно
+					</Typography>
+					
+					<Grid container spacing={1}>
 						<Grid item xs={6}>
-							<Tooltip title="Импортировать обстановку из файла .fil">
-								<Button onClick={handleImportClick} startIcon={<FileUploadIcon/>} color="secondary"
-								        variant="text" fullWidth className="control-button">
-									Импорт .fil
+							<Tooltip title="Открыть справку (F1)">
+								<Button 
+									onClick={openHelpDialog}
+									startIcon={<HelpOutlineIcon />}
+									color="info" 
+									variant="outlined"
+									fullWidth
+									size="small"
+									sx={{ borderRadius: 2 }}
+								>
+									Помощь
 								</Button>
 							</Tooltip>
-							<input type="file" accept=".fil" ref={fileInputRef} style={{display: 'none'}}
-							       onChange={handleFileChange}/>
+						</Grid>
+						<Grid item xs={6}>
+							<Tooltip title="Импортировать обстановку из файла .fil">
+								<Button 
+									onClick={handleImportClick}
+									startIcon={<FileUploadIcon />}
+									color="secondary"
+									variant="outlined" 
+									fullWidth
+									size="small"
+									sx={{ borderRadius: 2 }}
+								>
+									Импорт
+								</Button>
+							</Tooltip>
+							<input 
+								type="file" 
+								accept=".fil" 
+								ref={fileInputRef} 
+								style={{ display: 'none' }}
+								onChange={handleFileChange}
+							/>
 						</Grid>
 					</Grid>
 				</CardContent>
 			</Card>
-			<HelpDialog open={helpOpen} onClose={closeHelpDialog}/>
-		</>
+
+			<HelpDialog open={helpOpen} onClose={closeHelpDialog} />
+		</Box>
 	);
 });
 

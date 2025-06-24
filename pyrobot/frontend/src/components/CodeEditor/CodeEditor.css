@@ -1,120 +1,238 @@
 /*
  * @file CodeEditor.css
- * @description Стили для компонента редактора кода, панели управления, консоли и отображения статуса.
- * Файл определяет внешний вид главного контейнера редактора, самого редактора кода (react-simple-code-editor),
- * панели с кнопками управления, а также стили для подсветки синтаксиса (Prism.js) и консоли с ответами сервера.
+ * @description Современные стили для компонента редактора кода в стиле Material Design 3.
+ * Включает стили для подсветки синтаксиса Prism.js и красивые анимации.
  */
 
-/* Главный контейнер редактора кода */
-.code-editor {
-    /* Задает гибкий размер, позволяющий элементу занимать 25% пространства родителя */
-    flex: 1 1 25%;
-    /* Определяет порядок элемента в flex-контейнере */
-    order: 1;
-    /* Внешний отступ */
-    margin: var(--spacing);
-    /* Внутренний отступ */
-    padding: var(--spacing);
-    /* Фоновый цвет, заданный переменной */
-    background: var(--background-color-code-editor);
-    /* Цвет текста, заданный переменной */
-    color: var(--text-color-code-editor);
-    /* Использование flex-контейнера для внутренней компоновки */
-    display: flex;
-    /* Расположение дочерних элементов по вертикали */
-    flex-direction: column;
-    /* Равномерное распределение свободного пространства между элементами */
-    justify-content: space-between;
-    /* Скрытие содержимого, выходящего за пределы контейнера */
-    overflow: hidden;
-    /* Скругление углов контейнера */
-    border-radius: var(--border-radius);
-    /* Тень для создания эффекта подъема над фоном */
-    box-shadow: var(--box-shadow);
-    /* Минимальная высота, чтобы элемент не сжимался */
-    min-height: 0;
-}
-
-/* Стили для редактора кода (react-simple-code-editor) внутри главного контейнера */
-.code-editor .react-simple-code-editor {
-    /* Гибкий рост и сжатие элемента, занимающий все доступное пространство */
-    flex: 1 1 auto;
-    /* Ширина 100% от родительского контейнера */
-    width: 100%;
-    /* Внутренний отступ */
-    padding: var(--spacing);
-    /* Граница редактора с тонкой линией */
-    border: 1px solid #ccc;
-    /* Скругление углов границы */
-    border-radius: var(--small-border-radius);
-    /* Отступ снизу для разделения от следующих элементов */
-    margin-bottom: var(--spacing);
-    /* Плавная анимация изменения высоты */
-    transition: height 0.3s ease;
-    /* Наследование фонового цвета от родительского элемента */
-    background: inherit;
-    /* Наследование цвета текста от родительского элемента */
-    color: inherit;
-    /* Моноширинный шрифт для корректного отображения кода */
-    font-family: 'Roboto Mono', monospace !important;
-    /* Размер шрифта */
-    font-size: 14px;
-    /* Вертикальная прокрутка при переполнении содержимого */
+/* Современные стили для react-simple-code-editor */
+.react-simple-code-editor {
+    font-family: var(--font-family-monospace) !important;
+    font-size: 14px !important;
+    line-height: 1.6 !important;
+    background: transparent !important;
+    color: var(--text-color-code-editor) !important;
+    caret-color: var(--text-color-primary) !important;
+    border: none !important;
+    outline: none !important;
+    resize: none !important;
     overflow-y: auto !important;
-    /* Минимальная высота редактора */
-    min-height: 0;
-    /* Автоматический перенос строк */
-    white-space: pre-wrap !important;
-    /* Перенос слов при необходимости */
-    word-break: break-all !important;
-    /* Выравнивание текста по левому краю */
-    text-align: left !important;
-    /* Корректный расчет размеров с учетом отступов и границ */
+    tab-size: 2 !important;
+    white-space: pre !important;
+    word-wrap: break-word !important;
     box-sizing: border-box !important;
 }
 
-/* Стили для панели управления с кнопками (размещены в одну строку) */
-.editor-controls {
-    /* Использование flex-контейнера для горизонтального расположения кнопок */
-    display: flex;
-    /* Расположение элементов по горизонтали */
-    flex-direction: row;
-    /* Равномерное распределение кнопок по доступной ширине */
-    justify-content: space-around;
-    /* Зазор между кнопками, заданный переменной */
-    gap: var(--spacing);
-    /* Отступ сверху для отделения панели от редактора */
-    margin-top: var(--spacing);
+/* Улучшенные стили для скроллбара в редакторе */
+.react-simple-code-editor::-webkit-scrollbar {
+    width: 6px;
 }
 
-/* Стили для кнопок управления (иконки) */
-.editor-button {
-    /* Отображение в виде flex-контейнера для центрирования содержимого */
-    display: flex;
-    /* Центрирование по вертикали */
-    align-items: center;
-    /* Центрирование по горизонтали */
-    justify-content: center;
-    /* Фиксированные размеры кнопки */
-    width: 40px;
-    height: 40px;
-    /* Цвет текста/иконок кнопки */
-    color: #fff;
-    /* Убираем стандартные границы */
-    border: none;
-    /* Скругление углов кнопки */
-    border-radius: var(--small-border-radius);
-    /* Тень для визуального отделения кнопки от фона */
-    box-shadow: var(--button-box-shadow);
-    /* Курсор в виде руки при наведении */
-    cursor: pointer;
-    /* Плавный переход для изменения цвета фона и прозрачности */
-    transition: background-color 0.2s, opacity 0.2s;
+.react-simple-code-editor::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 3px;
 }
 
-/* Эффект при наведении: уменьшение непрозрачности кнопки */
-.editor-button:hover {
-    opacity: 0.9;
+.react-simple-code-editor::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 3px;
+    transition: background 0.2s ease;
+}
+
+.react-simple-code-editor::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.3);
+}
+
+/* Подсветка синтаксиса Prism.js для языка Кумир */
+.token.keyword-struct {
+    color: #7c3aed;
+    font-weight: 600;
+}
+
+.token.keyword-type {
+    color: #059669;
+    font-weight: 500;
+}
+
+.token.keyword-bool {
+    color: #dc2626;
+    font-weight: 500;
+}
+
+.token.keyword-io {
+    color: #2563eb;
+    font-weight: 500;
+}
+
+.token.keyword-flow {
+    color: #ea580c;
+    font-weight: 600;
+}
+
+.token.robot-command {
+    color: #0891b2;
+    font-weight: 600;
+    background: rgba(8, 145, 178, 0.1);
+    padding: 1px 4px;
+    border-radius: 4px;
+}
+
+.token.comment {
+    color: #6b7280;
+    font-style: italic;
+    opacity: 0.8;
+}
+
+.token.string {
+    color: #16a34a;
+    background: rgba(22, 163, 74, 0.1);
+    padding: 1px 3px;
+    border-radius: 3px;
+}
+
+.token.number {
+    color: #9333ea;
+    font-weight: 500;
+}
+
+.token.operator {
+    color: #f59e0b;
+    font-weight: 600;
+}
+
+/* Анимация для выделения активной строки */
+.react-simple-code-editor:focus {
+    box-shadow: inset 0 0 0 2px rgba(25, 118, 210, 0.2);
+}
+
+/* Стили для выделения текста */
+.react-simple-code-editor::selection {
+    background: rgba(25, 118, 210, 0.2);
+}
+
+.react-simple-code-editor::-moz-selection {
+    background: rgba(25, 118, 210, 0.2);
+}
+
+/* Анимация появления карточек */
+@keyframes cardSlideIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+.MuiCard-root {
+    animation: cardSlideIn 0.3s ease-out;
+}
+
+/* Эффект ховера для кнопок */
+.MuiButton-root {
+    transition: all 0.2s ease-in-out !important;
+}
+
+.MuiButton-root:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15) !important;
+}
+
+/* Стили для слайдера скорости */
+.MuiSlider-root {
+    color: var(--text-color-primary) !important;
+}
+
+.MuiSlider-thumb {
+    width: 20px !important;
+    height: 20px !important;
+    box-shadow: 0 2px 8px rgba(25, 118, 210, 0.3) !important;
+    transition: all 0.2s ease-in-out !important;
+}
+
+.MuiSlider-thumb:hover {
+    box-shadow: 0 4px 12px rgba(25, 118, 210, 0.4) !important;
+    transform: scale(1.1);
+}
+
+.MuiSlider-track {
+    background: linear-gradient(90deg, #4caf50, #2196f3) !important;
+    height: 4px !important;
+}
+
+.MuiSlider-rail {
+    background: rgba(0, 0, 0, 0.1) !important;
+    height: 4px !important;
+}
+
+/* Стили для меток слайдера */
+.MuiSlider-markLabel {
+    font-size: 11px !important;
+    color: rgba(0, 0, 0, 0.6) !important;
+    font-weight: 500 !important;
+}
+
+.MuiSlider-mark {
+    background-color: var(--text-color-primary) !important;
+    width: 3px !important;
+    height: 3px !important;
+    border-radius: 50% !important;
+}
+
+/* Пульсирующий эффект для активного состояния */
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(25, 118, 210, 0.4);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(25, 118, 210, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(25, 118, 210, 0);
+    }
+}
+
+.MuiButton-containedSuccess.running {
+    animation: pulse 2s infinite;
+}
+
+/* Градиентный фон для карточек */
+.MuiCard-root {
+    background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%) !important;
+    border: 1px solid rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Эффект фокуса для доступности */
+.MuiButton-root:focus-visible {
+    outline: 2px solid var(--text-color-primary);
+    outline-offset: 2px;
+}
+
+/* Адаптивные стили */
+@media (max-width: 768px) {
+    .react-simple-code-editor {
+        font-size: 13px !important;
+        line-height: 1.5 !important;
+    }
+    
+    .MuiSlider-markLabel {
+        font-size: 10px !important;
+    }
+    
+    .MuiButton-root {
+        min-width: 100px;
+        font-size: 13px;
+    }
+}
+
+@media (max-width: 480px) {
+    .react-simple-code-editor {
+        font-size: 12px !important;
+    }
+    
+    .MuiButton-root {
+        min-width: 80px;
+        font-size: 12px;
+        padding: 6px 12px;
+    }
 }
 
 /* Стили для иконок внутри кнопок: масштабирование в зависимости от размера экрана */

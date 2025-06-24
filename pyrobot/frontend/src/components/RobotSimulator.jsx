@@ -10,13 +10,11 @@
  */
 
 import React, {memo, useCallback, useEffect, useReducer, useRef, useState} from 'react';
-import {ThemeProvider} from '@mui/material';
 // Импорт дочерних компонентов
 import CodeEditor from './CodeEditor/CodeEditor';        // Редактор кода
 import ControlPanel from './ControlPanel/ControlPanel';  // Панель управления
 import Field from './Field/Field';                    // Игровое поле
 // Импорт стилей и утилит
-import theme from '../styles/theme';                    // Тема Material UI
 import {getHint} from './hints';                      // Функция для получения подсказок
 import logger from '../Logger';                       // Логгер фронтенда (путь исправлен)
 // Импорт клиента Socket.IO
@@ -752,62 +750,69 @@ const RobotSimulator = memo(() => {
 		// Зависит от размеров и текущего состояния границ
 	}, [state.width, state.height, state.permanentWalls]);
 
-	// Формируем текст для строки статуса под редактором
-	const statusText = `Поз: (${state.robotPos?.x ?? '?'},${state.robotPos?.y ?? '?'}) | ${state.width}x${state.height} | ${state.editMode ? 'Ред.' : 'Упр.'}`;
-
 	// --- Рендер основного компонента ---
 	return (
-		<ThemeProvider theme={theme}> {/* Обертка для темы Material UI */}
-			<div className="app-container"> {/* Основной контейнер приложения */}
-				{/* Компонент редактора кода */}
-				<CodeEditor
-					code={state.code}
-					setCode={c => dispatch({type: 'SET_CODE', payload: c})}
-					isRunning={state.isRunning || state.isAwaitingInput} // Блокировка кнопок
-					onClearCode={handleClearCode}
-					onStop={handleStop}
-					onStart={handleStart}
-					onReset={handleReset}
-					statusText={statusText} // Статус под редактором
-					speedLevel={animationSpeedLevel} // Уровень скорости
-					onSpeedChange={setAnimationSpeedLevel} // Обработчик изменения скорости
-				/>
-				{/* Компонент панели управления */}
-				<ControlPanel
-					// Передаем все необходимые части состояния и функции dispatch
-					robotPos={state.robotPos} setRobotPos={p => dispatch({type: 'SET_ROBOT_POS', payload: p})}
-					walls={state.walls} setWalls={w => dispatch({type: 'SET_WALLS', payload: w})}
-					permanentWalls={state.permanentWalls}
-					markers={state.markers} setMarkers={m => dispatch({type: 'SET_MARKERS', payload: m})}
-					coloredCells={state.coloredCells}
-					setColoredCells={c => dispatch({type: 'SET_COLORED_CELLS', payload: c})}
-					symbols={state.symbols} setSymbols={s => dispatch({type: 'SET_SYMBOLS', payload: s})}
-					radiation={state.radiation} setRadiation={r => dispatch({type: 'SET_RADIATION', payload: r})}
-					temperature={state.temperature}
-					setTemperature={t => dispatch({type: 'SET_TEMPERATURE', payload: t})}
-					width={state.width} setWidth={v => dispatch({type: 'SET_WIDTH', payload: v})}
-					height={state.height} setHeight={v => dispatch({type: 'SET_HEIGHT', payload: v})}
-					editMode={state.editMode} setEditMode={v => dispatch({type: 'SET_EDIT_MODE', payload: v})}
-					setStatusMessage={m => dispatch({type: 'SET_STATUS_MESSAGE', payload: m})}
-				/>
-				{/* Компонент игрового поля */}
-				<Field
-					canvasRef={canvasRef} // Передаем реф на canvas
-					// Передаем состояние поля для отрисовки
-					robotPos={state.robotPos} walls={state.walls} permanentWalls={state.permanentWalls}
-					markers={state.markers} coloredCells={state.coloredCells} symbols={state.symbols}
-					width={state.width} height={state.height} cellSize={state.cellSize}
-					editMode={state.editMode} statusMessage={state.statusMessage} // Сообщение под полем
-					// Передаем функции для взаимодействия с полем
-					setRobotPos={p => dispatch({type: 'SET_ROBOT_POS', payload: p})}
-					setWalls={w => dispatch({type: 'SET_WALLS', payload: w})}
-					setMarkers={m => dispatch({type: 'SET_MARKERS', payload: m})}
-					setColoredCells={c => dispatch({type: 'SET_COLORED_CELLS', payload: c})}
-					setCellSize={v => dispatch({type: 'SET_CELL_SIZE', payload: v})}
-					setStatusMessage={m => dispatch({type: 'SET_STATUS_MESSAGE', payload: m})}
-				/>
+		<div className="app-container fade-in"> {/* Основной контейнер приложения */}
+			<div className="layout-container">
+				{/* Левая панель - редактор кода */}
+				<div className="left-panel">
+					{/* Компонент редактора кода */}
+					<CodeEditor
+						code={state.code}
+						setCode={c => dispatch({type: 'SET_CODE', payload: c})}
+						isRunning={state.isRunning || state.isAwaitingInput} // Блокировка кнопок
+						onClearCode={handleClearCode}
+						onStop={handleStop}
+						onStart={handleStart}
+						onReset={handleReset}
+						speedLevel={animationSpeedLevel} // Уровень скорости
+						onSpeedChange={setAnimationSpeedLevel} // Обработчик изменения скорости
+					/>
+				</div>
+				
+				{/* Центральная панель - игровое поле */}
+				<div className="center-panel">
+					{/* Компонент игрового поля */}
+					<Field
+						canvasRef={canvasRef} // Передаем реф на canvas
+						// Передаем состояние поля для отрисовки
+						robotPos={state.robotPos} walls={state.walls} permanentWalls={state.permanentWalls}
+						markers={state.markers} coloredCells={state.coloredCells} symbols={state.symbols}
+						width={state.width} height={state.height} cellSize={state.cellSize}
+						editMode={state.editMode} statusMessage={state.statusMessage} // Сообщение под полем
+						// Передаем функции для взаимодействия с полем
+						setRobotPos={p => dispatch({type: 'SET_ROBOT_POS', payload: p})}
+						setWalls={w => dispatch({type: 'SET_WALLS', payload: w})}
+						setMarkers={m => dispatch({type: 'SET_MARKERS', payload: m})}
+						setColoredCells={c => dispatch({type: 'SET_COLORED_CELLS', payload: c})}
+						setCellSize={v => dispatch({type: 'SET_CELL_SIZE', payload: v})}
+						setStatusMessage={m => dispatch({type: 'SET_STATUS_MESSAGE', payload: m})}
+					/>
+				</div>
+
+				{/* Правая панель - панель управления */}
+				<div className="right-panel">
+					{/* Компонент панели управления */}
+					<ControlPanel
+						// Передаем все необходимые части состояния и функции dispatch
+						robotPos={state.robotPos} setRobotPos={p => dispatch({type: 'SET_ROBOT_POS', payload: p})}
+						walls={state.walls} setWalls={w => dispatch({type: 'SET_WALLS', payload: w})}
+						permanentWalls={state.permanentWalls}
+						markers={state.markers} setMarkers={m => dispatch({type: 'SET_MARKERS', payload: m})}
+						coloredCells={state.coloredCells}
+						setColoredCells={c => dispatch({type: 'SET_COLORED_CELLS', payload: c})}
+						symbols={state.symbols} setSymbols={s => dispatch({type: 'SET_SYMBOLS', payload: s})}
+						radiation={state.radiation} setRadiation={r => dispatch({type: 'SET_RADIATION', payload: r})}
+						temperature={state.temperature}
+						setTemperature={t => dispatch({type: 'SET_TEMPERATURE', payload: t})}
+						width={state.width} setWidth={v => dispatch({type: 'SET_WIDTH', payload: v})}
+						height={state.height} setHeight={v => dispatch({type: 'SET_HEIGHT', payload: v})}
+						editMode={state.editMode} setEditMode={v => dispatch({type: 'SET_EDIT_MODE', payload: v})}
+						setStatusMessage={m => dispatch({type: 'SET_STATUS_MESSAGE', payload: m})}
+					/>
+				</div>
 			</div>
-		</ThemeProvider>
+		</div>
 	);
 });
 

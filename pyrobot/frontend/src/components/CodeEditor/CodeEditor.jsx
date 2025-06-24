@@ -4,10 +4,28 @@
  */
 
 import React, {memo, useCallback, useState} from 'react';
-import {Button, Card, Typography, Slider} from '@mui/material';
+import {
+    Button, 
+    Card, 
+    CardContent, 
+    Typography, 
+    Slider, 
+    Box,
+    Paper,
+    IconButton,
+    Tooltip,
+    Divider
+} from '@mui/material';
 import Editor from 'react-simple-code-editor';
 import Prism from 'prismjs';
-import {Delete, PlayArrow, Refresh, Stop} from '@mui/icons-material';
+import {
+    Delete, 
+    PlayArrow, 
+    Refresh, 
+    Stop, 
+    Code,
+    Speed
+} from '@mui/icons-material';
 import './CodeEditor.css';
 import UserLog from '../UserLog/UserLog';
 
@@ -52,85 +70,257 @@ const CodeEditor = memo(({
 	                         onStop,
 	                         onStart,
 	                         onReset,
-	                         statusText,
+	                         speedLevel = 2,
+	                         onSpeedChange,
 	                         steps = [],
-	                         error = '', // Добавляем пропс error
+	                         error = '',
                          }) => {
 	const highlightCode = useCallback((inputCode) => {
 		return Prism.highlight(inputCode, Prism.languages.kumir, 'kumir');
 	}, []);
 
-	const [speed, setSpeed] = useState(2);
-	const speedValues = [2000, 1000, 500, 250, 0];
-
 	const handleSpeedChange = (event, newValue) => {
-		setSpeed(newValue);
-	};
-
-	const handleStartWithSpeed = () => {
-		onStart(speedValues[speed]);
+		if (onSpeedChange) {
+			onSpeedChange(newValue);
+		}
 	};
 
 	return (
-		<div className="code-editor">
-			<Typography variant="h5" gutterBottom>
-				Редактор Кода
-			</Typography>
+		<Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, height: '100%' }}>
+			{/* Заголовок с иконкой */}
+			<Card elevation={2} sx={{ borderRadius: 3, display: 'flex', flexDirection: 'column' }}>
+				<CardContent sx={{ 
+					pb: { xs: 1, sm: 1.5 }, 
+					px: { xs: 2, sm: 3 },
+					display: 'flex',
+					flexDirection: 'column',
+					flexGrow: 1
+				}}>
+					<Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: { xs: 1, sm: 1.5 } }}>
+						<Code color="primary" sx={{ fontSize: { xs: '1.2rem', sm: '1.5rem' } }} />
+						<Typography 
+							variant="h6" 
+							component="h2" 
+							fontWeight={600}
+							sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }}
+						>
+							Редактор Кода
+						</Typography>
+					</Box>
 
-			<Editor
-				value={code}
-				onValueChange={setCode}
-				highlight={highlightCode}
-				padding={10}
-				className="react-simple-code-editor"
-			/>
+					{/* Редактор кода */}
+					<Paper 
+						elevation={1} 
+						sx={{ 
+							borderRadius: 2, 
+							overflow: 'hidden',
+							border: '1px solid',
+							borderColor: 'divider',
+							flexGrow: 1,
+							display: 'flex',
+							flexDirection: 'column',
+							minHeight: 'clamp(120px, 15vh, 180px)',
+							maxHeight: 'clamp(180px, 25vh, 280px)',
+						}}
+					>
+						<Editor
+							value={code}
+							onValueChange={setCode}
+							highlight={highlightCode}
+							padding={16}
+							className="react-simple-code-editor"
+							style={{
+								fontFamily: 'var(--font-family-monospace)',
+								fontSize: 'clamp(12px, 2vw, 14px)',
+								lineHeight: '1.5',
+								height: '100%',
+								backgroundColor: 'var(--background-color-code-editor)',
+							}}
+						/>
+					</Paper>
 
-			<div className="editor-controls">
-				<Button variant="contained" color="info" className="editor-button" onClick={onClearCode}>
-					<Delete/>
-				</Button>
-				<Button variant="contained" color="error" className="editor-button" onClick={onStop}
-				        disabled={!isRunning}>
-					<Stop/>
-				</Button>
-				<Button variant="contained" color="success" className="editor-button" onClick={handleStartWithSpeed}
-				        disabled={isRunning}>
-					<PlayArrow/>
-				</Button>
-				<Button variant="outlined" color="warning" className="editor-button" onClick={onReset}>
-					<Refresh/>
-				</Button>
-			</div>
-
-			<Card className="status-card">
-				<Typography variant="body2" className="status-text">
-					{statusText}
-				</Typography>
+					{/* Кнопки управления */}
+					<Box sx={{ 
+						display: 'flex', 
+						gap: { xs: 0.3, sm: 0.5, md: 0.8 }, 
+						mt: 1.5, 
+						flexWrap: 'nowrap',
+						alignItems: 'center',
+						justifyContent: 'center',
+						overflowX: 'auto',
+						pb: 0.5,
+						flexShrink: 0
+					}}>
+						<Tooltip title="Очистить код">
+							<Button 
+								variant="outlined" 
+								color="secondary" 
+								startIcon={<Delete />}
+								onClick={onClearCode}
+								disabled={isRunning}
+								sx={{ 
+									borderRadius: 2, 
+									minWidth: 'auto', 
+									px: { xs: 0.5, sm: 1 },
+									fontSize: { xs: '0.7rem', sm: '0.75rem' },
+									'& .MuiButton-startIcon': {
+										marginRight: { xs: 0.3, sm: 0.5 }
+									}
+								}}
+								size="small"
+							>
+								<Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
+									Очистить
+								</Box>
+							</Button>
+						</Tooltip>
+						
+						<Tooltip title="Остановить выполнение">
+							<Button 
+								variant="contained" 
+								color="error" 
+								startIcon={<Stop />}
+								onClick={onStop}
+								disabled={!isRunning}
+								sx={{ 
+									borderRadius: 2, 
+									minWidth: 'auto', 
+									px: { xs: 0.5, sm: 1 },
+									fontSize: { xs: '0.7rem', sm: '0.75rem' },
+									'& .MuiButton-startIcon': {
+										marginRight: { xs: 0.3, sm: 0.5 }
+									}
+								}}
+								size="small"
+							>
+								<Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
+									Стоп
+								</Box>
+							</Button>
+						</Tooltip>
+						
+						<Tooltip title="Запустить код">
+							<Button 
+								variant="contained" 
+								color="success" 
+								startIcon={<PlayArrow />}
+								onClick={onStart}
+								disabled={isRunning}
+								sx={{ 
+									borderRadius: 2, 
+									minWidth: 'auto', 
+									px: { xs: 0.5, sm: 1 },
+									fontSize: { xs: '0.7rem', sm: '0.75rem' },
+									'& .MuiButton-startIcon': {
+										marginRight: { xs: 0.3, sm: 0.5 }
+									}
+								}}
+								size="small"
+							>
+								<Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
+									Запуск
+								</Box>
+							</Button>
+						</Tooltip>
+						
+						<Tooltip title="Сбросить состояние">
+							<Button 
+								variant="outlined" 
+								color="warning" 
+								startIcon={<Refresh />}
+								onClick={onReset}
+								disabled={isRunning}
+								sx={{ 
+									borderRadius: 2, 
+									minWidth: 'auto', 
+									px: { xs: 0.5, sm: 1 },
+									fontSize: { xs: '0.7rem', sm: '0.75rem' },
+									'& .MuiButton-startIcon': {
+										marginRight: { xs: 0.3, sm: 0.5 }
+									}
+								}}
+								size="small"
+							>
+								<Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
+									Сброс
+								</Box>
+							</Button>
+						</Tooltip>
+					</Box>
+				</CardContent>
 			</Card>
 
-			<div style={{padding: '10px', width: '100%'}}>
-				<Typography gutterBottom>Скорость исполнения</Typography>
-				<Slider
-					value={speed}
-					onChange={handleSpeedChange}
-					min={0}
-					max={4}
-					step={1}
-					marks={[
-						{value: 0, label: '2с'},
-						{value: 1, label: '1с'},
-						{value: 2, label: '0.5с'},
-						{value: 3, label: '0.25с'},
-						{value: 4, label: 'Мгновенно'},
-					]}
-					disabled={isRunning}
-				/>
-			</div>
-
-			<Card className="console-card">
-				<UserLog steps={steps} error={error}/>
+			{/* Контроль скорости */}
+			<Card elevation={1} sx={{ borderRadius: 3, flexShrink: 0 }}>
+				<CardContent sx={{ 
+					pb: { xs: 1.5, sm: 2 }, 
+					px: { xs: 2, sm: 3 },
+					py: { xs: 1.5, sm: 2 }
+				}}>
+					<Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: { xs: 1, sm: 1.5 } }}>
+						<Speed color="primary" fontSize="small" />
+						<Typography 
+							variant="subtitle2" 
+							fontWeight={500}
+							sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}
+						>
+							Скорость выполнения
+						</Typography>
+					</Box>
+					
+					<Box sx={{ px: { xs: 0.5, sm: 1 } }}>
+						<Slider
+							value={speedLevel}
+							onChange={handleSpeedChange}
+							min={0}
+							max={4}
+							step={1}
+							marks={[
+								{value: 0, label: '2с'},
+								{value: 1, label: '1с'},
+								{value: 2, label: '0.5с'},
+								{value: 3, label: '0.25с'},
+								{value: 4, label: 'Мгновенно'},
+							]}
+							disabled={isRunning}
+							sx={{
+								'& .MuiSlider-mark': {
+									backgroundColor: 'primary.main',
+								},
+								'& .MuiSlider-markLabel': {
+									fontSize: { xs: '10px', sm: '11px' },
+									'@media (max-width: 400px)': {
+										fontSize: '9px',
+									}
+								},
+								'& .MuiSlider-thumb': {
+									width: { xs: 16, sm: 20 },
+									height: { xs: 16, sm: 20 },
+								},
+								'& .MuiSlider-track': {
+									height: { xs: 2, sm: 3 },
+								},
+								'& .MuiSlider-rail': {
+									height: { xs: 2, sm: 3 },
+								},
+							}}
+						/>
+					</Box>
+				</CardContent>
 			</Card>
-		</div>
+
+			{/* Консоль выполнения */}
+			<Box sx={{ 
+				height: '25vh',
+				minHeight: '150px',
+				maxHeight: '400px',
+				flexShrink: 0,
+				display: 'flex',
+				flexDirection: 'column'
+			}}>
+				<UserLog steps={steps} error={error} />
+			</Box>
+		</Box>
 	);
 });
 

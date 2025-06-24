@@ -236,6 +236,14 @@ class Logger {
 	getLog() {
 		return this.entries.join('\n');
 	}
+
+	/**
+	 * Очищает все записи в логе и уведомляет подписчиков об изменении.
+	 */
+	clearLog() {
+		this.entries = [];
+		this._notify();
+	}
 }
 
 const logger = new Logger();

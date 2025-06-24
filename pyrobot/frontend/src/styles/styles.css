@@ -1,116 +1,347 @@
 /*
  * @file styles.css
- * @description Глобальные стили для приложения симулятора робота.
- * Файл содержит корневые CSS-переменные для единообразных отступов, цветов, шрифтов, теней,
- * базовые ресеты, общие стили для контейнеров, карточек и адаптивные стили для различных экранов.
+ * @description Современные глобальные стили для приложения симулятора робота.
+ * Файл содержит корневые CSS-переменные в стиле Material Design 3, базовые стили
+ * и адаптивные макеты для создания красивого пользовательского интерфейса.
  */
 
-/* 1) Корневые переменные */
-/* Здесь определяются переменные, используемые по всему приложению для поддержания консистентного стиля */
+/* Корневые переменные в стиле Material Design 3 */
 :root {
     /* Отступы */
-    --spacing: 8px; /* Основной отступ */
-    --half-spacing: 4px; /* Половина основного отступа */
+    --spacing-xs: 4px;
+    --spacing-sm: 8px;
+    --spacing-md: 16px;
+    --spacing-lg: 24px;
+    --spacing-xl: 32px;
+    --spacing-xxl: 48px;
 
     /* Скругления */
-    --border-radius: 8px; /* Основное скругление углов */
-    --small-border-radius: 4px; /* Меньшее скругление для некоторых элементов */
+    --border-radius-sm: 4px;
+    --border-radius-md: 8px;
+    --border-radius-lg: 12px;
+    --border-radius-xl: 16px;
+    --border-radius-xxl: 24px;
 
-    /* Тени */
-    --box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Легкая тень для контейнеров и карточек */
-    --button-box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.3); /* Более заметная тень для кнопок */
+    /* Тени (Material Design 3) */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 8px 25px rgba(0, 0, 0, 0.15);
+    --shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.1);
 
-    /* Цвета фонов и текста */
-    --background-color-app: #f9f9f9; /* Фон всего приложения */
-    --background-color-card: #fff; /* Фон карточек и контейнеров */
-    --background-color-code-editor: #ffffff; /* Фон редактора кода */
-    --text-color-code-editor: #333333; /* Цвет текста в редакторе кода */
-    --background-color-canvas: #289628; /* Фон игрового поля (canvas) */
-    --background-color-edit-mode: #6496ff; /* Фон canvas в режиме редактирования */
-    --background-color-dialog: #f5f5f5; /* Фон диалоговых окон */
-    --text-color-status: #333; /* Цвет текстовых сообщений и подсказок */
+    /* Цвета (сохраняем оригинальную цветовую схему) */
+    --background-color-app: #fafafa;
+    --background-color-card: #ffffff;
+    --background-color-code-editor: #ffffff;
+    --text-color-code-editor: #333333;
+    --background-color-canvas: #289628;
+    --background-color-edit-mode: #6496ff;
+    --background-color-dialog: #f5f5f5;
+    --text-color-status: #333;
+    --text-color-primary: #1976d2;
+    --text-color-secondary: #666;
 
     /* Шрифты */
-    --font-family-monospace: 'Fira Code', monospace; /* Моноширинный шрифт для отображения кода */
-    --font-size-status: 14px; /* Размер шрифта для статусных сообщений */
+    --font-family-base: 'Roboto', 'Helvetica', 'Arial', sans-serif;
+    --font-family-monospace: 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
+    --font-size-xs: 12px;
+    --font-size-sm: 14px;
+    --font-size-md: 16px;
+    --font-size-lg: 18px;
+    --font-size-xl: 20px;
+    --font-weight-light: 300;
+    --font-weight-regular: 400;
+    --font-weight-medium: 500;
+    --font-weight-bold: 700;
+
+    /* Переходы */
+    --transition-fast: 0.15s ease-out;
+    --transition-normal: 0.2s ease-out;
+    --transition-slow: 0.3s ease-out;
 }
 
-/* 2) Базовые ресеты */
-/* Обеспечивает единообразие отступов, размеров и коробочной модели во всех браузерах */
-html,
+/* Базовые ресеты */
+html {
+    height: 100%;
+    scroll-behavior: smooth;
+}
+
 body {
     height: 100%;
+    margin: 0;
+    padding: 0;
+    font-family: var(--font-family-base);
+    font-size: var(--font-size-md);
+    line-height: 1.6;
+    color: var(--text-color-status);
+    background-color: var(--background-color-app);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 *,
 *::before,
 *::after {
-    box-sizing: border-box; /* Рассчитывать размеры с учетом внутренних отступов и границ */
-    margin: 0; /* Убираем внешние отступы */
-    padding: 0; /* Убираем внутренние отступы */
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
 }
 
-body {
-    font-family: Arial, sans-serif; /* Основной шрифт приложения */
+#root {
+    height: 100%;
 }
 
-/* 3) Общие стили для контейнеров и карточек */
-/* Задает базовый внешний вид для контейнеров, карточек, игрового поля и статусных сообщений */
-.container,
-.card,
-.field-card,
-.status-card {
-    background: var(--background-color-card); /* Фон, заданный переменной */
-    border-radius: var(--border-radius); /* Скругление углов */
-    box-shadow: var(--box-shadow); /* Тень для визуального выделения */
-}
-
-.card,
-.field-card,
-.status-card {
-    display: flex; /* Используем flex-контейнер для выравнивания содержимого */
-    flex-direction: column; /* Располагаем элементы по вертикали */
-    justify-content: center; /* Центрируем по вертикали */
-    align-items: center; /* Центрируем по горизонтали */
-}
-
-/* Контейнер приложения */
-/* Центрирует основные компоненты приложения */
+/* Стили для контейнеров */
 .container {
-    display: flex;
-    justify-content: center; /* Горизонтальное центрирование */
-    align-items: flex-start; /* Выравнивание по верхнему краю */
-    height: 100%; /* Занимает всю высоту родительского элемента */
-    overflow: hidden; /* Скрывает переполнение */
-    min-height: 0;
+    background: var(--background-color-card);
+    border-radius: var(--border-radius-xl);
+    box-shadow: var(--shadow-md);
+    transition: var(--transition-normal);
 }
 
-/* Основной контейнер приложения – позиционирование относительно */
-/* Позволяет использовать абсолютное позиционирование для внутренних элементов (например, подсказок) */
+.container:hover {
+    box-shadow: var(--shadow-lg);
+}
+
+.card,
+.field-card,
+.status-card {
+    background: var(--background-color-card);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-md);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    transition: var(--transition-normal);
+}
+
+.card:hover,
+.field-card:hover {
+    box-shadow: var(--shadow-lg);
+}
+
+/* Основной контейнер приложения */
 .app-container {
     position: relative;
     display: flex;
-    flex-direction: row; /* Располагает дочерние элементы в строку */
-    align-items: stretch; /* Растягивает дочерние элементы по высоте */
-    background-color: var(--background-color-app); /* Фон приложения */
+    flex-direction: row;
+    align-items: stretch;
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
     width: 100%;
-    height: 100vh; /* Высота равна высоте окна браузера */
+    height: 100vh;
     overflow: hidden;
     min-height: 0;
 }
 
+/* Стили для макета */
+.layout-container {
+    display: flex;
+    flex-direction: row;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md);
+    height: 100vh;
+    width: 100%;
+    max-width: 1800px;
+    margin: 0 auto;
+    overflow: hidden;
+}
+
+.left-panel {
+    flex: 0 0 400px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    min-width: 400px;
+    max-width: 500px;
+    overflow-y: auto;
+    height: 100%;
+    padding-bottom: var(--spacing-lg);
+}
+
+.center-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    min-width: 0;
+    overflow: hidden;
+}
+
+.right-panel {
+    flex: 0 0 350px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    min-width: 350px;
+    max-width: 400px;
+    overflow-y: auto;
+    height: 100%;
+    padding-bottom: var(--spacing-lg);
+}
+
+/* Стили для кнопок (дополнительные к Material-UI) */
+.button-group {
+    display: flex;
+    gap: var(--spacing-sm);
+    flex-wrap: wrap;
+}
+
+/* Стили для статусных сообщений */
+.status-message {
+    padding: var(--spacing-md);
+    border-radius: var(--border-radius-md);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    background: var(--background-color-card);
+    box-shadow: var(--shadow-sm);
+    border-left: 4px solid var(--text-color-primary);
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Стили для кода */
+.code-container {
+    background: var(--background-color-code-editor);
+    border-radius: var(--border-radius-md);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+}
+
+.code-editor {
+    font-family: var(--font-family-monospace);
+    font-size: var(--font-size-sm);
+    line-height: 1.5;
+}
+
+/* Стили для игрового поля */
+.game-field {
+    border-radius: var(--border-radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+}
+
 /* Адаптивность */
-/* Медиа-запросы для адаптации макета под различные размеры экранов */
 @media (max-width: 1200px) {
-    .container {
-        flex-wrap: wrap; /* Перенос элементов на следующую строку при уменьшении ширины экрана */
+    .layout-container {
+        max-width: 100%;
+        padding: var(--spacing-sm);
+        gap: var(--spacing-sm);
     }
 }
 
 @media (max-width: 768px) {
-    .container,
-    .app-container {
-        flex-direction: column; /* Переход на колонночное расположение для узких экранов */
+    .layout-container {
+        flex-direction: column;
         height: 100%;
     }
+    
+    .left-panel,
+    .right-panel {
+        flex: none;
+        min-height: 0;
+    }
+    
+    .app-container {
+        flex-direction: column;
+    }
+    
+    .status-message {
+        padding: var(--spacing-sm);
+        font-size: var(--font-size-xs);
+    }
+}
+
+@media (max-width: 480px) {
+    .layout-container {
+        padding: var(--spacing-xs);
+        gap: var(--spacing-xs);
+    }
+    
+    .button-group {
+        gap: var(--spacing-xs);
+    }
+}
+
+/* Стили для скроллбаров */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--background-color-app);
+    border-radius: var(--border-radius-sm);
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: var(--border-radius-sm);
+    transition: var(--transition-fast);
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.3);
+}
+
+/* Стили для фокуса */
+.focus-visible {
+    outline: 2px solid var(--text-color-primary);
+    outline-offset: 2px;
+}
+
+/* Анимации */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+.fade-in {
+    animation: fadeIn 0.4s ease-out;
+}
+
+/* Адаптивность для мобильных устройств */
+@media (max-width: 1200px) {
+    .layout-container {
+        flex-direction: column;
+        height: auto;
+        overflow: auto;
+    }
+    
+    .left-panel, .right-panel {
+        flex: none;
+        max-width: none;
+        min-width: 0;
+        height: auto;
+        overflow: visible;
+    }
+    
+    .center-panel {
+        flex: none;
+        height: auto;
+        overflow: visible;
+    }
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+}
+
+.shake {
+    animation: shake 0.5s ease-in-out;
 }
