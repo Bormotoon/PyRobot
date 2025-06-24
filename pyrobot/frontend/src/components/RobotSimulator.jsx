@@ -337,7 +337,7 @@ const RobotSimulator = memo(() => {
 			}
 		};
 		// Зависимость только от URL бэкенда, чтобы эффект выполнился один раз
-	}, [backendUrl]);
+	}, [state.isRunning]);
 
 	/**
 	 * useCallback для обработчика очистки кода.
@@ -363,7 +363,7 @@ const RobotSimulator = memo(() => {
 
 	/**
 	 * useCallback для обработчика сброса состояния симулятора.
-	 * Зависит от backendUrl для отправки запроса на сервер.
+	 * Использует константное значение backendUrl, поэтому не требует зависимостей.
 	 */
 	const handleReset = useCallback(() => {
 		animationControllerRef.current.stop(); // Останавливаем анимацию
@@ -375,7 +375,7 @@ const RobotSimulator = memo(() => {
 				if (!res.ok) logger.log_warning(`/reset request failed with status ${res.status}`); else logger.log_event('/reset request successful.');
 			})
 			.catch(e => logger.log_error(`/reset fetch error: ${e.message}`));
-	}, [backendUrl]); // Зависит от URL
+	}, []); // Пустой массив зависимостей, так как используются только константы
 
 	/**
 	 * useCallback для асинхронной функции анимации трассировки выполнения.
@@ -605,18 +605,15 @@ const RobotSimulator = memo(() => {
 					}
 					return; // Завершаем обработку этого .then()
 				}
-				// --- Конец обработки ЗАПРОСА ВВОДА ---
-
-				// --- Обработка ОБЫЧНОГО завершения (успех или ошибка без ввода) ---
-				let animationResult = {completed: true}; // Результат анимации по умолчанию
-				try {
-					// Анимируем трассировку, если она есть
-					if (data.trace?.length > 0) {
-						dispatch({type: 'SET_IS_RUNNING', payload: true}); // Флаг на время анимации
-						animationResult = await animateTrace(data.trace);
-						// Снимаем флаг после анимации, если она не была прервана
-						if (animationControllerRef.current.isRunning === false) {
-							dispatch({type: 'SET_IS_RUNNING', payload: false});
+				// --- Конец обработки ЗАПРОСА ВВОДА ---			// --- Обработка ОБЫЧНОГО завершения (успех или ошибка без ввода) ---
+			try {
+				// Анимируем трассировку, если она есть
+				if (data.trace?.length > 0) {
+					dispatch({type: 'SET_IS_RUNNING', payload: true}); // Флаг на время анимации
+					await animateTrace(data.trace);
+					// Снимаем флаг после анимации, если она не была прервана
+					if (animationControllerRef.current.isRunning === false) {
+						dispatch({type: 'SET_IS_RUNNING', payload: false});
 						}
 					} else { // Если трассировки нет
 						dispatch({type: 'SET_IS_RUNNING', payload: false}); // Сразу снимаем флаг
@@ -702,7 +699,7 @@ const RobotSimulator = memo(() => {
 		state.isRunning, state.isAwaitingInput, state.inputRequestData, state.code,
 		state.width, state.height, state.cellSize, state.robotPos, state.walls,
 		state.markers, state.coloredCells, state.symbols, state.radiation, state.temperature,
-		animateTrace, backendUrl // Добавлены все зависимости из state и внешние функции/переменные
+		animateTrace // Добавлены все зависимости из state и внешние функции
 	]);
 
 	/**
@@ -740,7 +737,7 @@ const RobotSimulator = memo(() => {
 		// Очистка таймаута при следующем изменении или размонтировании
 		return () => clearTimeout(handler);
 		// Зависит от всех частей состояния поля и URL бэкенда
-	}, [state.width, state.height, state.cellSize, state.robotPos, state.walls, state.markers, state.coloredCells, state.symbols, state.radiation, state.temperature, backendUrl]);
+	}, [state.width, state.height, state.cellSize, state.robotPos, state.walls, state.markers, state.coloredCells, state.symbols, state.radiation, state.temperature]);
 
 	/**
 	 * useEffect для обновления постоянных стен (границ поля) при изменении размеров.

@@ -57,7 +57,7 @@ const Field = memo(({
 				}
 			}
 		}
-	}, [width, height, cellSize, canvasRef]);
+	}, [width, height, cellSize, canvasRef, coloredCells, markers, permanentWalls, robotPos, symbols, walls]);
 
 	// Эффект для динамического слоя (без изменений)
 	useEffect(() => {
@@ -176,7 +176,7 @@ const Field = memo(({
 				return newCells;
 			});
 		}
-	}, [cellSize, width, height, permanentWalls, setWalls, setColoredCells, setStatusMessage, logger]);
+	}, [cellSize, width, height, permanentWalls, setWalls, setColoredCells, setStatusMessage]);
 
 	// --->>> ОБНОВЛЯЕМ ПОДСКАЗКИ В handleMouseDown <<<---
 	const handleMouseDown = useCallback((e) => {
@@ -201,7 +201,7 @@ const Field = memo(({
 			setStatusMessage(getHint('canvasLeftClickNoEdit', false));
 			logger.log_event('Left click ignored (not in edit mode).');
 		}
-	}, [editMode, robotPos, getCanvasCoords, toGridCoords, setStatusMessage, handleWallsAndCells, setIsDraggingRobot, logger]);
+	}, [editMode, robotPos, getCanvasCoords, toGridCoords, setStatusMessage, handleWallsAndCells, setIsDraggingRobot]);
 
 	// handleMouseMove без изменений
 	const handleMouseMove = useCallback((e) => { /* ... */
@@ -225,7 +225,7 @@ const Field = memo(({
 		// Используем новый ключ и добавляем позицию
 		setStatusMessage(`${getHint('robotDragEnd', true)} (${robotPos?.x ?? '?'}, ${robotPos?.y ?? '?'}).`);
 		logger.log_robot_drag_end(robotPos);
-	}, [isDraggingRobot, setStatusMessage, robotPos, setIsDraggingRobot, logger]);
+	}, [isDraggingRobot, setStatusMessage, robotPos, setIsDraggingRobot]);
 
 	// --->>> ОБНОВЛЯЕМ ПОДСКАЗКИ В handleCanvasRightClick <<<---
 	const handleCanvasRightClick = useCallback((e) => {
@@ -255,7 +255,7 @@ const Field = memo(({
 			setStatusMessage(getHint('canvasRightClickNoEdit', false));
 			logger.log_event('Right click ignored (not in edit mode).');
 		}
-	}, [editMode, getCanvasCoords, toGridCoords, setMarkers, setStatusMessage, logger]);
+	}, [editMode, getCanvasCoords, toGridCoords, setMarkers, setStatusMessage]);
 
 	// --->>> ОБНОВЛЯЕМ ПОДСКАЗКИ В handleWheel <<<---
 	const handleWheel = useCallback((e) => {
@@ -290,7 +290,7 @@ const Field = memo(({
 		}
 		staticLayerNeedsUpdate.current = true;
 		setCellSize(newSize);
-	}, [cellSize, setCellSize, setStatusMessage, logger]);
+	}, [cellSize, setCellSize, setStatusMessage]);
 
 	// Глобальные слушатели без изменений
 	useEffect(() => {

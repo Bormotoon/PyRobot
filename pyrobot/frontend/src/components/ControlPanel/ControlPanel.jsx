@@ -1,12 +1,11 @@
 // FILE START: ControlPanel.jsx
 import React, {memo, useCallback, useRef, useState} from 'react';
-import {Button, Card, CardContent, CardHeader, Grid, Tooltip, Typography} from '@mui/material';
+import {Button, Card, CardContent, CardHeader, Grid, Tooltip} from '@mui/material';
 import {
 	Add as AddIcon, AddLocation as AddLocationIcon, ArrowBack as ArrowBackIcon,
 	ArrowDownward as ArrowDownwardIcon, ArrowForward as ArrowForwardIcon, ArrowUpward as ArrowUpwardIcon,
 	Brush as BrushIcon, Clear as ClearIcon, DeleteOutline as DeleteOutlineIcon, Edit as EditIcon,
-	FileUpload as FileUploadIcon, HelpOutline as HelpOutlineIcon, Remove as RemoveIcon,
-	InfoOutlined as InfoIcon
+	FileUpload as FileUploadIcon, HelpOutline as HelpOutlineIcon, Remove as RemoveIcon
 } from '@mui/icons-material';
 import {getHint} from '../hints'; // Уточните путь
 import './ControlPanel.css';
@@ -106,7 +105,7 @@ const ControlPanel = memo(({
 			setStatusMessage(getHint(hintSuccess, editMode));
 			logger.log_event(`[Movement] Robot moved ${logDirection} -> (${nX},${nY})`);
 		}
-	}, [robotPos, isBlocked, editMode, setRobotPos, setStatusMessage, logger]);
+	}, [robotPos, isBlocked, editMode, setRobotPos, setStatusMessage]);
 	// --- <<< КОНЕЦ ИСПРАВЛЕНИЙ >>> ---
 
 	const putMarker = useCallback(() => {
@@ -121,7 +120,7 @@ const ControlPanel = memo(({
 			setStatusMessage(getHint('putMarker', editMode));
 			logger.log_event(`[Marker] Marker placed at (${k})`);
 		}
-	}, [robotPos, markers, setMarkers, setStatusMessage, editMode, logger]);
+	}, [robotPos, markers, setMarkers, setStatusMessage, editMode]);
 
 	const pickMarker = useCallback(() => {
 		if (!robotPos) return;
@@ -139,7 +138,7 @@ const ControlPanel = memo(({
 			setStatusMessage(getHint('pickMarker', editMode));
 			logger.log_event(`[Marker] Marker picked from (${k})`);
 		}
-	}, [robotPos, markers, setMarkers, setStatusMessage, editMode, logger]);
+	}, [robotPos, markers, setMarkers, setStatusMessage, editMode]);
 
 	const paintCell = useCallback(() => {
 		if (!robotPos) return;
@@ -153,7 +152,7 @@ const ControlPanel = memo(({
 			setStatusMessage(getHint('paintCell', editMode));
 			logger.log_event(`[Cell] Cell painted at (${k})`);
 		}
-	}, [robotPos, coloredCells, setColoredCells, setStatusMessage, editMode, logger]);
+	}, [robotPos, coloredCells, setColoredCells, setStatusMessage, editMode]);
 
 	const clearCell = useCallback(() => {
 		if (!robotPos) return;
@@ -171,14 +170,14 @@ const ControlPanel = memo(({
 			setStatusMessage(getHint('clearCell', editMode));
 			logger.log_event(`[Cell] Cell cleared at (${k})`);
 		}
-	}, [robotPos, coloredCells, setColoredCells, setStatusMessage, editMode, logger]);
+	}, [robotPos, coloredCells, setColoredCells, setStatusMessage, editMode]);
 
 	const toggleEditMode = useCallback(() => {
 		const nextMode = !editMode;
 		setEditMode(nextMode);
 		setStatusMessage(getHint(nextMode ? 'enterEditMode' : 'exitEditMode', nextMode));
 		logger.log_edit_mode_change(nextMode);
-	}, [editMode, setEditMode, setStatusMessage, logger]);
+	}, [editMode, setEditMode, setStatusMessage]);
 
 	const changeDimension = useCallback((dim, delta) => {
 		if (!editMode) {
@@ -195,7 +194,7 @@ const ControlPanel = memo(({
 			setStatusMessage(getHint(delta > 0 ? (dim === 'width' ? 'increaseWidth' : 'increaseHeight') : (dim === 'width' ? 'decreaseWidth' : 'decreaseHeight'), true));
 			logger.log_dimension_change(dim, currentSize, newSize);
 		}
-	}, [editMode, width, height, setWidth, setHeight, setStatusMessage, logger]);
+	}, [editMode, width, height, setWidth, setHeight, setStatusMessage]);
 	const increaseWidth = useCallback(() => changeDimension('width', 1), [changeDimension]);
 	const decreaseWidth = useCallback(() => changeDimension('width', -1), [changeDimension]);
 	const increaseHeight = useCallback(() => changeDimension('height', 1), [changeDimension]);
@@ -205,14 +204,14 @@ const ControlPanel = memo(({
 		setHelpOpen(true);
 		setStatusMessage(getHint('helpOpen'));
 		logger.log_event('Help dialog opened.');
-	}, [setStatusMessage, logger]);
+	}, [setStatusMessage]);
 	const closeHelpDialog = useCallback(() => setHelpOpen(false), []);
 
 	const handleImportClick = useCallback(() => {
 		setStatusMessage(getHint('importTrigger'));
 		logger.log_event('Import file button clicked.');
 		fileInputRef.current?.click();
-	}, [setStatusMessage, logger]);
+	}, [setStatusMessage]);
 
 	const parseAndApplyFieldFile = useCallback((content, filename = "unknown") => {
 		if (!content || typeof content !== 'string') {
@@ -272,7 +271,7 @@ const ControlPanel = memo(({
 			logger.log_error(`[File Import] Error parsing file '${filename}': ${e.message}`);
 			throw new Error(`Ошибка разбора файла '${filename}': ${e.message}`);
 		}
-	}, [setWidth, setHeight, setRobotPos, setWalls, setColoredCells, setMarkers, setSymbols, setRadiation, setTemperature, logger]);
+	}, [setWidth, setHeight, setRobotPos, setWalls, setColoredCells, setMarkers, setSymbols, setRadiation, setTemperature]);
 
 	const handleFileChange = useCallback(async (e) => {
 		const file = e.target.files?.[0];
@@ -296,7 +295,7 @@ const ControlPanel = memo(({
 		} finally {
 			if (e.target) e.target.value = "";
 		}
-	}, [setStatusMessage, parseAndApplyFieldFile, logger]);
+	}, [setStatusMessage, parseAndApplyFieldFile]);
 
 	return (
 		<>
