@@ -27,6 +27,12 @@ class RobotCommandHandler:
             'закрасить': self.robot.do_paint,
         }
         
+        # Маппинг функций измерения
+        self.measurement_map = {
+            'радиация': lambda: self.robot.do_measurement('radiation'),
+            'температура': lambda: self.robot.do_measurement('temperature'),
+        }
+        
         # Маппинг условий КуМир на методы робота
         self.condition_map = {
             'слева свободно': lambda: self.robot.check_direction('left', 'free'),
@@ -63,9 +69,32 @@ class RobotCommandHandler:
                 return True
             except RobotError as e:
                 self.logger.warning(f"Robot command failed: {command} - {e}")
+                if hasattr(self.robot, 'error_direction'):
+                    self.logger.info(f"Robot error_direction set to: {self.robot.error_direction}")
                 raise
         
         return False
+    
+    def execute_measurement(self, measurement_type: str) -> float:
+        """
+        Выполняет команду измерения робота.
+        
+        Args:
+            measurement_type: Тип измерения ('radiation' или 'temperature')
+            
+        Returns:
+            Результат измерения (float или int)
+            
+        Raises:
+            RobotError: При ошибке выполнения измерения
+        """
+        try:
+            result = self.robot.do_measurement(measurement_type)
+            self.logger.debug(f"Robot measurement executed: {measurement_type} = {result}")
+            return result
+        except Exception as e:
+            self.logger.error(f"Robot measurement failed: {measurement_type} - {e}")
+            raise RobotError(f"Ошибка измерения {measurement_type}: {e}")
     
     def check_condition(self, condition: str) -> Optional[bool]:
         """
@@ -186,3 +215,12 @@ def _register_robot_conditions(visitor, handler):
             builtin_handler.register_function('свободно_снизу', make_robot_condition_wrapper('снизу свободно'))
             builtin_handler.register_function('клетка_закрашена', make_robot_condition_wrapper('клетка закрашена'))
             builtin_handler.register_function('клетка_чистая', make_robot_condition_wrapper('клетка чистая'))
+            
+            # Добавляем команды измерения радиации и температуры
+            def make_measurement_wrapper(measurement_type):
+                def wrapper():
+                    return handler.execute_measurement(measurement_type)
+                return wrapper
+            
+            builtin_handler.register_function('радиация', make_measurement_wrapper('radiation'))
+            builtin_handler.register_function('температура', make_measurement_wrapper('temperature'))

@@ -52,12 +52,18 @@ def process_robot_command(line, robot):
 
 		logger.info(f"Executing robot command: {cmd} (calling method {method_name})")
 		try:
+			# Отладочная запись в файл
+			with open('/tmp/robot_debug.log', 'a') as f:
+				f.write(f"robot_commands.py: Calling {method_name}() for command '{cmd}'\n")
 			method_to_call()  # Вызываем метод робота
 			logger.debug(f"Robot command '{cmd}' executed successfully by robot object.")
 			return True
 		except RobotError as e:
 			# Перехватываем и пробрасываем ошибки робота
 			logger.warning(f"Robot command '{cmd}' failed: {e}")
+			# Отладочная запись в файл
+			with open('/tmp/robot_debug.log', 'a') as f:
+				f.write(f"robot_commands.py: RobotError caught: {e}\n")
 			raise e  # Пробрасываем выше для обработки интерпретатором
 		except Exception as e:
 			# Перехватываем другие неожиданные ошибки

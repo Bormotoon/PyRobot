@@ -22,8 +22,13 @@ class SimulatedRobot:
 	def __init__(self, width, height, initial_pos=None, initial_walls=None, initial_markers=None,
 	             initial_colored_cells=None, initial_symbols=None, initial_radiation=None,
 	             initial_temperature=None):
-		if not isinstance(width, int) or width < 1: raise ValueError("Width must be a positive integer")
-		if not isinstance(height, int) or height < 1: raise ValueError("Height must be a positive integer")
+		# Проверяем ограничения размеров поля согласно документации КуМир
+		# Столбцы: 1-255, Строки: 1-128
+		if not isinstance(width, int) or not (1 <= width <= 255): 
+			raise ValueError("Width must be an integer between 1 and 255 (Kumir spec)")
+		if not isinstance(height, int) or not (1 <= height <= 128): 
+			raise ValueError("Height must be an integer between 1 and 128 (Kumir spec)")
+		
 		self.width = width
 		self.height = height
 		self.logger = logger
@@ -37,6 +42,9 @@ class SimulatedRobot:
 		self.symbols = dict(initial_symbols) if initial_symbols is not None else {}
 		self.radiation = dict(initial_radiation) if initial_radiation is not None else {}
 		self.temperature = dict(initial_temperature) if initial_temperature is not None else {}
+		
+		# Направление ошибки движения для визуализации (left, right, up, down или None)
+		self.error_direction = None
 
 		self.permanent_walls = self._setup_permanent_walls()
 		self.logger.info(
@@ -141,32 +149,40 @@ class SimulatedRobot:
 		nx, ny = self.robot_pos["x"] + 1, self.robot_pos["y"]
 		if self.is_move_allowed(nx, ny):
 			self.robot_pos["x"] = nx
+			self.error_direction = None  # Очищаем ошибку движения при успешном движении
 			self.logger.info(f"Moved Right -> ({nx},{ny})")
 		else:
+			self.error_direction = "right"  # Устанавливаем направление ошибки
 			raise RobotError("Стена/граница справа!")
 
 	def go_left(self):
 		nx, ny = self.robot_pos["x"] - 1, self.robot_pos["y"]
 		if self.is_move_allowed(nx, ny):
 			self.robot_pos["x"] = nx
+			self.error_direction = None  # Очищаем ошибку движения при успешном движении
 			self.logger.info(f"Moved Left -> ({nx},{ny})")
 		else:
+			self.error_direction = "left"  # Устанавливаем направление ошибки
 			raise RobotError("Стена/граница слева!")
 
 	def go_up(self):
 		nx, ny = self.robot_pos["x"], self.robot_pos["y"] - 1
 		if self.is_move_allowed(nx, ny):
 			self.robot_pos["y"] = ny
+			self.error_direction = None  # Очищаем ошибку движения при успешном движении
 			self.logger.info(f"Moved Up -> ({nx},{ny})")
 		else:
+			self.error_direction = "up"  # Устанавливаем направление ошибки
 			raise RobotError("Стена/граница сверху!")
 
 	def go_down(self):
 		nx, ny = self.robot_pos["x"], self.robot_pos["y"] + 1
 		if self.is_move_allowed(nx, ny):
 			self.robot_pos["y"] = ny
+			self.error_direction = None  # Очищаем ошибку движения при успешном движении
 			self.logger.info(f"Moved Down -> ({nx},{ny})")
 		else:
+			self.error_direction = "down"  # Устанавливаем направление ошибки
 			raise RobotError("Стена/граница снизу!")
 
 	# --- Метод закраски (без ошибки при повторе) ---
@@ -243,12 +259,16 @@ class SimulatedRobot:
 		self.logger.debug(f"Measure '{measure_type}' at {pos_key}")
 		if measure_type == "radiation":
 			value = self.radiation.get(pos_key, 0.0)  # Default to 0.0
+			# Ограничиваем значение радиации в соответствии с документацией (0-99)
+			value = max(0.0, min(99.0, float(value)))
 			self.logger.info(f"Radiation at {pos_key}: {value}")
-			return float(value)
+			return value
 		elif measure_type == "temperature":
 			value = self.temperature.get(pos_key, 0)  # Default to 0
+			# Ограничиваем температуру в соответствии с документацией (-273 до +233)
+			value = max(-273, min(233, int(value)))
 			self.logger.info(f"Temperature at {pos_key}: {value}")
-			return int(value)
+			return value
 		else:
 			self.logger.warning(f"Unknown measurement type requested: {measure_type}. Returning 0.")
 			# В оригинальном Кумире может быть ошибка, но возврат 0 безопаснее.

@@ -290,7 +290,8 @@ class KumirLanguageInterpreter:
             'coloredCells': [],
             'symbols': {},
             'radiation': {},
-            'temperature': {}
+            'temperature': {},
+            'robotErrorDirection': None
         }
         
         if self.robot:
@@ -305,6 +306,10 @@ class KumirLanguageInterpreter:
             # Собираем закрашенные клетки
             if hasattr(self.robot, 'colored_cells'):
                 state['coloredCells'] = list(self.robot.colored_cells)
+            
+            # Собираем направление ошибки движения
+            if hasattr(self.robot, 'error_direction'):
+                state['robotErrorDirection'] = self.robot.error_direction
         
         return state
 

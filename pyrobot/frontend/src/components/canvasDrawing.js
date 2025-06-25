@@ -29,7 +29,7 @@ export function drawColoredCells(ctx, coloredCells, cellSize) {
 	});
 }
 
-export function drawRobot(ctx, robotPos, cellSize) {
+export function drawRobot(ctx, robotPos, cellSize, errorDirection = null) {
 	if (!ctx || !robotPos || typeof robotPos.x !== 'number' || typeof robotPos.y !== 'number' || cellSize <= 0) {
 		// console.warn("Invalid parameters for drawRobot:", {ctx, robotPos, cellSize});
 		return;
@@ -48,6 +48,59 @@ export function drawRobot(ctx, robotPos, cellSize) {
 	ctx.lineTo(rx + diamondHalf, ry);           // Right point
 	ctx.lineTo(rx, ry + diamondHalf);           // Bottom point
 	ctx.lineTo(rx - diamondHalf, ry);           // Left point
+	ctx.closePath();
+	ctx.fill();
+	ctx.stroke();
+	
+	// Рисуем красный треугольник при ошибке движения
+	if (errorDirection) {
+		drawRobotErrorTriangle(ctx, robotPos, cellSize, errorDirection);
+	}
+}
+
+// Функция для отрисовки красного треугольника в углу клетки при ошибке движения
+export function drawRobotErrorTriangle(ctx, robotPos, cellSize, direction) {
+	if (!ctx || !robotPos || !direction || cellSize <= 0) return;
+	
+	const x = robotPos.x * cellSize;
+	const y = robotPos.y * cellSize;
+	const triangleSize = Math.max(8, cellSize * 0.25); // Размер треугольника
+	
+	ctx.fillStyle = '#FF0000'; // Красный цвет
+	ctx.strokeStyle = '#800000'; // Темно-красная граница
+	ctx.lineWidth = Math.max(1, cellSize * 0.015);
+	
+	ctx.beginPath();
+	
+	switch (direction.toLowerCase()) {
+		case 'up':
+			// Треугольник в верхнем левом углу
+			ctx.moveTo(x, y);
+			ctx.lineTo(x + triangleSize, y);
+			ctx.lineTo(x, y + triangleSize);
+			break;
+		case 'down':
+			// Треугольник в нижнем правом углу
+			ctx.moveTo(x + cellSize, y + cellSize);
+			ctx.lineTo(x + cellSize - triangleSize, y + cellSize);
+			ctx.lineTo(x + cellSize, y + cellSize - triangleSize);
+			break;
+		case 'left':
+			// Треугольник в нижнем левом углу
+			ctx.moveTo(x, y + cellSize);
+			ctx.lineTo(x + triangleSize, y + cellSize);
+			ctx.lineTo(x, y + cellSize - triangleSize);
+			break;
+		case 'right':
+			// Треугольник в верхнем правом углу
+			ctx.moveTo(x + cellSize, y);
+			ctx.lineTo(x + cellSize - triangleSize, y);
+			ctx.lineTo(x + cellSize, y + triangleSize);
+			break;
+		default:
+			return; // Неизвестное направление
+	}
+	
 	ctx.closePath();
 	ctx.fill();
 	ctx.stroke();
@@ -245,7 +298,7 @@ export function drawField(displayCanvas, offscreenCanvas, config) {
 	// Границы поля (например, коричневые и толще)
 	drawWalls(ctx, config.permanentWalls, '#8B4513', Math.max(3, config.cellSize * 0.1), config.cellSize);
 	drawMarkers(ctx, config.markers, config.cellSize);
-	drawRobot(ctx, config.robotPos, config.cellSize); // Робот рисуется последним, поверх всего
+	drawRobot(ctx, config.robotPos, config.cellSize, config.robotErrorDirection); // Робот рисуется последним, поверх всего
 }
 
 // FILE END: canvasDrawing.js

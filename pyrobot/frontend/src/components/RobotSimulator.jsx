@@ -77,6 +77,7 @@ const initialState = {
 	symbols: {},                // Символов нет
 	radiation: {},              // Радиации нет
 	temperature: {},            // Температуры нет
+	robotErrorDirection: null,  // Направление ошибки движения робота (для визуализации)
 	editMode: false,            // Режим редактирования выключен
 	inputRequestData: null,     // Нет активного запроса ввода
 };
@@ -226,6 +227,9 @@ function reducer(state, action) {
 				temperature: typeof action.payload === 'function' ? action.payload(state.temperature) : {...action.payload}
 			};
 			break;
+		case 'SET_ROBOT_ERROR_DIRECTION': // Установка направления ошибки движения робота
+			nextState = {...state, robotErrorDirection: action.payload};
+			break;
 		case 'SET_EDIT_MODE': // Переключение режима редактирования
 			nextState = {...state, editMode: action.payload};
 			break;
@@ -242,6 +246,7 @@ function reducer(state, action) {
 				isRunning: false, // Сбрасываем флаги
 				isAwaitingInput: false,
 				inputRequestData: null,
+				robotErrorDirection: null, // Очищаем ошибку движения
 			};
 			break;
 		}
@@ -443,6 +448,11 @@ const RobotSimulator = memo(() => {
 					type: 'SET_TEMPERATURE',
 					payload: event.stateAfter.temperature || {}
 				});
+				// Обновляем направление ошибки движения робота
+				if (event.stateAfter.robotErrorDirection !== undefined) dispatch({
+					type: 'SET_ROBOT_ERROR_DIRECTION',
+					payload: event.stateAfter.robotErrorDirection
+				});
 
 				// Формируем и устанавливаем сообщение о текущем шаге
 				const commandText = event.command ? `: ${event.command}` : '';
@@ -600,6 +610,11 @@ const RobotSimulator = memo(() => {
 							type: 'SET_MARKERS',
 							payload: data.finalState.markers || {}
 						});
+						// Обновляем направление ошибки движения робота
+						if (data.finalState.robotErrorDirection !== undefined) dispatch({
+							type: 'SET_ROBOT_ERROR_DIRECTION',
+							payload: data.finalState.robotErrorDirection
+						});
 					}
 					return; // Завершаем обработку этого .then()
 				}
@@ -653,6 +668,11 @@ const RobotSimulator = memo(() => {
 					if (data.finalState.markers) dispatch({
 						type: 'SET_MARKERS',
 						payload: data.finalState.markers || {}
+					});
+					// Обновляем направление ошибки движения робота
+					if (data.finalState.robotErrorDirection !== undefined) dispatch({
+						type: 'SET_ROBOT_ERROR_DIRECTION',
+						payload: data.finalState.robotErrorDirection
 					});
 
 					// Устанавливаем финальное сообщение, если анимация не была прервана
@@ -779,6 +799,7 @@ const RobotSimulator = memo(() => {
 						robotPos={state.robotPos} walls={state.walls} permanentWalls={state.permanentWalls}
 						markers={state.markers} coloredCells={state.coloredCells} symbols={state.symbols}
 						width={state.width} height={state.height} cellSize={state.cellSize}
+						robotErrorDirection={state.robotErrorDirection} // Направление ошибки движения робота
 						editMode={state.editMode} statusMessage={state.statusMessage} // Сообщение под полем
 						// Передаем функции для взаимодействия с полем
 						setRobotPos={p => dispatch({type: 'SET_ROBOT_POS', payload: p})}

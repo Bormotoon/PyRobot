@@ -688,6 +688,9 @@ def execute_line(line_raw, interpreter, current_original_index):
 	""" Выполняет одну строку кода Кумира. """
 	line = line_raw.strip();
 	logger.debug(f"Executing single line index {current_original_index + 1}: '{line}'");
+	# ROBOT_DEBUG: отладка execute_line
+	with open('/tmp/robot_debug.log', 'a') as f:
+		f.write(f"execute_line: processing '{line}'\n")
 	lower_line = line.lower()
 	env = interpreter.get_env_by_index(interpreter.get_current_env_index());
 	robot = interpreter.robot

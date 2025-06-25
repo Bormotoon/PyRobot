@@ -207,6 +207,12 @@ def update_field():
     }), 200
 
 
+@app.route('/test-debug', methods=['GET'])
+def test_debug():
+    print("=== TEST DEBUG ENDPOINT HIT ===")
+    return jsonify({'debug': 'This endpoint was called'}), 200
+
+
 @app.route('/execute', methods=['POST'])
 def execute_code():
     session_id_for_log = session.get('sid', 'None')

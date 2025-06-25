@@ -28,7 +28,7 @@ import logger from '../../Logger'; // Уточните путь
 const Field = memo(({
 	                    canvasRef,
 	                    robotPos, walls, permanentWalls, markers, coloredCells, symbols,
-	                    width, height, cellSize, editMode, statusMessage,
+	                    width, height, cellSize, robotErrorDirection, editMode, statusMessage,
 	                    setRobotPos, setWalls, setMarkers, setColoredCells, setCellSize, setStatusMessage,
                     }) => {
 
@@ -73,12 +73,12 @@ const Field = memo(({
 				const ctx = mainCanvas.getContext('2d');
 				if (ctx) {
 					logger.debug("Triggering dynamic layer redraw after static layer update.");
-					const dynamicConfig = {coloredCells, robotPos, markers, symbols, walls, permanentWalls, cellSize};
+					const dynamicConfig = {coloredCells, robotPos, markers, symbols, walls, permanentWalls, cellSize, robotErrorDirection};
 					drawField(mainCanvas, offscreenCanvas, dynamicConfig);
 				}
 			}
 		}
-	}, [width, height, cellSize, canvasRef, coloredCells, markers, permanentWalls, robotPos, symbols, walls]);
+	}, [width, height, cellSize, canvasRef, coloredCells, markers, permanentWalls, robotPos, symbols, walls, robotErrorDirection]);
 
 	// Эффект для динамического слоя (без изменений)
 	useEffect(() => {
@@ -100,9 +100,9 @@ const Field = memo(({
 				drawStaticLayer(offscreenCanvas, {width, height, cellSize});
 			}
 		}
-		const dynamicConfig = {coloredCells, robotPos, markers, symbols, walls, permanentWalls, cellSize};
+		const dynamicConfig = {coloredCells, robotPos, markers, symbols, walls, permanentWalls, cellSize, robotErrorDirection};
 		drawField(displayCanvas, offscreenCanvas, dynamicConfig);
-	}, [canvasRef, robotPos, walls, permanentWalls, markers, coloredCells, symbols, width, height, cellSize]);
+	}, [canvasRef, robotPos, walls, permanentWalls, markers, coloredCells, symbols, width, height, cellSize, robotErrorDirection]);
 
 	// --- Обработчики событий мыши ---
 
