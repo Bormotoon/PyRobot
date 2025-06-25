@@ -113,6 +113,11 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementHandlerMixin, St
         
         # Флаг для режима "только сбор определений" (не выполнять тела алгоритмов)
         self.definition_collection_mode: bool = False
+        
+        # Робот и его обработчик команд
+        self.robot = None
+        self.robot_command_handler = None
+        self.progress_callback = None
 
         if global_vars:
             for name, value_info in global_vars.items():
@@ -171,6 +176,20 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementHandlerMixin, St
         if not self.io_handler: # pragma: no cover
             raise KumirRuntimeError("IOHandler не инициализирован.")
         self.io_handler.write_output(text)
+    
+    # Методы для робота и прогресс-коллбека
+    def set_robot(self, robot):
+        """Устанавливает робота для выполнения команд."""
+        self.robot = robot
+    
+    def set_robot_command_handler(self, handler):
+        """Устанавливает обработчик команд робота."""
+        self.robot_command_handler = handler
+    
+    def set_progress_callback(self, callback):
+        """Устанавливает коллбек для отправки прогресса выполнения."""
+        self.progress_callback = callback
+    
     # КОНЕЦ ДОБАВЛЕННЫХ МЕТОДОВ    # ДОБАВЛЕНО: Методы для управления режимом сбора определений
     def set_definition_collection_mode(self, mode: bool) -> None:
         """Устанавливает режим сбора определений (не выполнять тела алгоритмов)"""

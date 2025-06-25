@@ -95,6 +95,11 @@ class SimulatedRobot:
 		self.permanent_walls = self._setup_permanent_walls()
 		self.logger.info(f"Robot Reset: Field size {self.width}x{self.height}, Position {self.robot_pos}.")
 
+	def reset_position(self):
+		"""Сбрасывает только позицию робота (для совместимости)."""
+		self.robot_pos = {'x': 0, 'y': 0}
+		self.logger.info("Robot position reset to (0,0).")
+
 	def _is_wall_between(self, x1, y1, x2, y2):
 		""" Проверяет наличие стены (пользовательской или границы) между двумя соседними клетками. """
 		wall_key = None

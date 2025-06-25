@@ -28,6 +28,12 @@ class KumirExecutionError(Exception):
         return f"{base_message} ({context.strip()})" if context else base_message
 
 
+# Ошибка робота (например, столкновение со стеной)
+class RobotError(KumirExecutionError):
+    def __init__(self, message, line_index=None, column_index=None, line_content=None):
+        super().__init__(message, line_index, column_index, line_content)
+
+
 # Ошибка, связанная с объявлениями
 class DeclarationError(KumirExecutionError):
     def __init__(self, message, line_index=None, column_index=None, line_content=None):

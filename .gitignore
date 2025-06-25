@@ -190,3 +190,9 @@ demo_results/
 kumir_python_solutions/
 mega_parser.log
 *.log
+
+# Project-specific ignores
+debug_interpret.log
+test_*.py
+kumir_sandbox/
+.antlr/

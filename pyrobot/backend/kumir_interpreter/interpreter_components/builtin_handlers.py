@@ -156,7 +156,19 @@ BUILTIN_FUNCTIONS = {
 class BuiltinFunctionHandler:
     def __init__(self, visitor: 'KumirInterpreterVisitor'):
         self.visitor = visitor
-        self.functions = BUILTIN_FUNCTIONS
+        # Создаем копию встроенных функций для возможности добавления новых
+        self.functions = BUILTIN_FUNCTIONS.copy()
+        self.custom_handlers = {}  # Для кастомных обработчиков
+
+    def register_function(self, name: str, handler: Callable[[], Any]):
+        """Регистрирует новую функцию с обработчиком."""
+        name_lower = name.lower()
+        self.functions[name_lower] = {
+            'min_args': 0,
+            'max_args': 0,
+            'arg_types': [],
+            'handler': lambda visitor_self, args, ctx: handler()
+        }
 
     def call_function(self, func_name: str, args: List[Any], ctx: Optional['ParserRuleContext']) -> Any:
         # TODO: Реализовать логику вызова встроенной функции,
@@ -208,7 +220,18 @@ BUILTIN_PROCEDURES = {
 class BuiltinProcedureHandler:
     def __init__(self, visitor: 'KumirInterpreterVisitor'):
         self.visitor = visitor
-        self.procedures = BUILTIN_PROCEDURES
+        # Создаем копию встроенных процедур для возможности добавления новых
+        self.procedures = BUILTIN_PROCEDURES.copy()
+        self.custom_handlers = {}  # Для кастомных обработчиков
+    
+    def register_procedure(self, name: str, handler: Callable[[], None]):
+        """Регистрирует новую процедуру с обработчиком."""
+        name_lower = name.lower()
+        self.procedures[name_lower] = {
+            'params': [],  # Роботные команды без параметров
+            'handler': f'custom_{name_lower}'
+        }
+        self.custom_handlers[f'custom_{name_lower}'] = handler
 
     def call_procedure(self, proc_name: str, analyzed_args: List[Dict], ctx: Optional['ParserRuleContext']) -> None:
         """Вызывает встроенную процедуру с проанализированными аргументами."""
@@ -220,7 +243,13 @@ class BuiltinProcedureHandler:
         proc_info = self.procedures[proc_name_lower]
         handler_name = proc_info['handler']
         
-        # Импортируем модуль с обработчиками
+        # Проверяем, является ли это кастомным обработчиком
+        if handler_name in self.custom_handlers:
+            # Вызываем кастомный обработчик
+            self.custom_handlers[handler_name]()
+            return
+        
+        # Импортируем модуль с обработчиками для встроенных процедур
         from . import builtin_functions as bf
         
         # Получаем функцию-обработчик
