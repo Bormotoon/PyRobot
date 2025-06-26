@@ -99,11 +99,6 @@ class KumirTableVar:
         self.data = {}  # Хранит актуальные данные, ключи - кортежи индексов
 
         for i, (min_idx, max_idx) in enumerate(self.dimension_bounds_list):
-            if not (isinstance(min_idx, int) and isinstance(max_idx, int)):
-                raise KumirEvalError(
-                    f"Границы измерения {i+1} для таблицы должны быть целыми числами.",
-                    self.declaration_ctx.start.line, self.declaration_ctx.start.column
-                )
             if min_idx > max_idx:
                 raise KumirEvalError(
                     f"Неверные границы для измерения {i+1} таблицы: минимальный индекс {min_idx} > максимального индекса {max_idx}.",
@@ -233,7 +228,7 @@ class KumirReturnValue:
 
 class KumirFunction:
     """Заглушка для представления функции Кумира."""
-    def __init__(self, name: str, parameters: List[Any], body_ctx: Any, return_type: str, 
+    def __init__(self, name: str, parameters: List[Any], body_ctx: Any, return_type: Optional[str], 
                  scope_manager: Any, type_converter: Any = None, error_handler: Any = None): # Упрощенные параметры
         self.name = name
         self.parameters = parameters # Список (имя_параметра, тип_параметра, режим_параметра)

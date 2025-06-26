@@ -10,7 +10,7 @@ from ..generated.KumirLexer import KumirLexer
 from ..generated.KumirParser import KumirParser
 from ..generated.KumirParserVisitor import KumirParserVisitor # Базовый визитор ANTLR
 from .. import kumir_exceptions # <--- Добавляем импорт модуля исключений
-from ..kumir_exceptions import KumirSemanticError, KumirRuntimeError, KumirSyntaxError, ExitSignal, BreakSignal, StopExecutionSignal, KumirNameError, KumirTypeError, DeclarationError # Изменения: ProcedureExitCalled -> ExitSignal, LoopExitException -> BreakSignal
+from ..kumir_exceptions import KumirSemanticError, KumirRuntimeError, KumirSyntaxError, ExitSignal, BreakSignal, StopExecutionSignal, KumirNameError, KumirTypeError, DeclarationError, KumirEvalError # Изменения: ProcedureExitCalled -> ExitSignal, LoopExitException -> BreakSignal
 from ..kumir_datatypes import KumirTableVar, KumirReturnValue, KumirValue, KumirType 
 from ..definitions import AlgorithmManager, AlgorithmDefinition, Parameter, FunctionCallFrame, FunctionReturnException  # Импорт наших новых классов
 from ..utils import KumirTypeConverter  # Импорт type converter
@@ -111,7 +111,9 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementHandlerMixin, St
             self.error_stream_out = error_stream
         else:
             logger = logging.getLogger(__name__)
-            self.error_stream_out = lambda x: logger.error(x)        
+            def log_error(message: str) -> None:
+                logger.error(message)
+            self.error_stream_out = log_error        
         # Настройка эхо ввода (автоматический вывод введённых значений)
         self.echo_input = echo_input
         
@@ -134,7 +136,7 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementHandlerMixin, St
             for name, value_info in global_vars.items():
                 self.scope_manager.scopes[0][name.lower()] = {'value': value_info, 'type': 'глоб_неизв', 'is_table': False, 'dimensions': None, 'initialized': True}
 
-    def _validate_and_convert_value_for_assignment(self, value: Any, target_kumir_type: str, var_name: str, is_target_table: bool, element_type: Optional[str] = None) -> Any:
+    def validate_and_convert_value_for_assignment(self, value: Any, target_kumir_type: str, var_name: str, is_target_table: bool, element_type: Optional[str] = None) -> Any:
         # TODO: Implement actual validation and conversion logic based on the original interpreter.
         # This is a placeholder.
         # Basic type checking and conversion can be added here.
@@ -599,14 +601,21 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementHandlerMixin, St
             
             if initial_value_ctx:
                 value_to_assign = self.visit(initial_value_ctx)
-                # Получено значение для инициализации таблицы
+                if value_to_assign is None:
+                    raise KumirEvalError(f"Не удалось вычислить начальное значение для переменной '{var_name}'", 
+                                       line_index=initial_value_ctx.start.line - 1,
+                                       column_index=initial_value_ctx.start.column)
                 
+                # После проверки на None, гарантируем что value_to_assign не None
+                assert value_to_assign is not None  # type narrowing для Pylance
+                
+                # Получено значение для инициализации таблицы
                 if is_table_type:
                     # Для таблиц нужно создать KumirTableVar из литерала массива
                     if value_to_assign.kumir_type == KumirType.TABLE.value and isinstance(value_to_assign.value, list):
                         # Создаем KumirTableVar из литерала массива
                         # Импортируем функцию создания таблицы из литерала
-                        from .declaration_visitors import _create_table_from_array_literal
+                        from .declaration_visitors import _create_table_from_array_literal  # type: ignore[attr-defined]
                         
                         # Создаём KumirTableVar из литерала массива
                         table_var = _create_table_from_array_literal(
@@ -618,14 +627,14 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementHandlerMixin, St
                         validated_value = KumirValue(table_var, KumirType.TABLE.value)
                         # KumirTableVar создан успешно
                     else:
-                        validated_value = cast(KumirInterpreterVisitor, self)._validate_and_convert_value_for_assignment(
+                        validated_value = cast(KumirInterpreterVisitor, self).validate_and_convert_value_for_assignment(
                             value_to_assign, 
                             base_kumir_type, 
                             var_name,
                             is_table_type
                         )
                 else:
-                    validated_value = cast(KumirInterpreterVisitor, self)._validate_and_convert_value_for_assignment(
+                    validated_value = cast(KumirInterpreterVisitor, self).validate_and_convert_value_for_assignment(
                         value_to_assign, 
                         base_kumir_type, 
                         var_name,
@@ -665,7 +674,7 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementHandlerMixin, St
                                  column_index=ctx.qualifiedIdentifier().start.column,
                                  line_content=self.get_line_content_from_ctx(ctx.qualifiedIdentifier()))
 
-        validated_value = cast(KumirInterpreterVisitor, self)._validate_and_convert_value_for_assignment(
+        validated_value = cast(KumirInterpreterVisitor, self).validate_and_convert_value_for_assignment(
             value_to_assign, 
             var_info['kumir_type'], 
             var_name,

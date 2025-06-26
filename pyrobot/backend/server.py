@@ -84,9 +84,11 @@ logger.info(f"CORS configured for origins: {allowed_origins}")
 logger.info(f"Session cookie Samesite: {app.config['SESSION_COOKIE_SAMESITE']}")
 logger.info(f"Session cookie Secure flag: {app.config['SESSION_COOKIE_SECURE']}")
 
+# Инициализация директории песочницы
+backend_dir = Path(__file__).parent.absolute()
+SANDBOX_DIR = backend_dir / "kumir_sandbox"
+
 try:
-    backend_dir = Path(__file__).parent.absolute()
-    SANDBOX_DIR = backend_dir / "kumir_sandbox"
     SANDBOX_DIR.mkdir(parents=True, exist_ok=True)
     logger.info(f"Ensured sandbox directory exists at: {SANDBOX_DIR}")
 except Exception as e:
@@ -249,13 +251,17 @@ def execute_code():
                                              initial_field_state=initial_state)
         logger.debug("Kumir interpreter initialized successfully.")
 
+        # Флаг для предотвращения повторных предупреждений
+        warned_no_sid = False
+        
         def progress_callback(progress_data):
+            nonlocal warned_no_sid
             current_sid = session.get('sid')
             if not current_sid:
-                if not hasattr(progress_callback, 'warned_no_sid'):
+                if not warned_no_sid:
                     logger.warning("Cannot emit progress via WebSocket: "
                                   "No SID found in Flask session.")
-                    progress_callback.warned_no_sid = True
+                    warned_no_sid = True
                 return
             
             if interpreter:

@@ -29,7 +29,8 @@ class ProcedureManager:
         # TODO: Проверить, что мы находимся внутри вызова функции, а не процедуры.
         # TODO: Проверить тип value_to_assign с ожидаемым типом возврата функции.        # Обновляем переменную __знач__ в текущей области видимости
         try:
-            self.visitor.scope_manager.update_variable('__знач__', value_to_assign, 0, 0)
+            if value_to_assign is not None:
+                self.visitor.scope_manager.update_variable('__знач__', value_to_assign, 0, 0)
         except Exception:
             # Ошибка при обновлении __знач__ (игнорируем для стабильности)
             pass
@@ -144,12 +145,8 @@ class ProcedureManager:
                 python_args_for_execute.append(arg_kv)
         
         # 4. Создаем контекст вызова для передачи в _execute_procedure_call
-        # Создаем фиктивный контекст с информацией о позиции
-        class FakeCallSiteContext:
-            def __init__(self, line: int, col: int):
-                self.start = type('obj', (object,), {'line': line + 1, 'column': col})()
-        
-        fake_ctx = FakeCallSiteContext(line_index, column_index)
+        # Используем None для фиктивного контекста
+        fake_ctx = None
           # 5. Вызываем _execute_procedure_call
         try:
             result = self._execute_procedure_call(proc_data, python_args_for_execute, fake_ctx)
@@ -167,7 +164,7 @@ class ProcedureManager:
                 raise KumirRuntimeError(f"Ошибка при выполнении процедуры '{proc_name}': {str(e)}",
                                         line_index=line_index, column_index=column_index)
 
-    def call_procedure_with_analyzed_args(self, proc_name: str, analyzed_args: List[Dict], 
+    def call_procedure_with_analyzed_args(self, proc_name: str, analyzed_args: List[Dict[str, Any]], 
                                          line_index: int, column_index: int) -> None:
         """
         Вызывает процедуру с уже проанализированными аргументами с учетом режимов параметров.
@@ -180,13 +177,8 @@ class ProcedureManager:
         # 1. Проверяем встроенные процедуры
         if hasattr(self.visitor, 'builtin_procedure_handler') and \
            self.visitor.builtin_procedure_handler.is_builtin_procedure(proc_name):
-            # Создаем фиктивный контекст для передачи информации о позиции
-            class FakeContext:
-                def __init__(self, line, column):
-                    self.start = type('', (), {'line': line + 1, 'column': column})()
-            
-            fake_ctx = FakeContext(line_index, column_index)
-            self.visitor.builtin_procedure_handler.call_procedure(proc_name, analyzed_args, fake_ctx)
+            # Передаём None в качестве контекста для встроенных процедур
+            self.visitor.builtin_procedure_handler.call_procedure(proc_name, analyzed_args, None)
             return
         
         # 2. Поиск определения пользовательской процедуры
@@ -210,7 +202,6 @@ class ProcedureManager:
                 param_kumir_type_str = formal_param['base_type']  # это строка типа "цел"
                 
                 # Конвертируем строку в KumirType enum
-                from ..kumir_datatypes import KumirType
                 param_kumir_type = KumirType.from_string(param_kumir_type_str)
                 
                 # DEBUG: убран лог обработки параметров
@@ -280,7 +271,7 @@ class ProcedureManager:
                             if new_value.kumir_type == target_kumir_type.value:
                                 target_scope[original_var_name_lower]['value'] = new_value
                                 target_scope[original_var_name_lower]['initialized'] = True
-                            elif target_kumir_type == KumirType.REAL and new_value.kumir_type == KumirType.INT.value:
+                            elif target_kumir_type == KumirType.REAL.value and new_value.kumir_type == KumirType.INT.value:
                                 converted_value = KumirValue(float(new_value.value), KumirType.REAL.value)
                                 target_scope[original_var_name_lower]['value'] = converted_value
                                 target_scope[original_var_name_lower]['initialized'] = True
@@ -396,17 +387,9 @@ class ProcedureManager:
         if isinstance(func_or_name, str):
             original_func_name_for_error = func_or_name
             kumir_func_obj = self.get_function_definition(func_or_name, call_site_ctx)
-        elif isinstance(func_or_name, KumirFunction):
+        else:
             kumir_func_obj = func_or_name
             original_func_name_for_error = kumir_func_obj.name
-        else: # pragma: no cover
-            lc_type_err = self.visitor.get_line_content_from_ctx(call_site_ctx)
-            line_type_err = call_site_ctx.start.line if call_site_ctx and hasattr(call_site_ctx, 'start') else -1
-            col_type_err = call_site_ctx.start.column if call_site_ctx and hasattr(call_site_ctx, 'start') else -1
-            raise KumirTypeError("Некорректный тип для func_or_name в call_function.",
-                                 line_index=line_type_err -1 if line_type_err != -1 else None,
-                                 column_index=col_type_err if col_type_err != -1 else None,
-                                 line_content=lc_type_err)
 
         proc_data_from_dict = self.procedures.get(kumir_func_obj.name.lower())
         if not proc_data_from_dict: # pragma: no cover
@@ -694,7 +677,7 @@ class ProcedureManager:
                     if hasattr(child, 'children') or isinstance(child, (KumirParser.AlgorithmDefinitionContext, KumirParser.ModuleDefinitionContext)):
                         self._collect_procedure_definitions(child)
 
-    def _execute_procedure_call(self, call_data: dict, args: List[Any], call_site_ctx: ParserRuleContext) -> Any:
+    def _execute_procedure_call(self, call_data: dict[str, Any], args: List[Any], call_site_ctx: Any) -> Any:
         proc_name = call_data['name']
         proc_def = self.procedures.get(proc_name.lower())
 
@@ -766,7 +749,7 @@ class ProcedureManager:
                     try:
                         # Check if parameter is a table type
                         is_param_table = 'таб' in formal_param_info['type'].lower()
-                        validated_value = self.visitor._validate_and_convert_value_for_assignment(
+                        validated_value = self.visitor.validate_and_convert_value_for_assignment(
                             actual_arg_value,
                             formal_param_info['type'], 
                             var_name=f"параметру '{param_name_original_case}'",
@@ -899,7 +882,7 @@ class ProcedureManager:
                                                          line_content=lc_target_scope)                                # For both table and scalar, we use _validate_and_convert_value_for_assignment from the visitor
                                 # Check if target is a table type
                                 is_target_table = 'таб' in var_info_in_target_scope['type'].lower()
-                                validated_value_for_target = self.visitor._validate_and_convert_value_for_assignment(
+                                validated_value_for_target = self.visitor.validate_and_convert_value_for_assignment(
                                     value_to_copy_back, # This is the value from the procedure's scope
                                     var_info_in_target_scope['type'],
                                     var_name=original_var_name,
@@ -930,7 +913,7 @@ class ProcedureManager:
                         try:
                             # Check if caller var is a table type
                             is_caller_table = 'таб' in var_info_in_caller['type'].lower()
-                            validated_value_for_caller = self.visitor._validate_and_convert_value_for_assignment(
+                            validated_value_for_caller = self.visitor.validate_and_convert_value_for_assignment(
                                 value_to_copy_back,
                                 var_info_in_caller['type'],
                                 original_var_name,
@@ -951,7 +934,7 @@ class ProcedureManager:
                         if postfix_op:
                             arg_list_node = getattr(postfix_op, 'argumentList', lambda: None)()
                             if arg_list_node:
-                                expressions = getattr(arg_list_node, 'expression', lambda: [])()
+                                expressions = getattr(arg_list_node, 'expression', lambda: [])()  # type: ignore[misc]
                                 if i < len(expressions):
                                     arg_expr_ctx_for_error = expressions[i]
                         

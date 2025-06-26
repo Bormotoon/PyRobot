@@ -233,7 +233,7 @@ class BuiltinProcedureHandler:
         }
         self.custom_handlers[f'custom_{name_lower}'] = handler
 
-    def call_procedure(self, proc_name: str, analyzed_args: List[Dict], ctx: Optional['ParserRuleContext']) -> None:
+    def call_procedure(self, proc_name: str, analyzed_args: List[Dict[str, Any]], ctx: Optional['ParserRuleContext']) -> None:
         """Вызывает встроенную процедуру с проанализированными аргументами."""
         proc_name_lower = proc_name.lower()
         

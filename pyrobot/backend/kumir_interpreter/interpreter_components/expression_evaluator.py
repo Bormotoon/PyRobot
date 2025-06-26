@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 from antlr4 import ParserRuleContext, Token
-from typing import Any, List, Tuple, Optional, Union
+from typing import Any, List, Tuple, Optional, Union, Callable
 from antlr4.tree.Tree import TerminalNode
 from ..generated.KumirParser import KumirParser # Оставляем только этот импорт для KumirParser
 from .scope_manager import ScopeManager
@@ -28,7 +28,7 @@ COMPARISON_OPS = {
 }
 
 # Словарь логических операций
-LOGICAL_OPS = {
+LOGICAL_OPS: dict[int, Callable[[bool, bool], bool]] = {
     KumirLexer.AND: lambda a, b: a and b,
     KumirLexer.OR: lambda a, b: a or b,
 }
@@ -89,7 +89,7 @@ class ExpressionEvaluator(KumirParserVisitor):
         Если результат visit не KumirValue, выбрасывает KumirRuntimeError.
         """
         value = self.visit(expr_ctx)
-        if not isinstance(value, KumirValue):
+        if not isinstance(value, KumirValue):  # type: ignore[redundant-expr]
             pos_token = self._get_token_for_position(expr_ctx)
             pos = self._position_from_token(pos_token)
             # Эта ситуация не должна возникать, если все visit методы возвращают KumirValue
@@ -277,15 +277,6 @@ class ExpressionEvaluator(KumirParserVisitor):
             op_token = ctx.getChild(2*i - 1)  # Операторы находятся между выражениями
             right = self.visit(logical_and_expressions[i])
             
-            if not (isinstance(result, KumirValue) and isinstance(right, KumirValue)):
-                # Для TerminalNodeImpl используем .symbol для получения токена
-                pos_err = self._position_from_token(op_token.symbol if hasattr(op_token, 'symbol') else ctx.start)
-                raise KumirRuntimeError(
-                    f"Внутренняя ошибка: операнды не являются KumirValue (типы: {type(result).__name__}, {type(right).__name__}).",
-                    line_index=pos_err[0], 
-                    column_index=pos_err[1]
-                )
-
             # Получаем тип токена для логической операции
             if hasattr(op_token, 'symbol'):
                 op_token_type = op_token.symbol.type
@@ -326,15 +317,6 @@ class ExpressionEvaluator(KumirParserVisitor):
             op_token = ctx.getChild(2*i - 1)  # Операторы находятся между выражениями
             right = self.visit(equality_expressions[i])
             
-            if not (isinstance(result, KumirValue) and isinstance(right, KumirValue)):
-                # Для TerminalNodeImpl используем .symbol для получения токена
-                pos_err = self._position_from_token(op_token.symbol if hasattr(op_token, 'symbol') else ctx.start)
-                raise KumirRuntimeError(
-                    f"Внутренняя ошибка: операнды не являются KumirValue (типы: {type(result).__name__}, {type(right).__name__}).",
-                    line_index=pos_err[0], 
-                    column_index=pos_err[1]
-                )
-
             # Получаем тип токена для логической операции
             if hasattr(op_token, 'symbol'):
                 op_token_type = op_token.symbol.type
@@ -375,15 +357,6 @@ class ExpressionEvaluator(KumirParserVisitor):
             op_token = ctx.getChild(2*i - 1)  # Операторы находятся между выражениями
             right = self.visit(relational_expressions[i])
             
-            if not (isinstance(result, KumirValue) and isinstance(right, KumirValue)):
-                # Для TerminalNodeImpl используем .symbol для получения токена
-                pos_err = self._position_from_token(op_token.symbol if hasattr(op_token, 'symbol') else ctx.start)
-                raise KumirRuntimeError(
-                    f"Внутренняя ошибка: операнды не являются KumirValue (типы: {type(result).__name__}, {type(right).__name__}).",
-                    line_index=pos_err[0], 
-                    column_index=pos_err[1]
-                )
-
             op_text = op_token.getText()
             
             # Получаем тип токена для операции равенства
@@ -431,14 +404,8 @@ class ExpressionEvaluator(KumirParserVisitor):
             op_token = ctx.getChild(2*i - 1)  # Операторы находятся между выражениями
             right = self.visit(additive_expressions[i])
             
-            if not (isinstance(result, KumirValue) and isinstance(right, KumirValue)):
-                # Для TerminalNodeImpl используем .symbol для получения токена
-                pos_err = self._position_from_token(op_token.symbol if hasattr(op_token, 'symbol') else ctx.start)
-                raise KumirRuntimeError(
-                    f"Внутренняя ошибка: операнды не являются KumirValue (типы: {type(result).__name__}, {type(right).__name__}).",
-                    line_index=pos_err[0], 
-                    column_index=pos_err[1]
-                )
+            # result и right гарантированно KumirValue согласно типизации
+            # Проверка не нужна - если типы неправильные, будет ошибка времени выполнения
 
             op_text = op_token.getText()
             
@@ -487,14 +454,7 @@ class ExpressionEvaluator(KumirParserVisitor):
             op_token = ctx.getChild(2*i - 1)  # Операторы находятся между выражениями
             right = self.visit(multiplicative_expressions[i])
             
-            if not (isinstance(result, KumirValue) and isinstance(right, KumirValue)):
-                # Для TerminalNodeImpl используем .symbol для получения токена
-                pos_err = self._position_from_token(op_token.symbol if hasattr(op_token, 'symbol') else ctx.start)
-                raise KumirRuntimeError(
-                    f"Внутренняя ошибка: операнды не являются KumirValue (типы: {type(result).__name__}, {type(right).__name__}).",
-                    line_index=pos_err[0], 
-                    column_index=pos_err[1]
-                )            
+            # result и right гарантированно KumirValue согласно типизации
             op_text = op_token.getText()
             actual_token = self._get_token_from_node(op_token)
             
@@ -550,13 +510,6 @@ class ExpressionEvaluator(KumirParserVisitor):
             op_token = ctx.getChild(2*i - 1)  # Операторы находятся между выражениями
             right = self.visit(power_expressions[i])
             
-            if not (isinstance(result, KumirValue) and isinstance(right, KumirValue)):                # Для TerminalNodeImpl используем .symbol для получения токена
-                pos_err = self._position_from_token(op_token.symbol if hasattr(op_token, 'symbol') else ctx.start)
-                raise KumirRuntimeError(
-                    f"Внутренняя ошибка: операнды не являются KumirValue (типы: {type(result).__name__}, {type(right).__name__}).",
-                    line_index=pos_err[0], 
-                    column_index=pos_err[1]
-                )            
             op_text = op_token.getText()
             actual_token = self._get_token_from_node(op_token)
             
@@ -709,97 +662,86 @@ class ExpressionEvaluator(KumirParserVisitor):
                 indices = []
                 for expr_ctx in index_list_ctx.expression():
                     idx_val = self.visit(expr_ctx)
-                    if not isinstance(idx_val, KumirValue) or idx_val.kumir_type != KumirType.INT.value:
+                    if idx_val.kumir_type != KumirType.INT.value:
                         pos = self._position_from_token(self._get_token_for_position(expr_ctx))
                         var_name = primary_expr.value if hasattr(primary_expr, 'value') and isinstance(primary_expr.value, str) else "переменная"
                         raise KumirEvalError(
-                            f"Индекс для '{var_name}' должен быть целым числом, получено: {idx_val.value if isinstance(idx_val, KumirValue) else idx_val}",
+                            f"Индекс для '{var_name}' должен быть целым числом, получено: {idx_val.value}",
                             line_index=pos[0], column_index=pos[1]
                         )
                     indices.append(idx_val.value)
                 
                 # Обрабатываем доступ к элементам массива или строки
-                if isinstance(primary_expr, KumirValue):
-                    # Проверяем, является ли это строковым массивом (литтаб)
-                    if (primary_expr.kumir_type == KumirType.STR.value and 
-                        isinstance(primary_expr.value, KumirTableVar)):
-                        # Это строковый массив - обрабатываем как массив
-                        table_var = primary_expr.value
-                        try:
-                            element_value = table_var.get_value(tuple(indices), index_list_ctx)
-                            return element_value
-                        except Exception as e:
-                            pos = self._position_from_token(self._get_token_for_position(index_list_ctx))
-                            raise KumirEvalError(
-                                f"Ошибка при доступе к элементу строкового массива: {e}",
-                                line_index=pos[0], column_index=pos[1]
-                            )
-                    elif primary_expr.kumir_type == KumirType.STR.value:
-                        # Доступ к символам обычной строки (не массива)
-                        string_value = primary_expr.value
-                        actual_string = string_value
+                if (primary_expr.kumir_type == KumirType.STR.value and 
+                    isinstance(primary_expr.value, KumirTableVar)):
+                    # Это строковый массив - обрабатываем как массив
+                    table_var = primary_expr.value
+                    try:
+                        element_value = table_var.get_value(tuple(indices), index_list_ctx)
+                        return element_value
+                    except Exception as e:
+                        pos = self._position_from_token(self._get_token_for_position(index_list_ctx))
+                        raise KumirEvalError(
+                            f"Ошибка при доступе к элементу строкового массива: {e}",
+                            line_index=pos[0], column_index=pos[1]
+                        )
                         
-                        if len(indices) == 1:
-                            # Доступ к одному символу
-                            kumir_idx = indices[0]
-                            if kumir_idx < 1 or kumir_idx > len(actual_string):
-                                pos = self._position_from_token(self._get_token_for_position(index_list_ctx))
-                                raise KumirIndexError(
-                                    f"Индекс символа {kumir_idx} вне допустимого диапазона [1..{len(actual_string)}]",
-                                    line_index=pos[0], column_index=pos[1]
-                                )
-                            py_idx = kumir_idx - 1  # КуМир 1-based -> Python 0-based
-                            char_value = actual_string[py_idx]
-                            return KumirValue(value=char_value, kumir_type=KumirType.CHAR.value)
-                        elif len(indices) == 2:
-                            # Срез строки
-                            k_idx1, k_idx2 = indices[0], indices[1]
-                            if k_idx1 < 1 or k_idx2 < k_idx1:
-                                pos = self._position_from_token(self._get_token_for_position(index_list_ctx))
-                                raise KumirIndexError(
-                                    f"Неверные границы среза. Начальный индекс ({k_idx1}) должен быть >= 1, конечный ({k_idx2}) >= начального",
-                                    line_index=pos[0], column_index=pos[1]
-                                )
-                            
-                            py_start = k_idx1 - 1
-                            py_end = min(k_idx2, len(actual_string))
-                            if py_start >= len(actual_string):
-                                slice_value = ""
-                            else:
-                                slice_value = actual_string[py_start:py_end]
-                            return KumirValue(value=slice_value, kumir_type=KumirType.STR.value)
-                        else:
+                elif primary_expr.kumir_type == KumirType.STR.value:
+                    # Доступ к символам обычной строки (не массива)
+                    string_value = primary_expr.value
+                    actual_string = string_value
+                    
+                    if len(indices) == 1:
+                        # Доступ к одному символу
+                        kumir_idx = indices[0]
+                        if kumir_idx < 1 or kumir_idx > len(actual_string):
                             pos = self._position_from_token(self._get_token_for_position(index_list_ctx))
                             raise KumirIndexError(
-                                f"Для строки ожидается 1 индекс (символ) или 2 индекса (срез). Получено {len(indices)}",
+                                f"Индекс символа {kumir_idx} вне допустимого диапазона [1..{len(actual_string)}]",
                                 line_index=pos[0], column_index=pos[1]
                             )
-                    
-                    elif hasattr(primary_expr, 'value') and hasattr(primary_expr.value, 'get_value'):
-                        # Это объект массива (KumirTableVar)
-                        table_var = primary_expr.value
-                        try:
-                            element_value = table_var.get_value(tuple(indices), index_list_ctx)
-                            return element_value
-                        except Exception as e:
+                        py_idx = kumir_idx - 1  # КуМир 1-based -> Python 0-based
+                        char_value = actual_string[py_idx]
+                        return KumirValue(value=char_value, kumir_type=KumirType.CHAR.value)
+                        
+                    elif len(indices) == 2:
+                        # Срез строки
+                        k_idx1, k_idx2 = indices[0], indices[1]
+                        if k_idx1 < 1 or k_idx2 < k_idx1:
                             pos = self._position_from_token(self._get_token_for_position(index_list_ctx))
-                            raise KumirEvalError(
-                                f"Ошибка при доступе к элементу массива: {e}",
+                            raise KumirIndexError(
+                                f"Неверные границы среза. Начальный индекс ({k_idx1}) должен быть >= 1, конечный ({k_idx2}) >= начального",
                                 line_index=pos[0], column_index=pos[1]
                             )
+                        
+                        py_start = k_idx1 - 1
+                        py_end = min(k_idx2, len(actual_string))
+                        if py_start >= len(actual_string):
+                            slice_value = ""
+                        else:
+                            slice_value = actual_string[py_start:py_end]
+                        return KumirValue(value=slice_value, kumir_type=KumirType.STR.value)
+                        
                     else:
-                        # primary_expr возвращает KumirTableVar напрямую
-                        if hasattr(primary_expr.value, 'get_value'):
-                            table_var = primary_expr.value
-                            try:
-                                element_value = table_var.get_value(tuple(indices), index_list_ctx)
-                                return element_value
-                            except Exception as e:
-                                pos = self._position_from_token(self._get_token_for_position(index_list_ctx))
-                                raise KumirEvalError(
-                                    f"Ошибка при доступе к элементу массива: {e}",
-                                    line_index=pos[0], column_index=pos[1]
-                                )
+                        pos = self._position_from_token(self._get_token_for_position(index_list_ctx))
+                        raise KumirIndexError(
+                            f"Для строки ожидается 1 индекс (символ) или 2 индекса (срез). Получено {len(indices)}",
+                            line_index=pos[0], column_index=pos[1]
+                        )
+                        
+                elif hasattr(primary_expr.value, 'get_value'):
+                    # Это объект массива (KumirTableVar)
+                    table_var = primary_expr.value
+                    try:
+                        element_value = table_var.get_value(tuple(indices), index_list_ctx)
+                        return element_value
+                    except Exception as e:
+                        pos = self._position_from_token(self._get_token_for_position(index_list_ctx))
+                        raise KumirEvalError(
+                            f"Ошибка при доступе к элементу массива: {e}",
+                            line_index=pos[0], column_index=pos[1]
+                        )
+                        
                 else:
                     pos = self._position_from_token(self._get_token_for_position(ctx))
                     raise KumirEvalError(
@@ -857,7 +799,7 @@ class ExpressionEvaluator(KumirParserVisitor):
                 # Это пользовательская функция - проверяем количество параметров
                 if algorithm_def and len(algorithm_def.parameters) == 0:
                     # Функция без аргументов - вызываем её сразу
-                    return self.main_visitor._call_user_function(var_name, [], ctx)
+                    return self.main_visitor.call_user_function(var_name, [], ctx)
                 else:
                     # Функция с аргументами - возвращаем имя для обработки в postfixExpression
                     return KumirValue(var_name, KumirType.STR.value)
@@ -934,7 +876,7 @@ class ExpressionEvaluator(KumirParserVisitor):
                 expressions = [expr_nodes]
         return expressions
 
-    def _call_function(self, func_name: str, args: list, arg_expressions: list, ctx) -> KumirValue:
+    def _call_function(self, func_name: str, args: list[KumirValue], arg_expressions: list[Any], ctx: Any) -> KumirValue:
         """Вызывает встроенную функцию с аргументами"""
         
         # Обрабатываем арифметические встроенные функции
@@ -1022,10 +964,7 @@ class ExpressionEvaluator(KumirParserVisitor):
                                 raise KumirArgumentError(f"Недостаточно аргументов для функции '{func_name}'", line_index=pos[0], column_index=pos[1])
                         else:
                             # Для параметров "арг" передаем значение
-                            if isinstance(arg, KumirValue):
-                                raw_args.append(arg.value)
-                            else:
-                                raw_args.append(arg)
+                            raw_args.append(arg.value)
                     
                     # Вызываем встроенную функцию
                     result = builtin_handler.call_function(func_name, raw_args, ctx)
@@ -1057,7 +996,7 @@ class ExpressionEvaluator(KumirParserVisitor):
                 
                 if algorithm_def and algorithm_def.is_function:
                     # Это пользовательская функция - вызываем её через main visitor
-                    result = self.main_visitor._call_user_function(func_name, args, ctx)
+                    result = self.main_visitor.call_user_function(func_name, args, ctx)
                     return result
                 else:
                     # Это процедура, а не функция - ошибка
@@ -1087,12 +1026,6 @@ class ExpressionEvaluator(KumirParserVisitor):
         
         for expr in expressions:
             element_value = self.visit(expr)
-            if not isinstance(element_value, KumirValue):
-                pos = self._position_from_token(self._get_token_for_position(ctx))
-                raise KumirRuntimeError(
-                    f"Элемент массива должен быть значением",
-                    line_index=pos[0], column_index=pos[1]
-                )
             elements.append(element_value.value)
         
         return KumirValue(value=elements, kumir_type=KumirType.TABLE.value)
