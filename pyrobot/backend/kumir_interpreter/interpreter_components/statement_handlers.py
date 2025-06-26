@@ -398,6 +398,11 @@ class StatementHandlerMixin(KumirParserVisitor):
                 target_var_name = ""
                 is_array_element = False
                 
+                if arg_ctx.NEWLINE_CONST():
+                    # Обработка константы новой строки 'нс' - выводим перевод строки
+                    kiv_self.io_handler.write_output("\n")
+                    continue
+                
                 if arg_ctx.expression():
                     # For INPUT, we need to get the lvalue to assign to
                     # This is a bit tricky since we're expecting the expression to be an lvalue

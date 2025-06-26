@@ -306,7 +306,9 @@ class DeclarationVisitorMixin:
             try:
                 result_type, _ = get_type_info_from_specifier(kiv_self, algo_header_ctx.typeSpecifier())
             except Exception as e:
-                print(f"[ERROR][DeclVisitor] Failed to get return type for function {algo_name_tokens}: {e}", file=sys.stderr)
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Failed to get return type for function {algo_name_tokens}: {e}")
                 result_type = "вещ"  # Fallback to float type        # Извлекаем параметры из контекста
         parameters = []
         param_list_ctx = algo_header_ctx.parameterList()
@@ -326,7 +328,9 @@ class DeclarationVisitorMixin:
                     try:
                         param_type, is_table = get_type_info_from_specifier(kiv_self, param_decl_ctx.typeSpecifier())
                     except Exception as e:
-                        print(f"[ERROR][DeclVisitor] Failed to get parameter type: {e}", file=sys.stderr)
+                        import logging
+                        logger = logging.getLogger(__name__)
+                        logger.error(f"Failed to get parameter type: {e}")
                 
                 # Определение режима параметра (арг, рез, аргрез)
                 param_mode = "арг"  # По умолчанию
@@ -356,7 +360,9 @@ class DeclarationVisitorMixin:
         try:
             kiv_self.algorithm_manager.register_algorithm(algorithm_def)
         except Exception as e:
-            print(f"[ERROR][DeclVisitor] Failed to register algorithm in AlgorithmManager {algo_name_tokens}: {e}", file=sys.stderr)        # Также регистрируем в старом ProcedureManager для обратной совместимости
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to register algorithm in AlgorithmManager {algo_name_tokens}: {e}")        # Также регистрируем в старом ProcedureManager для обратной совместимости
         try:
             kiv_self.procedure_manager.register_procedure(
                 name=algo_name_tokens,
@@ -365,7 +371,9 @@ class DeclarationVisitorMixin:
                 result_type=result_type
             )
         except Exception as e:
-            print(f"[ERROR][DeclVisitor] Failed to register {algo_name_tokens}: {e}", file=sys.stderr)
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to register {algo_name_tokens}: {e}")
             raise        # ВАЖНО: Не выполняем тела пользовательских функций и процедур при их определении, 
         # только при явных вызовах. Это исправляет проблему с выполнением тела функции во время парсинга.
         # Если это алгоритм (функция или процедура), всегда пропускаем выполнение тела,

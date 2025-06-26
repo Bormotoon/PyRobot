@@ -104,7 +104,14 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementHandlerMixin, St
         self.io_handler.set_visitor(self) # Устанавливаем visitor в IOHandler
 
         self.builtin_function_handler = BuiltinFunctionHandler(self) # Предполагаем наличие
-        self.builtin_procedure_handler = BuiltinProcedureHandler(self) # Предполагаем наличие        self.error_stream_out = error_stream if error_stream else lambda x: print(x, file=__import__('sys').stderr) # Используем правильные кавычки        
+        self.builtin_procedure_handler = BuiltinProcedureHandler(self) # Предполагаем наличие
+        
+        # Настройка error stream через логирование вместо print
+        if error_stream:
+            self.error_stream_out = error_stream
+        else:
+            logger = logging.getLogger(__name__)
+            self.error_stream_out = lambda x: logger.error(x)        
         # Настройка эхо ввода (автоматический вывод введённых значений)
         self.echo_input = echo_input
         
@@ -132,7 +139,6 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementHandlerMixin, St
         # This is a placeholder.
         # Basic type checking and conversion can be added here.
         # For now, just return the value as is.
-        # print(f"[DEBUG VALIDATE] var: {var_name}, value: {value} ({type(value)}), target_type: {target_kumir_type}, is_table: {is_target_table}, element_type: {element_type}")
         
         # Placeholder logic:
         # if target_kumir_type == "цел":

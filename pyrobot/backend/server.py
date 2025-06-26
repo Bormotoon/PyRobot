@@ -38,7 +38,7 @@ secret_key = os.environ.get('FLASK_SECRET_KEY',
 app.config['SECRET_KEY'] = secret_key
 
 if app.config['SECRET_KEY'] == 'fallback-secret-key-change-this-immediately!':
-    print("SECURITY WARNING: Using default FLASK_SECRET_KEY.")
+    logging.warning("SECURITY WARNING: Using default FLASK_SECRET_KEY.")
 
 app.config['SESSION_TYPE'] = 'redis'
 app.config['SESSION_PERMANENT'] = False
@@ -54,16 +54,16 @@ try:
     )
     redis_client.ping()
     app.config['SESSION_REDIS'] = redis_client
-    print(f"Session storage configured for Redis at "
+    logging.info(f"Session storage configured for Redis at "
                 f"{redis_host}:{redis_port}, DB: {redis_db}")
 except redis.exceptions.ConnectionError as redis_err:
-    print(f"CRITICAL: Failed to connect to Redis: {redis_err}")
+    logging.critical(f"Failed to connect to Redis: {redis_err}")
     app.config['SESSION_TYPE'] = 'filesystem'
-    print("Falling back to 'filesystem' session type.")
+    logging.info("Falling back to 'filesystem' session type.")
 except Exception as redis_other_err:
-    print(f"CRITICAL: Error configuring Redis: {redis_other_err}")
+    logging.critical(f"Error configuring Redis: {redis_other_err}")
     app.config['SESSION_TYPE'] = 'filesystem'
-    print("Falling back to 'filesystem' session type.")
+    logging.info("Falling back to 'filesystem' session type.")
 
 samesite = os.environ.get('SESSION_COOKIE_SAMESITE', 'Lax')
 app.config['SESSION_COOKIE_SAMESITE'] = samesite

@@ -49,7 +49,6 @@ class KumirType(Enum):
         # For now, let's return UNKNOWN to avoid crashing if a new type appears
         # or if a more complex type string (like for specific table types) is passed.
         # This part might need adjustment based on how type strings are generated/used.
-        # print(f"Warning: Unknown Kumir type string encountered: '{type_str}'") # Optional: for debugging
         return KumirType.UNKNOWN
 
 class KumirValue:

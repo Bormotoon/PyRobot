@@ -64,9 +64,9 @@ def interpret_kumir(code: str, input_data: Optional[str] = None) -> str:
     except KumirSyntaxError as e:
         line_info = f"строка {e.line_index + 1}" if hasattr(e, 'line_index') and e.line_index is not None else "N/A"
         col_info = f", столбец {e.column_index}" if hasattr(e, 'column_index') and e.column_index is not None else ""
-        return f"SYNTAX_ERROR: {e.args[0]} ({line_info}{col_info})"
+        return f"Ошибка в коде: {e.args[0]} ({line_info}{col_info})"
     except Exception as e:
-        error_info = f"UNEXPECTED_PARSING_ERROR: {type(e).__name__}: {e}"
+        error_info = f"Внутренняя ошибка парсера: {type(e).__name__}: {e}"
         with open("debug_interpret.log", "a", encoding="utf-8") as f:
             f.write(f"PARSING ERROR: {error_info}\n")
         return error_info
@@ -146,18 +146,18 @@ def interpret_kumir(code: str, input_data: Optional[str] = None) -> str:
         # ExitSignal - это нормальное завершение программы или процедуры с помощью "выход все"
         # Для главной программы просто завершаем без ошибки
         pass
-    except KumirSyntaxError as e: 
+    except KumirSyntaxError as e:
         line_info = f"строка {e.line_index + 1}" if hasattr(e, 'line_index') and e.line_index is not None else "N/A"
         col_info = f", столбец {e.column_index}" if hasattr(e, 'column_index') and e.column_index is not None else ""
-        captured_output.write(f"\\nRUNTIME_SYNTAX_ERROR: {e.args[0]} ({line_info}{col_info})")
+        captured_output.write(f"\\nОшибка в коде: {e.args[0]} ({line_info}{col_info})")
     except KumirRuntimeError as e:
         line_info = f"строка {e.line_index + 1}" if hasattr(e, 'line_index') and e.line_index is not None else "N/A"
         col_info = f", столбец {e.column_index}" if hasattr(e, 'column_index') and e.column_index is not None else ""
-        captured_output.write(f"\\nRUNTIME_ERROR: {e.args[0]} ({line_info}{col_info})")
+        captured_output.write(f"\\nОшибка выполнения: {e.args[0]} ({line_info}{col_info})")
     except Exception as e:
         import traceback
         tb_str = traceback.format_exc()
-        captured_output.write(f"\\nUNEXPECTED_EXECUTION_ERROR: {type(e).__name__}: {e}\\n{tb_str}")
+        captured_output.write(f"\\nВнутренняя ошибка интерпретатора: {type(e).__name__}: {e}")
         with open("debug_interpret.log", "a", encoding="utf-8") as debug_f:
             debug_f.write(f"EXCEPTION in visitor.visitProgram: {type(e).__name__}: {e}\n{tb_str}\n")
     finally:

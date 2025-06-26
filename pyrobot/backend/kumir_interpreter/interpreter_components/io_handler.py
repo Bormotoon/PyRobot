@@ -24,18 +24,15 @@ class IOHandler:
             # Если input_stream не предоставлен, можно либо вызвать исключение,
             # либо вернуть какое-то значение по умолчанию, либо запросить ввод через stdin.
             # Для тестов и CLI это может быть input().
-            # print(f"[IOHandler DEBUG] input_stream is None, falling back to input(). Prompt: {prompt}", file=__import__('sys').stderr)
             try:
                 input_value = input(prompt if not self.output_stream else "") # Если prompt уже вывели, не дублируем
                 return input_value
             except EOFError:
-                # print("[IOHandler DEBUG] EOFError during input()", file=__import__('sys').stderr)
                 # В случае EOF (например, если ввод перенаправлен из пустого файла)
                 # можно вернуть пустую строку или вызвать специфическое исключение КуМира.
                 # Пока вернем пустую строку, как это часто делают REPL.
                 return ""
             except RuntimeError as e:
-                # print(f"[IOHandler DEBUG] RuntimeError during input(): {e}", file=__import__('sys').stderr)
                 # Это может случиться, если stdin не доступен (например, в некоторых средах без консоли)
                 # TODO: Решить, какое исключение КуМир должно быть здесь. InputOutputError?
                 raise self.kumir_exceptions.InputOutputError(
@@ -52,7 +49,6 @@ class IOHandler:
             # которые обычно буферизуются по строкам или принудительно сбрасываются при \n.
             # Если бы мы использовали файловый объект, flush был бы актуален.
         except Exception as e:
-            # print(f"[IOHandler DEBUG] Exception during write_output: {e}", file=__import__('sys').stderr)
             # Если произошла ошибка при записи, можно вызвать специфическое исключение КуМира.
             raise self.kumir_exceptions.OutputError(
                 f"Ошибка при попытке записи вывода: {e}",
