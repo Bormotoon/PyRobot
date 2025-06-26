@@ -410,9 +410,9 @@ def check_redis_health() -> Dict[str, Any]:
 def check_interpreter_health() -> Dict[str, Any]:
     """Проверка здоровья интерпретатора"""
     try:
-        # Простая проверка - можем ли создать интерпретатор
+        # Простая проверка - можем ли создать интерпретатор с пустым кодом
         from .kumir_interpreter.interpreter import KumirLanguageInterpreter
-        interpreter = KumirLanguageInterpreter()
+        interpreter = KumirLanguageInterpreter("")
         return {'status': 'healthy', 'message': 'Interpreter initialization successful'}
     except Exception as e:
         return {'status': 'unhealthy', 'message': f'Interpreter check failed: {str(e)}'}
