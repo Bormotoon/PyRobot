@@ -19,7 +19,6 @@ import {
 } from '@mui/material';
 import {
 	Close as CloseIcon,
-	Help as HelpIcon,
 	MenuBook as MenuBookIcon
 } from '@mui/icons-material';
 
@@ -36,7 +35,6 @@ const HelpDialog = ({open, onClose}) => {
 	// Локальное состояние для хранения содержимого руководства (HTML)
 	const [manualContent, setManualContent] = useState('');
 	const [isLoading, setIsLoading] = useState(false);
-	const [hasError, setHasError] = useState(false);
 
 	/**
 	 * Хук useEffect для загрузки содержимого руководства при открытии диалога.
@@ -44,7 +42,6 @@ const HelpDialog = ({open, onClose}) => {
 	useEffect(() => {
 		if (open && !manualContent && !isLoading) {
 			setIsLoading(true);
-			setHasError(false);
 			
 			// process.env.PUBLIC_URL - это правильный способ получить путь к папке public
 			fetch(`${process.env.PUBLIC_URL}/manual.html`)
@@ -56,11 +53,9 @@ const HelpDialog = ({open, onClose}) => {
 				})
 				.then(html => {
 					setManualContent(html);
-					setHasError(false);
 				})
 				.catch(err => {
 					console.error("Failed to load manual.html:", err);
-					setHasError(true);
 					setManualContent(`
 						<div style="text-align: center; padding: 2rem; color: ${theme.palette.error.main};">
 							<h3>⚠️ Ошибка загрузки</h3>

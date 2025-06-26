@@ -25,6 +25,8 @@ class RobotCommandHandler:
             'вверх': self.robot.go_up,
             'вниз': self.robot.go_down,
             'закрасить': self.robot.do_paint,
+            'поставить маркер': self.robot.put_marker,
+            'убрать маркер': self.robot.pick_marker,
         }
         
         # Маппинг функций измерения
@@ -45,6 +47,8 @@ class RobotCommandHandler:
             'снизу стена': lambda: self.robot.check_direction('down', 'wall'),
             'клетка закрашена': lambda: self.robot.check_cell('painted'),
             'клетка чистая': lambda: self.robot.check_cell('clear'),
+            'маркер есть': lambda: self.robot.is_marker_here(),
+            'маркер нет': lambda: not self.robot.is_marker_here(),
         }
     
     def execute_command(self, command: str) -> bool:
@@ -135,6 +139,8 @@ class RobotCommandHandler:
             
             # Команды действий
             'закрасить': {'type': 'procedure', 'handler': lambda: self.execute_command('закрасить')},
+            'поставить маркер': {'type': 'procedure', 'handler': lambda: self.execute_command('поставить маркер')},
+            'убрать маркер': {'type': 'procedure', 'handler': lambda: self.execute_command('убрать маркер')},
             
             # Условия (функции)
             'слева свободно': {'type': 'function', 'handler': lambda: self.check_condition('слева свободно')},
@@ -147,6 +153,8 @@ class RobotCommandHandler:
             'снизу стена': {'type': 'function', 'handler': lambda: self.check_condition('снизу стена')},
             'клетка закрашена': {'type': 'function', 'handler': lambda: self.check_condition('клетка закрашена')},
             'клетка чистая': {'type': 'function', 'handler': lambda: self.check_condition('клетка чистая')},
+            'маркер есть': {'type': 'function', 'handler': lambda: self.check_condition('маркер есть')},
+            'маркер нет': {'type': 'function', 'handler': lambda: self.check_condition('маркер нет')},
         }
 
 def integrate_robot_with_visitor(visitor, robot: SimulatedRobot):
@@ -185,8 +193,8 @@ def _register_robot_commands(visitor, handler):
             builtin_handler.register_procedure('вверх', lambda: handler.execute_command('вверх'))
             builtin_handler.register_procedure('вниз', lambda: handler.execute_command('вниз'))
             builtin_handler.register_procedure('закрасить', lambda: handler.execute_command('закрасить'))
-            builtin_handler.register_procedure('поставить_метку', lambda: handler.execute_command('поставить метку'))
-            builtin_handler.register_procedure('взять_метку', lambda: handler.execute_command('взять метку'))
+            builtin_handler.register_procedure('поставить маркер', lambda: handler.execute_command('поставить маркер'))
+            builtin_handler.register_procedure('убрать маркер', lambda: handler.execute_command('убрать маркер'))
 
 
 def _register_robot_conditions(visitor, handler):

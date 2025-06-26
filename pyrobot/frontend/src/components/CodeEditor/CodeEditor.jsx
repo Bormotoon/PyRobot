@@ -3,7 +3,7 @@
  * @description Компонент редактора кода для симулятора робота.
  */
 
-import React, {memo, useCallback, useState} from 'react';
+import React, {memo, useCallback} from 'react';
 import {
     Button, 
     Card, 
@@ -12,9 +12,7 @@ import {
     Slider, 
     Box,
     Paper,
-    IconButton,
-    Tooltip,
-    Divider
+    Tooltip
 } from '@mui/material';
 import Editor from 'react-simple-code-editor';
 import Prism from 'prismjs';

@@ -92,7 +92,9 @@ class ScopeManager:
             if hasattr(self.visitor, 'error_handler') and hasattr(self.visitor.error_handler, 'internal_error'):
                  self.visitor.error_handler.internal_error("Попытка выйти из глобальной области видимости.", -1, -1)
             else:
-                print("Warning: Attempted to pop global scope", file=sys.stderr)
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning("Warning: Attempted to pop global scope")
 
 
     def pop_scope(self) -> None:

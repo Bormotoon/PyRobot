@@ -1,6 +1,6 @@
 \
 # filepath: c:\\Users\\Bormotoon\\VSCodeProjects\\PyRobot\\pyrobot\\backend\\kumir_interpreter\\interpreter_components\\main_visitor.py
-import sys
+import logging
 from antlr4.error.ErrorListener import ErrorListener
 from antlr4 import ParserRuleContext, TerminalNode, Token # Для ctx.toStringTree() и проверки типа узла
 from typing import Any, List, Dict, Optional, Callable, Tuple, cast
@@ -34,6 +34,7 @@ from .type_utils import get_type_info_from_specifier # <--- ИМПОРТ УЖЕ 
 class DiagnosticErrorListener(ErrorListener):
     def __init__(self, error_stream_writer=None):
         super().__init__()
+        self.logger = logging.getLogger(__name__)
         self.errors: List[KumirSyntaxError] = []
         self.error_stream_writer = error_stream_writer
 
@@ -56,7 +57,7 @@ class DiagnosticErrorListener(ErrorListener):
                 self.error_stream_writer.write(f"Ошибка в строке {line}, позиция {column}: {msg}\\\\n")
             else:
                 # Если нет, используем print или другой механизм
-                print(f"Ошибка в строке {line}, позиция {column}: {msg}", file=__import__('sys').stderr) 
+                self.logger.error(f"Ошибка в строке {line}, позиция {column}: {msg}") 
 
     def get_errors(self) -> List[KumirSyntaxError]:
         return self.errors
@@ -70,6 +71,9 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementHandlerMixin, St
                  precision: int = DEFAULT_PRECISION,
                  echo_input: bool = True):
         super().__init__() 
+        
+        # Настраиваем logger
+        self.logger = logging.getLogger(__name__)
         
         # Добавляем константы типов как атрибуты для использования в type_utils
         self.TYPE_MAP = TYPE_MAP
@@ -687,7 +691,7 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementHandlerMixin, St
 
         if module_name_node is None:
             # Эта ситуация не должна возникать при корректном дереве разбора для данного правила.
-            print("Ошибка: Не удалось извлечь узел имени модуля в import.", file=sys.stderr)
+            self.logger.error("Ошибка: Не удалось извлечь узел имени модуля в import.")
             # TODO: Рассмотреть возможность выброса исключения или более строгой обработки ошибки
             return None
 
@@ -699,7 +703,7 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementHandlerMixin, St
                 module_name = module_name[1:-1] # Удаляем кавычки
         # elif isinstance(module_name_node, KumirParser.QualifiedIdentifierContext):
             # Для QualifiedIdentifierContext .getText() уже дает правильное имя,            # и дополнительная обработка не требуется.
-            print(f"Предупреждение: Импорт модуля '{module_name}' пока не поддерживается и будет проигнорирован.", file=sys.stderr)
+            self.logger.warning(f"Предупреждение: Импорт модуля '{module_name}' пока не поддерживается и будет проигнорирован.")
         return None
 
     def visit(self, tree):

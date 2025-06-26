@@ -8,13 +8,11 @@ import {
 	Grid, 
 	Tooltip, 
 	Box,
-	Divider,
 	Chip,
 	IconButton,
 	Switch,
 	FormControlLabel,
 	TextField,
-	Paper,
 	Accordion,
 	AccordionSummary,
 	AccordionDetails
@@ -37,7 +35,6 @@ import {
 	SmartToy as RobotIcon,
 	GridOn as GridIcon,
 	ExpandMore as ExpandMoreIcon,
-	Palette as PaletteIcon,
 	LocationOn as LocationOnIcon
 } from '@mui/icons-material';
 import {getHint} from '../hints';

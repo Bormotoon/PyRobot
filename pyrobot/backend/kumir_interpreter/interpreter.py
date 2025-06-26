@@ -301,7 +301,7 @@ class KumirLanguageInterpreter:
             
             # Собираем маркеры
             if hasattr(self.robot, 'markers'):
-                state['markers'] = {f"{x},{y}": count for (x, y), count in self.robot.markers.items() if count > 0}
+                state['markers'] = {pos: count for pos, count in self.robot.markers.items() if count > 0}
             
             # Собираем закрашенные клетки
             if hasattr(self.robot, 'colored_cells'):
