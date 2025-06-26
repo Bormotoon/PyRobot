@@ -5,15 +5,20 @@ import re
 # Импортируем SAFE_GLOBALS, чтобы получить список валидных Python-имен
 # Это создаст зависимость, но она менее критична, чем предыдущие циклы.
 # Альтернатива - передавать словарь имен как аргумент.
+# Переменные для хранения глобальных настроек
+safe_globals = {}
+kumir_name_translations = {}
+
 try:
 	# Попытка импорта для получения имен
 	from .kumir_globals import SAFE_GLOBALS
+	safe_globals = SAFE_GLOBALS
 
 	# Создаем словарь трансляции ИМЕН Кумир -> Python
 	# Нужно убедиться, что все нужные имена здесь есть.
 	# Ключи - кумирские имена в нижнем регистре (возможно, без пробелов для удобства поиска)
-	# Значения - ключи из SAFE_GLOBALS
-	KUMIR_NAME_TRANSLATIONS = {
+	# Значения - ключи из safe_globals
+	kumir_name_translations = {
 		"sin": "sin", "cos": "cos", "tan": "tan", "cot": "cot",
 		"arcsin": "arcsin", "arccos": "arccos", "arctan": "arctan", "arccot": "arccot",
 		"sqrt": "sqrt", "ln": "ln", "lg": "lg", "exp": "exp",
@@ -75,16 +80,16 @@ try:
 		"консоль": "консоль",  # Если console_file() доступна под этим именем
 		# Добавить другие функции из kumir_globals.py по мере необходимости...
 	}
-	# Проверим, что все значения из словаря трансляции есть в SAFE_GLOBALS (или базовых)
-	missing_globals = {py_name for py_name in KUMIR_NAME_TRANSLATIONS.values()
-	                   if py_name not in SAFE_GLOBALS and py_name not in ['int', 'float', 'bool', 'str']}
+	# Проверим, что все значения из словаря трансляции есть в safe_globals (или базовых)
+	missing_globals = {py_name for py_name in kumir_name_translations.values()
+	                   if py_name not in safe_globals and py_name not in ['int', 'float', 'bool', 'str']}
 	if missing_globals:
 		logging.warning(f"Kumir name translations map to unknown Python identifiers: {missing_globals}")
 
 except ImportError:
 	logging.error("Could not import SAFE_GLOBALS from kumir_globals.py for translator setup.")
-	SAFE_GLOBALS = {}  # Определяем пустой словарь, чтобы код ниже не падал
-	KUMIR_NAME_TRANSLATIONS = {}
+	safe_globals = {}  # Определяем пустой словарь, чтобы код ниже не падал
+	kumir_name_translations = {}
 
 logger = logging.getLogger('KumirExprTranslator')
 
@@ -177,7 +182,7 @@ def kumir_expr_to_python_expr(kumir_expr):
 		logger.debug(f"After operator/const replacement: '{expr_ops_replaced}'")
 
 		# 3. Замена имен функций/сенсоров/переменных Кумира на Python идентификаторы
-		python_expr_raw = _replace_names_outside_strings(expr_ops_replaced, KUMIR_NAME_TRANSLATIONS)
+		python_expr_raw = _replace_names_outside_strings(expr_ops_replaced, kumir_name_translations)
 		logger.debug(f"After name replacement: '{python_expr_raw}'")
 
 		# 4. Очистка лишних пробелов

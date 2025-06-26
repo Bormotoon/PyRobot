@@ -194,10 +194,9 @@ class ProcedureManager:
             # 3. Инициализация параметров в новой области видимости
             output_parameters = []  # Параметры, которые нужно скопировать обратно
             
-            for i, (analyzed_arg, formal_param) in enumerate(zip(analyzed_args, formal_params_list)):
+            for analyzed_arg, formal_param in zip(analyzed_args, formal_params_list):
                 param_name = formal_param['name']
                 param_mode = analyzed_arg['mode']
-                param_type = formal_param['type']
                 param_kumir_type_str = formal_param['base_type']  # это строка типа "цел"
                 
                 # Конвертируем строку в KumirType enum
@@ -697,13 +696,11 @@ class ProcedureManager:
 
         self.visitor.scope_manager.push_scope()
         # self.visitor.call_stack.append(proc_name) # Если будет использоваться стек вызовов        # Объявление и инициализация параметров в новой области видимости
-        for i, (formal_param_name_lower, formal_param_info) in enumerate(proc_def['params'].items()):
+        for i, (_, formal_param_info) in enumerate(proc_def['params'].items()):
             param_name_original_case = formal_param_info['name']
             # param_base_type = formal_param_info['base_type'] # Не используется напрямую здесь после рефакторинга declare_variable
             param_is_table = formal_param_info['is_table']
             param_mode_for_evaluator = formal_param_info['mode_for_evaluator']
-            
-            declaration_dimensions = None
             actual_arg_value = None
             
             if i < len(args):
@@ -719,7 +716,8 @@ class ProcedureManager:
                     if isinstance(arg_data, dict) and 'value' in arg_data:
                         actual_arg_value = arg_data['value']
                         if param_is_table and isinstance(actual_arg_value, KumirTableVar):
-                             declaration_dimensions = actual_arg_value.dimension_bounds_list 
+                             # Размеры таблицы используются для объявления параметра
+                             pass 
                     else: 
                         lc_arg_res = self.visitor.get_line_content_from_ctx(call_site_ctx)
                         raise KumirArgumentError(f"Строка {call_site_ctx.start.line if call_site_ctx else '??'}: Некорректная структура аргумента для параметра '{param_name_original_case}' (режим 'арг рез').",
@@ -768,7 +766,7 @@ class ProcedureManager:
                         self.visitor.scope_manager.update_variable(param_name_original_case, kumir_value_for_update, line_index, column_index)
                         
                         # Проверяем, что параметр действительно сохранился
-                        var_info, scope = self.visitor.scope_manager.find_variable(param_name_original_case)
+                        var_info, _ = self.visitor.scope_manager.find_variable(param_name_original_case)
                         if var_info:
                             # Параметр найден в scope после присваивания
                             pass
@@ -805,7 +803,7 @@ class ProcedureManager:
         
         try:
             self.visitor.visit(body_ctx)
-        except ExitSignal as es: 
+        except ExitSignal: 
             # ExitSignal (команда "выход") должна завершать ТОЛЬКО текущий вызов процедуры/функции,
             # а НЕ всю рекурсию. Это стандартная семантика в КуМире.
             # Немедленно завершаем выполнение текущего вызова
@@ -825,7 +823,7 @@ class ProcedureManager:
             else:
                 # Для процедуры просто завершаем
                 return
-        except BreakSignal as lee: 
+        except BreakSignal: 
             pass
 
         if proc_def['is_function']:
@@ -845,10 +843,9 @@ class ProcedureManager:
 
 
         # Для параметров 'рез' и 'арг рез' обновляем переменные в вызывающей области видимости
-        current_proc_scope = self.visitor.scope_manager.scopes[-1]
         if len(self.visitor.scope_manager.scopes) > 1: # Убедимся, что есть вызывающая область
             caller_scope = self.visitor.scope_manager.scopes[-2]
-            for i, (param_name_local_lower, formal_param_info) in enumerate(proc_def['params'].items()):
+            for i, (_, formal_param_info) in enumerate(proc_def['params'].items()):
                 param_name_local_original_case = formal_param_info['name']
                 param_mode_for_evaluator = formal_param_info['mode_for_evaluator']
 
@@ -897,7 +894,7 @@ class ProcedureManager:
                                                      line_content=lc_scope_depth)
 
                         except (KumirNameError, KumirTypeError, AssignmentError) as e: 
-                            lc_copy_back = self.visitor.get_line_content_from_ctx(call_site_ctx)
+                            # lc_copy_back = self.visitor.get_line_content_from_ctx(call_site_ctx)  # Не используется
                             self.visitor.error_stream.write(f"Внутренняя ошибка при копировании результата параметра '{param_name_local_original_case}' в '{original_var_name}' (строка {call_site_ctx.start.line if call_site_ctx else '??'}): {e}\\n")
                     elif isinstance(original_arg_spec, str): 
                         original_var_name = original_arg_spec

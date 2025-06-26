@@ -8,8 +8,7 @@
 # TODO: Перенести сюда импорты KumirLexer, типы (INTEGER_TYPE и т.д.) и bf, если он не будет импортироваться извне
 # TODO: Также перенести сюда math_functions (div, mod, irand, rand), если они используются напрямую в лямбдах
 
-import sys # Для print отладки в будущем, если понадобится
-from typing import TYPE_CHECKING, Any, Optional, Callable, Dict, List, Tuple, Union
+from typing import TYPE_CHECKING, Any, Optional, Callable, Dict, List
 
 # Импортируем хендлеры из соседнего модуля
 from . import builtin_functions as bf

@@ -1,18 +1,17 @@
-\
 # filepath: c:\\Users\\Bormotoon\\VSCodeProjects\\PyRobot\\pyrobot\\backend\\kumir_interpreter\\interpreter_components\\main_visitor.py
 import logging
 from antlr4.error.ErrorListener import ErrorListener
-from antlr4 import ParserRuleContext, TerminalNode, Token # Для ctx.toStringTree() и проверки типа узла
-from typing import Any, List, Dict, Optional, Callable, Tuple, cast
+from antlr4 import ParserRuleContext, Token # Для ctx.toStringTree() и проверки типа узла
+from typing import Any, List, Dict, Optional, Callable, cast
 
 # Локальные импорты КуМир (относительные)
 from ..generated.KumirLexer import KumirLexer
 from ..generated.KumirParser import KumirParser
 from ..generated.KumirParserVisitor import KumirParserVisitor # Базовый визитор ANTLR
 from .. import kumir_exceptions # <--- Добавляем импорт модуля исключений
-from ..kumir_exceptions import KumirSemanticError, KumirRuntimeError, KumirSyntaxError, ExitSignal, BreakSignal, StopExecutionSignal, KumirNameError, KumirTypeError, DeclarationError, KumirEvalError # Изменения: ProcedureExitCalled -> ExitSignal, LoopExitException -> BreakSignal
-from ..kumir_datatypes import KumirTableVar, KumirReturnValue, KumirValue, KumirType 
-from ..definitions import AlgorithmManager, AlgorithmDefinition, Parameter, FunctionCallFrame, FunctionReturnException  # Импорт наших новых классов
+from ..kumir_exceptions import KumirRuntimeError, KumirSyntaxError, ExitSignal, StopExecutionSignal, KumirNameError, DeclarationError, KumirEvalError # Изменения: ProcedureExitCalled -> ExitSignal, LoopExitException -> BreakSignal
+from ..kumir_datatypes import KumirReturnValue, KumirValue, KumirType 
+from ..definitions import AlgorithmManager  # Импорт наших новых классов
 from ..utils import KumirTypeConverter  # Импорт type converter
 
 # Импорты компонентов интерпретатора из __init__.py текущего пакета
@@ -329,7 +328,7 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementHandlerMixin, St
             
             # --- Начало секции, которая может дублировать или должна быть в DeclarationVisitorMixin --- 
             # Установка параметров в текущую область
-            actual_params = proc_info.get('params', {})
+            # actual_params = proc_info.get('params', {})  # Не используется
             if args:
                 # TODO: Проверка количества и типов аргументов
                 # ... (эта логика есть в _execute_procedure_call старого интерпретатора)
@@ -338,10 +337,10 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementHandlerMixin, St
             # Инициализация 'знач' для функций
             if self.current_algorithm_is_function and self.current_algorithm_result_type and self.current_algorithm_result_type != VOID_TYPE:
                 try:
-                    is_table_check = False
+                    # is_table_check = False  # Не используется
                     # current_algorithm_result_type здесь точно строка и не VOID_TYPE
                     # Поэтому дополнительная проверка на isinstance(self.current_algorithm_result_type, str) не нужна.
-                    is_table_check = 'таб' in self.current_algorithm_result_type
+                    # is_table_check = 'таб' in self.current_algorithm_result_type  # Не используется
                     
                     self.scope_manager.declare_variable(
                         name='знач',

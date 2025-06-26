@@ -30,13 +30,13 @@ class RobotCommandHandler:
         }
         
         # Маппинг функций измерения
-        self.measurement_map = {
+        self.measurement_map: Dict[str, Any] = {
             'радиация': lambda: self.robot.do_measurement('radiation'),
             'температура': lambda: self.robot.do_measurement('temperature'),
         }
         
         # Маппинг условий КуМир на методы робота
-        self.condition_map = {
+        self.condition_map: Dict[str, Any] = {
             'слева свободно': lambda: self.robot.check_direction('left', 'free'),
             'справа свободно': lambda: self.robot.check_direction('right', 'free'),
             'сверху свободно': lambda: self.robot.check_direction('up', 'free'),
@@ -47,8 +47,8 @@ class RobotCommandHandler:
             'снизу стена': lambda: self.robot.check_direction('down', 'wall'),
             'клетка закрашена': lambda: self.robot.check_cell('painted'),
             'клетка чистая': lambda: self.robot.check_cell('clear'),
-            'маркер есть': lambda: self.robot.is_marker_here(),
-            'маркер нет': lambda: not self.robot.is_marker_here(),
+            'маркер есть': lambda: bool(self.robot.is_marker_here()),
+            'маркер нет': lambda: not bool(self.robot.is_marker_here()),
         }
     
     def execute_command(self, command: str) -> bool:
@@ -188,13 +188,18 @@ def _register_robot_commands(visitor, handler):
         
         # Регистрируем команды движения
         if hasattr(builtin_handler, 'register_procedure'):
-            builtin_handler.register_procedure('вправо', lambda: handler.execute_command('вправо'))
-            builtin_handler.register_procedure('влево', lambda: handler.execute_command('влево'))
-            builtin_handler.register_procedure('вверх', lambda: handler.execute_command('вверх'))
-            builtin_handler.register_procedure('вниз', lambda: handler.execute_command('вниз'))
-            builtin_handler.register_procedure('закрасить', lambda: handler.execute_command('закрасить'))
-            builtin_handler.register_procedure('поставить маркер', lambda: handler.execute_command('поставить маркер'))
-            builtin_handler.register_procedure('убрать маркер', lambda: handler.execute_command('убрать маркер'))
+            def make_command_wrapper(cmd: str):
+                def wrapper() -> bool:
+                    return handler.execute_command(cmd)
+                return wrapper
+            
+            builtin_handler.register_procedure('вправо', make_command_wrapper('вправо'))
+            builtin_handler.register_procedure('влево', make_command_wrapper('влево'))
+            builtin_handler.register_procedure('вверх', make_command_wrapper('вверх'))
+            builtin_handler.register_procedure('вниз', make_command_wrapper('вниз'))
+            builtin_handler.register_procedure('закрасить', make_command_wrapper('закрасить'))
+            builtin_handler.register_procedure('поставить маркер', make_command_wrapper('поставить маркер'))
+            builtin_handler.register_procedure('убрать маркер', make_command_wrapper('убрать маркер'))
 
 
 def _register_robot_conditions(visitor, handler):
@@ -206,8 +211,8 @@ def _register_robot_conditions(visitor, handler):
         # Регистрируем условия - исправляем, чтобы возвращали логический тип
         if hasattr(builtin_handler, 'register_function'):
             # Создаем обёртки, которые возвращают логический результат
-            def make_robot_condition_wrapper(condition_name):
-                def wrapper():
+            def make_robot_condition_wrapper(condition_name: str):
+                def wrapper() -> bool:
                     result = handler.check_condition(condition_name)
                     # Возвращаем логическое значение для КуМир
                     return result if result is not None else False
@@ -225,8 +230,8 @@ def _register_robot_conditions(visitor, handler):
             builtin_handler.register_function('клетка_чистая', make_robot_condition_wrapper('клетка чистая'))
             
             # Добавляем команды измерения радиации и температуры
-            def make_measurement_wrapper(measurement_type):
-                def wrapper():
+            def make_measurement_wrapper(measurement_type: str):
+                def wrapper() -> float:
                     return handler.execute_measurement(measurement_type)
                 return wrapper
             

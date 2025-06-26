@@ -214,7 +214,7 @@ class SafeEvaluator(ast.NodeVisitor):
 			raise EvaluationError(f"Вызов функции '{func_name or '<неизвестный объект>'}' не разрешен.")
 
 		args = [self.visit(arg) for arg in node.args]
-		kwargs = {kw.arg: self.visit(kw.value) for kw in node.keywords}
+		kwargs = {kw.arg: self.visit(kw.value) for kw in node.keywords if kw.arg is not None}
 
 		logger.debug(f"Calling function '{func_name or '<lambda/other>'}' with args: {args}, kwargs: {kwargs}")
 
