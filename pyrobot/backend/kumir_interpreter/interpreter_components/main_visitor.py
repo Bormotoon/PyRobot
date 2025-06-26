@@ -210,17 +210,6 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementHandlerMixin, St
 
     # Основной метод для запуска интерпретации с корневого узла (program)    
     def visitProgram(self, ctx: KumirParser.ProgramContext):
-        print(f"\n!!! [DEBUG main_visitor.visitProgram] CALLED! Context: {ctx.getText()[:100]}... !!!", file=sys.stderr)
-        
-        # DEBUG: расширенная отладка
-        with open("debug_interpret.log", "a", encoding="utf-8") as f:
-            f.write(f"visitProgram: ctx has {len(ctx.children) if ctx.children else 0} children\n")
-            if ctx.children:
-                for i, child in enumerate(ctx.children):
-                    f.write(f"  Child {i}: {type(child).__name__} = {child.getText()[:50]}\n")
-            
-            f.write(f"ctx.programItem() count: {len(ctx.programItem()) if ctx.programItem() else 0}\n")
-            f.write(f"ctx.moduleDefinition() count: {len(ctx.moduleDefinition()) if ctx.moduleDefinition() else 0}\n")
         
         # Обработка глобальных объявлений и присваиваний (programItem*)
         if ctx.programItem():
@@ -236,29 +225,15 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementHandlerMixin, St
         # Это важно, чтобы процедуры были известны до их вызова
         if ctx.moduleDefinition():
             for mod_def_ctx in ctx.moduleDefinition():
-                # DEBUG: 
-                with open("debug_interpret.log", "a", encoding="utf-8") as f:
-                    f.write(f"Processing moduleDefinition: {mod_def_ctx.getText()[:100]}\n")
-                    f.write(f"  has implicitModuleBody: {mod_def_ctx.implicitModuleBody() is not None}\n")
-                    f.write(f"  has moduleBody: {mod_def_ctx.moduleBody() is not None}\n")
                 
                 if mod_def_ctx.implicitModuleBody():
-                    with open("debug_interpret.log", "a", encoding="utf-8") as f:
-                        f.write(f"  Processing implicitModuleBody\n")
-                        f.write(f"    algorithmDefinition count: {len(mod_def_ctx.implicitModuleBody().algorithmDefinition()) if mod_def_ctx.implicitModuleBody().algorithmDefinition() else 0}\n")
                     
                     if mod_def_ctx.implicitModuleBody().algorithmDefinition():
                         for alg_def_ctx in mod_def_ctx.implicitModuleBody().algorithmDefinition():
-                            with open("debug_interpret.log", "a", encoding="utf-8") as f:
-                                f.write(f"      Calling visitAlgorithmDefinition for: {alg_def_ctx.getText()[:50]}\n")
                             self.visitAlgorithmDefinition(alg_def_ctx) # Собираем информацию
                 elif mod_def_ctx.moduleBody(): # Явный модуль
-                    with open("debug_interpret.log", "a", encoding="utf-8") as f:
-                        f.write(f"  Processing explicit moduleBody\n")
                     if mod_def_ctx.moduleBody().algorithmDefinition():
                         for alg_def_ctx in mod_def_ctx.moduleBody().algorithmDefinition():
-                            with open("debug_interpret.log", "a", encoding="utf-8") as f:
-                                f.write(f"      Calling visitAlgorithmDefinition for: {alg_def_ctx.getText()[:50]}\n")
                             self.visitAlgorithmDefinition(alg_def_ctx) # Собираем информацию
         
         # Ищем "главный" алгоритм для выполнения или первый попавшийся, если "главного" нет
@@ -554,13 +529,11 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementHandlerMixin, St
             initial_value_ctx = None
             
             if var_item_ctx.LBRACK(): 
-                print(f"[DEBUG] Обрабатываем границы для глобальной таблицы '{var_name}'", file=sys.stderr)
                 # Парсим границы массива
                 dimensions = []
                 array_bounds_nodes = var_item_ctx.arrayBounds()
                 if array_bounds_nodes:
                     for i, bounds_ctx in enumerate(array_bounds_nodes):
-                        print(f"[DEBUG] Обработка границ измерения {i + 1} для '{var_name}': {bounds_ctx.getText()}", file=sys.stderr)
                         
                         if not (bounds_ctx.expression(0) and bounds_ctx.expression(1) and bounds_ctx.COLON()):
                             raise DeclarationError(
@@ -590,7 +563,7 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementHandlerMixin, St
                                 line_content=self.get_line_content_from_ctx(bounds_ctx.expression(1)))
 
                         dimensions.append((min_idx, max_idx))
-                    print(f"[DEBUG] Определены границы для '{var_name}': {dimensions}", file=sys.stderr)
+                    # Границы для таблицы определены
                 else:
                     raise DeclarationError(
                         f"Строка {var_item_ctx.LBRACK().getSymbol().line}: Отсутствуют определения границ для таблицы '{var_name}'.",
@@ -625,12 +598,12 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementHandlerMixin, St
             
             if initial_value_ctx:
                 value_to_assign = self.visit(initial_value_ctx)
-                print(f"[DEBUG][GLOBAL_ARRAY_INIT] Получено значение для инициализации '{var_name}': {value_to_assign}, тип: {value_to_assign.kumir_type}", file=sys.stderr)
+                # Получено значение для инициализации таблицы
                 
                 if is_table_type:
                     # Для таблиц нужно создать KumirTableVar из литерала массива
                     if value_to_assign.kumir_type == KumirType.TABLE.value and isinstance(value_to_assign.value, list):
-                        print(f"[DEBUG][GLOBAL_ARRAY_INIT] Создаем KumirTableVar из литерала массива для '{var_name}'", file=sys.stderr)
+                        # Создаем KumirTableVar из литерала массива
                         # Импортируем функцию создания таблицы из литерала
                         from .declaration_visitors import _create_table_from_array_literal
                         
@@ -642,7 +615,7 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementHandlerMixin, St
                             initial_value_ctx
                         )
                         validated_value = KumirValue(table_var, KumirType.TABLE.value)
-                        print(f"[DEBUG][GLOBAL_ARRAY_INIT] Создан KumirTableVar для '{var_name}': {validated_value}", file=sys.stderr)
+                        # KumirTableVar создан успешно
                     else:
                         validated_value = cast(KumirInterpreterVisitor, self)._validate_and_convert_value_for_assignment(
                             value_to_assign, 
@@ -737,13 +710,8 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementHandlerMixin, St
         """Вызывает пользовательскую функцию с заданными аргументами через procedure_manager"""
         from ..kumir_datatypes import KumirValue
         
-        print(f"[DEBUG] _call_user_function вызвана для '{func_name}' с аргументами: {args}", file=sys.stderr)
-        
         # Используем публичный метод execute_user_function для единообразной логики
-        print(f"[DEBUG] Вызываем execute_user_function для '{func_name}'", file=sys.stderr)
         return_value = self.procedure_manager.execute_user_function(func_name, args, ctx)
-        
-        print(f"[DEBUG] _call_user_function получил результат: {return_value}", file=sys.stderr)
         
         if not isinstance(return_value, KumirValue) and return_value is not None:
             # Попытка преобразовать в KumirValue, если нужно

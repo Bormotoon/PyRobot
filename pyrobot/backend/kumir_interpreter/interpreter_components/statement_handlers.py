@@ -165,21 +165,18 @@ class StatementHandlerMixin(KumirParserVisitor):
         if ctx.expression() and not ctx.ASSIGN():
             # Проверяем, является ли это вызовом процедуры
             procedure_name = self._extract_procedure_name_from_expression(ctx.expression())
-            print(f"[DEBUG] AssignmentStatement: извлечено имя процедуры: {procedure_name} из выражения: {ctx.expression().getText()}", file=sys.stderr)
             
             if procedure_name and hasattr(kiv_self, 'procedure_manager'):
                 is_proc_defined = kiv_self.procedure_manager.is_procedure_defined(procedure_name)
-                print(f"[DEBUG] AssignmentStatement: процедура '{procedure_name}' определена: {is_proc_defined}", file=sys.stderr)
                 
                 if is_proc_defined:
-                    print(f"[DEBUG] AssignmentStatement: обрабатываем как вызов процедуры '{procedure_name}'", file=sys.stderr)
                     # Это вызов процедуры - обрабатываем через procedure call handler
                     self._handle_procedure_call_from_expression(ctx.expression())
                     return
                 else:
-                    print(f"[DEBUG] AssignmentStatement: '{procedure_name}' не является процедурой, обрабатываем как выражение", file=sys.stderr)
+                    # Не является процедурой, обрабатываем как выражение
+                    pass
             else:
-                print(f"[DEBUG] AssignmentStatement: обрабатываем как обычное выражение", file=sys.stderr)
                 # Обычное выражение - в expression evaluator
                 kiv_self.expression_evaluator.visit(ctx.expression())
             return
@@ -200,7 +197,6 @@ class StatementHandlerMixin(KumirParserVisitor):
                 # В КуМире знач := выражение НЕ прерывает выполнение функции,
                 # а только устанавливает значение для возврата.
                 # Функция продолжает выполняться до конца.
-                print(f"[DEBUG] Устанавливаю возвращаемое значение: {value_to_assign}", file=sys.stderr)
                 kiv_self.procedure_manager.set_return_value(value_to_assign)
 
             elif var_name_node:
@@ -305,7 +301,6 @@ class StatementHandlerMixin(KumirParserVisitor):
                 if arg_ctx.NEWLINE_CONST():
                     # Обработка константы новой строки 'нс'
                     formatted_str = "\n"
-                    print(f"[DEBUG] Processing NEWLINE_CONST: adding newline", file=sys.stderr)
                 elif arg_ctx.expression():
                     # arg_ctx.expression() возвращает список выражений
                     expressions = arg_ctx.expression()
@@ -944,22 +939,17 @@ class StatementHandlerMixin(KumirParserVisitor):
                 line_index=expr_ctx.start.line - 1,
                 column_index=expr_ctx.start.column
             )
-        print(f"[DEBUG] _handle_procedure_call_from_expression: procedure_name = {procedure_name}", file=sys.stderr)
-          # Извлекаем выражения аргументов из postfix expression
+        # Извлекаем выражения аргументов из postfix expression
         arg_expressions = []
         postfix_expr = self._extract_postfix_expression(expr_ctx)
-        print(f"[DEBUG] _handle_procedure_call_from_expression: postfix_expr = {postfix_expr}", file=sys.stderr)
         
         if postfix_expr is None:
-            print(f"[DEBUG] _handle_procedure_call_from_expression: postfix_expr is None!", file=sys.stderr)
+            # postfix_expr is None - no arguments
+            pass
         else:
-            print(f"[DEBUG] _handle_procedure_call_from_expression: postfix_expr has {len(postfix_expr.children)} children", file=sys.stderr)
-            
             # Проходим по детям postfixExpression: name LPAREN argumentList? RPAREN
             for i, child in enumerate(postfix_expr.children):
                 child_type = type(child).__name__
-                child_text = child.getText() if hasattr(child, 'getText') else str(child)
-                print(f"[DEBUG] _handle_procedure_call_from_expression: child[{i}] type={child_type}, text='{child_text}'", file=sys.stderr)
                 
                 # Ищем ArgumentListContext (по названию класса)
                 if 'ArgumentList' in child_type:

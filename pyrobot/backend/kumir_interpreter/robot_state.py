@@ -275,4 +275,39 @@ class SimulatedRobot:
 			# raise RobotError(f"Неизвестный тип измерения: {measure_type}")
 			return 0
 
+	def put_marker(self):
+		""" Поставить маркер в текущей клетке. """
+		pos_key = f"{self.robot_pos['x']},{self.robot_pos['y']}"
+		self.logger.debug(f"Attempting to put marker at {pos_key}")
+		
+		# Проверяем, есть ли уже маркер в этой клетке
+		if pos_key in self.markers and self.markers[pos_key] > 0:
+			self.logger.warning(f"Marker already exists at {pos_key}")
+			raise RobotError(f"В клетке ({self.robot_pos['x']},{self.robot_pos['y']}) уже есть маркер")
+		
+		# Ставим маркер
+		self.markers[pos_key] = 1
+		self.logger.info(f"Marker placed at {pos_key}")
+
+	def pick_marker(self):
+		""" Убрать маркер из текущей клетки. """
+		pos_key = f"{self.robot_pos['x']},{self.robot_pos['y']}"
+		self.logger.debug(f"Attempting to pick marker at {pos_key}")
+		
+		# Проверяем, есть ли маркер в этой клетке
+		if pos_key not in self.markers or self.markers[pos_key] <= 0:
+			self.logger.warning(f"No marker found at {pos_key}")
+			raise RobotError(f"В клетке ({self.robot_pos['x']},{self.robot_pos['y']}) нет маркера")
+		
+		# Убираем маркер
+		del self.markers[pos_key]
+		self.logger.info(f"Marker picked from {pos_key}")
+
+	def is_marker_here(self):
+		""" Проверить, есть ли маркер в текущей клетке. """
+		pos_key = f"{self.robot_pos['x']},{self.robot_pos['y']}"
+		has_marker = pos_key in self.markers and self.markers[pos_key] > 0
+		self.logger.debug(f"Check marker at {pos_key}: {has_marker}")
+		return has_marker
+
 # FILE END: robot_state.py

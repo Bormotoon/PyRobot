@@ -11,7 +11,6 @@ class IOHandler:
         self.output_stream = output_stream
         self.error_stream = error_stream # Добавляем error_stream
         # TODO: Implement input/output methods (ввод, вывод)
-        print(f"[DEBUG IOHandler.__init__] Initialized. self.output_stream type: {type(self.output_stream)}, id: {id(self.output_stream)}, self.error_stream type: {type(self.error_stream)}", file=__import__('sys').stderr)
 
     def get_input_line(self, prompt: str) -> str:
         # Сначала выводим подсказку, если она есть и есть куда выводить
@@ -46,7 +45,6 @@ class IOHandler:
 
     def write_output(self, text: str) -> None:
         """Записывает текст в выходной поток."""
-        print(f"[DEBUG IOHandler.write_output] CALLED. Text length: {len(text)}. Text: >>>{text}<<<", file=__import__('sys').stderr)
         try:
             if self.output_stream:
                 self.output_stream(text) # Просто вызываем output_stream как функцию
@@ -78,9 +76,7 @@ class IOHandler:
             # Если эхо отключено, можно очистить буфер ввода, если нужно
             # Но это зависит от конкретной реализации ввода
             pass
-        print(f"[DEBUG IOHandler.set_echo_input] Echo input set to {echo}.", file=__import__('sys').stderr)
 
     def set_visitor(self, visitor):
         """Устанавливает visitor после инициализации IOHandler."""
         self.visitor = visitor
-        print(f"[DEBUG IOHandler.set_visitor] Visitor set in IOHandler.", file=__import__('sys').stderr)

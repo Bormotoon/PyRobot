@@ -23,13 +23,10 @@ import {
 	PlayArrow as PlayIcon,
 	Error as ErrorIcon,
 	Info as InfoIcon,
-	Warning as WarningIcon,
-	CheckCircle as SuccessIcon,
 	Navigation as MovementIcon,
 	Edit as EditIcon,
 	Clear as ClearIcon,
 	Visibility as VisibilityIcon,
-	Fullscreen as FullscreenIcon,
 	FullscreenExit as FullscreenExitIcon
 } from '@mui/icons-material';
 import logger from '../../Logger';
@@ -100,10 +97,6 @@ const UserLog = ({ steps = [], error = '' }) => {
 			left: rect.left,
 			width: rect.width,
 		};
-	};
-
-	const toggleExpanded = () => {
-		setIsExpanded(prev => !prev);
 	};
 
 	const getLogIcon = (line) => {

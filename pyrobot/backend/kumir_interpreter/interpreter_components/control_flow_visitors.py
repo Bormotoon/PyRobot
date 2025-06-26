@@ -1,4 +1,3 @@
-import sys
 from typing import TYPE_CHECKING, cast, Optional, Any
 
 from ..generated.KumirParser import KumirParser
@@ -235,12 +234,9 @@ class ControlFlowVisitorMixin:
         # switchStatement: SWITCH caseBlock+ (ELSE statementSequence)? FI
         # caseBlock: CASE expression COLON statementSequence
         
-        print(f"!!! [DEBUG] visitSwitchStatement called, caseBlocks: {len(ctx.caseBlock())} !!!", file=sys.stderr)
-        
         executed_case = False
         for case_block_ctx in ctx.caseBlock():
             condition_expr_ctx = case_block_ctx.expression()
-            print(f"!!! [DEBUG] Evaluating case condition: {condition_expr_ctx.getText()} !!!", file=sys.stderr)
             
             # Вычисляем выражение как логическое (например, m = 1, m = 2, etc.)
             condition_val_node = kiv_self.expression_evaluator.visit(condition_expr_ctx)
@@ -254,10 +250,8 @@ class ControlFlowVisitorMixin:
             
             # Преобразуем результат в boolean согласно семантике КУМИРа
             condition_bool = self._evaluate_condition(condition_val_node, "оператора ВЫБОР (ПРИ)", condition_expr_ctx)
-            print(f"!!! [DEBUG] Case condition result: {condition_bool} !!!", file=sys.stderr)
             
             if condition_bool:
-                print(f"!!! [DEBUG] Executing case block !!!", file=sys.stderr)
                 if case_block_ctx.statementSequence():
                     kiv_self.visit(case_block_ctx.statementSequence())
                 executed_case = True
@@ -265,7 +259,6 @@ class ControlFlowVisitorMixin:
         
         # Если ни одно условие не выполнилось, выполняем блок ИНАЧЕ (если есть)
         if not executed_case and ctx.ELSE():
-            print(f"!!! [DEBUG] Executing ELSE block !!!", file=sys.stderr)
             # The statementSequence for ELSE will be at index len(ctx.caseBlock())
             # in the list of all statementSequences of the switchStatement.
             else_clause_stm_seq_index = len(ctx.caseBlock())
@@ -285,7 +278,7 @@ class ControlFlowVisitorMixin:
     def visitStopStatement(self, ctx: KumirParser.StopStatementContext) -> None:
         # stopStatement: STOP
         kiv_self = cast('KumirInterpreterVisitor', self)
-        print("Выполнение программы остановлено оператором СТОП.\n", file=sys.stderr)
+        # Выполнение программы остановлено оператором СТОП
         raise StopExecutionSignal()
 
     def visitAssertionStatement(self, ctx: KumirParser.AssertionStatementContext):
@@ -307,7 +300,6 @@ class ControlFlowVisitorMixin:
             err_col = ctx.start.column
             lc = kiv_self.get_line_content_from_ctx(ctx)
             # В КуМире сообщение об ошибке УТВ обычно стандартное
-            print(f"Ошибка времени выполнения: Утверждение (утв) ложно в строке {err_line}, поз. {err_col}.\n", file=sys.stderr)
             # Стандартный КуМир обычно прерывает выполнение здесь.
             raise KumirRuntimeError(f"Утверждение (утв) ложно.", line_index=err_line-1, column_index=err_col, line_content=lc)
         return None
@@ -316,8 +308,7 @@ class ControlFlowVisitorMixin:
         kiv_self = cast(KumirInterpreterVisitor, self)
         # pauseStatement: PAUSE
         # В интерактивной среде это была бы пауза. В пакетном режиме можно проигнорировать или вывести сообщение.
-        # print("[INFO] Оператор ПАУЗА выполнен.") # Или использовать error_stream_out, если это считается "выводом"
-        print("Оператор ПАУЗА выполнен.\n", file=sys.stderr) # Сообщение в поток ошибок/информации
+        # Оператор ПАУЗА выполнен - логируется через основную систему логирования
         # Можно добавить реальную паузу, если нужно для тестов, но обычно это не требуется для функциональных тестов.
         # import time
         # time.sleep(1) # Пауза на 1 секунду

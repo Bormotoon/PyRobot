@@ -19,21 +19,26 @@ from .kumir_interpreter.kumir_exceptions import (
     DeclarationError, AssignmentError, InputOutputError
 )
 
+# Импортируем новую систему мониторинга
+from .monitoring import (
+    setup_logging, request_logging_middleware, 
+    create_health_endpoints, log_code_execution,
+    metrics_collector
+)
+
 app = Flask(__name__)
 
 # --- Настройки CORS, Сессии, Логирования, Песочницы ---
 allowed_origins = os.environ.get('CORS_ALLOWED_ORIGINS',
                                  "http://localhost:3000").split(',')
 CORS(app, supports_credentials=True, origins=allowed_origins)
-logger = logging.getLogger('FlaskServer')
-logger.info(f"CORS configured for origins: {allowed_origins}")
 
 secret_key = os.environ.get('FLASK_SECRET_KEY',
                            'fallback-secret-key-please-change-this-immediately!')
 app.config['SECRET_KEY'] = secret_key
 
 if app.config['SECRET_KEY'] == 'fallback-secret-key-change-this-immediately!':
-    logger.warning("SECURITY WARNING: Using default FLASK_SECRET_KEY.")
+    print("SECURITY WARNING: Using default FLASK_SECRET_KEY.")
 
 app.config['SESSION_TYPE'] = 'redis'
 app.config['SESSION_PERMANENT'] = False
@@ -49,53 +54,35 @@ try:
     )
     redis_client.ping()
     app.config['SESSION_REDIS'] = redis_client
-    logger.info(f"Session storage configured for Redis at "
+    print(f"Session storage configured for Redis at "
                 f"{redis_host}:{redis_port}, DB: {redis_db}")
 except redis.exceptions.ConnectionError as redis_err:
-    logger.error(f"CRITICAL: Failed to connect to Redis: {redis_err}")
+    print(f"CRITICAL: Failed to connect to Redis: {redis_err}")
     app.config['SESSION_TYPE'] = 'filesystem'
-    logger.warning("Falling back to 'filesystem' session type.")
+    print("Falling back to 'filesystem' session type.")
 except Exception as redis_other_err:
-    logger.error(f"CRITICAL: Error configuring Redis: {redis_other_err}")
+    print(f"CRITICAL: Error configuring Redis: {redis_other_err}")
     app.config['SESSION_TYPE'] = 'filesystem'
-    logger.warning("Falling back to 'filesystem' session type.")
+    print("Falling back to 'filesystem' session type.")
 
 samesite = os.environ.get('SESSION_COOKIE_SAMESITE', 'Lax')
 app.config['SESSION_COOKIE_SAMESITE'] = samesite
 secure_flag = os.environ.get('SESSION_COOKIE_SECURE', 'False').lower() == 'true'
 app.config['SESSION_COOKIE_SECURE'] = secure_flag
-logger.info(f"Session cookie Samesite: {app.config['SESSION_COOKIE_SAMESITE']}")
-logger.info(f"Session cookie Secure flag: {app.config['SESSION_COOKIE_SECURE']}")
 
 Session(app)
 socketio = SocketIO(app, cors_allowed_origins=allowed_origins,
                     manage_session=False, async_mode='eventlet')
 
-log_level_name = os.environ.get('LOG_LEVEL', 'DEBUG').upper()
-log_level = getattr(logging, log_level_name, logging.DEBUG)
-if logger.hasHandlers():
-    logger.handlers.clear()
+# Настройка новой системы логирования и мониторинга
+logger = setup_logging(app)
+request_logging_middleware(app)
+create_health_endpoints(app)
 
-log_handler = logging.StreamHandler()
-log_formatter = logging.Formatter(
-    '%(asctime)s - %(name)s:%(lineno)d - %(levelname)s - %(message)s'
-)
-log_handler.setFormatter(log_formatter)
-logger.addHandler(log_handler)
-logger.setLevel(log_level)
-
-# Настройка уровней логирования для внешних библиотек
-logging.getLogger('werkzeug').setLevel(
-    logging.WARNING if log_level > logging.INFO else logging.INFO
-)
-logging.getLogger('socketio').setLevel(
-    logging.WARNING if log_level > logging.INFO else logging.INFO
-)
-logging.getLogger('engineio').setLevel(
-    logging.WARNING if log_level > logging.INFO else logging.INFO
-)
-logging.getLogger('redis').setLevel(logging.WARNING)
-logger.info(f"Logger level for '{logger.name}' set to: {log_level_name}")
+logger.info("PyRobot backend server starting up...")
+logger.info(f"CORS configured for origins: {allowed_origins}")
+logger.info(f"Session cookie Samesite: {app.config['SESSION_COOKIE_SAMESITE']}")
+logger.info(f"Session cookie Secure flag: {app.config['SESSION_COOKIE_SECURE']}")
 
 try:
     backend_dir = Path(__file__).parent.absolute()
@@ -103,12 +90,12 @@ try:
     SANDBOX_DIR.mkdir(parents=True, exist_ok=True)
     logger.info(f"Ensured sandbox directory exists at: {SANDBOX_DIR}")
 except Exception as e:
-    logger.exception(f"CRITICAL: Failed to create/ensure sandbox directory at "
-                     f"{SANDBOX_DIR}.")
+    logger.error(f"CRITICAL: Failed to create/ensure sandbox directory at {SANDBOX_DIR}", exc_info=True)
 
 
 # --- Вспомогательные функции ---
 def get_field_state_from_session():
+    logger = logging.getLogger('PyRobot.Session')
     s = session.get('field_state')
     if not isinstance(s, dict):
         if s is not None:
@@ -137,6 +124,8 @@ def get_field_state_from_session():
 # --- Эндпоинты Flask ---
 @app.route('/updateField', methods=['POST'])
 def update_field():
+    logger = logging.getLogger('PyRobot.UpdateField')
+    
     if not request.is_json:
         logger.warning("Request to /updateField is not JSON.")
         return jsonify({
@@ -214,7 +203,11 @@ def test_debug():
 
 
 @app.route('/execute', methods=['POST'])
+@log_code_execution
 def execute_code():
+    # Получаем logger для этой функции
+    logger = logging.getLogger('PyRobot.Execute')
+    
     session_id_for_log = session.get('sid', 'None')
     logger.debug(f"Session @ /execute start for SID {session_id_for_log}: "
                 f"{dict(session.items())}")
@@ -406,6 +399,7 @@ def reset_simulator_session():
 # --- Обработчики SocketIO ---
 @socketio.on('connect')
 def handle_connect():
+    logger = logging.getLogger('PyRobot.WebSocket')
     logger.info(f"WebSocket client connected: SID={request.sid}")
     session['sid'] = request.sid
     session.modified = True
@@ -417,6 +411,7 @@ def handle_connect():
 
 @socketio.on('disconnect')
 def handle_disconnect(*args):
+    logger = logging.getLogger('PyRobot.WebSocket')
     sid = request.sid
     logger.info(f"WebSocket client disconnected: SID={sid}")
 
@@ -442,6 +437,9 @@ if __name__ == '__main__':
     logger.info("Starting Flask-SocketIO server...")
     logger.info(f"  Host: {host}")
     logger.info(f"  Port: {port}")
+    # Получаем настройки для логирования
+    log_level_name = os.environ.get('LOG_LEVEL', 'INFO').upper()
+    
     logger.info(f"  Debug Mode: {debug_mode}")
     logger.info(f"  Reloader: {use_reloader}")
     logger.info(f"  Log Level: {log_level_name}")
@@ -453,7 +451,7 @@ if __name__ == '__main__':
         socketio.run(app, host=host, port=port, debug=debug_mode,
                      use_reloader=use_reloader)
     except Exception as run_err:
-        logger.exception(f"Failed to start the server: {run_err}")
+        logger.error(f"Failed to start the server: {run_err}", exc_info=True)
         import sys
         sys.exit(1)
 
