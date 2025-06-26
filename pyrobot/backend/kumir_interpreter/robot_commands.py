@@ -7,8 +7,6 @@ import logging
 
 # Import RobotError from the new exceptions file
 from .kumir_exceptions import RobotError
-# SimulatedRobot нужен для проверки типа и вызова методов
-from .robot_state import SimulatedRobot
 
 logger = logging.getLogger('RobotCommands')
 

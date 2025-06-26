@@ -1,9 +1,8 @@
-import sys
-from typing import TYPE_CHECKING, cast, Optional, List, Dict
+from typing import TYPE_CHECKING, cast, Optional, List, Dict, Any
 from pyrobot.backend.kumir_interpreter.kumir_exceptions import (
-    KumirRuntimeError, KumirSyntaxError, DeclarationError, KumirNameError,
+    KumirRuntimeError, KumirNameError, KumirSyntaxError,
     KumirTypeError, KumirArgumentError, BreakSignal, ContinueSignal, StopExecutionSignal, ExitSignal,
-    KumirNotImplementedError, KumirEvalError
+    KumirEvalError, KumirNotImplementedError
 )
 from ..generated.KumirParser import KumirParser
 from ..generated.KumirParserVisitor import KumirParserVisitor
@@ -12,9 +11,6 @@ from ..kumir_datatypes import KumirType, KumirValue, KumirTableVar
 from ..utils import KumirTypeConverter
 
 if TYPE_CHECKING:
-    from .scope_manager import ScopeManager
-    from .expression_evaluator import ExpressionEvaluator
-    from .procedure_manager import ProcedureManager
     from .main_visitor import KumirInterpreterVisitor
 
 class StatementHandlerMixin(KumirParserVisitor):
@@ -30,17 +26,10 @@ class StatementHandlerMixin(KumirParserVisitor):
         For booleans: direct evaluation
         For other types: raises KumirTypeError
         """
-        if condition_val is None:
-            raise KumirTypeError(
-                f"Условие в {context_name} не может быть неопределенным значением",
-                line_index=expr_ctx.start.line -1,
-                column_index=expr_ctx.start.column
-            )
-        
         try:
             converter = KumirTypeConverter()
             return converter.to_python_bool(condition_val)
-        except KumirTypeError as e:
+        except KumirTypeError:
             # Re-raise with more specific context
             raise KumirTypeError(
                 f"Условие в {context_name} должно быть логического или целого типа, получено: {condition_val.kumir_type}",
@@ -99,12 +88,6 @@ class StatementHandlerMixin(KumirParserVisitor):
             if var_decl_item_ctx.expression():
                 initial_value_expr_ctx = var_decl_item_ctx.expression()
                 initial_value = kiv_self.expression_evaluator.visit(initial_value_expr_ctx)
-                if initial_value is None:
-                    raise KumirRuntimeError(
-                        f"Не удалось вычислить начальное значение для переменной '{var_name}'. Выражение вернуло None.",
-                        line_index=initial_value_expr_ctx.start.line - 1,
-                        column_index=initial_value_expr_ctx.start.column
-                    )
 
             # Определяем, является ли переменная массивом по текущему объявлению
             # (т.е. есть границы [...] или тип сам по себе массив типа целтаб)
@@ -186,12 +169,6 @@ class StatementHandlerMixin(KumirParserVisitor):
             lvalue_ctx = ctx.lvalue()
             var_name_node = lvalue_ctx.qualifiedIdentifier()            # Вычисляем правую часть
             value_to_assign = kiv_self.expression_evaluator.visit(ctx.expression())
-            if value_to_assign is None:
-                raise KumirRuntimeError(
-                    f"Правая часть присваивания для '{lvalue_ctx.getText()}' не может быть вычислена (None).",
-                    line_index=ctx.expression().start.line -1,
-                    column_index=ctx.expression().start.column
-                )
 
             if lvalue_ctx.RETURN_VALUE(): # Присваивание в 'знач' (возврат из функции)
                 # В КуМире знач := выражение НЕ прерывает выполнение функции,
@@ -210,7 +187,7 @@ class StatementHandlerMixin(KumirParserVisitor):
                         for i in range(len(index_list_ctx.expression())):
                             idx_expr_ctx = index_list_ctx.expression(i)
                             idx_kv = kiv_self.expression_evaluator.visit(idx_expr_ctx)
-                            if idx_kv is None or idx_kv.kumir_type != KumirType.INT.value:
+                            if idx_kv.kumir_type != KumirType.INT.value:
                                 raise KumirTypeError(
                                     f"Индекс для '{var_name}' должен быть целым числом, получен {idx_kv}.",
                                     line_index=idx_expr_ctx.start.line -1,
@@ -308,13 +285,6 @@ class StatementHandlerMixin(KumirParserVisitor):
                         # Берём первое выражение (основное значение для вывода)
                         main_expr = expressions[0]
                         value_to_print = kiv_self.expression_evaluator.visit(main_expr)
-                        
-                        if value_to_print is None:
-                            raise KumirRuntimeError(
-                                f"Не удалось вычислить значение для вывода аргумента {i+1} процедуры ВЫВОД.",
-                                line_index=main_expr.start.line -1,
-                                column_index=main_expr.start.column
-                            )
 
                         # Обработка форматных спецификаторов
                         # Проверяем наличие форматных спецификаторов
@@ -332,7 +302,7 @@ class StatementHandlerMixin(KumirParserVisitor):
                                 precision = precision_value.value                        # Преобразование значения к строке с учетом типа и форматирования
                         # Нормализуем тип - обрабатываем и строковый и enum варианты
                         type_value = value_to_print.kumir_type
-                        if hasattr(type_value, 'value') and not isinstance(type_value, str):
+                        if hasattr(type_value, 'value'):
                             # Это enum объект, берем его значение
                             type_value = type_value.value
                         
@@ -379,14 +349,14 @@ class StatementHandlerMixin(KumirParserVisitor):
                     
                 current_output += formatted_str
 
-            if hasattr(kiv_self, 'io_handler') and kiv_self.io_handler is not None:
+            if hasattr(kiv_self, 'io_handler'):
                 kiv_self.io_handler.write_output(current_output)
             else:
                 import logging
                 logging.warning(f"io_handler is not available in StatementHandler. Output: {current_output}")
 
         elif ctx.INPUT(): # Проверяем, что это команда ВВОД
-            if not hasattr(kiv_self, 'io_handler') or kiv_self.io_handler is None:
+            if not hasattr(kiv_self, 'io_handler'):
                 raise KumirRuntimeError("Обработчик ввода-вывода (io_handler) не инициализирован.",
                                         line_index=ctx.start.line -1,
                                         column_index=ctx.start.column)
@@ -435,11 +405,15 @@ class StatementHandlerMixin(KumirParserVisitor):
                             # Clean up potential array notation for error messages
                             if '[' in target_var_name and ']' in target_var_name:
                                 target_var_name = target_var_name.split('[')[0]
+                    else:
+                        raise KumirSyntaxError("Не найдено выражение для ввода", 
+                                               line_index=arg_ctx.start.line - 1, 
+                                               column_index=arg_ctx.start.column)
 
                     try:
                         var_info = kiv_self.scope_manager.get_variable_info(target_var_name)
                         target_type = var_info['kumir_type']
-                        is_array = var_info['is_table']
+                        _is_array = var_info['is_table']  # Не используется в данном контексте
 
                     except KumirNameError:
                         raise KumirNameError(f"Переменная '{target_var_name}' не объявлена.",
@@ -493,7 +467,7 @@ class StatementHandlerMixin(KumirParserVisitor):
                             indices = []
                             for expr_ctx in index_list_ctx.expression():
                                 idx_result = kiv_self.expression_evaluator.visit(expr_ctx)
-                                if not isinstance(idx_result, KumirValue) or idx_result.kumir_type != KumirType.INT.value:
+                                if idx_result.kumir_type != KumirType.INT.value:
                                     raise KumirTypeError(
                                         f"Индекс массива должен быть целым числом, получено: {idx_result}",
                                         line_index=expr_ctx.start.line -1,
@@ -799,12 +773,6 @@ class StatementHandlerMixin(KumirParserVisitor):
             # argumentList содержит expression напрямую, а не через expressionList
             for expr_ctx in args_ctx.expression():
                 arg_val = kiv_self.expression_evaluator.visit(expr_ctx)
-                if arg_val is None:
-                    raise KumirRuntimeError(
-                        f"Не удалось вычислить аргумент для вызова процедуры '{proc_name}'.",
-                        line_index=expr_ctx.start.line -1,
-                        column_index=expr_ctx.start.column
-                    )
                 actual_args.append(arg_val)
         
         kiv_self.procedure_manager.call_procedure(
@@ -911,14 +879,14 @@ class StatementHandlerMixin(KumirParserVisitor):
                 return None
               # Проверяем, что у postfixExpression есть аргументы (признак вызова с параметрами)
             # Структура: primaryExpression LPAREN argumentList? RPAREN
-            has_arguments = False
+            _has_arguments = False  # Пока не используется
             if len(postfix_expr.children) > 1:
                 for i in range(1, len(postfix_expr.children)):
                     child = postfix_expr.children[i]
                     # Используем getattr для безопасной проверки типа токена
                     if hasattr(child, 'getSymbol') and getattr(child.getSymbol(), 'type', None) == getattr(KumirLexer, 'LPAREN', None):
                         # Это вызов функции/процедуры с аргументами
-                        has_arguments = True
+                        _has_arguments = True
                         break
             
             # Возвращаем имя как потенциальный вызов процедуры 
@@ -954,7 +922,7 @@ class StatementHandlerMixin(KumirParserVisitor):
             pass
         else:
             # Проходим по детям postfixExpression: name LPAREN argumentList? RPAREN
-            for i, child in enumerate(postfix_expr.children):
+            for _i, child in enumerate(postfix_expr.children):
                 child_type = type(child).__name__
                 
                 # Ищем ArgumentListContext (по названию класса)
@@ -1044,7 +1012,7 @@ class StatementHandlerMixin(KumirParserVisitor):
         except:
             return None
 
-    def _analyze_procedure_arguments(self, procedure_name: str, arg_expressions: List['KumirParser.ExpressionContext']) -> List[Dict]:
+    def _analyze_procedure_arguments(self, procedure_name: str, arg_expressions: List['KumirParser.ExpressionContext']) -> List[Dict[str, Any]]:
         """
         Анализирует аргументы процедуры с учетом режимов параметров ('арг', 'рез', 'аргрез').
         Возвращает список словарей с информацией о каждом аргументе.
@@ -1082,15 +1050,15 @@ class StatementHandlerMixin(KumirParserVisitor):
                 # Встроенная процедура - простой словарь {'name': ..., 'type': ..., 'mode': ...}
                 if 'mode' in formal_param:
                     param_mode = formal_param['mode']
-                    param_name = formal_param.get('name', f'параметр {i+1}')
+                    _param_name = formal_param.get('name', f'параметр {i+1}')
                 else:
                     # Пользовательская процедура - сложная структура
                     param_mode = formal_param.get('mode', 'арг')
-                    param_name = formal_param.get('name', f'параметр {i+1}')
+                    _param_name = formal_param.get('name', f'параметр {i+1}')
             else:
                 # Fallback для непредвиденной структуры
                 param_mode = 'арг'
-                param_name = f'параметр {i+1}'
+                _param_name = f'параметр {i+1}'
             
             # DEBUG: анализ режима параметра убран для production
             pass
@@ -1098,8 +1066,6 @@ class StatementHandlerMixin(KumirParserVisitor):
             if param_mode in ['арг', 'arg']:
                 # Для 'арг' параметров вычисляем значение
                 arg_value = kiv_self.expression_evaluator.visit(expr_ctx)
-                if arg_value is None:
-                    raise KumirRuntimeError(f"Не удалось вычислить значение аргумента для параметра '{param_name}'")
                 
                 analyzed_args.append({
                     'mode': param_mode,
@@ -1120,8 +1086,6 @@ class StatementHandlerMixin(KumirParserVisitor):
                 arg_value = None
                 if param_mode in ['аргрез', 'argres']:
                     arg_value = kiv_self.expression_evaluator.visit(expr_ctx)
-                    if arg_value is None:
-                        raise KumirRuntimeError(f"Не удалось вычислить значение аргумента для параметра '{param_name}'")
                 
                 # Получаем информацию о переменной для обратной записи
                 var_info = kiv_self.scope_manager.find_variable_with_scope_depth(var_name)

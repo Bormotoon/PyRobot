@@ -1,7 +1,6 @@
 # Visitor methods for general statements (assignment, I/O calls, etc.)
 
-import sys
-from typing import Any, List, Dict, Optional, TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, cast
 from ..generated.KumirParser import KumirParser
 from ..kumir_exceptions import KumirRuntimeError, KumirTypeError
 from ..kumir_datatypes import KumirType
@@ -23,12 +22,6 @@ class StatementVisitorMixin:
                     # expression() может вернуть список выражений, берем первое
                     first_expression = expressions[0] if isinstance(expressions, list) else expressions
                     value_to_print = kiv_self.expression_evaluator.visit(first_expression)
-                    if value_to_print is None:
-                        raise KumirRuntimeError(
-                            f"Не удалось вычислить значение для вывода аргумента {i+1} процедуры ВЫВОД.",
-                            line_index=arg_ctx.start.line -1,
-                            column_index=arg_ctx.start.column
-                        )
                       # Отладочный вывод для диагностики
                     
                     # Дополнительная отладка для сравнения типов
@@ -139,7 +132,7 @@ class StatementVisitorMixin:
             for i, (var_name, value_str) in enumerate(zip(input_variables, values)):
                 try:
                     # Получаем информацию о переменной для определения её типа
-                    var_info, scope = kiv_self.scope_manager.find_variable(var_name)
+                    var_info, _scope = kiv_self.scope_manager.find_variable(var_name)
                     if not var_info:
                         raise KumirRuntimeError(
                             f"Переменная '{var_name}' не найдена.",

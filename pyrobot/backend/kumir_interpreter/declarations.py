@@ -8,13 +8,11 @@
 import logging
 import math
 import re
-import sys
 
 # Импортируем нужные исключения из нового файла
 from .kumir_exceptions import (DeclarationError, AssignmentError, InputOutputError,
                                KumirInputRequiredError, KumirExecutionError, KumirEvalError)
 from .constants import ALLOWED_TYPES, MAX_INT
-from .file_functions import get_default_output
 from .identifiers import is_valid_identifier
 # Импортируем safe_eval только для использования, а не для исключений
 from .safe_eval import safe_eval

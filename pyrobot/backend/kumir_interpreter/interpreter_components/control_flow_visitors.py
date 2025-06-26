@@ -1,7 +1,7 @@
-from typing import TYPE_CHECKING, cast, Optional, Any
+from typing import TYPE_CHECKING, cast
 
 from ..generated.KumirParser import KumirParser
-from ..kumir_exceptions import BreakSignal, KumirTypeError, KumirRuntimeError, KumirNameError, KumirNotImplementedError, StopExecutionSignal
+from ..kumir_exceptions import BreakSignal, KumirTypeError, KumirRuntimeError, KumirNotImplementedError, StopExecutionSignal
 from ..kumir_datatypes import KumirValue, KumirType # Для проверки типов результатов выражений, KumirType для объявления переменной цикла
 from ..utils import KumirTypeConverter
 
@@ -18,17 +18,10 @@ class ControlFlowVisitorMixin:
         For booleans: direct evaluation
         For other types: raises KumirTypeError
         """
-        if condition_val is None:
-            raise KumirTypeError(
-                f"Условие в {context_name} не может быть неопределенным значением",
-                line_index=expr_ctx.start.line -1,
-                column_index=expr_ctx.start.column
-            )
-        
         try:
             converter = KumirTypeConverter()
             return converter.to_python_bool(condition_val)
-        except KumirTypeError as e:
+        except KumirTypeError:
             # Re-raise with more specific context
             raise KumirTypeError(
                 f"Условие в {context_name} должно быть логического или целого типа, получено: {condition_val.kumir_type}",
@@ -241,13 +234,6 @@ class ControlFlowVisitorMixin:
             # Вычисляем выражение как логическое (например, m = 1, m = 2, etc.)
             condition_val_node = kiv_self.expression_evaluator.visit(condition_expr_ctx)
             
-            if not isinstance(condition_val_node, KumirValue):
-                err_line = condition_expr_ctx.start.line
-                err_col = condition_expr_ctx.start.column
-                lc = kiv_self.get_line_content_from_ctx(condition_expr_ctx)
-                raise KumirRuntimeError(f"Строка {err_line}, поз. {err_col}: не удалось вычислить условие в ПРИ оператора ВЫБОР.",
-                                     line_index=err_line-1, column_index=err_col, line_content=lc)
-            
             # Преобразуем результат в boolean согласно семантике КУМИРа
             condition_bool = self._evaluate_condition(condition_val_node, "оператора ВЫБОР (ПРИ)", condition_expr_ctx)
             
@@ -277,7 +263,7 @@ class ControlFlowVisitorMixin:
 
     def visitStopStatement(self, ctx: KumirParser.StopStatementContext) -> None:
         # stopStatement: STOP
-        kiv_self = cast('KumirInterpreterVisitor', self)
+        _kiv_self = cast('KumirInterpreterVisitor', self)  # Может понадобиться позже
         # Выполнение программы остановлено оператором СТОП
         raise StopExecutionSignal()
 
@@ -305,7 +291,7 @@ class ControlFlowVisitorMixin:
         return None
 
     def visitPauseStatement(self, ctx: KumirParser.PauseStatementContext):
-        kiv_self = cast(KumirInterpreterVisitor, self)
+        _kiv_self = cast(KumirInterpreterVisitor, self)  # Может понадобиться позже
         # pauseStatement: PAUSE
         # В интерактивной среде это была бы пауза. В пакетном режиме можно проигнорировать или вывести сообщение.
         # Оператор ПАУЗА выполнен - логируется через основную систему логирования

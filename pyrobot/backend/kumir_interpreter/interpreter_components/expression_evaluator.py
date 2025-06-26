@@ -3,8 +3,7 @@
 
 from __future__ import annotations
 from antlr4 import ParserRuleContext, Token
-from typing import Any, List, Tuple, Optional, Union, Callable
-from antlr4.tree.Tree import TerminalNode
+from typing import Any, List, Tuple, Callable
 from ..generated.KumirParser import KumirParser # Оставляем только этот импорт для KumirParser
 from .scope_manager import ScopeManager
 from .procedure_manager import ProcedureManager
@@ -13,7 +12,6 @@ from ..generated.KumirParser import KumirParser
 from .scope_manager import ScopeManager # Исправленный импорт ScopeManager
 from ..kumir_datatypes import KumirValue, KumirType, KumirTableVar # Добавлено
 from ..kumir_exceptions import KumirEvalError, KumirTypeError, KumirNameError, KumirRuntimeError, KumirNotImplementedError, KumirArgumentError, KumirSyntaxError, KumirIndexError # Добавлены KumirRuntimeError, KumirNotImplementedError, KumirArgumentError, KumirSyntaxError, КумирIndexError
-import sys # Добавлено
 import operator # Добавлено для реляционных операций
 from ..generated.KumirLexer import KumirLexer # Добавлено для констант токенов
 
@@ -807,7 +805,7 @@ class ExpressionEvaluator(KumirParserVisitor):
                 # Это процедура - возвращаем имя для обработки в postfixExpression
                 return KumirValue(var_name, KumirType.STR.value)
           # Ищем переменную в scope_manager (возвращает кортеж (var_info, scope))
-        var_info, scope = self.scope_manager.find_variable(var_name)
+        var_info, _scope = self.scope_manager.find_variable(var_name)
         if var_info is None:
             pos = self._position_from_token(ctx.ID().symbol)
             raise KumirNameError(f"Переменная '{var_name}' не объявлена.", line_index=pos[0], column_index=pos[1])

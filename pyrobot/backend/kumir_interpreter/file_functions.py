@@ -23,19 +23,19 @@ try:
 	# Поднимаемся на один уровень (к каталогу backend)
 	backend_dir = current_dir.parent
 	# Создаем путь к каталогу песочницы
-	SANDBOX_BASE_DIR = backend_dir / "kumir_sandbox"
+	sandbox_base_dir = backend_dir / "kumir_sandbox"
 	# Убедимся, что каталог существует, создаем его, если нет
-	SANDBOX_BASE_DIR.mkdir(parents=True, exist_ok=True)
+	sandbox_base_dir.mkdir(parents=True, exist_ok=True)
 	# Сохраняем абсолютный путь как строку для сравнения префиксов
-	SANDBOX_BASE_PATH_STR = str(SANDBOX_BASE_DIR)
-	logger.info(f"File sandbox initialized at: {SANDBOX_BASE_PATH_STR}")
+	sandbox_base_path_str = str(sandbox_base_dir)
+	logger.info(f"File sandbox initialized at: {sandbox_base_path_str}")
 except Exception as e:
 	logger.exception(f"CRITICAL: Failed to initialize file sandbox directory: {e}")
 	# Если песочница не создана, дальнейшая работа опасна.
-	# Можно либо остановить приложение, либо установить SANDBOX_BASE_DIR в None
+	# Можно либо остановить приложение, либо установить sandbox_base_dir в None
 	# и проверять это в _resolve_sandbox_path. Установим в None для явной ошибки.
-	SANDBOX_BASE_DIR = None
-	SANDBOX_BASE_PATH_STR = None  # raise RuntimeError(f"Failed to initialize file sandbox: {e}") # Можно раскомментировать для остановки
+	sandbox_base_dir = None
+	sandbox_base_path_str = None  # raise RuntimeError(f"Failed to initialize file sandbox: {e}") # Можно раскомментировать для остановки
 
 
 class SandboxError(Exception):
@@ -58,7 +58,7 @@ def _resolve_sandbox_path(user_path):
         SandboxError: Если путь выходит за пределы песочницы или песочница не инициализирована.
         TypeError: Если user_path не является строкой.
     """
-	if SANDBOX_BASE_DIR is None or SANDBOX_BASE_PATH_STR is None:
+	if sandbox_base_dir is None or sandbox_base_path_str is None:
 		logger.critical("Sandbox base directory is not configured. File operations denied.")
 		raise SandboxError("Файловая песочница не инициализирована.")
 
@@ -66,7 +66,7 @@ def _resolve_sandbox_path(user_path):
 		raise TypeError(f"Путь должен быть строкой, получен {type(user_path)}")
 
 	# Создаем путь относительно базового каталога песочницы
-	combined_path = SANDBOX_BASE_DIR / user_path
+	combined_path = sandbox_base_dir / user_path
 
 	# Получаем канонический абсолютный путь (разрешает '..', '.', симлинки)
 	try:
@@ -82,9 +82,9 @@ def _resolve_sandbox_path(user_path):
 
 	# ГЛАВНАЯ ПРОВЕРКА: Убеждаемся, что абсолютный путь начинается с пути к песочнице
 	# Это предотвращает выход из песочницы через '..' или абсолютные пути.
-	if not abs_path_str.startswith(SANDBOX_BASE_PATH_STR):
+	if not abs_path_str.startswith(sandbox_base_path_str):
 		logger.warning(
-			f"Path traversal attempt detected: User path '{user_path}' resolved to '{abs_path_str}', which is outside sandbox '{SANDBOX_BASE_PATH_STR}'.")
+			f"Path traversal attempt detected: User path '{user_path}' resolved to '{abs_path_str}', which is outside sandbox '{sandbox_base_path_str}'.")
 		raise SandboxError(f"Доступ запрещен: путь '{user_path}' выходит за пределы песочницы.")
 
 	logger.debug(f"Resolved sandboxed path for '{user_path}' -> '{abs_path}'")
@@ -186,8 +186,9 @@ def open_for_writing(filename):
 			raise Exception(f"Нет прав на запись в файл '{filename}'.")
 	elif not parent_dir.exists() or not os.access(str(parent_dir), os.W_OK):
 		# Проверяем существование родительской директории и права на запись в нее
+		sandbox_rel_path = parent_dir.relative_to(sandbox_base_dir) if sandbox_base_dir else str(parent_dir)
 		raise Exception(
-			f"Нет прав на создание файла '{filename}' в директории '{parent_dir.relative_to(SANDBOX_BASE_DIR)}'.")
+			f"Нет прав на создание файла '{filename}' в директории '{sandbox_rel_path}'.")
 
 	try:
 		# Открываем файл в режиме записи
@@ -222,8 +223,9 @@ def open_for_append(filename):
 		if not os.access(path_str, os.W_OK):
 			raise Exception(f"Нет прав на запись (добавление) в файл '{filename}'.")
 	elif not parent_dir.exists() or not os.access(str(parent_dir), os.W_OK):
+		sandbox_rel_path = parent_dir.relative_to(sandbox_base_dir) if sandbox_base_dir else str(parent_dir)
 		raise Exception(
-			f"Нет прав на создание файла '{filename}' для добавления в директории '{parent_dir.relative_to(SANDBOX_BASE_DIR)}'.")
+			f"Нет прав на создание файла '{filename}' для добавления в директории '{sandbox_rel_path}'.")
 
 	try:
 		# Открываем файл в режиме добавления
@@ -249,7 +251,7 @@ def close_file(f):
 	if path_str not in _open_files:
 		# Это может случиться, если файл был открыт не нашими функциями
 		# или был закрыт ранее. Проверяем, начинается ли путь с песочницы для безопасности.
-		if SANDBOX_BASE_PATH_STR and path_str.startswith(SANDBOX_BASE_PATH_STR):
+		if sandbox_base_path_str and path_str.startswith(sandbox_base_path_str):
 			logger.warning(f"Attempting to close file '{f.name}' which was not tracked as open. Closing anyway.")
 		else:
 			# Попытка закрыть файл вне песочницы или некорректный путь
@@ -258,7 +260,8 @@ def close_file(f):
 
 	try:
 		f.close()
-		logger.info(f"Closed file '{os.path.relpath(path_str, SANDBOX_BASE_PATH_STR)}' (path: {path_str}).")
+		rel_path = os.path.relpath(path_str, sandbox_base_path_str) if sandbox_base_path_str else path_str
+		logger.info(f"Closed file '{rel_path}' (path: {path_str}).")
 	except Exception as e:
 		# Удаляем из _open_files даже если закрытие вызвало ошибку,
 		# чтобы не блокировать повторное открытие
@@ -451,7 +454,10 @@ def full_path(name):
 	try:
 		path_obj = _resolve_sandbox_path(name)
 		# Возвращаем путь относительно базы песочницы
-		relative_path = path_obj.relative_to(SANDBOX_BASE_DIR)
+		if sandbox_base_dir:
+			relative_path = path_obj.relative_to(sandbox_base_dir)
+		else:
+			relative_path = path_obj
 		# Возвращаем как строку в стиле Unix (с '/')
 		return str(relative_path).replace('\\', '/')
 	except (SandboxError, TypeError) as e:
@@ -466,7 +472,7 @@ def full_path(name):
 
 def WORKING_DIRECTORY():
 	"""Возвращает путь к корневому каталогу песочницы."""
-	if SANDBOX_BASE_PATH_STR:
+	if sandbox_base_path_str:
 		# Возвращаем просто '/', обозначая корень песочницы
 		return "/"
 	else:

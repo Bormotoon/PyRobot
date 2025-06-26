@@ -1,7 +1,6 @@
 # Scope and variable management functions 
 from typing import Any, Tuple, Optional, Dict, List
 from antlr4 import ParserRuleContext
-import sys # Добавлено для print в error_stream
 
 from ..kumir_exceptions import DeclarationError, KumirEvalError, KumirIndexError, KumirTypeError, KumirNameError
 from ..kumir_datatypes import KumirType, KumirValue, KumirTableVar

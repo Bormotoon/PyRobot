@@ -1,6 +1,5 @@
 # Functions for managing user-defined procedures and functions (algorithms) 
-import sys
-from typing import Dict, Any, List, Optional, TYPE_CHECKING, Union, Tuple # <--- ДОБАВЛЕН Tuple, List, Optional (List, Optional уже были, Tuple добавлен)
+from typing import Dict, Any, List, Optional, TYPE_CHECKING, Union # <--- УДАЛЕН Tuple, sys, logging
 from antlr4 import ParserRuleContext # Убрана TerminalNode, она импортируется ниже, если нужна
 from antlr4.tree.Tree import TerminalNode # Импорт TerminalNode
 
@@ -8,7 +7,7 @@ from antlr4.tree.Tree import TerminalNode # Импорт TerminalNode
 from ..generated.KumirParser import KumirParser # Исправленный импорт KumirParser
 from ..kumir_exceptions import DeclarationError, KumirArgumentError, KumirNameError, KumirTypeError, ExitSignal, AssignmentError, KumirEvalError, BreakSignal, KumirRuntimeError # Заменены ProcedureExitCalled на ExitSignal и LoopExitException на BreakSignal, добавлен KumirRuntimeError
 from ..kumir_datatypes import KumirTableVar, KumirFunction, KumirValue, KumirType # <--- ДОБАВЛЕН KumirType
-from .constants import VOID_TYPE, INTEGER_TYPE, FLOAT_TYPE, STRING_TYPE, BOOLEAN_TYPE 
+from .constants import VOID_TYPE # <--- УДАЛЕНЫ неиспользуемые типы
 from .scope_manager import get_default_value # <--- Import get_default_value
 from .type_utils import get_type_info_from_specifier # <--- ДОБАВЛЕН ИМПОРТ
 
@@ -149,7 +148,7 @@ class ProcedureManager:
         fake_ctx = None
           # 5. Вызываем _execute_procedure_call
         try:
-            result = self._execute_procedure_call(proc_data, python_args_for_execute, fake_ctx)
+            _result = self._execute_procedure_call(proc_data, python_args_for_execute, fake_ctx)
             # Для процедур результат не используется (должен быть None)
         except ExitSignal:
             # ExitSignal должен пробрасываться дальше без изменений

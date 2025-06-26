@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, Optional, List, Dict
 from antlr4 import ParserRuleContext
 
 if TYPE_CHECKING:
-    from ..main_visitor import KumirInterpreterVisitor # Для аннотации типов, избегаем циклического импорта
+    from pyrobot.backend.kumir_interpreter.interpreter_components.main_visitor import KumirInterpreterVisitor # Для аннотации типов, избегаем циклического импорта
 
 from ..kumir_exceptions import KumirArgumentError, KumirEvalError
 from ..kumir_datatypes import KumirValue, KumirType
@@ -324,7 +324,7 @@ def handle_insert_substring(visitor: 'KumirInterpreterVisitor', fragment: str, t
 
 # --- Новые обработчики процедур ---
 
-def handle_delete_substring_procedure(visitor: 'KumirInterpreterVisitor', analyzed_args: List[Dict], ctx: Optional[ParserRuleContext]) -> None:
+def handle_delete_substring_procedure(visitor: 'KumirInterpreterVisitor', analyzed_args: List[Dict[str, Any]], ctx: Optional[ParserRuleContext]) -> None:
     """Обработчик процедуры удалить(аргрез лит строка, арг цел начало, арг цел количество)."""
     # analyzed_args[0] - строка (аргрез)
     # analyzed_args[1] - начало (арг) 
@@ -375,7 +375,7 @@ def handle_delete_substring_procedure(visitor: 'KumirInterpreterVisitor', analyz
         column_index=ctx.start.column if ctx and ctx.start else 0
     )
 
-def handle_insert_substring_procedure(visitor: 'KumirInterpreterVisitor', analyzed_args: List[Dict], ctx: Optional[ParserRuleContext]) -> None:
+def handle_insert_substring_procedure(visitor: 'KumirInterpreterVisitor', analyzed_args: List[Dict[str, Any]], ctx: Optional[ParserRuleContext]) -> None:
     """Обработчик процедуры вставить(лит фрагмент, аргрез лит строка, арг цел начало)."""
     # analyzed_args[0] - фрагмент (арг)
     # analyzed_args[1] - строка (аргрез)

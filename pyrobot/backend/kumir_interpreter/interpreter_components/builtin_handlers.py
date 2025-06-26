@@ -17,8 +17,33 @@ from . import builtin_functions as bf
 from ..math_functions import div, mod 
 
 if TYPE_CHECKING:
-    from ..interpreter import KumirInterpreterVisitor # Для аннотации типов visitor_self
+    from pyrobot.backend.kumir_interpreter.interpreter_components.main_visitor import KumirInterpreterVisitor # Для аннотации типов visitor_self
     from antlr4 import ParserRuleContext
+
+# Типы для лямбда-функций
+HandlerFunc = Callable[['KumirInterpreterVisitor', List[Any], Optional['ParserRuleContext']], Any]
+
+# Вспомогательные функции для создания типизированных лямбд
+def make_handler_1arg(handler_func: Callable[['KumirInterpreterVisitor', Any, Optional['ParserRuleContext']], Any]) -> HandlerFunc:
+    return lambda visitor_self, args, ctx: handler_func(visitor_self, args[0], ctx)
+
+def make_handler_2arg(handler_func: Callable[['KumirInterpreterVisitor', Any, Any, Optional['ParserRuleContext']], Any]) -> HandlerFunc:
+    return lambda visitor_self, args, ctx: handler_func(visitor_self, args[0], args[1], ctx)
+
+def make_math_handler_2arg(math_func: Callable[[Any, Any], Any]) -> HandlerFunc:
+    return lambda visitor_self, args, ctx: math_func(args[0], args[1])
+
+def make_lit_to_int_handler(visitor_self: 'KumirInterpreterVisitor', args: List[Any], ctx: Optional['ParserRuleContext']) -> Any:
+    if len(args) == 1:
+        return bf.handle_lit_to_int(visitor_self, args[0], ctx)
+    else:
+        return bf.handle_lit_to_int_with_success(visitor_self, args[0], args[1], ctx)
+
+def make_lit_to_real_handler(visitor_self: 'KumirInterpreterVisitor', args: List[Any], ctx: Optional['ParserRuleContext']) -> Any:
+    if len(args) == 1:
+        return bf.handle_lit_to_real(visitor_self, args[0], ctx)
+    else:
+        return bf.handle_lit_to_real_with_success(visitor_self, args[0], args[1], ctx)
 
 # Типы, которые могут понадобиться для словаря, если решим его типизировать позже
 # ArgTypes = List[List[str]]
@@ -31,72 +56,72 @@ BUILTIN_FUNCTIONS = {
     'sqrt': { 
         'min_args': 1, 'max_args': 1,
         'arg_types': [['вещ', 'цел']], 
-        'handler': lambda visitor_self, args, ctx: bf.handle_sqrt(visitor_self, args[0], ctx)
+        'handler': make_handler_1arg(bf.handle_sqrt)
     },
     'sin': { 
         'min_args': 1, 'max_args': 1,
         'arg_types': [['вещ', 'цел']],
-        'handler': lambda visitor_self, args, ctx: bf.handle_sin(visitor_self, args[0], ctx)
+        'handler': make_handler_1arg(bf.handle_sin)
     },
     'cos': { 
         'min_args': 1, 'max_args': 1,
         'arg_types': [['вещ', 'цел']],
-        'handler': lambda visitor_self, args, ctx: bf.handle_cos(visitor_self, args[0], ctx)
+        'handler': make_handler_1arg(bf.handle_cos)
     },
     'tan': { 
         'min_args': 1, 'max_args': 1,
         'arg_types': [['вещ', 'цел']],
-        'handler': lambda visitor_self, args, ctx: bf.handle_tan(visitor_self, args[0], ctx)
+        'handler': make_handler_1arg(bf.handle_tan)
     },
     'arctan': { 
         'min_args': 1, 'max_args': 1,
         'arg_types': [['вещ', 'цел']],
-        'handler': lambda visitor_self, args, ctx: bf.handle_arctan(visitor_self, args[0], ctx)
+        'handler': make_handler_1arg(bf.handle_arctan)
     },
     'int': { 
         'min_args': 1, 'max_args': 1,
         'arg_types': [['вещ', 'цел']],
-        'handler': lambda visitor_self, args, ctx: bf.handle_int_conversion(visitor_self, args[0], ctx)
+        'handler': make_handler_1arg(bf.handle_int_conversion)
     },
     'abs': { 
         'min_args': 1, 'max_args': 1,
         'arg_types': [['вещ', 'цел']],
-        'handler': lambda visitor_self, args, ctx: bf.handle_abs(visitor_self, args[0], ctx)
+        'handler': make_handler_1arg(bf.handle_abs)
     },
     'sign': { 
         'min_args': 1, 'max_args': 1,
         'arg_types': [['вещ', 'цел']],
-        'handler': lambda visitor_self, args, ctx: bf.handle_sign(visitor_self, args[0], ctx)
+        'handler': make_handler_1arg(bf.handle_sign)
     },
     'случайноецелое': { 
          'min_args': 2, 'max_args': 2,
          'arg_types': [['цел', 'цел']],
-         'handler': lambda visitor_self, args, ctx: bf.handle_random_integer(visitor_self, args[0], args[1], ctx)
+         'handler': make_handler_2arg(bf.handle_random_integer)
     },
     'случайноевещественное': { 
          'min_args': 2, 'max_args': 2,
          'arg_types': [['вещ', 'вещ'], ['цел', 'цел'], ['вещ', 'цел'], ['цел', 'вещ']],
-         'handler': lambda visitor_self, args, ctx: bf.handle_random_real(visitor_self, args[0], args[1], ctx)
+         'handler': make_handler_2arg(bf.handle_random_real)
     },
     'div': { 
         'min_args': 2, 'max_args': 2,
         'arg_types': [['цел', 'цел']],
-        'handler': lambda visitor_self, args, ctx: div(args[0], args[1]) 
+        'handler': make_math_handler_2arg(div)
     },
     'mod': { 
         'min_args': 2, 'max_args': 2,
         'arg_types': [['цел', 'цел']],
-        'handler': lambda visitor_self, args, ctx: mod(args[0], args[1]) 
+        'handler': make_math_handler_2arg(mod)
     },
     'irand': { 
         'min_args': 2, 'max_args': 2,
         'arg_types': [['цел', 'цел']], 
-        'handler': lambda visitor_self, args, ctx: bf.handle_irand(visitor_self, args[0], args[1], ctx) 
+        'handler': make_handler_2arg(bf.handle_irand)
     },
     'rand': { 
         'min_args': 2, 'max_args': 2,
         'arg_types': [['вещ', 'цел'], ['вещ', 'цел']], # Оригинал был [['вещ', 'цел'], ['вещ', 'цел']], уточнил по math_functions.rand, он принимает (Any, Any)
-        'handler': lambda visitor_self, args, ctx: bf.handle_rand(visitor_self, args[0], args[1], ctx)
+        'handler': make_handler_2arg(bf.handle_rand)
     },
     # --- Математические функции (конец) ---
 
@@ -104,39 +129,39 @@ BUILTIN_FUNCTIONS = {
     'длин': { 
         'min_args': 1, 'max_args': 1,
         'arg_types': [['лит']],
-        'handler': lambda visitor_self, args, ctx: bf.handle_length(visitor_self, args[0], ctx)
+        'handler': make_handler_1arg(bf.handle_length)
     },
     'позиция': {
         'min_args': 2, 'max_args': 2,
         'arg_types': [['лит', 'лит']],
-        'handler': lambda visitor_self, args, ctx: bf.handle_position(visitor_self, args[0], args[1], ctx)
+        'handler': make_handler_2arg(bf.handle_position)
     },
     'поз': { # Сокращенный вариант для "позиция"
         'min_args': 2, 'max_args': 2,
         'arg_types': [['лит', 'лит']],
-        'handler': lambda visitor_self, args, ctx: bf.handle_position(visitor_self, args[0], args[1], ctx)
+        'handler': make_handler_2arg(bf.handle_position)
     },
     'лит_в_цел': {
         'min_args': 1, 'max_args': 2, # может быть с параметром успех или без
         'arg_types': [['лит'], ['лит', 'лог']], 
         'param_modes': [['арг'], ['арг', 'рез']], # первый параметр - арг, второй (если есть) - рез
-        'handler': lambda visitor_self, args, ctx: bf.handle_lit_to_int(visitor_self, args[0], ctx) if len(args) == 1 else bf.handle_lit_to_int_with_success(visitor_self, args[0], args[1], ctx)
+        'handler': make_lit_to_int_handler
     },
     'лит_в_вещ': {
         'min_args': 1, 'max_args': 2,
         'arg_types': [['лит'], ['лит', 'лог']], 
         'param_modes': [['арг'], ['арг', 'рез']], # первый параметр - арг, второй (если есть) - рез
-        'handler': lambda visitor_self, args, ctx: bf.handle_lit_to_real(visitor_self, args[0], ctx) if len(args) == 1 else bf.handle_lit_to_real_with_success(visitor_self, args[0], args[1], ctx)
+        'handler': make_lit_to_real_handler
     },
     'цел_в_лит': {
         'min_args': 1, 'max_args': 1,
         'arg_types': [['цел']],
-        'handler': lambda visitor_self, args, ctx: bf.handle_int_to_lit(visitor_self, args[0], ctx)
+        'handler': make_handler_1arg(bf.handle_int_to_lit)
     },
     'вещ_в_лит': {
         'min_args': 1, 'max_args': 1,
         'arg_types': [['вещ']],
-        'handler': lambda visitor_self, args, ctx: bf.handle_real_to_lit(visitor_self, args[0], ctx)
+        'handler': make_handler_1arg(bf.handle_real_to_lit)
     },
     # --- Строковые функции (конец) ---
 
@@ -160,14 +185,18 @@ class BuiltinFunctionHandler:
         self.functions = BUILTIN_FUNCTIONS.copy()
         self.custom_handlers = {}  # Для кастомных обработчиков
 
-    def register_function(self, name: str, handler: Callable[[], Any]):
+    def register_function(self, name: str, handler: Callable[[], Any]) -> None:
         """Регистрирует новую функцию с обработчиком."""
         name_lower = name.lower()
+        
+        def typed_handler(visitor_self: 'KumirInterpreterVisitor', args: List[Any], ctx: Optional['ParserRuleContext']) -> Any:
+            return handler()
+        
         self.functions[name_lower] = {
             'min_args': 0,
             'max_args': 0,
             'arg_types': [],
-            'handler': lambda visitor_self, args, ctx: handler()
+            'handler': typed_handler
         }
 
     def call_function(self, func_name: str, args: List[Any], ctx: Optional['ParserRuleContext']) -> Any:
@@ -265,7 +294,7 @@ class BuiltinProcedureHandler:
         """Проверяет, является ли процедура встроенной."""
         return proc_name.lower() in self.procedures
         
-    def get_procedure_info(self, proc_name: str) -> Dict:
+    def get_procedure_info(self, proc_name: str) -> Dict[str, Any]:
         """Возвращает информацию о встроенной процедуре."""
         proc_name_lower = proc_name.lower()
         if proc_name_lower in self.procedures:

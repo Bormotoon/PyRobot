@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, List, Optional
 from .kumir_exceptions import KumirEvalError, KumirTypeError 
 from enum import Enum
 

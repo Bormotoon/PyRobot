@@ -5,7 +5,7 @@
 """
 
 import logging
-from typing import Optional, Dict, Any, Callable, List
+from typing import Optional, Dict, Any, Callable
 from io import StringIO
 import sys
 
@@ -65,7 +65,7 @@ class KumirLanguageInterpreter:
         self.current_input_request = None
         
         # Callback для прогресса выполнения
-        self.progress_callback: Optional[Callable] = None
+        self.progress_callback: Optional[Callable[..., Any]] = None
         
         # Трассировка выполнения
         self.trace = []
@@ -127,7 +127,7 @@ class KumirLanguageInterpreter:
                 initial_pos={'x': 0, 'y': 0}
             )
 
-    def interpret(self, progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
+    def interpret(self, progress_callback: Optional[Callable[..., Any]] = None) -> Dict[str, Any]:
         """
         Выполнение программы КуМир.
         

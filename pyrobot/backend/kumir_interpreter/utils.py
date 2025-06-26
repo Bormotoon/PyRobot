@@ -1,8 +1,8 @@
-from typing import Any, Union  # Оставляем только используемые импорты
+from typing import Any, Union, Optional  # Добавляем Optional
 
 from .kumir_datatypes import KumirValue, KumirType
 from .kumir_exceptions import (  # Используем правильный стиль импорта
-    KumirTypeError, KumirSemanticError, KumirRuntimeError
+    KumirTypeError
 )
 
 # KumirValue is now defined in kumir_datatypes.py
@@ -136,7 +136,7 @@ class KumirTypeConverter:
             raise KumirTypeError(f"Невозможно преобразовать тип "
                                 f"{val.kumir_type} в число (ЦЕЛ/ВЕЩ).", None)
 
-    def to_string_for_display(self, val: KumirValue) -> str:
+    def to_string_for_display(self, val: Optional[KumirValue]) -> str:
         """Convert KumirValue to string for display."""
         if val is None or val.kumir_type == KumirType.UNKNOWN.value:
             return "НЕОПРЕД"

@@ -2,8 +2,7 @@
 import re
 
 # --->>> ДОБАВЛЯЕМ ИМПОРТЫ ИЗ constants <<<---
-from .constants import RESERVED_KEYWORDS, \
-    ALLOWED_TYPES  # ALLOWED_TYPES может не использоваться здесь, но пусть будет для консистентности
+from .constants import RESERVED_KEYWORDS
 
 
 def is_valid_identifier(identifier, var_type):

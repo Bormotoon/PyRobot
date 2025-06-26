@@ -1,10 +1,9 @@
 # Visitor methods for declaration statements (variables, etc.)
 import sys # Для print отладки
-from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Union, cast
+from typing import TYPE_CHECKING, cast
 
 from ..generated.KumirParser import KumirParser
-from ..kumir_exceptions import (KumirEvalError, KumirNotImplementedError,
-                                DeclarationError, AssignmentError)
+from ..kumir_exceptions import (KumirEvalError, DeclarationError, AssignmentError)
 from ..kumir_datatypes import KumirType, KumirValue, KumirTableVar
 from ..definitions import Parameter, AlgorithmDefinition  # Импорт наших новых классов
 from .type_utils import get_type_info_from_specifier
@@ -221,14 +220,7 @@ class DeclarationVisitorMixin:
                     except (AssignmentError, DeclarationError, KumirEvalError) as e:
                         line = var_decl_item_ctx.expression().start.line
                         column = var_decl_item_ctx.expression().start.column
-                        if isinstance(e, KumirEvalError):
-                            raise KumirEvalError(
-                                f"Строка {line}, столбец {column}: Ошибка при инициализации таблицы '{var_name}': {e.args[0]}",
-                                line_index=line-1, 
-                                column_index=column, 
-                                line_content=kiv_self.get_line_content_from_ctx(var_decl_item_ctx.expression())
-                            ) from e
-                        elif isinstance(e, (AssignmentError, DeclarationError)):
+                        if type(e) is KumirEvalError:
                             raise KumirEvalError(
                                 f"Строка {line}, столбец {column}: Ошибка при инициализации таблицы '{var_name}': {e.args[0]}",
                                 line_index=line-1, 
@@ -236,7 +228,13 @@ class DeclarationVisitorMixin:
                                 line_content=kiv_self.get_line_content_from_ctx(var_decl_item_ctx.expression())
                             ) from e
                         else:
-                            raise
+                            # AssignmentError or DeclarationError
+                            raise KumirEvalError(
+                                f"Строка {line}, столбец {column}: Ошибка при инициализации таблицы '{var_name}': {e.args[0]}",
+                                line_index=line-1, 
+                                column_index=column, 
+                                line_content=kiv_self.get_line_content_from_ctx(var_decl_item_ctx.expression())
+                            ) from e
 
             else:  # Обычная (скалярная) переменная
                 if var_decl_item_ctx.LBRACK():
@@ -268,19 +266,18 @@ class DeclarationVisitorMixin:
                         column = var_decl_item_ctx.expression().start.column
                         # Мы не можем напрямую использовать type(e)(...) т.к. KumirEvalError требует line_index, column_index
                         # Пересоздадим исключение с правильными аргументами, если это одна из наших ошибок
-                        if isinstance(e, KumirEvalError):
+                        if type(e) is KumirEvalError:
                              raise KumirEvalError(
                                 f"Строка {line}, столбец {column}: Ошибка при инициализации переменной '{var_name}': {e.args[0]}",
                                 line_index=line-1, column_index=column, line_content=kiv_self.get_line_content_from_ctx(var_decl_item_ctx.expression())
                             ) from e
-                        elif isinstance(e, (AssignmentError, DeclarationError)): # Эти ошибки не имеют line/col в конструкторе
+                        else:
+                             # AssignmentError or DeclarationError - эти ошибки не имеют line/col в конструкторе
                              # Оборачиваем в KumirEvalError
                              raise KumirEvalError(
                                 f"Строка {line}, столбец {column}: Ошибка при инициализации переменной '{var_name}': {e.args[0]}",
                                 line_index=line-1, column_index=column, line_content=kiv_self.get_line_content_from_ctx(var_decl_item_ctx.expression())
                              ) from e
-                        else: # pragma: no cover
-                             raise # Другие типы ошибок
         return None # Explicitly return None as variable declarations are statements
 
     # The following visit methods are for specific statement types if defined in grammar

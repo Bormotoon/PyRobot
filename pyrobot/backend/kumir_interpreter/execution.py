@@ -6,7 +6,6 @@
 Обновлен для работы с механизмом ссылок через interpreter и использует
 исключения из kumir_exceptions.
 """
-import copy
 import logging
 import re
 import time
@@ -18,11 +17,9 @@ from .kumir_exceptions import (KumirExecutionError, DeclarationError, Assignment
 from .constants import ALLOWED_TYPES
 # Импортируем только нужные функции process_* из declarations
 from .declarations import (process_declaration, process_assignment, process_output,
-                           process_input, get_default_value, _validate_and_convert_value)
+                           process_input)
 from .robot_commands import process_robot_command
 from .safe_eval import safe_eval  # KumirEvalError импортирован выше
-from .preprocessing import split_respecting_quotes
-from .identifiers import is_valid_identifier
 
 logger = logging.getLogger('KumirExecution')
 
@@ -97,7 +94,8 @@ def process_if_block(lines, start_index, interpreter, trace, progress_callback, 
 	i = start_index + 1;
 	series1_lines, series2_lines = [], [];
 	series1_indices, series2_indices = [], []
-	current_series, current_indices = None, None;
+	current_series = None
+	current_indices = None
 	found_then, found_else, end_if_index = False, False, -1
 	while i < n:
 		line_raw = lines[i];
@@ -111,15 +109,15 @@ def process_if_block(lines, start_index, interpreter, trace, progress_callback, 
 			found_then = True;
 			current_series, current_indices = series1_lines, series1_indices
 			content_after_then = line[len("то"):].strip()
-			if content_after_then: current_series.append(content_after_then); current_indices.append(
-				original_index_for_line)
+			if content_after_then: 
+				current_series.append(content_after_then); current_indices.append(original_index_for_line)
 			logger.debug(f"Found 'то' at index {original_index_for_line + 1}. Content after: '{content_after_then}'")
 		elif lower_line.startswith("иначе") and found_then and not found_else:
 			found_else = True;
 			current_series, current_indices = series2_lines, series2_indices
 			content_after_else = line[len("иначе"):].strip()
-			if content_after_else: current_series.append(content_after_else); current_indices.append(
-				original_index_for_line)
+			if content_after_else: 
+				current_series.append(content_after_else); current_indices.append(original_index_for_line)
 			logger.debug(f"Found 'иначе' at index {original_index_for_line + 1}. Content after: '{content_after_else}'")
 		elif lower_line.startswith("иначе если") and found_then and not found_else:
 			logger.warning(
@@ -129,7 +127,7 @@ def process_if_block(lines, start_index, interpreter, trace, progress_callback, 
 			current_series.append(line_raw);
 			current_indices.append(original_index_for_line)
 		else:
-			if current_series is not None:
+			if current_series is not None and current_indices is not None:
 				current_series.append(line_raw); current_indices.append(original_index_for_line)
 			elif not found_then:
 				logger.debug(f"Line '{line}' appended to 'если' condition."); condition_expr += "\n" + line_raw
@@ -202,7 +200,9 @@ def process_select_block(lines, start_index, interpreter, trace, progress_callba
 	else_series, else_indices = [], [];
 	found_else = False;
 	end_select_index = -1
-	current_branch_dict, current_branch_lines, current_branch_indices = None, None, None
+	current_branch_dict = None
+	current_branch_lines = None
+	current_branch_indices = None
 	while i < n:
 		line_raw = lines[i];
 		line = line_raw.strip();
@@ -223,8 +223,8 @@ def process_select_block(lines, start_index, interpreter, trace, progress_callba
 			first_command = parts[1].strip();
 			current_branch_dict = {"condition": condition_expr, "body": [], "indices": []}
 			current_branch_lines, current_branch_indices = current_branch_dict["body"], current_branch_dict["indices"]
-			if first_command: current_branch_lines.append(first_command); current_branch_indices.append(
-				original_index_for_line)
+			if first_command: 
+				current_branch_lines.append(first_command); current_branch_indices.append(original_index_for_line)
 			branches.append(current_branch_dict)
 			logger.debug(
 				f"Found 'при' branch (idx {len(branches) - 1}) with condition '{condition_expr}'. First command: '{first_command}'")
@@ -236,11 +236,11 @@ def process_select_block(lines, start_index, interpreter, trace, progress_callba
 			current_branch_dict = None;
 			current_branch_lines, current_branch_indices = else_series, else_indices
 			content_after_else = line[len("иначе"):].strip()
-			if content_after_else: current_branch_lines.append(content_after_else); current_branch_indices.append(
-				original_index_for_line)
+			if content_after_else: 
+				current_branch_lines.append(content_after_else); current_branch_indices.append(original_index_for_line)
 			logger.debug(f"Found 'иначе' block. Content after: '{content_after_else}'")
 		else:
-			if current_branch_lines is not None:
+			if current_branch_lines is not None and current_branch_indices is not None:
 				current_branch_lines.append(line_raw); current_branch_indices.append(original_index_for_line)
 			else:
 				raise KumirExecutionError(f"Неожиданная строка '{line}' внутри 'выбор' до начала веток 'при'/'иначе'.",
@@ -719,7 +719,8 @@ def execute_line(line_raw, interpreter, current_original_index):
 					logger.error(f"Error in pause progress callback: {cb_err}")
 			return
 		if process_robot_command(line, robot): return
-		if process_algorithm_call(line_raw, interpreter, current_original_index): return
+		# TODO: Implement algorithm calls
+		# if process_algorithm_call(line_raw, interpreter, current_original_index): return
 		logger.error(f"Unknown command or syntax error: '{line}'")
 		raise KumirExecutionError(f"Неизвестная команда или синтаксическая ошибка.")
 	except (KumirExecutionError, KumirEvalError, RobotError, DeclarationError, AssignmentError, InputOutputError,

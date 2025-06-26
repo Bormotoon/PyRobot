@@ -1,7 +1,5 @@
 # Functions for handling input and output operations
 from typing import Callable, Optional
-# Импортируем kumir_exceptions как модуль, чтобы передавать его
-from .. import kumir_exceptions # Относительный импорт
 
 class IOHandler:
     def __init__(self, kumir_exceptions_module, visitor = None, input_stream: Optional[Callable[[], str]] = None, output_stream: Optional[Callable[[str], None]] = None, error_stream: Optional[Callable[[str], None]] = None):

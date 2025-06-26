@@ -11,7 +11,7 @@ import psutil
 import os
 from functools import wraps
 from datetime import datetime, timezone
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from flask import request, g, jsonify
 
 
