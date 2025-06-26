@@ -1,12 +1,19 @@
 # Generated from c:/Users/Bormotoon/VSCodeProjects/PyRobot/kumir_lang/KumirParser.g4 by ANTLR 4.13.2
 # encoding: utf-8
-from antlr4 import *
-from io import StringIO
+from typing import Optional
+from antlr4.Parser import Parser
+from antlr4.ParserRuleContext import ParserRuleContext
+from antlr4.Token import Token
+from antlr4.atn.ATNDeserializer import ATNDeserializer
+from antlr4.atn.ATN import ATN
+from antlr4.dfa.DFA import DFA
+from antlr4.PredictionContext import PredictionContextCache
+from antlr4.atn.ParserATNSimulator import ParserATNSimulator
+from antlr4 import TokenStream
+from antlr4 import ParseTreeListener, ParseTreeVisitor
+from antlr4.error.Errors import RecognitionException, NoViableAltException
 import sys
-if sys.version_info[1] > 5:
-	from typing import TextIO
-else:
-	from typing.io import TextIO
+from typing import TextIO
 
 def serializedATN():
     return [
@@ -497,7 +504,7 @@ class KumirParser ( Parser ):
     class QualifiedIdentifierContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -544,7 +551,7 @@ class KumirParser ( Parser ):
     class LiteralContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -656,7 +663,7 @@ class KumirParser ( Parser ):
     class ColorLiteralContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -739,18 +746,18 @@ class KumirParser ( Parser ):
     class ExpressionListContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
-        def expression(self, i:int=None):
+        def expression(self, i:Optional[int]=None):
             if i is None:
                 return self.getTypedRuleContexts(KumirParser.ExpressionContext)
             else:
                 return self.getTypedRuleContext(KumirParser.ExpressionContext,i)
 
 
-        def COMMA(self, i:int=None):
+        def COMMA(self, i:Optional[int]=None):
             if i is None:
                 return self.getTokens(KumirParser.COMMA)
             else:
@@ -809,7 +816,7 @@ class KumirParser ( Parser ):
     class ArrayLiteralContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -874,7 +881,7 @@ class KumirParser ( Parser ):
     class PrimaryExpressionContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -975,18 +982,18 @@ class KumirParser ( Parser ):
     class ArgumentListContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
-        def expression(self, i:int=None):
+        def expression(self, i:Optional[int]=None):
             if i is None:
                 return self.getTypedRuleContexts(KumirParser.ExpressionContext)
             else:
                 return self.getTypedRuleContext(KumirParser.ExpressionContext,i)
 
 
-        def COMMA(self, i:int=None):
+        def COMMA(self, i:Optional[int]=None):
             if i is None:
                 return self.getTokens(KumirParser.COMMA)
             else:
@@ -1045,11 +1052,11 @@ class KumirParser ( Parser ):
     class IndexListContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
-        def expression(self, i:int=None):
+        def expression(self, i:Optional[int]=None):
             if i is None:
                 return self.getTypedRuleContexts(KumirParser.ExpressionContext)
             else:
@@ -1130,7 +1137,7 @@ class KumirParser ( Parser ):
     class PostfixExpressionContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -1138,38 +1145,38 @@ class KumirParser ( Parser ):
             return self.getTypedRuleContext(KumirParser.PrimaryExpressionContext,0)
 
 
-        def LBRACK(self, i:int=None):
+        def LBRACK(self, i:Optional[int]=None):
             if i is None:
                 return self.getTokens(KumirParser.LBRACK)
             else:
                 return self.getToken(KumirParser.LBRACK, i)
 
-        def indexList(self, i:int=None):
+        def indexList(self, i:Optional[int]=None):
             if i is None:
                 return self.getTypedRuleContexts(KumirParser.IndexListContext)
             else:
                 return self.getTypedRuleContext(KumirParser.IndexListContext,i)
 
 
-        def RBRACK(self, i:int=None):
+        def RBRACK(self, i:Optional[int]=None):
             if i is None:
                 return self.getTokens(KumirParser.RBRACK)
             else:
                 return self.getToken(KumirParser.RBRACK, i)
 
-        def LPAREN(self, i:int=None):
+        def LPAREN(self, i:Optional[int]=None):
             if i is None:
                 return self.getTokens(KumirParser.LPAREN)
             else:
                 return self.getToken(KumirParser.LPAREN, i)
 
-        def RPAREN(self, i:int=None):
+        def RPAREN(self, i:Optional[int]=None):
             if i is None:
                 return self.getTokens(KumirParser.RPAREN)
             else:
                 return self.getToken(KumirParser.RPAREN, i)
 
-        def argumentList(self, i:int=None):
+        def argumentList(self, i:Optional[int]=None):
             if i is None:
                 return self.getTypedRuleContexts(KumirParser.ArgumentListContext)
             else:
@@ -1254,7 +1261,7 @@ class KumirParser ( Parser ):
     class UnaryExpressionContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -1336,7 +1343,7 @@ class KumirParser ( Parser ):
     class PowerExpressionContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -1402,24 +1409,24 @@ class KumirParser ( Parser ):
     class MultiplicativeExpressionContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
-        def powerExpression(self, i:int=None):
+        def powerExpression(self, i:Optional[int]=None):
             if i is None:
                 return self.getTypedRuleContexts(KumirParser.PowerExpressionContext)
             else:
                 return self.getTypedRuleContext(KumirParser.PowerExpressionContext,i)
 
 
-        def MUL(self, i:int=None):
+        def MUL(self, i:Optional[int]=None):
             if i is None:
                 return self.getTokens(KumirParser.MUL)
             else:
                 return self.getToken(KumirParser.MUL, i)
 
-        def DIV(self, i:int=None):
+        def DIV(self, i:Optional[int]=None):
             if i is None:
                 return self.getTokens(KumirParser.DIV)
             else:
@@ -1483,24 +1490,24 @@ class KumirParser ( Parser ):
     class AdditiveExpressionContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
-        def multiplicativeExpression(self, i:int=None):
+        def multiplicativeExpression(self, i:Optional[int]=None):
             if i is None:
                 return self.getTypedRuleContexts(KumirParser.MultiplicativeExpressionContext)
             else:
                 return self.getTypedRuleContext(KumirParser.MultiplicativeExpressionContext,i)
 
 
-        def PLUS(self, i:int=None):
+        def PLUS(self, i:Optional[int]=None):
             if i is None:
                 return self.getTokens(KumirParser.PLUS)
             else:
                 return self.getToken(KumirParser.PLUS, i)
 
-        def MINUS(self, i:int=None):
+        def MINUS(self, i:Optional[int]=None):
             if i is None:
                 return self.getTokens(KumirParser.MINUS)
             else:
@@ -1565,36 +1572,36 @@ class KumirParser ( Parser ):
     class RelationalExpressionContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
-        def additiveExpression(self, i:int=None):
+        def additiveExpression(self, i:Optional[int]=None):
             if i is None:
                 return self.getTypedRuleContexts(KumirParser.AdditiveExpressionContext)
             else:
                 return self.getTypedRuleContext(KumirParser.AdditiveExpressionContext,i)
 
 
-        def LT(self, i:int=None):
+        def LT(self, i:Optional[int]=None):
             if i is None:
                 return self.getTokens(KumirParser.LT)
             else:
                 return self.getToken(KumirParser.LT, i)
 
-        def GT(self, i:int=None):
+        def GT(self, i:Optional[int]=None):
             if i is None:
                 return self.getTokens(KumirParser.GT)
             else:
                 return self.getToken(KumirParser.GT, i)
 
-        def LE(self, i:int=None):
+        def LE(self, i:Optional[int]=None):
             if i is None:
                 return self.getTokens(KumirParser.LE)
             else:
                 return self.getToken(KumirParser.LE, i)
 
-        def GE(self, i:int=None):
+        def GE(self, i:Optional[int]=None):
             if i is None:
                 return self.getTokens(KumirParser.GE)
             else:
@@ -1658,24 +1665,24 @@ class KumirParser ( Parser ):
     class EqualityExpressionContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
-        def relationalExpression(self, i:int=None):
+        def relationalExpression(self, i:Optional[int]=None):
             if i is None:
                 return self.getTypedRuleContexts(KumirParser.RelationalExpressionContext)
             else:
                 return self.getTypedRuleContext(KumirParser.RelationalExpressionContext,i)
 
 
-        def EQ(self, i:int=None):
+        def EQ(self, i:Optional[int]=None):
             if i is None:
                 return self.getTokens(KumirParser.EQ)
             else:
                 return self.getToken(KumirParser.EQ, i)
 
-        def NE(self, i:int=None):
+        def NE(self, i:Optional[int]=None):
             if i is None:
                 return self.getTokens(KumirParser.NE)
             else:
@@ -1739,18 +1746,18 @@ class KumirParser ( Parser ):
     class LogicalAndExpressionContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
-        def equalityExpression(self, i:int=None):
+        def equalityExpression(self, i:Optional[int]=None):
             if i is None:
                 return self.getTypedRuleContexts(KumirParser.EqualityExpressionContext)
             else:
                 return self.getTypedRuleContext(KumirParser.EqualityExpressionContext,i)
 
 
-        def AND(self, i:int=None):
+        def AND(self, i:Optional[int]=None):
             if i is None:
                 return self.getTokens(KumirParser.AND)
             else:
@@ -1809,18 +1816,18 @@ class KumirParser ( Parser ):
     class LogicalOrExpressionContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
-        def logicalAndExpression(self, i:int=None):
+        def logicalAndExpression(self, i:Optional[int]=None):
             if i is None:
                 return self.getTypedRuleContexts(KumirParser.LogicalAndExpressionContext)
             else:
                 return self.getTypedRuleContext(KumirParser.LogicalAndExpressionContext,i)
 
 
-        def OR(self, i:int=None):
+        def OR(self, i:Optional[int]=None):
             if i is None:
                 return self.getTokens(KumirParser.OR)
             else:
@@ -1879,7 +1886,7 @@ class KumirParser ( Parser ):
     class ExpressionContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -1927,7 +1934,7 @@ class KumirParser ( Parser ):
     class TypeSpecifierContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -2012,7 +2019,7 @@ class KumirParser ( Parser ):
     class BasicTypeContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -2077,7 +2084,7 @@ class KumirParser ( Parser ):
     class ActorTypeContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -2139,7 +2146,7 @@ class KumirParser ( Parser ):
     class ArrayTypeContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -2204,11 +2211,11 @@ class KumirParser ( Parser ):
     class ArrayBoundsContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
-        def expression(self, i:int=None):
+        def expression(self, i:Optional[int]=None):
             if i is None:
                 return self.getTypedRuleContexts(KumirParser.ExpressionContext)
             else:
@@ -2262,7 +2269,7 @@ class KumirParser ( Parser ):
     class VariableDeclarationItemContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -2272,7 +2279,7 @@ class KumirParser ( Parser ):
         def LBRACK(self):
             return self.getToken(KumirParser.LBRACK, 0)
 
-        def arrayBounds(self, i:int=None):
+        def arrayBounds(self, i:Optional[int]=None):
             if i is None:
                 return self.getTypedRuleContexts(KumirParser.ArrayBoundsContext)
             else:
@@ -2289,7 +2296,7 @@ class KumirParser ( Parser ):
             return self.getTypedRuleContext(KumirParser.ExpressionContext,0)
 
 
-        def COMMA(self, i:int=None):
+        def COMMA(self, i:Optional[int]=None):
             if i is None:
                 return self.getTokens(KumirParser.COMMA)
             else:
@@ -2370,18 +2377,18 @@ class KumirParser ( Parser ):
     class VariableListContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
-        def variableDeclarationItem(self, i:int=None):
+        def variableDeclarationItem(self, i:Optional[int]=None):
             if i is None:
                 return self.getTypedRuleContexts(KumirParser.VariableDeclarationItemContext)
             else:
                 return self.getTypedRuleContext(KumirParser.VariableDeclarationItemContext,i)
 
 
-        def COMMA(self, i:int=None):
+        def COMMA(self, i:Optional[int]=None):
             if i is None:
                 return self.getTokens(KumirParser.COMMA)
             else:
@@ -2440,7 +2447,7 @@ class KumirParser ( Parser ):
     class VariableDeclarationContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -2494,7 +2501,7 @@ class KumirParser ( Parser ):
     class GlobalDeclarationContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -2560,7 +2567,7 @@ class KumirParser ( Parser ):
     class GlobalAssignmentContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -2656,7 +2663,7 @@ class KumirParser ( Parser ):
     class ParameterDeclarationContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -2733,18 +2740,18 @@ class KumirParser ( Parser ):
     class ParameterListContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
-        def parameterDeclaration(self, i:int=None):
+        def parameterDeclaration(self, i:Optional[int]=None):
             if i is None:
                 return self.getTypedRuleContexts(KumirParser.ParameterDeclarationContext)
             else:
                 return self.getTypedRuleContext(KumirParser.ParameterDeclarationContext,i)
 
 
-        def COMMA(self, i:int=None):
+        def COMMA(self, i:Optional[int]=None):
             if i is None:
                 return self.getTokens(KumirParser.COMMA)
             else:
@@ -2803,41 +2810,41 @@ class KumirParser ( Parser ):
     class AlgorithmNameTokensContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
-        def LPAREN(self, i:int=None):
+        def LPAREN(self, i:Optional[int]=None):
             if i is None:
                 return self.getTokens(KumirParser.LPAREN)
             else:
                 return self.getToken(KumirParser.LPAREN, i)
 
-        def ALG_BEGIN(self, i:int=None):
+        def ALG_BEGIN(self, i:Optional[int]=None):
             if i is None:
                 return self.getTokens(KumirParser.ALG_BEGIN)
             else:
                 return self.getToken(KumirParser.ALG_BEGIN, i)
 
-        def PRE_CONDITION(self, i:int=None):
+        def PRE_CONDITION(self, i:Optional[int]=None):
             if i is None:
                 return self.getTokens(KumirParser.PRE_CONDITION)
             else:
                 return self.getToken(KumirParser.PRE_CONDITION, i)
 
-        def POST_CONDITION(self, i:int=None):
+        def POST_CONDITION(self, i:Optional[int]=None):
             if i is None:
                 return self.getTokens(KumirParser.POST_CONDITION)
             else:
                 return self.getToken(KumirParser.POST_CONDITION, i)
 
-        def SEMICOLON(self, i:int=None):
+        def SEMICOLON(self, i:Optional[int]=None):
             if i is None:
                 return self.getTokens(KumirParser.SEMICOLON)
             else:
                 return self.getToken(KumirParser.SEMICOLON, i)
 
-        def EOF(self, i:int=None):
+        def EOF(self, i:Optional[int]=None):
             if i is None:
                 return self.getTokens(KumirParser.EOF)
             else:
@@ -2901,11 +2908,11 @@ class KumirParser ( Parser ):
     class AlgorithmNameContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
-        def ID(self, i:int=None):
+        def ID(self, i:Optional[int]=None):
             if i is None:
                 return self.getTokens(KumirParser.ID)
             else:
@@ -2963,7 +2970,7 @@ class KumirParser ( Parser ):
     class AlgorithmHeaderContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -3068,7 +3075,7 @@ class KumirParser ( Parser ):
     class PreConditionContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -3133,7 +3140,7 @@ class KumirParser ( Parser ):
     class PostConditionContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -3198,7 +3205,7 @@ class KumirParser ( Parser ):
     class AlgorithmBodyContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -3246,11 +3253,11 @@ class KumirParser ( Parser ):
     class StatementSequenceContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
-        def statement(self, i:int=None):
+        def statement(self, i:Optional[int]=None):
             if i is None:
                 return self.getTypedRuleContexts(KumirParser.StatementContext)
             else:
@@ -3306,7 +3313,7 @@ class KumirParser ( Parser ):
     class LvalueContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -3393,7 +3400,7 @@ class KumirParser ( Parser ):
     class AssignmentStatementContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -3465,18 +3472,18 @@ class KumirParser ( Parser ):
     class IoArgumentContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
-        def expression(self, i:int=None):
+        def expression(self, i:Optional[int]=None):
             if i is None:
                 return self.getTypedRuleContexts(KumirParser.ExpressionContext)
             else:
                 return self.getTypedRuleContext(KumirParser.ExpressionContext,i)
 
 
-        def COLON(self, i:int=None):
+        def COLON(self, i:Optional[int]=None):
             if i is None:
                 return self.getTokens(KumirParser.COLON)
             else:
@@ -3559,18 +3566,18 @@ class KumirParser ( Parser ):
     class IoArgumentListContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
-        def ioArgument(self, i:int=None):
+        def ioArgument(self, i:Optional[int]=None):
             if i is None:
                 return self.getTypedRuleContexts(KumirParser.IoArgumentContext)
             else:
                 return self.getTypedRuleContext(KumirParser.IoArgumentContext,i)
 
 
-        def COMMA(self, i:int=None):
+        def COMMA(self, i:Optional[int]=None):
             if i is None:
                 return self.getTokens(KumirParser.COMMA)
             else:
@@ -3629,7 +3636,7 @@ class KumirParser ( Parser ):
     class IoStatementContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -3691,7 +3698,7 @@ class KumirParser ( Parser ):
     class IfStatementContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -3705,7 +3712,7 @@ class KumirParser ( Parser ):
         def THEN(self):
             return self.getToken(KumirParser.THEN, 0)
 
-        def statementSequence(self, i:int=None):
+        def statementSequence(self, i:Optional[int]=None):
             if i is None:
                 return self.getTypedRuleContexts(KumirParser.StatementSequenceContext)
             else:
@@ -3777,7 +3784,7 @@ class KumirParser ( Parser ):
     class CaseBlockContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -3841,7 +3848,7 @@ class KumirParser ( Parser ):
     class SwitchStatementContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -3851,7 +3858,7 @@ class KumirParser ( Parser ):
         def FI(self):
             return self.getToken(KumirParser.FI, 0)
 
-        def caseBlock(self, i:int=None):
+        def caseBlock(self, i:Optional[int]=None):
             if i is None:
                 return self.getTypedRuleContexts(KumirParser.CaseBlockContext)
             else:
@@ -3930,7 +3937,7 @@ class KumirParser ( Parser ):
     class EndLoopConditionContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -3983,7 +3990,7 @@ class KumirParser ( Parser ):
     class LoopSpecifierContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -3996,7 +4003,7 @@ class KumirParser ( Parser ):
         def FROM(self):
             return self.getToken(KumirParser.FROM, 0)
 
-        def expression(self, i:int=None):
+        def expression(self, i:Optional[int]=None):
             if i is None:
                 return self.getTypedRuleContexts(KumirParser.ExpressionContext)
             else:
@@ -4098,7 +4105,7 @@ class KumirParser ( Parser ):
     class LoopStatementContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -4184,7 +4191,7 @@ class KumirParser ( Parser ):
     class ExitStatementContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -4231,7 +4238,7 @@ class KumirParser ( Parser ):
     class PauseStatementContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -4278,7 +4285,7 @@ class KumirParser ( Parser ):
     class StopStatementContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -4325,7 +4332,7 @@ class KumirParser ( Parser ):
     class AssertionStatementContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -4378,7 +4385,7 @@ class KumirParser ( Parser ):
     class ProcedureCallStatementContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -4455,7 +4462,7 @@ class KumirParser ( Parser ):
     class StatementContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -4680,7 +4687,7 @@ class KumirParser ( Parser ):
     class AlgorithmDefinitionContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -4698,21 +4705,21 @@ class KumirParser ( Parser ):
         def ALG_END(self):
             return self.getToken(KumirParser.ALG_END, 0)
 
-        def preCondition(self, i:int=None):
+        def preCondition(self, i:Optional[int]=None):
             if i is None:
                 return self.getTypedRuleContexts(KumirParser.PreConditionContext)
             else:
                 return self.getTypedRuleContext(KumirParser.PreConditionContext,i)
 
 
-        def postCondition(self, i:int=None):
+        def postCondition(self, i:Optional[int]=None):
             if i is None:
                 return self.getTypedRuleContexts(KumirParser.PostConditionContext)
             else:
                 return self.getTypedRuleContext(KumirParser.PostConditionContext,i)
 
 
-        def variableDeclaration(self, i:int=None):
+        def variableDeclaration(self, i:Optional[int]=None):
             if i is None:
                 return self.getTypedRuleContexts(KumirParser.VariableDeclarationContext)
             else:
@@ -4815,7 +4822,7 @@ class KumirParser ( Parser ):
     class ModuleNameContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -4879,7 +4886,7 @@ class KumirParser ( Parser ):
     class ImportStatementContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -4944,7 +4951,7 @@ class KumirParser ( Parser ):
     class ProgramItemContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -5018,7 +5025,7 @@ class KumirParser ( Parser ):
     class ModuleHeaderContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -5083,18 +5090,18 @@ class KumirParser ( Parser ):
     class ModuleBodyContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
-        def programItem(self, i:int=None):
+        def programItem(self, i:Optional[int]=None):
             if i is None:
                 return self.getTypedRuleContexts(KumirParser.ProgramItemContext)
             else:
                 return self.getTypedRuleContext(KumirParser.ProgramItemContext,i)
 
 
-        def algorithmDefinition(self, i:int=None):
+        def algorithmDefinition(self, i:Optional[int]=None):
             if i is None:
                 return self.getTypedRuleContexts(KumirParser.AlgorithmDefinitionContext)
             else:
@@ -5162,18 +5169,18 @@ class KumirParser ( Parser ):
     class ImplicitModuleBodyContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
-        def programItem(self, i:int=None):
+        def programItem(self, i:Optional[int]=None):
             if i is None:
                 return self.getTypedRuleContexts(KumirParser.ProgramItemContext)
             else:
                 return self.getTypedRuleContext(KumirParser.ProgramItemContext,i)
 
 
-        def algorithmDefinition(self, i:int=None):
+        def algorithmDefinition(self, i:Optional[int]=None):
             if i is None:
                 return self.getTypedRuleContexts(KumirParser.AlgorithmDefinitionContext)
             else:
@@ -5244,7 +5251,7 @@ class KumirParser ( Parser ):
     class ModuleDefinitionContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
@@ -5344,21 +5351,21 @@ class KumirParser ( Parser ):
     class ProgramContext(ParserRuleContext):
         __slots__ = 'parser'
 
-        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+        def __init__(self, parser, parent:Optional[ParserRuleContext]=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
         def EOF(self):
             return self.getToken(KumirParser.EOF, 0)
 
-        def programItem(self, i:int=None):
+        def programItem(self, i:Optional[int]=None):
             if i is None:
                 return self.getTypedRuleContexts(KumirParser.ProgramItemContext)
             else:
                 return self.getTypedRuleContext(KumirParser.ProgramItemContext,i)
 
 
-        def moduleDefinition(self, i:int=None):
+        def moduleDefinition(self, i:Optional[int]=None):
             if i is None:
                 return self.getTypedRuleContexts(KumirParser.ModuleDefinitionContext)
             else:

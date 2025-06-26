@@ -1,11 +1,11 @@
 # Generated from c:/Users/Bormotoon/VSCodeProjects/PyRobot/kumir_lang/KumirLexer.g4 by ANTLR 4.13.2
-from antlr4 import *
-from io import StringIO
+from antlr4.Lexer import Lexer
+from antlr4.atn.ATNDeserializer import ATNDeserializer
+from antlr4.atn.LexerATNSimulator import LexerATNSimulator
+from antlr4.dfa.DFA import DFA
+from antlr4.PredictionContext import PredictionContextCache
 import sys
-if sys.version_info[1] > 5:
-    from typing import TextIO
-else:
-    from typing.io import TextIO
+from typing import TextIO
 
 
 def serializedATN():
