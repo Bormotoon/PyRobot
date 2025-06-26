@@ -58,7 +58,6 @@ class DeclarationVisitorMixin:
 
     def visitVariableDeclaration(self, ctx: KumirParser.VariableDeclarationContext):
         kiv_self = cast('KumirInterpreterVisitor', self)
-        print(f"[DEBUG][VisitVarDecl_Mixin] Обработка variableDeclaration: {ctx.getText()}", file=sys.stderr)
         type_ctx = ctx.typeSpecifier()
         
         # Используем новую функцию для получения информации о типе
@@ -81,7 +80,6 @@ class DeclarationVisitorMixin:
             else:
                 raise # Перевыбрасываем оригинальное исключение, если оно уже полное
 
-        print(f"[DEBUG][VisitVarDecl_Mixin] Тип определен через get_type_info_from_specifier: {base_kumir_type}, таблица: {is_table_type}", file=sys.stderr)
 
         if not base_kumir_type: # Эта проверка может быть избыточной, если get_type_info_from_specifier всегда возвращает тип или кидает исключение
             lc_fallback = kiv_self.get_line_content_from_ctx(type_ctx)
@@ -92,7 +90,6 @@ class DeclarationVisitorMixin:
 
         for var_decl_item_ctx in ctx.variableList().variableDeclarationItem():
             var_name = var_decl_item_ctx.ID().getText()
-            print(f"[DEBUG][VisitVarDecl_Mixin] Обработка переменной/таблицы: {var_name}", file=sys.stderr)
 
             if is_table_type:
                 if not var_decl_item_ctx.LBRACK():
@@ -112,25 +109,27 @@ class DeclarationVisitorMixin:
                         line_content=kiv_self.get_line_content_from_ctx(var_decl_item_ctx))
 
                 for i, bounds_ctx in enumerate(array_bounds_nodes):
-                    print(f"[DEBUG][VisitVarDecl_Mixin] Обработка границ измерения {i + 1} для '{var_name}': {bounds_ctx.getText()}",
-                          file=sys.stderr)
+                    # Debug: обработка границ измерения
                     
                     if var_name == 'A': 
                         expr0_text = bounds_ctx.expression(0).getText()
                         expr1_text = bounds_ctx.expression(1).getText()
-                        print(f"[DEBUG][VarDecl_N_Check_Bounds_Mixin] Table '{var_name}', Dim {i+1}, MinExpr: '{expr0_text}', MaxExpr: '{expr1_text}'", file=sys.stderr)
                         if expr1_text == 'N':
                             n_info_check, _ = kiv_self.scope_manager.find_variable('N')
                             if n_info_check:
-                                print(f"[DEBUG][VarDecl_N_Check_Value_Mixin] ПЕРЕД вычислением MaxExpr ('N'), N = {n_info_check['value']}", file=sys.stderr)
+                                # Переменная N найдена
+                                pass
                             else:
-                                print(f"[DEBUG][VarDecl_N_Check_Value_Mixin] ПЕРЕД вычислением MaxExpr ('N'), N не найдена!", file=sys.stderr)
+                                # Переменная N не найдена
+                                pass
                         if expr0_text == 'N':
                             n_info_check, _ = kiv_self.scope_manager.find_variable('N')
                             if n_info_check:
-                                print(f"[DEBUG][VarDecl_N_Check_Value_Mixin] ПЕРЕД вычислением MinExpr ('N'), N = {n_info_check['value']}", file=sys.stderr)
+                                # Переменная N найдена
+                                pass
                             else:
-                                print(f"[DEBUG][VarDecl_N_Check_Value_Mixin] ПЕРЕД вычислением MinExpr ('N'), N не найдена!", file=sys.stderr)
+                                # Переменная N не найдена
+                                pass
 
                     if not (bounds_ctx.expression(0) and bounds_ctx.expression(1) and bounds_ctx.COLON()):
                         raise DeclarationError(
@@ -192,11 +191,9 @@ class DeclarationVisitorMixin:
                     # Инициализация таблицы литералом массива
                     try:
                         value_to_assign = kiv_self.expression_evaluator.visitExpression(var_decl_item_ctx.expression())
-                        print(f"[DEBUG][ARRAY_INIT] Получено значение для инициализации: {value_to_assign}, тип: {value_to_assign.kumir_type}, value: {value_to_assign.value}", file=sys.stderr)
                         
                         # Для таблиц нужно создать KumirTableVar из литерала массива
                         if value_to_assign.kumir_type == KumirType.TABLE.value and isinstance(value_to_assign.value, list):
-                            print(f"[DEBUG][ARRAY_INIT] Создаем KumirTableVar из литерала массива", file=sys.stderr)
                             # Создаём KumirTableVar из литерала массива
                             table_var = _create_table_from_array_literal(
                                 value_to_assign.value, 
@@ -205,9 +202,7 @@ class DeclarationVisitorMixin:
                                 var_decl_item_ctx.expression()
                             )
                             validated_value = KumirValue(table_var, KumirType.TABLE.value)
-                            print(f"[DEBUG][ARRAY_INIT] Создан KumirTableVar: {validated_value}", file=sys.stderr)
                         else:
-                            print(f"[DEBUG][ARRAY_INIT] Используем валидацию, тип: {value_to_assign.kumir_type}, значение: {type(value_to_assign.value)}", file=sys.stderr)
                             # Используем метод для валидации таблиц
                             validated_value = kiv_self._validate_and_convert_value_for_assignment(
                                 value_to_assign, base_kumir_type, var_name, is_target_table=True
@@ -304,7 +299,6 @@ class DeclarationVisitorMixin:
         algo_name_tokens = algo_header_ctx.algorithmNameTokens().getText().strip()
         is_func = algo_header_ctx.typeSpecifier() is not None
         
-        print(f"[DEBUG][DeclVisitor] Visiting Algorithm Definition for: {algo_name_tokens}, Is function: {is_func}", file=sys.stderr)
 
         # Определяем тип возвращаемого значения для функций
         result_type = "void"
@@ -361,7 +355,6 @@ class DeclarationVisitorMixin:
         # Регистрируем в новом AlgorithmManager
         try:
             kiv_self.algorithm_manager.register_algorithm(algorithm_def)
-            print(f"[DEBUG][DeclVisitor] Successfully registered algorithm in AlgorithmManager: {algo_name_tokens}", file=sys.stderr)
         except Exception as e:
             print(f"[ERROR][DeclVisitor] Failed to register algorithm in AlgorithmManager {algo_name_tokens}: {e}", file=sys.stderr)        # Также регистрируем в старом ProcedureManager для обратной совместимости
         try:
@@ -371,7 +364,6 @@ class DeclarationVisitorMixin:
                 is_function=is_func,
                 result_type=result_type
             )
-            print(f"[DEBUG][DeclVisitor] Successfully registered {'function' if is_func else 'procedure'}: {algo_name_tokens}", file=sys.stderr)
         except Exception as e:
             print(f"[ERROR][DeclVisitor] Failed to register {algo_name_tokens}: {e}", file=sys.stderr)
             raise        # ВАЖНО: Не выполняем тела пользовательских функций и процедур при их определении, 
@@ -383,12 +375,10 @@ class DeclarationVisitorMixin:
         is_main = algo_name_tokens == ""
         
         if is_func or not is_main:  # Если это функция или не главный алгоритм программы
-            print(f"[DEBUG][DeclVisitor] Skipping algorithm body execution for {algo_name_tokens} - will execute only on explicit call", file=sys.stderr)
             return None
             
         # В обычном режиме для ГЛАВНОГО алгоритма позволяем ANTLR обойти дочерние узлы
         # Это поведение по умолчанию, так что возвращаем результат по умолчанию
-        print(f"[DEBUG][DeclVisitor] Allowing body execution for main algorithm {algo_name_tokens}", file=sys.stderr)
         return None # Algorithm definition is a declaration, not an expression with a value
 
     # Removed duplicated/placeholder visit methods for specific var/arr/proc/func declare statements

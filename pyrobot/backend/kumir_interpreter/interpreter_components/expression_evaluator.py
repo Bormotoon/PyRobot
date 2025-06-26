@@ -984,13 +984,11 @@ class ExpressionEvaluator(KumirParserVisitor):
             a = args[0]
             result = abs(a.value)
             return KumirValue(result, a.kumir_type)          # TODO: Добавить остальные встроенные функции при необходимости        # ДОБАВЛЕНО: Проверяем встроенные функции через builtin_function_handler
-        print(f"[DEBUG] expression_evaluator._call_function для '{func_name}' с аргументами: {args}", file=sys.stderr)
         
         # Сначала проверяем встроенные функции
         if hasattr(self.main_visitor, 'builtin_function_handler'):
             builtin_handler = self.main_visitor.builtin_function_handler
             if func_name.lower() in builtin_handler.functions:
-                print(f"[DEBUG] Найдена встроенная функция '{func_name}', вызываем через builtin_function_handler", file=sys.stderr)
                 try:
                     # Получаем информацию о функции для определения типов параметров
                     func_info = builtin_handler.functions[func_name.lower()]
@@ -1031,7 +1029,6 @@ class ExpressionEvaluator(KumirParserVisitor):
                     
                     # Вызываем встроенную функцию
                     result = builtin_handler.call_function(func_name, raw_args, ctx)
-                    print(f"[DEBUG] Встроенная функция '{func_name}' вернула: {result}", file=sys.stderr)
                     
                     # Оборачиваем результат в KumirValue, если нужно
                     if not isinstance(result, KumirValue):
@@ -1048,29 +1045,22 @@ class ExpressionEvaluator(KumirParserVisitor):
                     
                     return result
                 except Exception as e:
-                    print(f"[DEBUG] Ошибка при вызове встроенной функции '{func_name}': {e}", file=sys.stderr)
                     pos = self._position_from_token(self._get_token_for_position(ctx))
                     raise KumirEvalError(f"Ошибка при вызове функции '{func_name}': {str(e)}", line_index=pos[0], column_index=pos[1])
         
         # Потом проверяем пользовательские функции в AlgorithmManager
-        print(f"[DEBUG] Проверяем наличие algorithm_manager: {hasattr(self.main_visitor, 'algorithm_manager')}", file=sys.stderr)
         
         if hasattr(self.main_visitor, 'algorithm_manager'):
-            print(f"[DEBUG] algorithm_manager найден, проверяем наличие алгоритма '{func_name}': {self.main_visitor.algorithm_manager.has_algorithm(func_name)}", file=sys.stderr)
             
             if self.main_visitor.algorithm_manager.has_algorithm(func_name):
                 algorithm_def = self.main_visitor.algorithm_manager.get_algorithm(func_name)
-                print(f"[DEBUG] Алгоритм '{func_name}' найден, это функция: {algorithm_def.is_function if algorithm_def else 'None'}", file=sys.stderr)
                 
                 if algorithm_def and algorithm_def.is_function:
                     # Это пользовательская функция - вызываем её через main visitor
-                    print(f"[DEBUG] Вызываем пользовательскую функцию '{func_name}' через _call_user_function", file=sys.stderr)
                     result = self.main_visitor._call_user_function(func_name, args, ctx)
-                    print(f"[DEBUG] expression_evaluator._call_function вызвал пользовательскую функцию '{func_name}' и получил: {result}", file=sys.stderr)
                     return result
                 else:
                     # Это процедура, а не функция - ошибка
-                    print(f"[DEBUG] '{func_name}' не является функцией", file=sys.stderr)
                     pos = self._position_from_token(self._get_token_for_position(ctx))
                     raise KumirTypeError(f"'{func_name}' является процедурой, а не функцией, и не может использоваться в выражении", line_index=pos[0], column_index=pos[1])
         

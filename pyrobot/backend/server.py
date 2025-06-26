@@ -198,7 +198,7 @@ def update_field():
 
 @app.route('/test-debug', methods=['GET'])
 def test_debug():
-    print("=== TEST DEBUG ENDPOINT HIT ===")
+    # Debug endpoint test
     return jsonify({'debug': 'This endpoint was called'}), 200
 
 

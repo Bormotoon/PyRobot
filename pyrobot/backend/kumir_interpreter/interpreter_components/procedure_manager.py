@@ -43,16 +43,13 @@ class ProcedureManager:
     def push_return_value_frame(self) -> None:
         """Создает новый фрейм для возвращаемого значения функции."""
         self._return_value_stack.append(None)
-        # print(f"[DEBUG] push_return_value_frame: добавлен фрейм, размер стека = {len(self._return_value_stack)}", file=sys.stderr)
     
     def pop_return_value_frame(self) -> Optional[KumirValue]:
         """Удаляет и возвращает верхний фрейм возвращаемого значения."""
         if self._return_value_stack:
             value = self._return_value_stack.pop()
-            # print(f"[DEBUG] pop_return_value_frame: удален фрейм, размер стека = {len(self._return_value_stack)}, значение = {value}", file=sys.stderr)
             return value
         else:
-            # print(f"[DEBUG] pop_return_value_frame: стек пуст", file=sys.stderr)
             return None
     
     def get_and_clear_return_value(self) -> Optional[KumirValue]:
@@ -60,10 +57,8 @@ class ProcedureManager:
         if self._return_value_stack:
             value = self._return_value_stack[-1]  # Get without removing frame
             self._return_value_stack[-1] = None   # Clear value in frame
-            # print(f"[DEBUG] get_and_clear_return_value: получено значение = {value}", file=sys.stderr)
             return value
         else:
-            # print(f"[DEBUG] get_and_clear_return_value: стек пуст", file=sys.stderr)
             return None
 
     def register_procedure(self, name: str, ctx: KumirParser.AlgorithmDefinitionContext, 
@@ -90,7 +85,6 @@ class ProcedureManager:
             'is_function': is_function,  # Добавляем для совместимости
             'result_type': result_type        }
         
-        # print(f"[DEBUG][ProcedureManager] Зарегистрирован алгоритм '{name}' (функция: {is_function}) с {len(params_info)} параметрами", file=sys.stderr)
 
     def call_procedure(self, proc_name: str, actual_args: List[KumirValue], 
                        line_index: int, column_index: int) -> None:
@@ -252,7 +246,7 @@ class ProcedureManager:
                     # DEBUG: убран лог пометки для копирования
             
             # 4. Выполнение тела процедуры
-            print(f"[DEBUG] call_procedure_with_analyzed_args: выполняем тело процедуры", file=sys.stderr)
+            # Debug: выполняем тело процедуры
             self.visitor.visit(proc_data['body_ctx'])
             
             # 5. Копирование значений обратно для output параметров
@@ -262,13 +256,12 @@ class ProcedureManager:
                 original_var_name = var_info['name']
                 scope_depth = var_info['scope_depth']
                 
-                print(f"[DEBUG] call_procedure_with_analyzed_args: копируем '{param_name}' обратно в '{original_var_name}'", file=sys.stderr)
+                # Debug: копируем значение обратно
                 
                 # Получаем новое значение параметра из локальной области видимости
                 param_var_info, _ = self.visitor.scope_manager.find_variable(param_name)
                 if param_var_info:
                     new_value = param_var_info['value']
-                    print(f"[DEBUG] call_procedure_with_analyzed_args: новое значение '{param_name}' = {new_value}", file=sys.stderr)
                     
                     # Обновляем исходную переменную в КОНКРЕТНОЙ области видимости
                     # scope_depth = 0 означает текущую область (когда анализировали аргументы ВНЕ процедуры)
@@ -287,25 +280,26 @@ class ProcedureManager:
                             if new_value.kumir_type == target_kumir_type.value:
                                 target_scope[original_var_name_lower]['value'] = new_value
                                 target_scope[original_var_name_lower]['initialized'] = True
-                                print(f"[DEBUG] call_procedure_with_analyzed_args: обновили исходную переменную '{original_var_name}' = {new_value}", file=sys.stderr)
                             elif target_kumir_type == KumirType.REAL and new_value.kumir_type == KumirType.INT.value:
                                 converted_value = KumirValue(float(new_value.value), KumirType.REAL.value)
                                 target_scope[original_var_name_lower]['value'] = converted_value
                                 target_scope[original_var_name_lower]['initialized'] = True
-                                print(f"[DEBUG] call_procedure_with_analyzed_args: обновили исходную переменную '{original_var_name}' = {converted_value} (конвертировано)", file=sys.stderr)
                             else:
-                                print(f"[DEBUG] call_procedure_with_analyzed_args: ОШИБКА - несовместимые типы при копировании '{param_name}' -> '{original_var_name}': {new_value.kumir_type} vs {target_kumir_type.value}", file=sys.stderr)
+                                # Несовместимые типы
+                                pass
                         else:
-                            print(f"[DEBUG] call_procedure_with_analyzed_args: ОШИБКА - переменная '{original_var_name}' не найдена в целевой области видимости", file=sys.stderr)
+                            # Переменная не найдена в целевой области
+                            pass
                     else:
-                        print(f"[DEBUG] call_procedure_with_analyzed_args: ОШИБКА - некорректный target_scope_index {target_scope_index} для scope_depth {scope_depth}", file=sys.stderr)
+                        # Некорректный target_scope_index
+                        pass
                 else:
-                    print(f"[DEBUG] call_procedure_with_analyzed_args: ОШИБКА - не найден параметр '{param_name}' в локальной области", file=sys.stderr)
+                    # Параметр не найден в локальной области
+                    pass
         
         finally:
             # 6. Очистка области видимости
             self.visitor.scope_manager.pop_scope()
-            print(f"[DEBUG] call_procedure_with_analyzed_args: очистили область видимости", file=sys.stderr)
 
     def is_function_defined(self, name: str) -> bool:
         """Проверяет, определена ли функция с таким именем."""
@@ -721,7 +715,6 @@ class ProcedureManager:
 
         self.visitor.scope_manager.push_scope()
         # self.visitor.call_stack.append(proc_name) # Если будет использоваться стек вызовов        # Объявление и инициализация параметров в новой области видимости
-        # print(f"[DEBUG] Начинаем объявление параметров для {proc_name}. Количество параметров: {len(proc_def['params'])}", file=sys.stderr)
         for i, (formal_param_name_lower, formal_param_info) in enumerate(proc_def['params'].items()):
             param_name_original_case = formal_param_info['name']
             # param_base_type = formal_param_info['base_type'] # Не используется напрямую здесь после рефакторинга declare_variable
@@ -756,20 +749,20 @@ class ProcedureManager:
                 raise KumirArgumentError(f"Строка {call_site_ctx.start.line if call_site_ctx else '??'}: Недостаточно аргументов для вызова процедуры '{proc_name}'.",
                                          line_index=(call_site_ctx.start.line-1) if call_site_ctx else None, 
                                          column_index=call_site_ctx.start.column if call_site_ctx else None,
-                                         line_content=lc_arg_count)            # 1. Объявляем переменную параметра            print(f"[DEBUG] Объявляем параметр '{param_name_original_case}' с типом {formal_param_info['type']}", file=sys.stderr)
+                                         line_content=lc_arg_count)
+            
+            # 1. Объявляем переменную параметра
             self.visitor.scope_manager.declare_variable(
                 name=param_name_original_case,
                 kumir_type=KumirType.from_string(formal_param_info['type']), 
                 initial_value=None,  # Будет установлено ниже при присваивании
                 line_index=(call_site_ctx.start.line-1) if call_site_ctx and call_site_ctx.start else 0,
                 column_index=call_site_ctx.start.column if call_site_ctx and call_site_ctx.start else 0
-            )            # print(f"[DEBUG] Параметр '{param_name_original_case}' объявлен успешно", file=sys.stderr)
-            # print(f"[DEBUG] actual_arg_value для '{param_name_original_case}': {actual_arg_value}, тип: {type(actual_arg_value)}", file=sys.stderr)
+            )
 
             # 2. Присваиваем значение параметру (если нужно)
             if param_mode_for_evaluator == 'arg' or param_mode_for_evaluator == 'arg_res' or param_mode_for_evaluator == 'arg_res_table_special':
                 if actual_arg_value is not None:
-                    # print(f"[DEBUG] Присваиваем значение {actual_arg_value} параметру '{param_name_original_case}'", file=sys.stderr)
                     try:
                         # Check if parameter is a table type
                         is_param_table = 'таб' in formal_param_info['type'].lower()
@@ -779,31 +772,27 @@ class ProcedureManager:
                             var_name=f"параметру '{param_name_original_case}'",
                             is_target_table=is_param_table
                         )
-                        print(f"[DEBUG] Валидированное значение для '{param_name_original_case}': {validated_value}, тип: {type(validated_value)}", file=sys.stderr)
                           # Оборачиваем валидированное значение в KumirValue для update_variable
                         if not isinstance(validated_value, KumirValue):                            # Используем нормализованное значение типа из KumirType enum
                             normalized_type = KumirType.from_string(formal_param_info['type']).value
-                            print(f"[DEBUG] formal_param_info['type']: {formal_param_info['type']}", file=sys.stderr)
-                            print(f"[DEBUG] normalized_type: {normalized_type}", file=sys.stderr)
                             kumir_value_for_update = KumirValue(validated_value, normalized_type)
-                            print(f"[DEBUG] Обернули в KumirValue: {kumir_value_for_update}", file=sys.stderr)
                         else:
                             kumir_value_for_update = validated_value
-                            print(f"[DEBUG] Используем существующий KumirValue: {kumir_value_for_update}", file=sys.stderr)
                         
                         # Извлекаем координаты из контекста для update_variable
                         line_index = call_site_ctx.start.line if call_site_ctx and hasattr(call_site_ctx, 'start') else -1
                         column_index = call_site_ctx.start.column if call_site_ctx and hasattr(call_site_ctx, 'start') else -1
                         
                         self.visitor.scope_manager.update_variable(param_name_original_case, kumir_value_for_update, line_index, column_index)
-                        print(f"[DEBUG] Параметр '{param_name_original_case}' успешно обновлен значением {kumir_value_for_update}", file=sys.stderr)
                         
                         # Проверяем, что параметр действительно сохранился
                         var_info, scope = self.visitor.scope_manager.find_variable(param_name_original_case)
                         if var_info:
-                            print(f"[DEBUG] Проверка: параметр '{param_name_original_case}' найден в scope с значением {var_info.get('value')} и типом {var_info.get('kumir_type')}", file=sys.stderr)
+                            # Параметр найден в scope после присваивания
+                            pass
                         else:
-                            print(f"[DEBUG] ОШИБКА: параметр '{param_name_original_case}' НЕ найден в scope после присваивания!", file=sys.stderr)
+                            # Параметр НЕ найден в scope после присваивания
+                            pass
                     except (KumirTypeError, KumirEvalError, AssignmentError) as e: 
                         lc_assign = self.visitor.get_line_content_from_ctx(call_site_ctx)
                         if not hasattr(e, 'line_index') or e.line_index is None:
@@ -978,7 +967,6 @@ class ProcedureManager:
         
         self.visitor.scope_manager.pop_scope()
         self.visitor.function_call_active = False
-        # print(f"[DEBUG][ProcManager] Exiting {proc_name}. Return value: {execution_result}", file=sys.stderr)
         return execution_result
 
     def execute_user_function(self, func_name: str, args: List[Any], call_site_ctx: ParserRuleContext) -> Any:
@@ -993,7 +981,6 @@ class ProcedureManager:
         Returns:
             Результат выполнения функции
         """
-        print(f"[DEBUG] execute_user_function вызван для '{func_name}' с {len(args)} аргументами", file=sys.stderr)
         
         # Получаем полные данные о процедуре из словаря зарегистрированных процедур
         proc_data = self.procedures.get(func_name.lower())
@@ -1010,26 +997,20 @@ class ProcedureManager:
                                  column_index=call_site_ctx.start.column if call_site_ctx else None,
                                  line_content=lc)
         
-        print(f"[DEBUG] Найдена функция '{func_name}' с {len(proc_data['params'])} параметрами", file=sys.stderr)
         
         # ИСПРАВЛЕНИЕ: Добавляем управление стеком возвращаемых значений И областями видимости
-        print(f"[DEBUG] Создаем новый фрейм в стеке возвращаемых значений для функции '{func_name}'", file=sys.stderr)
         self.push_return_value_frame()
         
         # Создаем новую область видимости для функции
-        print(f"[DEBUG] Создаем новую область видимости для функции '{func_name}'", file=sys.stderr)
         self.visitor.scope_manager.push_scope()
         
         try:
             result = self._execute_procedure_call(proc_data, args, call_site_ctx)
-            print(f"[DEBUG] _execute_procedure_call для '{func_name}' возвратил: {result}", file=sys.stderr)
         finally:
             # Убираем область видимости и фрейм из стека в любом случае
-            print(f"[DEBUG] Убираем область видимости для функции '{func_name}'", file=sys.stderr)
             self.visitor.scope_manager.pop_scope()
             
             popped_value = self.pop_return_value_frame()
-            print(f"[DEBUG] Убрали фрейм из стека возвращаемых значений для функции '{func_name}', значение фрейма: {popped_value}", file=sys.stderr)
             
         # Возвращаем значение из стека возвращаемых значений, а не из _execute_procedure_call
         return popped_value if popped_value is not None else result

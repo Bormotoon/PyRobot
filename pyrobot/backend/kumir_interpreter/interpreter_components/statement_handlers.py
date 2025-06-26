@@ -382,7 +382,8 @@ class StatementHandlerMixin(KumirParserVisitor):
             if hasattr(kiv_self, 'io_handler') and kiv_self.io_handler is not None:
                 kiv_self.io_handler.write_output(current_output)
             else:
-                print(f"WARNING: io_handler is not available in StatementHandler. Output: {current_output}", file=sys.stderr)
+                import logging
+                logging.warning(f"io_handler is not available in StatementHandler. Output: {current_output}")
 
         elif ctx.INPUT(): # Проверяем, что это команда ВВОД
             if not hasattr(kiv_self, 'io_handler') or kiv_self.io_handler is None:
@@ -953,10 +954,10 @@ class StatementHandlerMixin(KumirParserVisitor):
                 
                 # Ищем ArgumentListContext (по названию класса)
                 if 'ArgumentList' in child_type:
-                    print(f"[DEBUG] _handle_procedure_call_from_expression: Найден ArgumentListContext!", file=sys.stderr)
+                    # Debug: найден ArgumentListContext
                     if hasattr(child, 'expression'):
                         expressions = child.expression()
-                        print(f"[DEBUG] _handle_procedure_call_from_expression: ArgumentList содержит {len(expressions) if expressions else 0} выражений", file=sys.stderr)
+                        # Debug: количество выражений в ArgumentList
                         if expressions:
                             arg_expressions = expressions
                             break
@@ -975,13 +976,15 @@ class StatementHandlerMixin(KumirParserVisitor):
             except ExitSignal:
                 # ExitSignal от процедуры должен завершать ТОЛЬКО саму процедуру,
                 # а НЕ пробрасываться дальше. Это стандартная семантика КуМира.
-                print(f"[DEBUG] _handle_procedure_call_from_expression: перехватили ExitSignal, НЕ пробрасываем (процедура завершена корректно)", file=sys.stderr)
+                # Debug: ExitSignal перехвачен корректно
                 # НЕ пробрасываем ExitSignal дальше - процедура корректно завершилась
+                pass
                 
         except Exception as e:
-            print(f"[DEBUG] _handle_procedure_call_from_expression: перехватили исключение типа {type(e).__name__}: {str(e)}", file=sys.stderr)
+            import logging
+            logging.error(f"Error in procedure call: {type(e).__name__}: {str(e)}")
             import traceback
-            traceback.print_exc(file=sys.stderr)
+            logging.debug(traceback.format_exc())
             if isinstance(e, (KumirRuntimeError, KumirTypeError, KumirNameError)):
                 raise
             else:

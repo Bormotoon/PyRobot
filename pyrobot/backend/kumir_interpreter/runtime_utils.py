@@ -38,7 +38,6 @@ def interpret_kumir(code: str, input_data: Optional[str] = None) -> str:
     with open("debug_interpret.log", "w", encoding="utf-8") as f:
         f.write(f"interpret_kumir CALLED! Code first 200 chars:\n{code[:200]!r}\n")
     
-    print(f"\n!!! [DEBUG runtime_utils.interpret_kumir] CALLED! Code first 100 chars: {code[:100]!r} !!!", file=sys.stderr)
     logger.debug(f"interpret_kumir called with code:\\n{code}") # Лог входного кода
     
     # Создаем лексер и парсер
@@ -82,7 +81,6 @@ def interpret_kumir(code: str, input_data: Optional[str] = None) -> str:
     def input_fn():
         line = input_buffer.readline()
         result = line.rstrip('\r\n')
-        print(f"[DEBUG INPUT_FN] readline(): {line!r}, after rstrip: {result!r}", file=sys.stderr)
         return result
     
     def output_fn(text: str):

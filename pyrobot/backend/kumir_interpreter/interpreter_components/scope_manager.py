@@ -75,7 +75,6 @@ class ScopeManager:
     def enter_scope(self) -> None:
         """Входит в новую локальную область видимости."""
         self.scopes.append({})
-        # print(f"[DEBUG][ScopeManager] Вошли в область уровня {len(self.scopes)}", file=sys.stderr)
 
     def push_scope(self) -> None:
         """Синоним для enter_scope."""
@@ -84,7 +83,6 @@ class ScopeManager:
     def exit_scope(self) -> None:
         """Выходит из текущей локальной области видимости."""
         if len(self.scopes) > 1:
-            # print(f"[DEBUG][ScopeManager] Вышли из области уровня {len(self.scopes) -1}", file=sys.stderr)
             self.scopes.pop()
         else:
             # print("[ERROR][ScopeManager] Попытка выйти из глобальной области!", file=sys.stderr)

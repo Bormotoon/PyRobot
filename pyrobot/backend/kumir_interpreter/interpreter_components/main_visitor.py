@@ -249,7 +249,6 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementHandlerMixin, St
         return None # visitProgram обычно ничего не возвращает
 
     def visitImplicitModuleBody(self, ctx: KumirParser.ImplicitModuleBodyContext):
-        # print("[DEBUG] Visiting ImplicitModuleBody")
         # self.procedure_manager._collect_procedure_definitions(ctx) # TODO: Implement or move
 
         # Обработка programItem и algorithmDefinition внутри неявного модуля
@@ -275,7 +274,6 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementHandlerMixin, St
 
     # Метод для выполнения конкретного узла алгоритма (например, "главного")
     def execute_algorithm_node(self, alg_name: str, args: Optional[List[Any]] = None):
-        # print(f"[DEBUG] Attempting to execute algorithm: {alg_name} with args: {args}")
         alg_name_lower = alg_name.lower()
         if alg_name_lower not in self.procedure_manager.procedures:
             # Попробуем найти его, если он еще не был "собран"
@@ -373,12 +371,10 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementHandlerMixin, St
                     
                     # Проверяем, было ли значение 'знач' установлено
                     # (оно хранится в текущей области видимости)
-                    # print(f"[DEBUG] Function {self.current_algorithm_name} finishing. Return value obj: {self.return_value}")
                     
                     # Ищем 'знач' в текущей области видимости
                     znach_val_info = self.scope_manager.lookup_variable('знач', alg_ctx) # Используем alg_ctx для контекста ошибки
                     if znach_val_info:
-                        # print(f"[DEBUG] 'знач' found in scope: {znach_val_info}")
                         # Убедимся, что тип соответствует
                         # expected_type = self.current_algorithm_result_type
                         # actual_type = znach_val_info['type'] # TODO: get actual type of value
@@ -396,7 +392,6 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementHandlerMixin, St
                         return KumirReturnValue(value=None, type=VOID_TYPE)
 
                 elif self.return_value is not None:
-                    # print(f"[DEBUG] Function {self.current_algorithm_name} returning explicit value: {self.return_value.value} of type {self.return_value.type}")
                     return self.return_value # Уже KumirReturnValue
                 else: # self.return_value is None and self.current_algorithm_result_type == VOID_TYPE
                     return KumirReturnValue(value=None, type=VOID_TYPE)
@@ -404,7 +399,6 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementHandlerMixin, St
                 return None # Процедуры ничего не возвращают (кроме как через параметры 'рез')
 
         except ExitSignal: # Перехватываем ВЫХОД из процедуры/функции
-            # print(f"[DEBUG] ProcedureExitCalled caught in execute_algorithm_node for {self.current_algorithm_name}")
             if self.current_algorithm_is_function:
                 # Если это функция, и она должна была вернуть значение, но был ВЫХОД
                 # Нужно проверить, было ли присвоено 'знач'
@@ -421,11 +415,9 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementHandlerMixin, St
                     return KumirReturnValue(value=None, type=VOID_TYPE)
             return None # Для процедур ВЫХОД просто завершает выполнение
         except StopExecutionSignal:
-            # print("[DEBUG] StopExecutionSignal caught by execute_algorithm_node, re-raising.")
             self.stop_execution_flag = True # Устанавливаем флаг
             raise # Передаем сигнал выше, чтобы остановить всю программу
         finally:
-            # print(f"[DEBUG] Exiting scope for algorithm: {self.current_algorithm_name}")
             self.scope_manager.exit_scope()
             self.current_algorithm_name = None # Сбрасываем состояние
             self.current_algorithm_is_function = False
@@ -441,7 +433,6 @@ class KumirInterpreterVisitor(DeclarationVisitorMixin, StatementHandlerMixin, St
 
 
     def visitAlgorithmBody(self, ctx: KumirParser.AlgorithmBodyContext):
-        # print(f"[DEBUG] Visiting AlgorithmBody for: {self.current_algorithm_name}")
         # Область видимости для параметров и 'знач' уже должна быть создана
         # в visitAlgorithmDefinition (через DeclarationVisitorMixin)
         # или в execute_algorithm_node (для "главного" алгоритма).
