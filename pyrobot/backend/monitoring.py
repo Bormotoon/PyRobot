@@ -4,14 +4,13 @@
 """
 
 import logging
-import logging.config
 import json
 import time
 import traceback
 import psutil
 import os
 from functools import wraps
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional
 from flask import request, g, jsonify
 
@@ -21,10 +20,10 @@ class StructuredFormatter(logging.Formatter):
     Форматтер для structured logging в JSON формате
     """
     
-    def format(self, record):
+    def format(self, record: logging.LogRecord) -> str:
         # Базовые поля
         log_data = {
-            'timestamp': datetime.utcnow().isoformat() + 'Z',
+            'timestamp': datetime.now(timezone.utc).isoformat(),
             'level': record.levelname,
             'logger': record.name,
             'message': record.getMessage(),
@@ -34,7 +33,7 @@ class StructuredFormatter(logging.Formatter):
         }
         
         # Добавляем exception info если есть
-        if record.exc_info:
+        if record.exc_info and record.exc_info[0] is not None:
             log_data['exception'] = {
                 'type': record.exc_info[0].__name__,
                 'message': str(record.exc_info[1]),
@@ -147,7 +146,7 @@ class MetricsCollector:
                 'errors_by_type': self.metrics['errors_by_type'],
                 'recent_errors_count': sum(self.metrics['errors_by_type'].values())
             },
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
+            'timestamp': datetime.now(timezone.utc).isoformat()
         }
 
 
@@ -155,7 +154,7 @@ class MetricsCollector:
 metrics_collector = MetricsCollector()
 
 
-def setup_logging(app):
+def setup_logging(app) -> logging.Logger:
     """
     Настройка системы логирования
     """
@@ -198,7 +197,7 @@ def setup_logging(app):
     return app_logger
 
 
-def request_logging_middleware(app):
+def request_logging_middleware(app) -> None:
     """
     Middleware для логирования запросов и метрик
     """
@@ -338,7 +337,7 @@ def log_robot_operation(operation_name: str):
     return decorator
 
 
-def create_health_endpoints(app):
+def create_health_endpoints(app) -> None:
     """
     Создание endpoints для мониторинга здоровья системы
     """
@@ -348,7 +347,7 @@ def create_health_endpoints(app):
         """Базовая проверка здоровья"""
         return jsonify({
             'status': 'healthy',
-            'timestamp': datetime.utcnow().isoformat() + 'Z',
+            'timestamp': datetime.now(timezone.utc).isoformat(),
             'version': '1.0.0',  # TODO: получать из конфигурации
             'environment': os.environ.get('ENVIRONMENT', 'development')
         })
@@ -371,7 +370,7 @@ def create_health_endpoints(app):
             
             return jsonify({
                 'status': overall_status,
-                'timestamp': datetime.utcnow().isoformat() + 'Z',
+                'timestamp': datetime.now(timezone.utc).isoformat(),
                 'checks': checks,
                 'metrics': metrics_collector.get_summary()
             })
@@ -382,7 +381,7 @@ def create_health_endpoints(app):
             
             return jsonify({
                 'status': 'unhealthy',
-                'timestamp': datetime.utcnow().isoformat() + 'Z',
+                'timestamp': datetime.now(timezone.utc).isoformat(),
                 'error': str(e)
             }), 500
     
@@ -412,7 +411,7 @@ def check_interpreter_health() -> Dict[str, Any]:
     try:
         # Простая проверка - можем ли создать интерпретатор с пустым кодом
         from .kumir_interpreter.interpreter import KumirLanguageInterpreter
-        interpreter = KumirLanguageInterpreter("")
+        _ = KumirLanguageInterpreter("")  # Проверяем только возможность создания
         return {'status': 'healthy', 'message': 'Interpreter initialization successful'}
     except Exception as e:
         return {'status': 'unhealthy', 'message': f'Interpreter check failed: {str(e)}'}

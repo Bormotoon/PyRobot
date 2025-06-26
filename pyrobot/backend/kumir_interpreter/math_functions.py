@@ -1,6 +1,7 @@
 import math
 import random
 import sys
+from typing import Union
 
 """
 Модуль math_functions.py
@@ -11,7 +12,7 @@ import sys
 """
 
 
-def sqrt(x):
+def sqrt(x: float) -> float:
     """
     Вычисляет квадратный корень числа x (при условии, что x >= 0).
 
@@ -30,7 +31,7 @@ def sqrt(x):
     return math.sqrt(x)  # Вычисляем квадратный корень с использованием стандартной функции math.sqrt
 
 
-def abs_val(x):
+def abs_val(x: float) -> float:
     """
     Вычисляет абсолютное значение числа x (подходит для чисел с плавающей точкой).
 
@@ -44,7 +45,7 @@ def abs_val(x):
     return x if x >= 0 else -x
 
 
-def iabs(x):
+def iabs(x: Union[int, float]) -> int:
     """
     Вычисляет абсолютное значение целого числа x.
 
@@ -59,7 +60,7 @@ def iabs(x):
     return x if x >= 0 else -x
 
 
-def sign(x):
+def sign(x: Union[int, float]) -> int:
     """
     Определяет знак числа x.
 
@@ -77,7 +78,7 @@ def sign(x):
         return 1
 
 
-def sin_val(x):
+def sin_val(x: float) -> float:
     """
     Вычисляет синус угла x (где x задается в радианах).
 
@@ -90,7 +91,7 @@ def sin_val(x):
     return math.sin(x)
 
 
-def cos_val(x):
+def cos_val(x: float) -> float:
     """
     Вычисляет косинус угла x (где x задается в радианах).
 
@@ -103,7 +104,7 @@ def cos_val(x):
     return math.cos(x)
 
 
-def tan_val(x):
+def tan_val(x: float) -> float:
     """
     Вычисляет тангенс угла x (где x задается в радианах).
 
@@ -116,7 +117,7 @@ def tan_val(x):
     return math.tan(x)
 
 
-def cot(x):
+def cot(x: float) -> float:
     """
     Вычисляет котангенс угла x (определён, если sin(x) != 0).
 
@@ -129,14 +130,14 @@ def cot(x):
     Исключения:
       ValueError: Если sin(x) равен 0, так как операция не определена.
     """
-    s = math.sin(x)
+    s: float = math.sin(x)
     if s == 0:
         raise ValueError("cot: sin(x) is 0, operation undefined")
     # Котангенс равен cos(x) / sin(x)
     return math.cos(x) / s
 
 
-def arcsin_val(x):
+def arcsin_val(x: float) -> float:
     """
     Вычисляет арксинус числа x (при условии, что x принадлежит интервалу [-1, 1]).
 
@@ -154,7 +155,7 @@ def arcsin_val(x):
     return math.asin(x)
 
 
-def arccos_val(x):
+def arccos_val(x: float) -> float:
     """
     Вычисляет арккосинус числа x (при условии, что x принадлежит интервалу [-1, 1]).
 
@@ -172,7 +173,7 @@ def arccos_val(x):
     return math.acos(x)
 
 
-def arctan_val(x):
+def arctan_val(x: float) -> float:
     """
     Вычисляет арктангенс числа x.
 
@@ -185,7 +186,7 @@ def arctan_val(x):
     return math.atan(x)
 
 
-def arccot(x):
+def arccot(x: float) -> float:
     """
     Вычисляет арккотангенс числа x.
     Для x = 0 возвращает π/2.
@@ -207,7 +208,7 @@ def arccot(x):
         return math.atan(1 / x) + math.pi
 
 
-def ln(x):
+def ln(x: float) -> float:
     """
     Вычисляет натуральный логарифм числа x (x > 0).
 
@@ -225,7 +226,7 @@ def ln(x):
     return math.log(x)
 
 
-def lg(x):
+def lg(x: float) -> float:
     """
     Вычисляет логарифм числа x по основанию 10 (x > 0).
 
@@ -243,7 +244,7 @@ def lg(x):
     return math.log10(x)
 
 
-def exp_val(x):
+def exp_val(x: float) -> float:
     """
     Вычисляет экспоненту (e) в степени x.
 
@@ -256,7 +257,7 @@ def exp_val(x):
     return math.exp(x)
 
 
-def min_val(x, y):
+def min_val(x: float, y: float) -> float:
     """
     Возвращает меньшее из двух чисел (с плавающей точкой).
 
@@ -270,7 +271,7 @@ def min_val(x, y):
     return x if x < y else y
 
 
-def max_val(x, y):
+def max_val(x: float, y: float) -> float:
     """
     Возвращает большее из двух чисел (с плавающей точкой).
 
@@ -284,7 +285,7 @@ def max_val(x, y):
     return x if x > y else y
 
 
-def imin(x, y):
+def imin(x: Union[int, float], y: Union[int, float]) -> int:
     """
     Возвращает меньшее из двух целых чисел.
 
@@ -298,7 +299,7 @@ def imin(x, y):
     return int(x) if int(x) < int(y) else int(y)
 
 
-def imax(x, y):
+def imax(x: Union[int, float], y: Union[int, float]) -> int:
     """
     Возвращает большее из двух целых чисел.
 
@@ -312,7 +313,7 @@ def imax(x, y):
     return int(x) if int(x) > int(y) else int(y)
 
 
-def div(x, y):
+def div(x: Union[int, float], y: Union[int, float]) -> int:
     """
     Выполняет целочисленное деление x на y.
 
@@ -332,7 +333,7 @@ def div(x, y):
     return int(x) // int(y)
 
 
-def mod(x, y):
+def mod(x: Union[int, float], y: Union[int, float]) -> int:
     """
     Вычисляет остаток от деления x на y.
 
@@ -351,7 +352,7 @@ def mod(x, y):
     return int(x) % int(y)
 
 
-def int_part(x):
+def int_part(x: float) -> int:
     """
     Возвращает целую часть числа x, то есть наибольшее целое число, не превышающее x.
 
@@ -364,7 +365,7 @@ def int_part(x):
     return math.floor(x)
 
 
-def rnd(x):
+def rnd(x: float) -> float:
     """
     Возвращает случайное число с плавающей точкой из интервала [0, x].
 
@@ -378,7 +379,7 @@ def rnd(x):
     return random.random() * x
 
 
-def rand(x, y):
+def rand(x: float, y: float) -> float:
     """
     Возвращает случайное число с плавающей точкой из интервала [x, y].
 
@@ -392,7 +393,7 @@ def rand(x, y):
     return random.uniform(x, y)
 
 
-def irnd(x):
+def irnd(x: Union[int, float]) -> int:
     """
     Возвращает случайное целое число из интервала [0, x].
 
@@ -405,7 +406,7 @@ def irnd(x):
     return random.randint(0, int(x))
 
 
-def irand(x, y):
+def irand(x: Union[int, float], y: Union[int, float]) -> int:
     """
     Возвращает случайное целое число из интервала [x, y].
 
@@ -419,7 +420,7 @@ def irand(x, y):
     return random.randint(int(x), int(y))
 
 
-def max_int():
+def max_int() -> int:
     """
     Возвращает максимальное целое число, доступное в языке KUMIR.
 
@@ -429,7 +430,7 @@ def max_int():
     return 2147483647
 
 
-def max_float():
+def max_float() -> float:
     """
     Возвращает максимальное значение типа float, доступное в Python.
 

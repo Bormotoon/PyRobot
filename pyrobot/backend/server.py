@@ -4,10 +4,11 @@ import eventlet
 
 eventlet.monkey_patch()
 import redis
+from redis.exceptions import ConnectionError as RedisConnectionError
 from flask import Flask, request, jsonify, session
 from flask_cors import CORS
 from flask_session import Session
-from flask_socketio import SocketIO, join_room, emit
+from flask_socketio import SocketIO, join_room, emit, request as socketio_request
 import os
 from pathlib import Path
 
@@ -22,8 +23,7 @@ from .kumir_interpreter.kumir_exceptions import (
 # Импортируем новую систему мониторинга
 from .monitoring import (
     setup_logging, request_logging_middleware, 
-    create_health_endpoints, log_code_execution,
-    metrics_collector
+    create_health_endpoints, log_code_execution
 )
 
 app = Flask(__name__)
@@ -56,7 +56,7 @@ try:
     app.config['SESSION_REDIS'] = redis_client
     logging.info(f"Session storage configured for Redis at "
                 f"{redis_host}:{redis_port}, DB: {redis_db}")
-except redis.exceptions.ConnectionError as redis_err:
+except RedisConnectionError as redis_err:
     logging.critical(f"Failed to connect to Redis: {redis_err}")
     app.config['SESSION_TYPE'] = 'filesystem'
     logging.info("Falling back to 'filesystem' session type.")
@@ -400,19 +400,19 @@ def reset_simulator_session():
 @socketio.on('connect')
 def handle_connect():
     logger = logging.getLogger('PyRobot.WebSocket')
-    logger.info(f"WebSocket client connected: SID={request.sid}")
-    session['sid'] = request.sid
+    logger.info(f"WebSocket client connected: SID={socketio_request.sid}")
+    session['sid'] = socketio_request.sid
     session.modified = True
-    join_room(request.sid)
-    emit('connection_ack', {'sid': request.sid})
-    logger.debug(f"SID '{request.sid}' saved to Flask session. "
+    join_room(socketio_request.sid)
+    emit('connection_ack', {'sid': socketio_request.sid})
+    logger.debug(f"SID '{socketio_request.sid}' saved to Flask session. "
                 f"Session keys: {list(session.keys())}")
 
 
 @socketio.on('disconnect')
 def handle_disconnect(*args):
     logger = logging.getLogger('PyRobot.WebSocket')
-    sid = request.sid
+    sid = socketio_request.sid
     logger.info(f"WebSocket client disconnected: SID={sid}")
 
 
